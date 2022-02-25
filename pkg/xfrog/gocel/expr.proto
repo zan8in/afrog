@@ -1,11 +1,9 @@
 syntax = "proto3";
-package celgo;
-option go_package = "./;celgo";
+package gocel;
+option go_package = "./;gocel";
 
-// author: 胖胖的alex
-// createdate:2022-02-24
 // https://docs.xray.cool/#/guide/poc/v2?id=expression%e7%bc%96%e5%86%99
-// 编译命令：protoc --go_out=./  ./celexpression.proto
+// 编译命令：protoc --go_out=./  ./expr.proto
 
 // addrType 连接地址信息
 // addrType 类型包含字段如下, 设变量名为 addr
@@ -22,9 +20,9 @@ message connInfoType {
   addrType destination = 2;  // conn.destination(addrType)目的地址信息
 }
 
-// urlType url 类型，可以 request.url、response.url 和 reverse.url 调用
-// urlType 类型包含的字段如下, 设变量名为 url, 以 http://example.com:8080/a?c=d#x=y 为例:
-message urlType {
+// UrlType url 类型，可以 request.url、response.url 和 reverse.url 调用
+// UrlType 类型包含的字段如下, 设变量名为 url, 以 http://example.com:8080/a?c=d#x=y 为例:
+message UrlType {
   string scheme = 1;  // url.schema(string)url 的 scheme, 示例为 "http"
   string domain = 2;  // url.domain(string)url 的域名，示例例为 "example.com"
   string host = 3;  // url.host(string)url 的主机名，示例为 "example.com:8080"
@@ -36,8 +34,8 @@ message urlType {
 
 // reverseType 反连平台类型
 // reverseType 类型包含字段如下, 设变量名为 reverse（需要先使用 newReverse() 生成实例)
-message reverse {
-  urlType url = 1;  // reverse.url(urlType)反连平台的url
+message Reverse {
+  UrlType url = 1;  // reverse.url(UrlType)反连平台的url
   string domain = 2;  // reverse.domain(string)反连平台的域名
   string ip = 3;  // reverse.ip(string)反连平台的ip地址
   bool is_domain_name_server = 4;  // reverse.is_domain_name_server(bool)反连平台的domain是否同时是nameserver
@@ -45,9 +43,9 @@ message reverse {
 }
 
 // request 扫描请求
-message request {
+message Request {
   bytes raw = 1;  // request.raw([]byte)原始请求
-  urlType url = 2;  // request.url(urlType)自定义类型urlType,请查看urlType的说明
+  UrlType url = 2;  // request.url(UrlType)自定义类型UrlType,请查看UrlType的说明
   string method = 3;  // request.method(string)原始请求的方法 
   map<string, string> headers = 4;  // request.headers(map[string]string)原始请求的HTTP头，是一个键值对（均为小写），我们可以通过headers['server']来获取值。如果键不存在，则获取到的值是空字符串。注意，该空字符串不能用于 == 以外的操作，否则不存在的时候将报错，需要先 in 判断下。详情参考下文常用函数章节。
   string content_type = 5;  // request.contnet_type(string)原始请求的 content-type 头的值, 等于request.headers["Content-Type"]
@@ -56,9 +54,9 @@ message request {
 }
 
 // response 请求的响应，通用属性包含：raw
-message response {
+message Response {
   bytes raw = 1; // response.raw([]byte)原始响应
-  urlType url = 2;  // response.url(urlType)自定义类型 urlType, 请查看下方 urlType 的说明
+  UrlType url = 2;  // response.url(UrlType)自定义类型 UrlType, 请查看下方 UrlType 的说明
   int32 status = 3; // response.status(int)返回包的satus code
   bytes raw_header = 4;  // response.raw_header([]byte)原始的 header 部分，需要使用字节流相关方法来判断。
   bytes body = 5;  // response.body([]byte)返回包的Body，因为是一个字节流（bytes）而非字符串，后面判断的时候需要使用字节流相关的方法

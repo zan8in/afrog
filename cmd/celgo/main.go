@@ -3,15 +3,17 @@ package main
 import (
 	"fmt"
 
-	"github.com/zan8in/afrog/pkg/celgo"
+	"github.com/zan8in/afrog/pkg/xfrog/gocel"
 )
 
 func main() {
-	var urltype celgo.UrlType
 
-	urltype.Domain = "localhost"
-	urltype.Path = "admin.php"
-	urltype.Scheme = "https"
+	gocel.Run(`response.body.bcontains(b'test.php')`, map[string]interface{}{}, func(result interface{}, err error) {
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		fmt.Println(result)
+	})
 
-	fmt.Println(urltype)
 }

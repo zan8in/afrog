@@ -1,0 +1,11 @@
+package errors
+
+import "errors"
+
+func NewCelEnvError(err error) error {
+	return errors.New("NewCelEnv Error: " + err.Error())
+}
+
+func NewEvalError(err error) error {
+	return errors.New("Eval Error: " + err.Error())
+}
