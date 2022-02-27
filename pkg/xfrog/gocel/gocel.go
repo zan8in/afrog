@@ -11,13 +11,13 @@ import (
 )
 
 func Run(expression string, variablemap map[string]interface{}, call runCallback) {
-	newCustomLib()
-	env, err := newCelEnv()
+	//NewCustomLib()
+	env, err := NewCelEnv()
 	if err != nil {
 		call(nil, errors.NewCelEnvError(err))
 		return
 	}
-	val, err := eval(env, expression, variablemap)
+	val, err := Eval(env, expression, variablemap)
 	if err != nil {
 		call(nil, errors.NewEvalError(err))
 		return
@@ -62,7 +62,7 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 }
 
 // Step 1: 创建 cel 库
-func newCustomLib() {
+func NewCustomLib() {
 	c := GetCustomLibPool()
 
 	reg := types.NewEmptyRegistry()
@@ -74,7 +74,7 @@ func newCustomLib() {
 }
 
 // Step 2: 创建 cel 环境
-func newCelEnv() (env *cel.Env, err error) {
+func NewCelEnv() (env *cel.Env, err error) {
 	c := GetCustomLibPool()
 	env, err = cel.NewEnv(cel.Lib(&c))
 	return env, err
@@ -84,7 +84,7 @@ func newCelEnv() (env *cel.Env, err error) {
 // @env cel.Env cel环境
 // @expression string gocel表达式
 // @params map[string]interface 表达式变量值
-func eval(env *cel.Env, expression string, params map[string]interface{}) (ref.Val, error) {
+func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.Val, error) {
 	ast, iss := env.Compile(expression)
 	if iss.Err() != nil {
 		return nil, iss.Err()

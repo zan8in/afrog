@@ -1,0 +1,57 @@
+name: poc-yaml-demo
+set:
+    username: payload.curl.cmd.icontains("curl")
+    password: 123456
+payloads:
+    continues: false
+    payloads:
+        ping:
+            cmd: r"ping test.com"
+        curl:
+            cmd: r"curl test.com"
+# 脚本部分
+transport: http # 传输方式
+rules: # 规则描述
+    r1:
+        request:
+            method: GET
+            path: /
+        expression: |
+            response.status==200 && response.body.bcontains(b'Example Domain')
+    r2:
+        request:
+          method: GET
+          path: /
+          headers:
+              Content-Type: application/xml
+          body: aaaa
+          follow_redirects: true
+        expression: |
+          response.status==200
+expression: # 规则表达式
+    #payload.curl.cmd.icontains("curl") && payload.ping.cmd.icontains("p")
+    true && false
+
+# 信息部分
+detail:
+    author: alex(http://github.com/zan8in){{set.password}}
+    links: 
+        - http://github.com/zan8in/afrog{{set.password}}
+    # 指纹信息
+    fingerprint:
+        infos:
+            - id: "长亭指纹库 id{{set.password}}"
+              name: "SSH"
+              version: "1.0" # {{version}}
+              type: "system_bin"
+              confidence: 70
+        host_info:
+            hostname: "test{{set.password}}"
+    # 漏洞信息
+    vulnerability:
+        id: "长亭漏洞库 id"
+        match: "证明漏洞存在的信息"
+        # 其它字段
+        cve: "CVE-2020-1234"
+    # 其它未明确定义的字段
+    summary: "test"
