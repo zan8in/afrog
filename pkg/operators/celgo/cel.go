@@ -1,8 +1,7 @@
-package gocel
+package celgo
 
 import (
 	"fmt"
-	sync "sync"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -10,9 +9,21 @@ import (
 	"github.com/zan8in/afrog/pkg/xfrog/errors"
 )
 
-func Run(expression string, variablemap map[string]interface{}, call runCallback) {
-	// NewCustomLib()
-	env, err := NewCelEnv()
+type CustomLib struct {
+	envOptions     []cel.EnvOption
+	programOptions []cel.ProgramOption
+}
+
+func (c *CustomLib) CompileOptions() []cel.EnvOption {
+	return c.envOptions
+}
+
+func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
+	return c.programOptions
+}
+
+func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, call runCallback) {
+	env, err := c.NewCelEnv()
 	if err != nil {
 		call(nil, errors.NewCelEnvError(err))
 		return
@@ -30,9 +41,8 @@ func Run(expression string, variablemap map[string]interface{}, call runCallback
 	call(isVul, err)
 }
 
-func RunEval(expression string, variablemap map[string]interface{}) (bool, error) {
-	//NewCustomLib()
-	env, err := NewCelEnv()
+func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{}) (bool, error) {
+	env, err := c.NewCelEnv()
 	if err != nil {
 		return false, errors.NewCelEnvError(err)
 	}
@@ -50,51 +60,19 @@ func RunEval(expression string, variablemap map[string]interface{}) (bool, error
 
 type runCallback func(interface{}, error)
 
-var (
-	CustomLibPool = sync.Pool{
-		New: func() interface{} {
-			return CustomLib{}
-		},
-	}
-)
-
-func GetCustomLibPool() CustomLib {
-	return CustomLibPool.Get().(CustomLib)
-}
-
-func SetCustomLibPool(c CustomLib) {
-	CustomLibPool.Put(c)
-}
-
-type CustomLib struct {
-	envOptions     []cel.EnvOption
-	programOptions []cel.ProgramOption
-}
-
-func (c *CustomLib) CompileOptions() []cel.EnvOption {
-	return c.envOptions
-}
-
-func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
-	return c.programOptions
-}
-
 // Step 1: 创建 cel 库
-func NewCustomLib() {
-	c := GetCustomLibPool()
-
+func NewCustomLib() CustomLib {
+	c := CustomLib{}
 	reg := types.NewEmptyRegistry()
 
-	c.envOptions = GetComplieOptions(reg)
-	c.programOptions = GetProgramOptions(reg)
-
-	SetCustomLibPool(c)
+	c.envOptions = ReadComplieOptions(reg)
+	c.programOptions = ReadProgramOptions(reg)
+	return c
 }
 
 // Step 2: 创建 cel 环境
-func NewCelEnv() (env *cel.Env, err error) {
-	c := GetCustomLibPool()
-	env, err = cel.NewEnv(cel.Lib(&c))
+func (c *CustomLib) NewCelEnv() (env *cel.Env, err error) {
+	env, err = cel.NewEnv(cel.Lib(c))
 	return env, err
 }
 

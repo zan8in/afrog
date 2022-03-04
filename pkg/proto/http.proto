@@ -1,0 +1,67 @@
+syntax = "proto3";
+package proto;
+option go_package = "./;proto";
+
+// https://docs.xray.cool/#/guide/poc/v2?id=expression%e7%bc%96%e5%86%99
+// 编译命令：protoc --go_out=./  ./http.proto
+
+// addrType 连接地址信息
+// addrType 类型包含字段如下, 设变量名为 addr
+message  AddrType {
+  string transport = 1; // addr.transport(string)tranport: http、tcp、udp
+  string addr = 2;  // addr.transport(string)目的地址， 获取失败时返回空字符串，形如： "192.0.2.1:25", "[20012001:1]:80"
+  string port = 3;  // addr.port(string)端口号， 获取失败时返回 ""
+}
+
+// connInfoType 连接信息，包含源地址和目的地址, 可以通过 response.conn
+// connInfoType 类型包含字段如下, 设变量名为 conn
+message ConnInfoType {
+  AddrType source = 1;  // conn.source(addrType)源地址信息
+  AddrType destination = 2;  // conn.destination(addrType)目的地址信息
+}
+
+// UrlType url 类型，可以 request.url、response.url 和 reverse.url 调用
+// UrlType 类型包含的字段如下, 设变量名为 url, 以 http://example.com:8080/a?c=d#x=y 为例:
+message UrlType {
+  string scheme = 1;  // url.schema(string)url 的 scheme, 示例为 "http"
+  string domain = 2;  // url.domain(string)url 的域名，示例例为 "example.com"
+  string host = 3;  // url.host(string)url 的主机名，示例为 "example.com:8080"
+  string port = 4;  // url.port(string)url 的 port，注意这里也是字符串。 示例为 "8080"
+  string path = 5;  // url.path(string)url 的 path， 示例为 "/a"
+  string query = 6;  // url.query(string)url 的 query, 示例为 "c=d"
+  string fragment = 7;  // url.fragment(string)url 的锚点，示例为 "x=y"
+}
+
+// reverseType 反连平台类型
+// reverseType 类型包含字段如下, 设变量名为 reverse（需要先使用 newReverse() 生成实例)
+message Reverse {
+  UrlType url = 1;  // reverse.url(UrlType)反连平台的url
+  string domain = 2;  // reverse.domain(string)反连平台的域名
+  string ip = 3;  // reverse.ip(string)反连平台的ip地址
+  bool is_domain_name_server = 4;  // reverse.is_domain_name_server(bool)反连平台的domain是否同时是nameserver
+  int64 wait = 5;  // reverse.wait(timeout)(func(timeout int) bool) 等待timeout秒，并返回是否存在该时间内获得了信息
+}
+
+// request 扫描请求
+message Request {
+  UrlType url = 1;  // request.url(UrlType)自定义类型UrlType,请查看UrlType的说明
+  string method = 2;  // request.method(string)原始请求的方法 
+  map<string, string> headers = 3;  // request.headers(map[string]string)原始请求的HTTP头，是一个键值对（均为小写），我们可以通过headers['server']来获取值。如果键不存在，则获取到的值是空字符串。注意，该空字符串不能用于 == 以外的操作，否则不存在的时候将报错，需要先 in 判断下。详情参考下文常用函数章节。
+  string content_type = 4;  // request.contnet_type(string)原始请求的 content-type 头的值, 等于request.headers["Content-Type"]
+  bytes body = 5;  // request.body([]byte)原始请求的 body，需要使用字节流相关方法来判断。如果是 GET， body 为空。
+  bytes raw = 6;  // request.raw([]byte)原始请求
+  bytes raw_header = 7;  // request.raw_header([]byte)原始的 header 部分，需要使用字节流相关方法来判断。
+}
+
+// response 请求的响应，通用属性包含：raw
+message Response {
+  UrlType url = 1;  // response.url(UrlType)自定义类型 UrlType, 请查看下方 UrlType 的说明
+  int32 status = 2; // response.status(int)返回包的satus code
+  map<string, string> headers = 3;  // response.headers(map[string]string)返回包的HTTP头，类似 request.headers。
+  string content_type = 4;  // response.content_type(string)返回包的content-type头的值
+  bytes body = 5;  // response.body([]byte)返回包的Body，因为是一个字节流（bytes）而非字符串，后面判断的时候需要使用字节流相关的方法
+  int64 latency = 6;  // response.latency(int)响应的延迟时间，可以用于 sql 时间盲注的判断，单位毫秒 (ms)
+  ConnInfoType conn = 7;  // response.conn(connInfoType)连接相关信息
+  bytes raw = 8; // response.raw([]byte)原始响应
+  bytes raw_header = 9;  // response.raw_header([]byte)原始的 header 部分，需要使用字节流相关方法来判断。
+}

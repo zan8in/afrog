@@ -1,0 +1,101 @@
+package poc
+
+import (
+	"os"
+	"path/filepath"
+
+	"gopkg.in/yaml.v2"
+)
+
+// https://docs.xray.cool/#/guide/poc/v2
+
+type Sets map[string]interface{}
+type Poc struct {
+	Id         string   `yaml:"id"`        //  脚本名称
+	Transport  string   `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
+	Set        Sets     `yaml:"set"`       // 全局变量定义，该字段用于定义全局变量。比如随机数，反连平台等
+	Payloads   Payloads `yaml:"payloads"`
+	Rules      Rules    `yaml:"rules"`
+	Expression string   `yaml:"expression"`
+	Info       Info     `yaml:"info"`
+}
+
+type Payloadss = map[string]Sets
+type Payloads struct {
+	Continue bool      `yaml:"continue"`
+	Payloads Payloadss `yaml:"payloads"`
+}
+
+// 以下是 脚本部分
+type Rules map[string]Rule
+type Outputs yaml.MapSlice
+type Rule struct {
+	Request    RuleRequest `yaml:"request"`
+	Expression string      `yaml:"expression"`
+	Output     Outputs     `yaml:"output"`
+}
+
+// http/tcp/udp cache 是否使用缓存的请求，如果该选项为 true，那么如果在一次探测中其它脚本对相同目标发送过相同请求，那么便使用之前缓存的响应，而不发新的数据包
+// content 用于tcp/udp请求，请求内容，比如：content: "request"
+// read_timeout 用于tcp/udp请求，发送请求之后的读取超时时间（注 实际是一个 int， 但是为了能够变量渲染，设置为 string）
+// connection_id 用于tcp/udp请求，连接 id ,同一个连接 id 复用连接(注 不允许用0； cache 为 true 的时候可能会导致请求不会发送，所以如果有特殊需求记得 cache: false)
+type RuleRequest struct {
+	Cache           bool              `yaml:"cache"`
+	Content         string            `yaml:"content"`       // tcp/udp专用
+	ReadTimeout     string            `yaml:"read_timeout"`  // tcp/udp专用
+	ConnectionId    string            `yaml:"connection_id"` // tcp/udp专用
+	Method          string            `yaml:"method"`
+	Path            string            `yaml:"path"`
+	Headers         map[string]string `yaml:"headers"`
+	Body            string            `yaml:"body"`
+	FollowRedirects bool              `yaml:"follow_redirects"`
+}
+
+// 以下开始是 信息部分
+type Info struct {
+	Name           string         `yaml:"name"`
+	Author         string         `yaml:"author"`
+	Severity       string         `yaml:"severity"`
+	Description    string         `yaml:"description"`
+	Reference      []string       `yaml:"reference"`
+	Tags           string         `yaml:"tags"`
+	Classification Classification `yaml:"classification"`
+}
+
+type Classification struct {
+	CvssMetrics string  `yaml:"cvss-metrics"`
+	CvssScore   float64 `yaml:"cvss-score"`
+	CveId       string  `yaml:"cve-id"`
+	CweId       string  `yaml:"cwe-id"`
+}
+
+const afrogPocsDirectory = "afrog-pocs"
+
+func SetPocDirectory() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	pocsDir := filepath.Join(homeDir, afrogPocsDirectory)
+	_, err = os.Stat(pocsDir)
+	if err != nil {
+		err = os.MkdirAll(pocsDir, 0755)
+		return pocsDir, err
+	}
+	return pocsDir, err
+}
+
+// ReadConfiguration reads the afrog configuration file from disk.
+func ReadPocs(pocYaml string) (Poc, error) {
+	var poc = Poc{}
+	file, err := os.Open(pocYaml)
+	if err != nil {
+		return poc, err
+	}
+	defer file.Close()
+
+	if err := yaml.NewDecoder(file).Decode(&poc); err != nil {
+		return poc, err
+	}
+	return poc, nil
+}

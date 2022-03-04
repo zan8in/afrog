@@ -1,4 +1,4 @@
-package gocel
+package celgo
 
 import (
 	"strings"
@@ -6,20 +6,22 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/zan8in/afrog/pkg/proto"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
 	NewEnvOptions = []cel.EnvOption{
+		cel.Container("proto"),
 		cel.Types(
-			&UrlType{},
-			&Request{},
-			&Response{},
-			&Reverse{},
+			&proto.UrlType{},
+			&proto.Request{},
+			&proto.Response{},
+			&proto.Reverse{},
 		),
 		cel.Declarations(
-			decls.NewVar("request", decls.NewObjectType("gocel.Request")),
-			decls.NewVar("response", decls.NewObjectType("gocel.Response")),
+			decls.NewVar("request", decls.NewObjectType("proto.Request")),
+			decls.NewVar("response", decls.NewObjectType("proto.Response")),
 		),
 		cel.Declarations(
 			// functions
@@ -35,7 +37,7 @@ var (
 	}
 )
 
-func GetComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
+func ReadComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
 	allEnvOptions := []cel.EnvOption{
 		cel.CustomTypeAdapter(reg),
 		cel.CustomTypeProvider(reg),
@@ -46,8 +48,7 @@ func GetComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
 
 //	如果有set：追加set变量到 cel options
 //	这里得注意下 reverse的顺序问题 map可能是随机的
-func AddRuleSetOptions(key string, args map[string]interface{}) {
-	c := GetCustomLibPool()
+func WriteRuleSetOptions(c CustomLib, key string, args map[string]interface{}) {
 	for k, v := range args {
 		// 在执行之前是不知道变量的类型的，所以统一声明为字符型
 		// 所以randomInt虽然返回的是int型，在运算中却被当作字符型进行计算，需要重载string_*_string
@@ -69,12 +70,9 @@ func AddRuleSetOptions(key string, args map[string]interface{}) {
 
 		c.envOptions = append(c.envOptions, cel.Declarations(d))
 	}
-	SetCustomLibPool(c)
 }
 
 //	追加rule变量到 cel options
-func AddRuleIsVulOptions(key string, isVul bool) {
-	c := GetCustomLibPool()
+func WriteRuleIsVulOptions(c CustomLib, key string, isVul bool) {
 	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(key+"()", decls.Bool)))
-	SetCustomLibPool(c)
 }

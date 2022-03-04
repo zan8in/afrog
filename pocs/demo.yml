@@ -6,9 +6,9 @@ payloads:
     continues: false
     payloads:
         ping:
-            cmd: r"ping test.com"
+            cmd: ping test.com
         curl:
-            cmd: r"curl test.com"
+            cmd: curl test.com
 # 脚本部分
 transport: http # 传输方式
 rules: # 规则描述
@@ -17,20 +17,21 @@ rules: # 规则描述
             method: GET
             path: /
         expression: |
-            response.status==200 && response.body.bcontains(b'Example Domain')
+            ("curl").icontains("curl")
     r2:
         request:
-          method: GET
-          path: /
+          method: POST
+          path: ^admin.php?id=100#money
           headers:
-              Content-Type: application/xml
-          body: aaaa
+              Content-Type: application/xml{{payloads.ping.cmd}}
+          body: |
+              {{payloads.curl.cmd}}
           follow_redirects: true
         expression: |
-          response.status==200
+            ("curl").icontains("curl")
+          
 expression: # 规则表达式
-    #payload.curl.cmd.icontains("curl") && payload.ping.cmd.icontains("p")
-    true && false
+    ("curl").icontains("curl")
 
 # 信息部分
 detail:
