@@ -8,16 +8,17 @@ import (
 )
 
 // https://docs.xray.cool/#/guide/poc/v2
+// Rule有序，参考：https://github.com/WAY29/pocV/blob/main/pkg/xray/structs/poc.go
 
 type Sets map[string]interface{}
 type Poc struct {
-	Id         string   `yaml:"id"`        //  脚本名称
-	Transport  string   `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
-	Set        Sets     `yaml:"set"`       // 全局变量定义，该字段用于定义全局变量。比如随机数，反连平台等
-	Payloads   Payloads `yaml:"payloads"`
-	Rules      Rules    `yaml:"rules"`
-	Expression string   `yaml:"expression"`
-	Info       Info     `yaml:"info"`
+	Id         string       `yaml:"id"`        //  脚本名称
+	Transport  string       `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
+	Set        Sets         `yaml:"set"`       // 全局变量定义，该字段用于定义全局变量。比如随机数，反连平台等
+	Payloads   Payloads     `yaml:"payloads"`
+	Rules      RuleMapSlice `yaml:"rules"`
+	Expression string       `yaml:"expression"`
+	Info       Info         `yaml:"info"`
 }
 
 type Payloadss = map[string]Sets
@@ -27,12 +28,28 @@ type Payloads struct {
 }
 
 // 以下是 脚本部分
-type Rules map[string]Rule
+var order = 0
+
+// 用于帮助yaml解析，保证Rule有序
+type RuleMap struct {
+	Key   string
+	Value Rule
+}
+
+// 用于帮助yaml解析，保证Rule有序
+type RuleMapSlice []RuleMap
 type Outputs yaml.MapSlice
 type Rule struct {
 	Request    RuleRequest `yaml:"request"`
 	Expression string      `yaml:"expression"`
 	Output     Outputs     `yaml:"output"`
+	order      int
+}
+
+type ruleAlias struct {
+	Request    RuleRequest   `yaml:"request"`
+	Expression string        `yaml:"expression"`
+	Output     yaml.MapSlice `yaml:"output"`
 }
 
 // http/tcp/udp cache 是否使用缓存的请求，如果该选项为 true，那么如果在一次探测中其它脚本对相同目标发送过相同请求，那么便使用之前缓存的响应，而不发新的数据包
@@ -98,4 +115,39 @@ func ReadPocs(pocYaml string) (Poc, error) {
 		return poc, err
 	}
 	return poc, nil
+}
+
+func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var tmp ruleAlias
+	if err := unmarshal(&tmp); err != nil {
+		return err
+	}
+
+	r.Request = tmp.Request
+	r.Expression = tmp.Expression
+	r.Output = Outputs(tmp.Output)
+	r.order = order
+
+	order += 1
+	return nil
+}
+
+func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	order = 0
+	tempMap := make(map[string]Rule, 1)
+	err := unmarshal(&tempMap)
+	if err != nil {
+		return err
+	}
+
+	newRuleSlice := make([]RuleMap, len(tempMap))
+	for roleName, role := range tempMap {
+		newRuleSlice[role.order] = RuleMap{
+			Key:   roleName,
+			Value: role,
+		}
+	}
+
+	*m = RuleMapSlice(newRuleSlice)
+	return nil
 }

@@ -82,7 +82,10 @@ func (c *Checker) Check() {
 	//log.Log().Debug(c.variableMap["username"].(string))
 
 	// 处理 rule
-	for k, rule := range c.pocItem.Rules {
+	fmt.Println(c.target)
+	for _, ruleMap := range c.pocItem.Rules {
+		k := ruleMap.Key
+		rule := ruleMap.Value
 		// translate : http
 		if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
 			if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {

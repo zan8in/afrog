@@ -1,6 +1,0 @@
-2022-03-04 21:18:12	error	core/checker.go:113	Eval Error: ERROR: <input>:1:3: undeclared reference to 'r1' (in container 'proto')
- | r1() && r2()
- | ..^
-ERROR: <input>:1:11: undeclared reference to 'r2' (in container 'proto')
- | r1() && r2()
- | ..........^
