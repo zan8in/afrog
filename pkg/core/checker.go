@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/utils"
 )
 
 type Checker struct {
@@ -77,8 +78,33 @@ func (c *Checker) Check() {
 	customLib := celgo.NewCustomLib()
 
 	// 处理 set
-	customLib.WriteRuleSetOptions(c.pocItem.Set)
-	c.UpdateVariableMap(c.pocItem.Set)
+	if len(c.pocItem.Set) > 0 {
+		for key, value := range c.pocItem.Set {
+			if value == "newReverse()" {
+				// c.variableMap[key] = reverse.NewReverse() // todo
+				continue
+			}
+			out, err := customLib.RunEval(value.(string), c.variableMap)
+			if err != nil {
+				log.Log().Error(err.Error())
+				return
+			}
+			switch value := out.Value().(type) {
+			// set value 无论是什么类型都先转成string
+			case *proto.UrlType:
+				c.variableMap[key] = utils.UrlTypeToString(value)
+			case int64:
+				c.variableMap[key] = int(value)
+			default:
+				c.variableMap[key] = fmt.Sprintf("%v", out)
+			}
+			c.pocItem.Set[key] = out.Value()
+		}
+
+		customLib.WriteRuleSetOptions(c.pocItem.Set)
+		// c.UpdateVariableMap(c.pocItem.Set)
+	}
+
 	//log.Log().Debug(c.variableMap["username"].(string))
 
 	// 处理 rule
@@ -102,23 +128,28 @@ func (c *Checker) Check() {
 			fastclient := http2.FastClient{}
 			fastclient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			fastclient.Client = http2.New(c.options)
-			err = fastclient.HTTPRequest(c.originalRequest, rule, c.variableMap)
+			// fixed variablemap no rest problem.
+			tempVariableMap := VariableMapPool.Get().(map[string]interface{})
+			for k, v := range c.variableMap {
+				tempVariableMap[k] = v
+			}
+			err = fastclient.HTTPRequest(c.originalRequest, rule, tempVariableMap)
 			if err != nil {
 				return
 			}
 
-			isVul, err := customLib.RunEval(rule.Expression, c.variableMap)
+			isVul, err := customLib.RunEval(rule.Expression, tempVariableMap)
 			if err != nil {
 				log.Log().Error(err.Error())
 				return
 			}
-			customLib.WriteRuleFunctionsROptions(k, isVul)
+			customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
 			// save result of request、response、target、pocinfo eg.
 			c.pocResult = PocResultPool.Get().(*PocResult)
-			c.pocResult.IsVul = isVul
-			c.pocResult.ResultRequest = c.variableMap["request"].(*proto.Request)
-			c.pocResult.ResultResponse = c.variableMap["response"].(*proto.Response)
+			c.pocResult.IsVul = isVul.Value().(bool)
+			c.pocResult.ResultRequest = tempVariableMap["request"].(*proto.Request)
+			c.pocResult.ResultResponse = tempVariableMap["response"].(*proto.Response)
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 		}
 	}
@@ -129,7 +160,7 @@ func (c *Checker) Check() {
 		return
 	}
 	// save final result
-	c.result.IsVul = isVul
+	c.result.IsVul = isVul.Value().(bool)
 
 	// print result info
 	log.Log().Info("----------------------------------------------------------------")

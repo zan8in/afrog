@@ -31,6 +31,14 @@ var (
 				decls.NewInstanceOverload("string_icontains_string",
 					[]*exprpb.Type{decls.String, decls.String},
 					decls.Bool)),
+			decls.NewFunction("randomInt",
+				decls.NewOverload("randomInt_int_int",
+					[]*exprpb.Type{decls.Int, decls.Int},
+					decls.Int)),
+			decls.NewFunction("randomLowercase",
+				decls.NewOverload("randomLowercase_int",
+					[]*exprpb.Type{decls.Int},
+					decls.String)),
 		),
 	}
 )

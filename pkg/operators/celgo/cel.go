@@ -52,21 +52,16 @@ func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, c
 	call(isVul, err)
 }
 
-func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{}) (bool, error) {
+func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{}) (ref.Val, error) {
 	env, err := c.NewCelEnv()
 	if err != nil {
-		return false, errors.NewCelEnvError(err)
+		return nil, errors.NewCelEnvError(err)
 	}
 	val, err := Eval(env, expression, variablemap)
 	if err != nil {
-		return false, errors.NewEvalError(err)
+		return nil, errors.NewEvalError(err)
 	}
-	isVul, ok := val.Value().(bool)
-	if !ok {
-		fmt.Println("successVal Value error: ", err.Error())
-		return isVul, err
-	}
-	return isVul, nil
+	return val, nil
 }
 
 type runCallback func(interface{}, error)

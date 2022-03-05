@@ -2,12 +2,14 @@ package celgo
 
 import (
 	"bytes"
+	"math/rand"
 	"strings"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
+	"github.com/zan8in/afrog/pkg/utils"
 )
 
 var (
@@ -39,6 +41,31 @@ var (
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to contains", rhs.Type())
 					}
 					return types.Bool(strings.Contains(strings.ToLower(string(v1)), strings.ToLower(string(v2))))
+				},
+			},
+			&functions.Overload{
+				Operator: "randomInt_int_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					from, ok := lhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to randomInt", lhs.Type())
+					}
+					to, ok := rhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to randomInt", rhs.Type())
+					}
+					min, max := int(from), int(to)
+					return types.Int(rand.Intn(max-min) + min)
+				},
+			},
+			&functions.Overload{
+				Operator: "randomLowercase_int",
+				Unary: func(value ref.Val) ref.Val {
+					n, ok := value.(types.Int)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to randomLowercase", value.Type())
+					}
+					return types.String(utils.RandLetters(int(n)))
 				},
 			},
 		),

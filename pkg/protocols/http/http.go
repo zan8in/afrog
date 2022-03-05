@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -178,7 +177,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		Domain:   u.Hostname(),
 		Host:     u.Host,
 		Port:     u.Port(),
-		Path:     u.EscapedPath(),
+		Path:     u.Path,
 		Query:    u.RawQuery,
 		Fragment: u.Fragment,
 	}
@@ -205,6 +204,8 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 
 	fc.ResultResponse.Raw = []byte(fastResp.String())
 	fc.ResultResponse.RawHeader = fastResp.Header.Header()
+	// fc.ResultResponse.Conn.Source.Addr = fastResp.LocalAddr().String()
+	// fc.ResultResponse.Conn.Destination.Addr = fastResp.RemoteAddr().String()
 
 	fc.VariableMap["response"] = fc.ResultResponse
 
@@ -232,162 +233,12 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 	fc.NewProtoRequest.Body = fastReq.Body()
 	fc.VariableMap["request"] = fc.NewProtoRequest
 
+	fmt.Println("+++++++++++++++++++++++++++++")
+	fmt.Println(string(fastReq.URI().RequestURI()))
+	fmt.Println(string(fastReq.RequestURI()))
+	fmt.Println("+++++++++++++++++++++++++++++")
+
 	return err
-}
-
-func (fc *FastClient) HTTPRequest22(httpRequest *http.Request, rule poc.Rule) (map[string]interface{}, error) {
-	var err error
-	fc.VariableMap = map[string]interface{}{}
-	fc.NewProtoRequest = &proto.Request{}
-	fc.ResultResponse = &proto.Response{}
-
-	reqUrl := httpRequest.URL.String()
-
-	// 储存 protoRequest
-	fc.NewProtoRequest = GetProtoRequestPool()
-	fc.NewProtoRequest.Method = httpRequest.Method
-	fc.NewProtoRequest.Url = Url2UrlType(httpRequest.URL)
-
-	header := make(map[string]string)
-	for k := range httpRequest.Header {
-		header[k] = httpRequest.Header.Get(k)
-	}
-	fc.NewProtoRequest.Headers = header
-	fc.NewProtoRequest.ContentType = httpRequest.Header.Get("Content-Type")
-	if httpRequest.Body != nil && httpRequest.Body != http.NoBody {
-		// request data
-		fc.Data, err = ioutil.ReadAll(httpRequest.Body)
-		if err != nil {
-			log.Log().Error(fmt.Sprintf("Request Body [%s] 读取失败", reqUrl))
-			return fc.VariableMap, err
-		}
-	}
-	fc.VariableMap["request"] = fc.NewProtoRequest
-
-	// 原始请求转为fasthttp
-	fastReq := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(fastReq)
-
-	err = CopyRequest(httpRequest, fastReq, fc.Data)
-	if err != nil {
-		log.Log().Error(fmt.Sprintf("Request Body [%s] 原始请求转为fasthttp失败", reqUrl))
-		return fc.VariableMap, err
-	}
-
-	// 覆盖 header
-	for k, v := range rule.Request.Headers {
-		fastReq.Header.Set(k, fc.AssignVariableMap(v))
-	}
-	// 覆盖 method
-	fastReq.Header.SetMethod(rule.Request.Method)
-
-	// 覆盖path变量
-	tempPath := fc.AssignVariableMap(strings.TrimSpace(rule.Request.Path))
-	if strings.HasPrefix(rule.Request.Path, "/") {
-		// 如果 path 是以 / 开头的， 取 dir 路径拼接
-		tempPath = strings.TrimRight(tempPath, "/") + rule.Request.Path
-	} else if strings.HasPrefix(rule.Request.Path, "^") {
-		// 如果 path 是以 ^ 开头的， uri 直接取该路径
-		tempPath = "/" + rule.Request.Path[1:]
-	}
-	// 某些poc没有区分path和query，需要处理
-	tempPath = strings.ReplaceAll(tempPath, " ", "%20")
-	tempPath = strings.ReplaceAll(tempPath, "+", "%20")
-	fastReq.URI().Update(tempPath)
-
-	// 处理 multipart 及 覆盖body变量
-	contentType := string(fastReq.Header.ContentType())
-	if strings.HasPrefix(strings.ToLower(contentType), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
-		multipartBody, err := DealMultipart(contentType, rule.Request.Body)
-		if err != nil {
-			return fc.VariableMap, err
-		}
-		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(multipartBody))))
-	} else {
-		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(rule.Request.Body))))
-	}
-
-	fastResp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(fastResp)
-	if rule.Request.FollowRedirects {
-		maxrd := 5
-		if fc.MaxRedirect > 0 {
-			maxrd = int(fc.MaxRedirect)
-		}
-		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
-	} else {
-		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
-	}
-	if err != nil {
-		log.Log().Error(err.Error())
-		return fc.VariableMap, err
-	}
-
-	log.Log().Info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-	// log.Log().Info(fc.NewProtoRequest.Url.Path)
-	log.Log().Info(string(fastReq.URI().Path()))
-	// log.Log().Info(fastReq.String())
-	log.Log().Info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-
-	var respBody []byte
-	contentEncoding := strings.ToLower(string(fastResp.Header.Peek("Content-Encoding")))
-	switch contentEncoding {
-	case "", "none", "identity":
-		respBody = fastResp.Body()
-	case "gzip":
-		respBody, err = fastResp.BodyGunzip()
-	case "deflate":
-		respBody, err = fastResp.BodyInflate()
-	default:
-		respBody = []byte{}
-	}
-	if err != nil {
-		log.Log().Error(err.Error())
-		return fc.VariableMap, err
-	}
-	fastResp.SetBody(respBody)
-
-	fc.ResultResponse = protoResponsePool.Get().(*proto.Response)
-	fc.ResultResponse.Status = int32(fastResp.StatusCode())
-	u, err := url.Parse(fastReq.URI().String())
-	if err != nil {
-		log.Log().Error(err.Error())
-		return fc.VariableMap, err
-	}
-	fc.ResultResponse.Url = &proto.UrlType{
-		Scheme:   u.Scheme,
-		Domain:   u.Hostname(),
-		Host:     u.Host,
-		Port:     u.Port(),
-		Path:     u.EscapedPath(),
-		Query:    u.RawQuery,
-		Fragment: u.Fragment,
-	}
-	newheader := make(map[string]string)
-	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
-	for _, h := range respHeaderSlice {
-		hslice := strings.SplitN(h, ":", 2)
-		if len(hslice) != 2 {
-			continue
-		}
-		k := strings.ToLower(hslice[0])
-		v := strings.TrimLeft(hslice[1], " ")
-		if newheader[k] != "" {
-			newheader[k] += v
-		} else {
-			newheader[k] = v
-		}
-	}
-	fc.ResultResponse.Headers = newheader
-	fc.ResultResponse.ContentType = string(fastResp.Header.ContentType())
-	fc.ResultResponse.Body = fastResp.Body()
-
-	fc.ResultResponse.Raw = []byte(fastResp.String())
-	fc.ResultResponse.RawHeader = fastResp.Header.Header()
-
-	fc.VariableMap["response"] = fc.ResultResponse
-
-	return fc.VariableMap, err
 }
 
 func DealMultipart(contentType string, ruleBody string) (result string, err error) {
@@ -465,89 +316,6 @@ func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) e
 	return nil
 }
 
-// func HTTPRequest2(reqUrl string, FollowRedirects bool) error {
-// 	var err error
-
-// 	client := New()
-// 	fastReq := fasthttp.AcquireRequest()
-// 	fastReq.SetRequestURI(reqUrl)
-// 	defer fasthttp.ReleaseRequest(fastReq)
-
-// 	fastResp := fasthttp.AcquireResponse()
-// 	defer fasthttp.ReleaseResponse(fastResp)
-
-// 	if FollowRedirects {
-// 		err = client.DoRedirects(fastReq, fastResp, 5)
-// 	} else {
-// 		err = client.DoTimeout(fastReq, fastResp, time.Second*15)
-// 	}
-// 	if err != nil {
-// 		log.Log().Error(err.Error())
-// 		return err
-// 	}
-
-// 	var respBody []byte
-// 	contentEncoding := strings.ToLower(string(fastResp.Header.Peek("Content-Encoding")))
-// 	switch contentEncoding {
-// 	case "", "none", "identity":
-// 		respBody = fastResp.Body()
-// 	case "gzip":
-// 		respBody, err = fastResp.BodyGunzip()
-// 	case "deflate":
-// 		respBody, err = fastResp.BodyInflate()
-// 	default:
-// 		respBody = []byte{}
-// 	}
-// 	if err != nil {
-// 		log.Log().Error(err.Error())
-// 		return err
-// 	}
-// 	fastResp.SetBody(respBody)
-
-// 	protoRespPool := protoResponsePool.Get().(*proto.Response)
-// 	protoRespPool.Status = int32(fastResp.StatusCode())
-// 	u, err := url.Parse(fastReq.URI().String())
-// 	if err != nil {
-// 		log.Log().Error(err.Error())
-// 		return err
-// 	}
-// 	protoRespPool.Url = &proto.UrlType{
-// 		Scheme:   u.Scheme,
-// 		Domain:   u.Hostname(),
-// 		Host:     u.Host,
-// 		Port:     u.Port(),
-// 		Path:     u.EscapedPath(),
-// 		Query:    u.RawQuery,
-// 		Fragment: u.Fragment,
-// 	}
-// 	newheader := make(map[string]string)
-// 	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
-// 	for _, h := range respHeaderSlice {
-// 		hslice := strings.SplitN(h, ":", 2)
-// 		if len(hslice) != 2 {
-// 			continue
-// 		}
-// 		k := strings.ToLower(hslice[0])
-// 		v := strings.TrimLeft(hslice[1], " ")
-// 		if newheader[k] != "" {
-// 			newheader[k] += v
-// 		} else {
-// 			newheader[k] = v
-// 		}
-// 	}
-// 	protoRespPool.Headers = newheader
-// 	protoRespPool.ContentType = string(fastResp.Header.ContentType())
-// 	protoRespPool.Body = fastResp.Body()
-
-// 	protoRespPool.Raw = []byte(fastResp.String())
-// 	protoRespPool.RawHeader = fastResp.Header.Header()
-// 	log.Log().Warn(string(fastResp.Header.Header()))
-// 	fmt.Println("===========")
-// 	fmt.Println(protoRespPool.Headers)
-
-// 	return err
-// }
-
 func Url2UrlType(u *url.URL) *proto.UrlType {
 	return &proto.UrlType{
 		Scheme:   u.Scheme,
@@ -559,18 +327,6 @@ func Url2UrlType(u *url.URL) *proto.UrlType {
 		Fragment: u.Fragment,
 	}
 }
-
-// func FastURI2UrlType(u *fasthttp.URI) *proto.UrlType {
-// 	return &proto.UrlType{
-// 		Scheme:   string(u.Scheme()),
-// 		Domain:   string(u.Host()),
-// 		Host:     string(u.Host()),
-// 		Port:     u.por,
-// 		Path:     u.EscapedPath(),
-// 		Query:    u.RawQuery,
-// 		Fragment: u.Fragment,
-// 	}
-// }
 
 func GetProtoRequestPool() *proto.Request {
 	return protoRequestPool.Get().(*proto.Request)

