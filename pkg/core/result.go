@@ -21,7 +21,14 @@ type PocResult struct {
 }
 
 func (pr *PocResult) ReadFullResultRequestInfo() string {
-	result := pr.ResultRequest.Url.GetScheme() + "://" + pr.ResultRequest.Url.GetHost() + pr.ResultRequest.Url.GetPath() + pr.ResultRequest.Url.GetQuery() + "\n"
+	result := pr.ResultRequest.Url.GetScheme() + "://" + pr.ResultRequest.Url.GetHost() + pr.ResultRequest.Url.GetPath()
+	if len(pr.ResultRequest.Url.GetQuery()) > 0 {
+		result += "?" + pr.ResultRequest.Url.GetQuery()
+	} else if len(pr.ResultRequest.Url.Fragment) > 0 {
+		result += "#" + pr.ResultRequest.Url.Fragment
+	}
+	result += "\r\n"
+
 	for k, v := range pr.ResultRequest.Headers {
 		result += k + ": " + v + "\r\n"
 	}
