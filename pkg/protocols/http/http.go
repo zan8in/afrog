@@ -298,7 +298,6 @@ func (fc *FastClient) AssignVariableMap(find string) string {
 }
 
 func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) error {
-
 	curURL := req.URL.String()
 	dstRequest.SetRequestURI(curURL)
 	dstRequest.Header.SetMethod(req.Method)

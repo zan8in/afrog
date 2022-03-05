@@ -3,9 +3,11 @@ package core
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/google/cel-go/common/types/ref"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/operators/celgo"
@@ -84,7 +86,13 @@ func (c *Checker) Check() {
 				// c.variableMap[key] = reverse.NewReverse() // todo
 				continue
 			}
-			out, err := customLib.RunEval(value.(string), c.variableMap)
+			var out ref.Val
+			switch v := value.(type) {
+			case int:
+				out, err = customLib.RunEval(strconv.Itoa(v), c.variableMap)
+			default:
+				out, err = customLib.RunEval(v.(string), c.variableMap)
+			}
 			if err != nil {
 				log.Log().Error(err.Error())
 				return
@@ -100,12 +108,8 @@ func (c *Checker) Check() {
 			}
 			c.pocItem.Set[key] = out.Value()
 		}
-
 		customLib.WriteRuleSetOptions(c.pocItem.Set)
-		// c.UpdateVariableMap(c.pocItem.Set)
 	}
-
-	//log.Log().Debug(c.variableMap["username"].(string))
 
 	// 处理 rule
 	fmt.Println(c.target)
@@ -170,7 +174,7 @@ func (c *Checker) Check() {
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
-	// print result info
+	// print result info (调试)
 	log.Log().Info("----------------------------------------------------------------")
 	for _, v := range c.result.AllPocResult {
 		log.Log().Info("Request:\r\n")

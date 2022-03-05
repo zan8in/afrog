@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/zan8in/afrog/pkg/xfrog/gocel"
+	"github.com/zan8in/afrog/pkg/operators/celgo"
 )
 
 type Runner struct {
@@ -11,12 +11,15 @@ type Runner struct {
 
 func main() {
 
-	gocel.NewCustomLib()
+	c := celgo.NewCustomLib()
 
-	resp := poc.GetRunnerPool().GocelResponse
-	resp.Body = []byte("test.php")
+	resp := make(map[string]interface{})
+	resp["rand1"] = 123
+	resp["rand2"] = 123
 
-	isvul, err := gocel.RunEval(`response.body.bcontains(b'test.php')`, map[string]interface{}{
+	c.WriteRuleSetOptions(resp)
+
+	isvul, err := c.RunEval(`response.body.bcontains(bytes(string(rand1 + rand2)))`, map[string]interface{}{
 		"response": resp,
 	})
 	if err != nil {
