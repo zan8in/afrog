@@ -123,7 +123,12 @@ func (c *Checker) Check() {
 				log.Log().Error(fmt.Sprintf("Target [%s] 格式不合法", c.target))
 				return
 			}
-			c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
+			// 设置User-Agent
+			if len(c.options.Config.ConfigHttp.UserAgent) > 0 {
+				c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
+			} else {
+				c.originalRequest.Header.Set("User-Agent", utils.RandomUA())
+			}
 
 			fastclient := http2.FastClient{}
 			fastclient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
@@ -150,7 +155,10 @@ func (c *Checker) Check() {
 			c.pocResult.IsVul = isVul.Value().(bool)
 			c.pocResult.ResultRequest = tempVariableMap["request"].(*proto.Request)
 			c.pocResult.ResultResponse = tempVariableMap["response"].(*proto.Response)
+			// 保存每次request和response，用于调试和结果展示
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
+
+			log.Log().Info(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
 		}
 	}
 
