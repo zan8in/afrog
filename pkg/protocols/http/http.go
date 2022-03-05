@@ -89,6 +89,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 	}
 
 	// 覆盖 header
+	fastReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for k, v := range rule.Request.Headers {
 		fastReq.Header.Set(k, fc.AssignVariableMap(v))
 	}
@@ -233,10 +234,10 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 	fc.NewProtoRequest.Body = fastReq.Body()
 	fc.VariableMap["request"] = fc.NewProtoRequest
 
-	fmt.Println("+++++++++++++++++++++++++++++")
-	fmt.Println(string(fastReq.URI().RequestURI()))
-	fmt.Println(string(fastReq.RequestURI()))
-	fmt.Println("+++++++++++++++++++++++++++++")
+	// fmt.Println("+++++++++++++++++++++++++++++")
+	// fmt.Println(string(fastReq.URI().RequestURI()))
+	// fmt.Println(string(fastReq.RequestURI()))
+	// fmt.Println("+++++++++++++++++++++++++++++")
 
 	return err
 }
