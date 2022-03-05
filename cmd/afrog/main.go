@@ -79,8 +79,12 @@ func readConfig() {
 	for i := 0; i < 10; i++ {
 
 	}
-	options.Targets.Set("http://example.com")
-	options.Targets.Set("lankegp.com")
+	url1 := "http://121.196.164.206:9000"
+	options.Targets.Set(url1)
+	// url2 := "lankegp.com"
+	// options.Targets.Set(url2)
+	// url3 := "lankegp"
+	// options.Targets.Set(url3)
 
 	// read pocs from afrog-pocs directory
 	pocsDir, err := poc.SetPocDirectory()

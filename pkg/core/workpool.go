@@ -39,13 +39,11 @@ func (w *WorkPool) TargetWait() {
 	w.TargetsSwg.Wait()
 }
 
-// InputWorkPool is a work pool per-input
-type InputWorkPool struct {
+type WaitPool struct {
 	WaitGroup *sizedwaitgroup.SizedWaitGroup
 }
 
-// InputPool returns a work pool for an input type
-func (w *WorkPool) InputPool(concurrencyType string) *InputWorkPool {
+func (w *WorkPool) NewPool(concurrencyType string) *WaitPool {
 	var count int
 	if concurrencyType == PocConcurrencyType {
 		count = w.config.PocConcurrency
@@ -53,5 +51,5 @@ func (w *WorkPool) InputPool(concurrencyType string) *InputWorkPool {
 		count = w.config.TargetConcurrency
 	}
 	swg := sizedwaitgroup.New(count)
-	return &InputWorkPool{WaitGroup: &swg}
+	return &WaitPool{WaitGroup: &swg}
 }

@@ -20,10 +20,13 @@ type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
 	ReadTimeout         string `yaml:"read_timeout"`
 	WriteTimeout        string `yaml:"write_timeout"`
+	MaxRedirect         int32  `yaml:"max_redirect"`
 	MaxIdle             string `yaml:"max_idle"`
 	Concurrency         int    `yaml:"concurrency"`
+	MaxConnsPerHost     int    `yaml:"max_conns_per_host"`
 	MaxResponseBodySize int    `yaml:"max_responsebody_sizse"`
 	MaxRedirectCount    int    `yaml:"max_redirect_count"`
+	UserAgent           string `yaml:"user_agent"`
 }
 
 const afrogConfigFilename = ".afrog-config.yaml"
@@ -40,12 +43,15 @@ func New() (*Config, error) {
 	c.TargetSizeWaitGroup = 8
 	configHttp := c.ConfigHttp
 	configHttp.Proxy = ""
-	configHttp.ReadTimeout = "500ms"
-	configHttp.ReadTimeout = "500ms"
+	configHttp.ReadTimeout = "15000ms"
+	configHttp.ReadTimeout = "1500ms"
 	configHttp.MaxIdle = "1h"
+	configHttp.MaxRedirect = 5
 	configHttp.Concurrency = 4096
+	configHttp.MaxConnsPerHost = 10000
 	configHttp.MaxResponseBodySize = 1024 * 1024 * 2
 	configHttp.MaxRedirectCount = 5
+	configHttp.UserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0"
 	c.ConfigHttp = configHttp
 	WriteConfiguration(&c)
 	return ReadConfiguration()

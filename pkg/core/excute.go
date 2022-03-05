@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -32,7 +31,12 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 }
 
 func (e *Engine) executeTargets(poc1 poc.Poc) {
-	wg := e.workPool.InputPool(e.workPool.config.TargetConcurrencyType)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Log().Error("gorutine recover() error from pkg/core/exccute/excutTargets")
+		}
+	}()
+	wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
 	allTargets := e.options.Targets
 	if len(allTargets) == 0 {
 		log.Log().Error("executeTargets failed, no targets")
@@ -47,12 +51,21 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 	}
 	wg.WaitGroup.Wait()
 	// log.Log().Debug(fmt.Sprintf("scan targets count:%d", len(allTargets)))
-	ms := 500 + rand.Intn(500)
-	time.Sleep(time.Duration(ms) * time.Millisecond)
+	randSleep()
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
-	log.Log().Debug(fmt.Sprintf("%s - %s", target, poc.Id))
+	defer func() {
+		if r := recover(); r != nil {
+			log.Log().Error("gorutine recover() error from pkg/core/exccute/executeExpression")
+		}
+	}()
+	c := NewChecker(*e.options, target, poc)
+	c.Check()
+	randSleep()
+}
+
+func randSleep() {
 	ms := 500 + rand.Intn(500)
 	time.Sleep(time.Duration(ms) * time.Millisecond)
 }

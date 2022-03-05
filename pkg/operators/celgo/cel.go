@@ -2,11 +2,16 @@ package celgo
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/zan8in/afrog/pkg/xfrog/errors"
+	"github.com/google/cel-go/interpreter/functions"
+	"github.com/zan8in/afrog/pkg/errors"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 type CustomLib struct {
@@ -20,6 +25,12 @@ func (c *CustomLib) CompileOptions() []cel.EnvOption {
 
 func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return c.programOptions
+}
+
+var CustomLibPool = sync.Pool{
+	New: func() interface{} {
+		return CustomLib{}
+	},
 }
 
 func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, call runCallback) {
@@ -62,7 +73,7 @@ type runCallback func(interface{}, error)
 
 // Step 1: 创建 cel 库
 func NewCustomLib() CustomLib {
-	c := CustomLib{}
+	c := CustomLibPool.Get().(CustomLib)
 	reg := types.NewEmptyRegistry()
 
 	c.envOptions = ReadComplieOptions(reg)
@@ -94,4 +105,48 @@ func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.V
 		return nil, err
 	}
 	return out, nil
+}
+
+//	如果有set：追加set变量到 cel options
+//	这里得注意下 reverse的顺序问题 map可能是随机的
+func (c *CustomLib) WriteRuleSetOptions(args map[string]interface{}) {
+	for k, v := range args {
+		// 在执行之前是不知道变量的类型的，所以统一声明为字符型
+		// 所以randomInt虽然返回的是int型，在运算中却被当作字符型进行计算，需要重载string_*_string
+		var d *exprpb.Decl
+		switch vv := v.(type) {
+		case int64:
+			d = decls.NewVar(k, decls.Int)
+		case string:
+			if strings.HasPrefix(vv, "newReverse") {
+				d = decls.NewVar(k, decls.NewObjectType("gocel.Reverse"))
+			} else if strings.HasPrefix(vv, "randomInt") {
+				d = decls.NewVar(k, decls.Int)
+			} else {
+				d = decls.NewVar(k, decls.String)
+			}
+		default:
+			d = decls.NewVar(k, decls.String)
+		}
+		c.envOptions = append(c.envOptions, cel.Declarations(d))
+	}
+}
+
+func (c *CustomLib) WriteRuleFunctionsROptions(funcName string, returnBool bool) {
+	c.envOptions = append(c.envOptions, cel.Declarations(
+		decls.NewFunction(funcName,
+			decls.NewOverload(funcName,
+				[]*exprpb.Type{},
+				decls.Bool)),
+	),
+	)
+
+	c.programOptions = append(c.programOptions, cel.Functions(
+		&functions.Overload{
+			Operator: funcName,
+			Function: func(values ...ref.Val) ref.Val {
+				return types.Bool(returnBool)
+			},
+		}))
+
 }

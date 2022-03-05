@@ -1,0 +1,177 @@
+package core
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+
+	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/operators/celgo"
+	"github.com/zan8in/afrog/pkg/poc"
+	"github.com/zan8in/afrog/pkg/proto"
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+)
+
+type Checker struct {
+	options         *config.Options
+	target          string
+	pocItem         *poc.Poc
+	originalRequest *http.Request // 原始request
+	variableMap     map[string]interface{}
+	result          *Result
+	pocResult       *PocResult
+}
+
+var CheckerPool = sync.Pool{
+	New: func() interface{} {
+		return &Checker{
+			originalRequest: &http.Request{},
+			variableMap:     make(map[string]interface{}),
+		}
+	},
+}
+
+var ResultPool = sync.Pool{
+	New: func() interface{} {
+		return &Result{
+			PocInfo: &poc.Poc{},
+		}
+	},
+}
+
+var PocResultPool = sync.Pool{
+	New: func() interface{} {
+		return &PocResult{
+			ResultRequest:  &proto.Request{},
+			ResultResponse: &proto.Response{},
+		}
+	},
+}
+
+var VariableMapPool = sync.Pool{
+	New: func() interface{} {
+		return make(map[string]interface{})
+	},
+}
+
+func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker {
+	c := CheckerPool.Get().(*Checker)
+	c.options = &options
+	c.target = target
+	c.pocItem = &pocItem
+	return c
+}
+
+func (c *Checker) Check() {
+	var err error
+	// init variablemap from sync.pool
+	c.variableMap = VariableMapPool.Get().(map[string]interface{})
+	// init result
+	c.result = ResultPool.Get().(*Result)
+	c.result.Target = c.target
+	c.result.PocInfo = c.pocItem
+
+	//log.Log().Debug(fmt.Sprintf("Run afrog Poc [%s] for %s", c.pocItem.Id, c.target))
+	customLib := celgo.NewCustomLib()
+
+	// 处理 set
+	customLib.WriteRuleSetOptions(c.pocItem.Set)
+	c.UpdateVariableMap(c.pocItem.Set)
+	//log.Log().Debug(c.variableMap["username"].(string))
+
+	// 处理 rule
+	for k, rule := range c.pocItem.Rules {
+		// translate : http
+		if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
+			if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
+				c.target = "http://" + c.target
+			}
+			// 原始请求
+			c.originalRequest, err = http.NewRequest("GET", c.target, nil)
+			if err != nil {
+				log.Log().Error(fmt.Sprintf("Target [%s] 格式不合法", c.target))
+				return
+			}
+			c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
+
+			fastclient := http2.FastClient{}
+			fastclient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
+			fastclient.Client = http2.New(c.options)
+			err = fastclient.HTTPRequest(c.originalRequest, rule, c.variableMap)
+			if err != nil {
+				return
+			}
+
+			isVul, err := customLib.RunEval(rule.Expression, c.variableMap)
+			if err != nil {
+				log.Log().Error(err.Error())
+				return
+			}
+			customLib.WriteRuleFunctionsROptions(k, isVul)
+
+			// save result of request、response、target、pocinfo eg.
+			c.pocResult = PocResultPool.Get().(*PocResult)
+			c.pocResult.IsVul = isVul
+			c.pocResult.ResultRequest = c.variableMap["request"].(*proto.Request)
+			c.pocResult.ResultResponse = c.variableMap["response"].(*proto.Response)
+			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
+		}
+	}
+
+	isVul, err := customLib.RunEval(c.pocItem.Expression, c.variableMap)
+	if err != nil {
+		log.Log().Error(err.Error())
+		return
+	}
+	// save final result
+	c.result.IsVul = isVul
+
+	// print result info
+	log.Log().Info("----------------------------------------------------------------")
+	for _, v := range c.result.AllPocResult {
+		log.Log().Info("Request:\r\n")
+		log.Log().Info(v.ReadFullResultRequestInfo())
+		log.Log().Info("Response:\r\n")
+		log.Log().Info(v.ReadFullResultResponseInfo())
+	}
+	// log.Log().Info(c.result.ReadPocInfo())
+	log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
+	log.Log().Info(c.result.PrintResultInfo())
+	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+}
+
+// 更新 Set/Payload VariableMap
+// key map["set.username"] = ...  map["payload.ping.cmd"] = ...
+func (c *Checker) UpdateVariableMap(args map[string]interface{}) {
+	for k, v := range args {
+		switch vv := v.(type) {
+		case int64:
+			c.variableMap[k] = int(vv)
+		default:
+			c.variableMap[k] = fmt.Sprintf("%v", vv)
+		}
+	}
+}
+
+// 替换变量的值
+// find string 规定要查找的值
+// oldstr 规定被搜索的字符串
+// newstr 规定替换的值
+func (c *Checker) AssignVariableMap(find string) string {
+	for k, v := range c.variableMap {
+		_, isMap := v.(map[string]string)
+		if isMap {
+			continue
+		}
+		newstr := fmt.Sprintf("%v", v)
+		oldstr := "{{" + k + "}}"
+		if !strings.Contains(find, oldstr) {
+			continue
+		}
+		find = strings.ReplaceAll(find, oldstr, newstr)
+		break
+	}
+	return find
+}

@@ -13,7 +13,7 @@ var err error
 func main() {
 	url := "http://192.168.66.168/redirect.php"
 	url2 := "http://example.com"
-	http.HTTPRequest(url, false)
+	http.HTTPRequest(url2, false)
 	fmt.Println("-----------", url, url2)
 	//poc.SendGetRequest("http://192.168.66.168/redirect.php")
 	// log.Log().Info("Zap info")

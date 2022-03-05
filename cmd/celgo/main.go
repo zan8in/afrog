@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/zan8in/afrog/pkg/xfrog/gocel"
-	poc "github.com/zan8in/afrog/pkg/xfrog/pocset"
 )
 
 type Runner struct {
