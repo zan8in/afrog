@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -132,11 +133,15 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		}
 		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
 	} else {
-		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
+		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*1)
 	}
 	if err != nil {
-		log.Log().Error(err.Error())
-		return err
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
 	}
 
 	// log.Log().Info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -230,8 +235,10 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		}
 	}
 	fc.NewProtoRequest.Headers = newReqheader
-	fc.NewProtoRequest.ContentType = newReqheader["Content-Type"]
+	fc.NewProtoRequest.ContentType = newReqheader["content-type"]
 	fc.NewProtoRequest.Body = fastReq.Body()
+	fc.NewProtoRequest.RawHeader = fastReq.Header.Header()
+	fc.NewProtoRequest.Raw = []byte(string(fastReq.Header.Header()) + string(fastReq.Body()))
 	fc.VariableMap["request"] = fc.NewProtoRequest
 
 	// fmt.Println("+++++++++++++++++++++++++++++")
@@ -240,6 +247,29 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 	// fmt.Println("+++++++++++++++++++++++++++++")
 
 	return err
+}
+
+func httpConnError(err error) (string, bool) {
+	errName := ""
+	known := false
+	if err == fasthttp.ErrTimeout {
+		errName = "timeout"
+		known = true
+	} else if err == fasthttp.ErrNoFreeConns {
+		errName = "conn_limit"
+		known = true
+	} else if err == fasthttp.ErrConnectionClosed {
+		errName = "conn_close"
+		known = true
+	} else {
+		errName = reflect.TypeOf(err).String()
+		if errName == "*net.OpError" {
+			// Write and Read errors are not so often and in fact they just mean timeout problems
+			errName = "timeout"
+			known = true
+		}
+	}
+	return errName, known
 }
 
 func DealMultipart(contentType string, ruleBody string) (result string, err error) {

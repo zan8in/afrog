@@ -137,17 +137,12 @@ func (c *Checker) Check() {
 			fastclient := http2.FastClient{}
 			fastclient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			fastclient.Client = http2.New(c.options)
-			// fixed variablemap no rest problem.
-			tempVariableMap := VariableMapPool.Get().(map[string]interface{})
-			for k, v := range c.variableMap {
-				tempVariableMap[k] = v
-			}
-			err = fastclient.HTTPRequest(c.originalRequest, rule, tempVariableMap)
+			err = fastclient.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
 				return
 			}
 
-			isVul, err := customLib.RunEval(rule.Expression, tempVariableMap)
+			isVul, err := customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
 				log.Log().Error(err.Error())
 				return
@@ -157,8 +152,8 @@ func (c *Checker) Check() {
 			// save result of request、response、target、pocinfo eg.
 			c.pocResult = PocResultPool.Get().(*PocResult)
 			c.pocResult.IsVul = isVul.Value().(bool)
-			c.pocResult.ResultRequest = tempVariableMap["request"].(*proto.Request)
-			c.pocResult.ResultResponse = tempVariableMap["response"].(*proto.Response)
+			c.pocResult.ResultRequest = c.variableMap["request"].(*proto.Request)
+			c.pocResult.ResultResponse = c.variableMap["response"].(*proto.Response)
 			// 保存每次request和response，用于调试和结果展示
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
