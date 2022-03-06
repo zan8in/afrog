@@ -10,22 +10,20 @@ import (
 // https://docs.xray.cool/#/guide/poc/v2
 // Rule有序，参考：https://github.com/WAY29/pocV/blob/main/pkg/xray/structs/poc.go
 
-type Sets map[string]interface{}
 type Poc struct {
-	Id         string       `yaml:"id"`        //  脚本名称
-	Transport  string       `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
-	Set        Sets         `yaml:"set"`       // 全局变量定义，该字段用于定义全局变量。比如随机数，反连平台等
-	Payloads   Payloads     `yaml:"payloads"`
-	Rules      RuleMapSlice `yaml:"rules"`
-	Expression string       `yaml:"expression"`
-	Info       Info         `yaml:"info"`
+	Id         string        `yaml:"id"`        //  脚本名称
+	Transport  string        `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
+	Set        yaml.MapSlice `yaml:"set"`       // 全局变量定义，该字段用于定义全局变量。比如随机数，反连平台等
+	Payloads   Payloads      `yaml:"payloads"`
+	Rules      RuleMapSlice  `yaml:"rules"`
+	Expression string        `yaml:"expression"`
+	Info       Info          `yaml:"info"`
 }
 
 // TODO REMARK
-type Payloadss = map[string]Sets
 type Payloads struct {
-	Continue bool      `yaml:"continue"`
-	Payloads Payloadss `yaml:"payloads"`
+	Continue bool          `yaml:"continue"`
+	Payloads yaml.MapSlice `yaml:"payloads"`
 }
 
 // 以下是 脚本部分
@@ -39,11 +37,10 @@ type RuleMap struct {
 
 // 用于帮助yaml解析，保证Rule有序
 type RuleMapSlice []RuleMap
-type Outputs yaml.MapSlice
 type Rule struct {
-	Request    RuleRequest `yaml:"request"`
-	Expression string      `yaml:"expression"`
-	Output     Outputs     `yaml:"output"`
+	Request    RuleRequest   `yaml:"request"`
+	Expression string        `yaml:"expression"`
+	Output     yaml.MapSlice `yaml:"output"`
 	order      int
 }
 
@@ -129,7 +126,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	r.Request = tmp.Request
 	r.Expression = tmp.Expression
-	r.Output = Outputs(tmp.Output)
+	r.Output = tmp.Output
 	r.order = order
 
 	order += 1

@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/pkg/proto"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
+	"gopkg.in/yaml.v2"
 )
 
 type Checker struct {
@@ -81,24 +82,7 @@ func (c *Checker) Check() error {
 
 	// set
 	if len(c.pocItem.Set) > 0 {
-		for key, value := range c.pocItem.Set {
-			if value == "newReverse()" {
-				// c.variableMap[key] = reverse.NewReverse() // todo
-				continue
-			}
-			out, err := customLib.RunEval(value.(string), c.variableMap)
-			if err != nil {
-				return err
-			}
-			switch value := out.Value().(type) {
-			case *proto.UrlType:
-				c.variableMap[key] = utils.UrlTypeToString(value)
-			case int64:
-				c.variableMap[key] = int(value)
-			default:
-				c.variableMap[key] = fmt.Sprintf("%v", out)
-			}
-		}
+		c.UpdateVariableMap(customLib, c.pocItem.Set)
 		customLib.WriteRuleSetOptions(c.pocItem.Set)
 	}
 
@@ -179,15 +163,28 @@ func (c *Checker) Check() error {
 }
 
 // Update Set/Payload VariableMap
-func (c *Checker) UpdateVariableMap(args map[string]interface{}) {
-	for k, v := range args {
-		switch vv := v.(type) {
+func (c *Checker) UpdateVariableMap(customLib celgo.CustomLib, args yaml.MapSlice) error {
+	for _, item := range args {
+		key := item.Key.(string)
+		value := item.Value.(string)
+		if value == "newReverse()" {
+			// c.variableMap[key] = reverse.NewReverse() // todo
+			continue
+		}
+		out, err := customLib.RunEval(value, c.variableMap)
+		if err != nil {
+			return err
+		}
+		switch value := out.Value().(type) {
+		case *proto.UrlType:
+			c.variableMap[key] = utils.UrlTypeToString(value)
 		case int64:
-			c.variableMap[k] = int(vv)
+			c.variableMap[key] = int(value)
 		default:
-			c.variableMap[k] = fmt.Sprintf("%v", vv)
+			c.variableMap[key] = fmt.Sprintf("%v", out)
 		}
 	}
+	return nil
 }
 
 // 替换变量的值

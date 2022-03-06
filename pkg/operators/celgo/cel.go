@@ -12,6 +12,7 @@ import (
 	"github.com/google/cel-go/interpreter/functions"
 	"github.com/zan8in/afrog/pkg/errors"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"gopkg.in/yaml.v2"
 )
 
 type CustomLib struct {
@@ -104,24 +105,26 @@ func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.V
 
 //	如果有set：追加set变量到 cel options
 //	这里得注意下 reverse的顺序问题 map可能是随机的
-func (c *CustomLib) WriteRuleSetOptions(args map[string]interface{}) {
-	for k, v := range args {
+func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
+	for _, v := range args {
+		key := v.Key.(string)
+		value := v.Value
 		// 在执行之前是不知道变量的类型的，所以统一声明为字符型
 		// 所以randomInt虽然返回的是int型，在运算中却被当作字符型进行计算，需要重载string_*_string
 		var d *exprpb.Decl
-		switch vv := v.(type) {
+		switch vv := value.(type) {
 		case int64:
-			d = decls.NewVar(k, decls.Int)
+			d = decls.NewVar(key, decls.Int)
 		case string:
 			if strings.HasPrefix(vv, "newReverse") {
-				d = decls.NewVar(k, decls.NewObjectType("gocel.Reverse"))
+				d = decls.NewVar(key, decls.NewObjectType("gocel.Reverse"))
 			} else if strings.HasPrefix(vv, "randomInt") {
-				d = decls.NewVar(k, decls.Int)
+				d = decls.NewVar(key, decls.Int)
 			} else {
-				d = decls.NewVar(k, decls.String)
+				d = decls.NewVar(key, decls.String)
 			}
 		default:
-			d = decls.NewVar(k, decls.String)
+			d = decls.NewVar(key, decls.String)
 		}
 		c.envOptions = append(c.envOptions, cel.Declarations(d))
 	}

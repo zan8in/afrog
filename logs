@@ -1,0 +1,24 @@
+2022-03-06 19:29:19	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:19	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:19	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:19	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:19	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	error	core/checker.go:173	[poc-yaml-spring-cloud-gateway-code-injection-cve-2022-22947] [critical] http://139.9.119.190:9001
+2022-03-06 19:29:20	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:20	error	core/checker.go:173	[poc-yaml-spring-cloud-gateway-code-injection-cve-2022-22947] [critical] http://121.196.164.206:9000
+2022-03-06 19:29:21	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:22	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:23	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:24	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:24	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:26	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:26	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:27	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:27	error	core/checker.go:173	[poc-yaml-spring-cloud-gateway-code-injection-cve-2022-22947] [critical] https://34.141.128.122
+2022-03-06 19:29:28	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:31	info	core/checker.go:150	result:::::::::::::true
+2022-03-06 19:29:31	error	core/checker.go:173	[poc-yaml-spring-cloud-gateway-code-injection-cve-2022-22947] [critical] https://202.65.121.62:7199
