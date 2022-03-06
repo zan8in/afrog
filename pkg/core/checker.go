@@ -57,6 +57,8 @@ var VariableMapPool = sync.Pool{
 	},
 }
 
+var lock sync.Mutex
+
 func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.options = &options
@@ -77,7 +79,7 @@ func (c *Checker) Check() error {
 	//log.Log().Debug(fmt.Sprintf("Run afrog Poc [%s] for %s", c.pocItem.Id, c.target))
 	customLib := celgo.NewCustomLib()
 
-	// 处理 set
+	// set
 	if len(c.pocItem.Set) > 0 {
 		for key, value := range c.pocItem.Set {
 			if value == "newReverse()" {
@@ -89,7 +91,6 @@ func (c *Checker) Check() error {
 				return err
 			}
 			switch value := out.Value().(type) {
-			// set value 无论是什么类型都先转成string
 			case *proto.UrlType:
 				c.variableMap[key] = utils.UrlTypeToString(value)
 			case int64:
@@ -102,7 +103,6 @@ func (c *Checker) Check() error {
 	}
 
 	// 处理 rule
-	fmt.Println(c.target)
 	for _, ruleMap := range c.pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
@@ -157,23 +157,28 @@ func (c *Checker) Check() error {
 	c.result.IsVul = isVul.Value().(bool)
 
 	// print result info (调试)
-	log.Log().Info("----------------------------------------------------------------")
-	for _, v := range c.result.AllPocResult {
-		log.Log().Info("Request:\r\n")
-		log.Log().Info(v.ReadFullResultRequestInfo())
-		log.Log().Info("Response:\r\n")
-		log.Log().Info(v.ReadFullResultResponseInfo())
+	// log.Log().Info("----------------------------------------------------------------")
+	// for _, v := range c.result.AllPocResult {
+	// 	log.Log().Info("Request:\r\n")
+	// 	log.Log().Info(v.ReadFullResultRequestInfo())
+	// 	log.Log().Info("Response:\r\n")
+	// 	log.Log().Info(v.ReadFullResultResponseInfo())
+	// }
+	// // log.Log().Info(c.result.ReadPocInfo())
+	// log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
+	reslt := c.result.PrintResultInfo()
+	if reslt != "" {
+		log.Log().Error(reslt)
+		// lock.Lock()
+		// utils.BufferWriteAppend("./result.txt", reslt)
+		// lock.Unlock()
 	}
-	// log.Log().Info(c.result.ReadPocInfo())
-	log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
-	log.Log().Info(c.result.PrintResultInfo())
-	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 
 	return err
 }
 
-// 更新 Set/Payload VariableMap
-// key map["set.username"] = ...  map["payload.ping.cmd"] = ...
+// Update Set/Payload VariableMap
 func (c *Checker) UpdateVariableMap(args map[string]interface{}) {
 	for k, v := range args {
 		switch vv := v.(type) {

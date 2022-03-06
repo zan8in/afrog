@@ -1,2 +1,0 @@
-2022-03-05 19:18:48	info	core/checker.go:161	result:::::::::::::false
-2022-03-05 19:36:27	error	core/excute.go:60	gorutine recover() error from pkg/core/exccute/executeExpression
