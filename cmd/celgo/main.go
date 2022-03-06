@@ -17,8 +17,6 @@ func main() {
 	resp["rand1"] = 123
 	resp["rand2"] = 123
 
-	c.WriteRuleSetOptions(resp)
-
 	isvul, err := c.RunEval(`response.body.bcontains(bytes(string(rand1 + rand2)))`, map[string]interface{}{
 		"response": resp,
 	})
