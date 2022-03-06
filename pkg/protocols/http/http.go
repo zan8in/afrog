@@ -21,12 +21,9 @@ import (
 )
 
 type FastClient struct {
-	Client          *fasthttp.Client
-	MaxRedirect     int32
-	NewProtoRequest *proto.Request  // 变形后request
-	ResultResponse  *proto.Response // 储存结果
-	Data            []byte          // post data
-	VariableMap     map[string]interface{}
+	Client      *fasthttp.Client
+	MaxRedirect int32
+	VariableMap map[string]interface{}
 }
 
 var protoRequestPool sync.Pool = sync.Pool{
@@ -71,48 +68,38 @@ func New(options *config.Options) *fasthttp.Client {
 	return client
 }
 
-func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, params map[string]interface{}) error {
+func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
 	var err error
-	fc.VariableMap = params
-	fc.NewProtoRequest = GetProtoRequestPool()
-	fc.ResultResponse = GetProtoResponsePool()
 
-	reqUrl := httpRequest.URL.String()
+	fc.VariableMap = variableMap
 
-	// 处理 fasthttp 请求
 	fastReq := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(fastReq)
 
-	err = CopyRequest(httpRequest, fastReq, fc.Data)
-	if err != nil {
-		log.Log().Error(fmt.Sprintf("Request Body [%s] 原始请求转为fasthttp失败", reqUrl))
-		return err
-	}
+	CopyRequest(httpRequest, fastReq, nil)
 
-	// 覆盖 header
+	// set fastReq.Header from poc.Rule
 	fastReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for k, v := range rule.Request.Headers {
 		fastReq.Header.Set(k, fc.AssignVariableMap(v))
 	}
-	// 覆盖 method
+	// set fastReq.Header method from poc.Rule
 	fastReq.Header.SetMethod(rule.Request.Method)
 
-	// 覆盖path变量
+	// set fastReq Path from poc.Rule
 	tempPath := ""
 	if strings.HasPrefix(rule.Request.Path, "/") {
-		// 如果 path 是以 / 开头的， 取 dir 路径拼接
-		tempPath = strings.TrimRight(httpRequest.URL.Path, "/") + rule.Request.Path
+		tempPath = strings.TrimRight(httpRequest.URL.Path, "/") + rule.Request.Path // 如果 path 是以 / 开头的， 取 dir 路径拼接
 	} else if strings.HasPrefix(rule.Request.Path, "^") {
-		// 如果 path 是以 ^ 开头的， uri 直接取该路径
-		tempPath = "/" + rule.Request.Path[1:]
+		tempPath = "/" + rule.Request.Path[1:] // 如果 path 是以 ^ 开头的， uri 直接取该路径
+	} else {
+		return errors.New("poc rule request path format err, prefix no `/`")
 	}
-	// 某些poc没有区分path和query，需要处理
 	tempPath = strings.ReplaceAll(tempPath, " ", "%20")
 	tempPath = strings.ReplaceAll(tempPath, "+", "%20")
-	// fastReq.SetRequestURI(tempPath)
 	fastReq.URI().Update(fc.AssignVariableMap(strings.TrimSpace(tempPath)))
 
-	// 处理 multipart 及 覆盖body变量
+	// set fastReq Body from poc.Rule
 	contentType := string(fastReq.Header.ContentType())
 	if strings.HasPrefix(strings.ToLower(contentType), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
 		multipartBody, err := DealMultipart(contentType, rule.Request.Body)
@@ -126,8 +113,9 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
+
 	if rule.Request.FollowRedirects {
-		maxrd := 5
+		maxrd := 5 // follow redirects default 5
 		if fc.MaxRedirect > 0 {
 			maxrd = int(fc.MaxRedirect)
 		}
@@ -144,14 +132,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		}
 	}
 
-	// log.Log().Info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-	// log.Log().Info(fastReq.URI().String())
-	// log.Log().Info(string(fastReq.RequestURI()))
-	// log.Log().Info(string(fastReq.Header.Header()))
-	// log.Log().Info(string(fastReq.Body()))
-	// // log.Log().Info(fastReq.String())
-	// log.Log().Info("-----------------------------------------------------")
-
+	// set fastResp body
 	var respBody []byte
 	contentEncoding := strings.ToLower(string(fastResp.Header.Peek("Content-Encoding")))
 	switch contentEncoding {
@@ -165,17 +146,15 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		respBody = []byte{}
 	}
 	if err != nil {
-		log.Log().Error(err.Error())
 		return err
 	}
 	fastResp.SetBody(respBody)
 
-	// 处理 reponse
-	fc.ResultResponse = protoResponsePool.Get().(*proto.Response)
-	fc.ResultResponse.Status = int32(fastResp.StatusCode())
+	// fc.VariableMap["response"] variable assignment
+	tempResultResponse := GetProtoResponsePool()
+	tempResultResponse.Status = int32(fastResp.StatusCode())
 	u, err := url.Parse(fastReq.URI().String())
 	if err != nil {
-		log.Log().Error(err.Error())
 		return err
 	}
 	urlType := &proto.UrlType{
@@ -187,8 +166,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 		Query:    u.RawQuery,
 		Fragment: u.Fragment,
 	}
-	fc.ResultResponse.Url = urlType
-
+	tempResultResponse.Url = urlType
 	newheader := make(map[string]string)
 	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
 	for _, h := range respHeaderSlice {
@@ -204,21 +182,19 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 			newheader[k] = v
 		}
 	}
-	fc.ResultResponse.Headers = newheader
-	fc.ResultResponse.ContentType = string(fastResp.Header.ContentType())
-	fc.ResultResponse.Body = fastResp.Body()
+	tempResultResponse.Headers = newheader
+	tempResultResponse.ContentType = string(fastResp.Header.ContentType())
+	tempResultResponse.Body = fastResp.Body()
+	tempResultResponse.Raw = []byte(fastResp.String())
+	tempResultResponse.RawHeader = fastResp.Header.Header()
+	// tempResultResponse.Conn.Source.Addr = fastResp.LocalAddr().String()
+	// tempResultResponse.Conn.Destination.Addr = fastResp.RemoteAddr().String()
+	fc.VariableMap["response"] = tempResultResponse
 
-	fc.ResultResponse.Raw = []byte(fastResp.String())
-	fc.ResultResponse.RawHeader = fastResp.Header.Header()
-	// fc.ResultResponse.Conn.Source.Addr = fastResp.LocalAddr().String()
-	// fc.ResultResponse.Conn.Destination.Addr = fastResp.RemoteAddr().String()
-
-	fc.VariableMap["response"] = fc.ResultResponse
-
-	// 处理 request
-	fc.NewProtoRequest.Method = string(fastReq.Header.Method())
-	fc.NewProtoRequest.Url = urlType
-
+	// fc.VariableMap["request"] variable assignment
+	tempResultRequest := GetProtoRequestPool()
+	tempResultRequest.Method = string(fastReq.Header.Method())
+	tempResultRequest.Url = urlType
 	newReqheader := make(map[string]string)
 	reqHeaderSlice := strings.Split(fastReq.Header.String(), "\r\n")
 	for _, h := range reqHeaderSlice {
@@ -234,17 +210,12 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, para
 			newReqheader[k] = v
 		}
 	}
-	fc.NewProtoRequest.Headers = newReqheader
-	fc.NewProtoRequest.ContentType = newReqheader["content-type"]
-	fc.NewProtoRequest.Body = fastReq.Body()
-	fc.NewProtoRequest.RawHeader = fastReq.Header.Header()
-	fc.NewProtoRequest.Raw = []byte(string(fastReq.Header.Header()) + string(fastReq.Body()))
-	fc.VariableMap["request"] = fc.NewProtoRequest
-
-	// fmt.Println("+++++++++++++++++++++++++++++")
-	// fmt.Println(string(fastReq.URI().RequestURI()))
-	// fmt.Println(string(fastReq.RequestURI()))
-	// fmt.Println("+++++++++++++++++++++++++++++")
+	tempResultRequest.Headers = newReqheader
+	tempResultRequest.ContentType = newReqheader["content-type"]
+	tempResultRequest.Body = fastReq.Body()
+	tempResultRequest.RawHeader = fastReq.Header.Header()
+	tempResultRequest.Raw = []byte(string(fastReq.Header.Header()) + string(fastReq.Body()))
+	fc.VariableMap["request"] = tempResultRequest
 
 	return err
 }
@@ -273,23 +244,19 @@ func httpConnError(err error) (string, bool) {
 }
 
 func DealMultipart(contentType string, ruleBody string) (result string, err error) {
-	errMsg := ""
 	// 处理multipart的/n
 	re := regexp.MustCompile(`(?m)multipart\/form-Data; boundary=(.*)`)
 	match := re.FindStringSubmatch(contentType)
 	if len(match) != 2 {
-		errMsg = "no boundary in content-type"
-		return "", errors.New(errMsg)
+		return "", errors.New("no boundary in content-type")
 	}
 	boundary := "--" + match[1]
-	multiPartContent := ""
 
 	// 处理rule
+	multiPartContent := ""
 	multiFile := strings.Split(ruleBody, boundary)
 	if len(multiFile) == 0 {
-		errMsg = "ruleBody.Body multi content format err"
-		//logging.GlobalLogger.Error("util/requests.go:DealMultipart Err", errMsg)
-		return multiPartContent, errors.New(errMsg)
+		return multiPartContent, errors.New("ruleBody.Body multi content format err")
 	}
 
 	for _, singleFile := range multiFile {
@@ -327,11 +294,9 @@ func (fc *FastClient) AssignVariableMap(find string) string {
 	return find
 }
 
-func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) error {
-	curURL := req.URL.String()
-	dstRequest.SetRequestURI(curURL)
+func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) {
+	dstRequest.SetRequestURI(req.URL.String())
 	dstRequest.Header.SetMethod(req.Method)
-
 	for name, values := range req.Header {
 		// Loop over all values for the name.
 		for index, value := range values {
@@ -343,7 +308,6 @@ func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) e
 		}
 	}
 	dstRequest.SetBodyRaw(data)
-	return nil
 }
 
 func Url2UrlType(u *url.URL) *proto.UrlType {

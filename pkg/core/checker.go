@@ -3,11 +3,9 @@ package core
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/google/cel-go/common/types/ref"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/operators/celgo"
@@ -67,7 +65,7 @@ func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker
 	return c
 }
 
-func (c *Checker) Check() {
+func (c *Checker) Check() error {
 	var err error
 	// init variablemap from sync.pool
 	c.variableMap = VariableMapPool.Get().(map[string]interface{})
@@ -86,16 +84,9 @@ func (c *Checker) Check() {
 				// c.variableMap[key] = reverse.NewReverse() // todo
 				continue
 			}
-			var out ref.Val
-			switch v := value.(type) {
-			case int:
-				out, err = customLib.RunEval(strconv.Itoa(v), c.variableMap)
-			default:
-				out, err = customLib.RunEval(v.(string), c.variableMap)
-			}
+			out, err := customLib.RunEval(value.(string), c.variableMap)
 			if err != nil {
-				log.Log().Error(err.Error())
-				return
+				return err
 			}
 			switch value := out.Value().(type) {
 			// set value 无论是什么类型都先转成string
@@ -106,7 +97,6 @@ func (c *Checker) Check() {
 			default:
 				c.variableMap[key] = fmt.Sprintf("%v", out)
 			}
-			c.pocItem.Set[key] = out.Value()
 		}
 		customLib.WriteRuleSetOptions(c.pocItem.Set)
 	}
@@ -124,8 +114,7 @@ func (c *Checker) Check() {
 			// 原始请求
 			c.originalRequest, err = http.NewRequest("GET", c.target, nil)
 			if err != nil {
-				log.Log().Error(fmt.Sprintf("Target [%s] 格式不合法", c.target))
-				return
+				return err
 			}
 			// 设置User-Agent
 			if len(c.options.Config.ConfigHttp.UserAgent) > 0 {
@@ -139,13 +128,12 @@ func (c *Checker) Check() {
 			fastclient.Client = http2.New(c.options)
 			err = fastclient.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
-				return
+				return err
 			}
 
 			isVul, err := customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
-				log.Log().Error(err.Error())
-				return
+				return err
 			}
 			customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
@@ -163,8 +151,7 @@ func (c *Checker) Check() {
 
 	isVul, err := customLib.RunEval(c.pocItem.Expression, c.variableMap)
 	if err != nil {
-		log.Log().Error(err.Error())
-		return
+		return err
 	}
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
@@ -181,6 +168,8 @@ func (c *Checker) Check() {
 	log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
 	log.Log().Info(c.result.PrintResultInfo())
 	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+
+	return err
 }
 
 // 更新 Set/Payload VariableMap

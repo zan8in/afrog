@@ -14,6 +14,7 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 	for _, pocYaml := range allPocsYamlSlice {
 		p, err := poc.ReadPocs(pocYaml)
 		if err != nil {
+			log.Log().Error(err.Error())
 			continue
 		}
 		pocSlice = append(pocSlice, p)
@@ -27,7 +28,6 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 		}(p)
 	}
 	e.workPool.Wait()
-	// log.Log().Debug(fmt.Sprintf("scan pocs count:%d", len(pocSlice)))
 }
 
 func (e *Engine) executeTargets(poc1 poc.Poc) {
@@ -61,7 +61,9 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 		}
 	}()
 	c := NewChecker(*e.options, target, poc)
-	c.Check()
+	if err := c.Check(); err != nil {
+		log.Log().Error(err.Error())
+	}
 	randSleep()
 }
 
