@@ -19,10 +19,11 @@ func main() {
 }
 
 func readConfig() {
-	options.Targets.Set("https://202.65.121.62:7199")
-	options.Targets.Set("https://34.141.128.122")
-	options.Targets.Set("http://121.196.164.206:9000")
-	options.Targets.Set("http://139.9.119.190:9001")
+	// options.Targets.Set("https://202.65.121.62:7199")
+	// options.Targets.Set("https://34.141.128.122")
+	// options.Targets.Set("http://121.196.164.206:9000")
+	// options.Targets.Set("http://139.9.119.190:9001")
+	options.Targets.Set("http://127.0.0.1")
 	// allTargets, _ := utils.ReadFileLineByLine("./urls.txt")
 	// for _, t := range allTargets {
 	// 	options.Targets.Set(t)

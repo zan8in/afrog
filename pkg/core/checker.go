@@ -86,6 +86,12 @@ func (c *Checker) Check() error {
 		customLib.WriteRuleSetOptions(c.pocItem.Set)
 	}
 
+	// payloads
+	if len(c.pocItem.Payloads.Payloads) > 0 {
+		c.UpdateVariableMap(customLib, c.pocItem.Payloads.Payloads)
+		customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
+	}
+
 	// 处理 rule
 	for _, ruleMap := range c.pocItem.Rules {
 		k := ruleMap.Key
@@ -141,18 +147,18 @@ func (c *Checker) Check() error {
 	c.result.IsVul = isVul.Value().(bool)
 
 	// print result info (调试)
-	// log.Log().Info("----------------------------------------------------------------")
-	// for _, v := range c.result.AllPocResult {
-	// 	log.Log().Info("Request:\r\n")
-	// 	log.Log().Info(v.ReadFullResultRequestInfo())
-	// 	log.Log().Info("Response:\r\n")
-	// 	log.Log().Info(v.ReadFullResultResponseInfo())
-	// }
+	log.Log().Info("----------------------------------------------------------------")
+	for _, v := range c.result.AllPocResult {
+		log.Log().Info("Request:\r\n")
+		log.Log().Info(v.ReadFullResultRequestInfo())
+		log.Log().Info("Response:\r\n")
+		log.Log().Info(v.ReadFullResultResponseInfo())
+	}
 	// // log.Log().Info(c.result.ReadPocInfo())
 	// log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
 	reslt := c.result.PrintResultInfo()
 	if reslt != "" {
-		log.Log().Error(reslt)
+		log.Log().Info(fmt.Sprintf("Result: %s\r\n", reslt))
 		// lock.Lock()
 		// utils.BufferWriteAppend("./result.txt", reslt)
 		// lock.Unlock()
