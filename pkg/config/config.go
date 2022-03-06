@@ -15,7 +15,6 @@ type Config struct {
 	TargetSizeWaitGroup int32      `yaml:"target_sizewaitgroup"`
 	ConfigHttp          ConfigHttp `yaml:"http"`
 }
-
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
 	ReadTimeout         string `yaml:"read_timeout"`
@@ -32,6 +31,7 @@ type ConfigHttp struct {
 const afrogConfigFilename = ".afrog-config.yaml"
 const Version = "1.0"
 
+// Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
 	config, err := ReadConfiguration()
 	if err != nil {
@@ -43,8 +43,8 @@ func New() (*Config, error) {
 	c.TargetSizeWaitGroup = 8
 	configHttp := c.ConfigHttp
 	configHttp.Proxy = ""
-	configHttp.ReadTimeout = "15000ms"
-	configHttp.ReadTimeout = "1500ms"
+	configHttp.ReadTimeout = "100000ms"
+	configHttp.WriteTimeout = "100000ms"
 	configHttp.MaxIdle = "1h"
 	configHttp.MaxRedirect = 5
 	configHttp.Concurrency = 4096

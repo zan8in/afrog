@@ -21,6 +21,7 @@ type Poc struct {
 	Info       Info         `yaml:"info"`
 }
 
+// TODO REMARK
 type Payloadss = map[string]Sets
 type Payloads struct {
 	Continue bool      `yaml:"continue"`
@@ -88,7 +89,9 @@ type Classification struct {
 
 const afrogPocsDirectory = "afrog-pocs"
 
-func SetPocDirectory() (string, error) {
+// Initialize afrog-pocs directory
+// @return pocsDir {{UserHomeDir}}/afrog-pocs
+func InitPocHomeDirectory() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -102,7 +105,8 @@ func SetPocDirectory() (string, error) {
 	return pocsDir, err
 }
 
-// ReadConfiguration reads the afrog configuration file from disk.
+// Read a poc yaml file from disk.
+// `pocYaml` is a poc yaml file of absolute path.
 func ReadPocs(pocYaml string) (Poc, error) {
 	var poc = Poc{}
 	file, err := os.Open(pocYaml)
