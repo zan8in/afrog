@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/zan8in/afrog/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -33,28 +34,38 @@ const Version = "1.0"
 
 // Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
-	config, err := ReadConfiguration()
-	if err != nil {
-		return config, err
+	if isExistConfigFile() != nil {
+		c := Config{}
+		c.ConfigVersion = Version
+		c.PocSizeWaitGroup = 8
+		c.TargetSizeWaitGroup = 8
+		configHttp := c.ConfigHttp
+		configHttp.Proxy = ""
+		configHttp.ReadTimeout = "100000ms"
+		configHttp.WriteTimeout = "100000ms"
+		configHttp.MaxIdle = "1h"
+		configHttp.MaxRedirect = 5
+		configHttp.Concurrency = 4096
+		configHttp.MaxConnsPerHost = 10000
+		configHttp.MaxResponseBodySize = 1024 * 1024 * 2
+		configHttp.MaxRedirectCount = 5
+		configHttp.UserAgent = ""
+		c.ConfigHttp = configHttp
+		WriteConfiguration(&c)
 	}
-	c := Config{}
-	c.ConfigVersion = Version
-	c.PocSizeWaitGroup = 8
-	c.TargetSizeWaitGroup = 8
-	configHttp := c.ConfigHttp
-	configHttp.Proxy = ""
-	configHttp.ReadTimeout = "100000ms"
-	configHttp.WriteTimeout = "100000ms"
-	configHttp.MaxIdle = "1h"
-	configHttp.MaxRedirect = 5
-	configHttp.Concurrency = 4096
-	configHttp.MaxConnsPerHost = 10000
-	configHttp.MaxResponseBodySize = 1024 * 1024 * 2
-	configHttp.MaxRedirectCount = 5
-	configHttp.UserAgent = "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0"
-	c.ConfigHttp = configHttp
-	WriteConfiguration(&c)
 	return ReadConfiguration()
+}
+
+func isExistConfigFile() error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return errors.Wrap(err, "could not get home directory")
+	}
+	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
+	if utils.Exists(configFile) {
+		return nil
+	}
+	return errors.New("could not get config file")
 }
 
 func getConfigFile() (string, error) {

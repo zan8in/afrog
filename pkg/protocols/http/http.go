@@ -121,7 +121,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		}
 		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
 	} else {
-		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*1)
+		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
 	}
 	if err != nil {
 		errName, known := httpConnError(err)
