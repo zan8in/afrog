@@ -147,25 +147,24 @@ func (c *Checker) Check() error {
 	c.result.IsVul = isVul.Value().(bool)
 
 	// print result info (调试)
-	log.Log().Info("----------------------------------------------------------------")
-	for _, v := range c.result.AllPocResult {
-		log.Log().Info("Request:\r\n")
-		log.Log().Info(v.ReadFullResultRequestInfo())
-		log.Log().Info("Response:\r\n")
-		log.Log().Info(v.ReadFullResultResponseInfo())
+	c.PrintTraceInfo()
+
+	return err
+}
+
+func (c *Checker) PrintTraceInfo() {
+	log.Log().Info("------------------------start----------------------------------------")
+	for i, v := range c.result.AllPocResult {
+		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
 	}
-	// // log.Log().Info(c.result.ReadPocInfo())
-	// log.Log().Info(fmt.Sprintf("Result: %v\r\n", c.result.IsVul))
 	reslt := c.result.PrintResultInfo()
 	if reslt != "" {
-		log.Log().Info(fmt.Sprintf("Result: %s\r\n", reslt))
+		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", reslt))
 		// lock.Lock()
 		// utils.BufferWriteAppend("./result.txt", reslt)
 		// lock.Unlock()
 	}
-	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-
-	return err
+	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }
 
 // Update Set/Payload VariableMap
