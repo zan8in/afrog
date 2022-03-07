@@ -93,7 +93,9 @@ func InitPocHomeDirectory() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	pocsDir := filepath.Join(homeDir, afrogPocsDirectory)
+
 	_, err = os.Stat(pocsDir)
 	if err != nil {
 		err = os.MkdirAll(pocsDir, 0755)
@@ -106,6 +108,7 @@ func InitPocHomeDirectory() (string, error) {
 // `pocYaml` is a poc yaml file of absolute path.
 func ReadPocs(pocYaml string) (Poc, error) {
 	var poc = Poc{}
+
 	file, err := os.Open(pocYaml)
 	if err != nil {
 		return poc, err
@@ -135,6 +138,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	order = 0
+
 	tempMap := make(map[string]Rule, 1)
 	err := unmarshal(&tempMap)
 	if err != nil {

@@ -72,7 +72,6 @@ type runCallback func(interface{}, error)
 func NewCustomLib() *CustomLib {
 	c := CustomLibPool.Get().(CustomLib)
 	reg := types.NewEmptyRegistry()
-
 	c.envOptions = ReadComplieOptions(reg)
 	c.programOptions = ReadProgramOptions(reg)
 	return &c

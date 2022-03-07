@@ -13,10 +13,12 @@ import (
 
 func ReadFileLineByLine(filename string) ([]string, error) {
 	var result []string
+
 	fp, err := os.Open(filename)
 	if err != nil {
 		return result, err
 	}
+
 	buf := bufio.NewScanner(fp)
 	for {
 		if !buf.Scan() {
@@ -32,16 +34,13 @@ func ReadFromFile(filename string) ([]byte, error) {
 	if !Exists(filename) {
 		return nil, errors.New(filename + "文件不存在")
 	}
+
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	if err != nil {
-		log.Println("读取文件失败: ", err)
-		return nil, err
-	}
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Println("读取文件失败: ", err)

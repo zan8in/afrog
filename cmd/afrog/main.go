@@ -10,7 +10,6 @@ import (
 var options = &config.Options{}
 
 func main() {
-
 	readConfig()
 
 	if _, err := runner.New(options); err != nil {
@@ -41,5 +40,4 @@ func readConfig() {
 		log.Log().Fatal(err.Error())
 	}
 	options.Config = config
-
 }

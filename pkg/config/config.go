@@ -77,10 +77,12 @@ func isExistConfigFile() error {
 	if err != nil {
 		return errors.Wrap(err, "could not get home directory")
 	}
+
 	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
 	if utils.Exists(configFile) {
 		return nil
 	}
+
 	return errors.New("could not get config file")
 }
 
@@ -89,8 +91,10 @@ func getConfigFile() (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "could not get home directory")
 	}
+
 	configDir := filepath.Join(homeDir, ".config", "afrog")
 	_ = os.MkdirAll(configDir, 0755)
+
 	afrogConfigFile := filepath.Join(configDir, afrogConfigFilename)
 	return afrogConfigFile, nil
 }

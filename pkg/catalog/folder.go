@@ -108,6 +108,7 @@ func (pathInfo PathInfo) MeshWith(anotherPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var combos []string
 	for _, basePath := range allPaths {
 		combinedPath := filepath.Join(basePath, anotherPath)

@@ -64,7 +64,6 @@ func New(options *config.Options) *fasthttp.Client {
 		// client.Dial = fasthttpproxy.FasthttpHTTPDialerTimeout("localhost:10808", time.Second*5) // http proxy 有问题，不支持https访问
 		client.Dial = fasthttpproxy.FasthttpSocksDialer("socks5://" + options.Config.ConfigHttp.Proxy)
 	}
-
 	return client
 }
 
@@ -81,6 +80,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	for k, v := range rule.Request.Headers {
 		fastReq.Header.Set(k, fc.AssignVariableMap(v, variableMap))
 	}
+
 	// set fastReq.Header method from poc.Rule
 	fastReq.Header.SetMethod(rule.Request.Method)
 

@@ -52,15 +52,16 @@ func (c *Catalog) tryResolve(fullPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	pathInfoItems, err := pathInfo.MeshWith(filename)
 	if err != nil {
 		return "", err
 	}
+
 	for _, pathInfoItem := range pathInfoItems {
 		if _, err := os.Stat(pathInfoItem); !os.IsNotExist(err) {
 			return pathInfoItem, nil
 		}
 	}
-
 	return "", errNoValidCombination
 }
