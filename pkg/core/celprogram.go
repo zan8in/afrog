@@ -360,7 +360,69 @@ var (
 )
 
 func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
-	allProgramOpitons := []cel.ProgramOption{}
+	allProgramOpitons := []cel.ProgramOption{
+		cel.Functions(
+			&functions.Overload{
+				Operator: "string_submatch_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					var (
+						resultMap = make(map[string]string)
+					)
+
+					v1, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to submatch", lhs.Type())
+					}
+					v2, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to submatch", rhs.Type())
+					}
+
+					re := regexp2.MustCompile(string(v1), regexp2.RE2)
+					if m, _ := re.FindStringMatch(string(v2)); m != nil {
+						gps := m.Groups()
+						for n, gp := range gps {
+							if n == 0 {
+								continue
+							}
+							resultMap[gp.Name] = gp.String()
+						}
+					}
+					return types.NewStringStringMap(reg, resultMap)
+				},
+			},
+			&functions.Overload{
+				Operator: "string_bsubmatch_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					var (
+						resultMap = make(map[string]string)
+					)
+
+					v1, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to bsubmatch", lhs.Type())
+					}
+					v2, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to bsubmatch", rhs.Type())
+					}
+
+					re := regexp2.MustCompile(string(v1), regexp2.RE2)
+					if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {
+						gps := m.Groups()
+						for n, gp := range gps {
+							if n == 0 {
+								continue
+							}
+							resultMap[gp.Name] = gp.String()
+						}
+					}
+
+					return types.NewStringStringMap(reg, resultMap)
+				},
+			},
+		),
+	}
 	allProgramOpitons = append(allProgramOpitons, NewProgramOptions...)
 	return allProgramOpitons
 }

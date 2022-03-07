@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
@@ -99,13 +100,13 @@ func (c *Checker) Check() error {
 
 	// set
 	if len(c.pocItem.Set) > 0 {
-		c.customLib.WriteRuleSetOptions(c.pocItem.Set)
+		// c.customLib.WriteRuleSetOptions(c.pocItem.Set)
 		c.UpdateVariableMap(c.pocItem.Set)
 	}
 
 	// payloads
 	if len(c.pocItem.Payloads.Payloads) > 0 {
-		c.customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
+		// c.customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
 		c.UpdateVariableMap(c.pocItem.Payloads.Payloads)
 	}
 
@@ -143,7 +144,14 @@ func (c *Checker) Check() error {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
 				return err
 			}
+			// set result function eg: r1() r2()
 			c.customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
+
+			// output
+			if len(rule.Output) > 0 {
+				// c.customLib.WriteRuleSetOptions(rule.Output)
+				c.UpdateVariableMap(rule.Output)
+			}
 
 			// save result of request、response、target、pocinfo eg.
 			c.pocResult = PocResultPool.Get().(*PocResult)
@@ -183,7 +191,7 @@ func (c *Checker) PrintTraceInfo() {
 		// utils.BufferWriteAppend("./result.txt", reslt)
 		// lock.Unlock()
 	}
-	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }
 
 // Update Set/Payload VariableMap
@@ -193,6 +201,7 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 		value := item.Value.(string)
 		if value == "newReverse()" {
 			c.variableMap[key] = c.newRerverse()
+			c.customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
 			continue
 		}
 		out, err := c.customLib.RunEval(value, c.variableMap)
@@ -203,10 +212,16 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 		switch value := out.Value().(type) {
 		case *proto.UrlType:
 			c.variableMap[key] = utils.UrlTypeToString(value)
+			c.customLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
 		case int64:
 			c.variableMap[key] = int(value)
+			c.customLib.UpdateCompileOption(key, decls.Int)
+		case map[string]string:
+			c.variableMap[key] = value
+			c.customLib.UpdateCompileOption(key, StrStrMapType)
 		default:
 			c.variableMap[key] = fmt.Sprintf("%v", out)
+			c.customLib.UpdateCompileOption(key, decls.String)
 		}
 	}
 }

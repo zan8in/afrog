@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	StrStrMapType = decls.NewMapType(decls.String, decls.String)
 	NewEnvOptions = []cel.EnvOption{
 		cel.Container("proto"),
 		cel.Types(
@@ -16,6 +17,7 @@ var (
 			&proto.Request{},
 			&proto.Response{},
 			&proto.Reverse{},
+			StrStrMapType,
 		),
 		cel.Declarations(
 			decls.NewVar("request", decls.NewObjectType("proto.Request")),
@@ -111,12 +113,12 @@ var (
 			decls.NewFunction("submatch",
 				decls.NewInstanceOverload("string_submatch_string",
 					[]*exprpb.Type{decls.String, decls.String},
-					decls.NewMapType(decls.String, decls.String),
+					StrStrMapType,
 				)),
 			decls.NewFunction("bsubmatch",
 				decls.NewInstanceOverload("string_bsubmatch_bytes",
 					[]*exprpb.Type{decls.String, decls.Bytes},
-					decls.NewMapType(decls.String, decls.String),
+					StrStrMapType,
 				)),
 			decls.NewFunction("bmatches",
 				decls.NewInstanceOverload("string_bmatches_bytes",

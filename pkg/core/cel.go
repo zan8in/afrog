@@ -127,6 +127,8 @@ func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
 			} else {
 				d = decls.NewVar(key, decls.String)
 			}
+		case map[string]string:
+			d = decls.NewVar(key, StrStrMapType)
 		default:
 			d = decls.NewVar(key, decls.String)
 		}
