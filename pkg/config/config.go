@@ -19,6 +19,7 @@ type Config struct {
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
+	DialTimeout         int32  `yaml:"dial_timeout"`
 	ReadTimeout         string `yaml:"read_timeout"`
 	WriteTimeout        string `yaml:"write_timeout"`
 	MaxRedirect         int32  `yaml:"max_redirect"`
@@ -51,6 +52,7 @@ func New() (*Config, error) {
 		c.TargetSizeWaitGroup = 8
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
+		configHttp.DialTimeout = 10
 		configHttp.ReadTimeout = "100000ms"
 		configHttp.WriteTimeout = "100000ms"
 		configHttp.MaxIdle = "1h"

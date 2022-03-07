@@ -23,6 +23,7 @@ import (
 type FastClient struct {
 	Client      *fasthttp.Client
 	MaxRedirect int32
+	DialTimeout int32
 }
 
 var protoRequestPool sync.Pool = sync.Pool{
@@ -118,7 +119,11 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		}
 		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
 	} else {
-		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
+		dialtimeout := 15
+		if fc.DialTimeout > 0 {
+			dialtimeout = int(fc.DialTimeout)
+		}
+		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
 	}
 	if err != nil {
 		errName, known := httpConnError(err)

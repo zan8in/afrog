@@ -84,6 +84,7 @@ func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker
 func (c *Checker) Check() error {
 	var err error
 	FastClient = &http2.FastClient{}
+	FastClient.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
 	FastClient.Client = http2.New(c.options)
 
 	// init variablemap from sync.pool
