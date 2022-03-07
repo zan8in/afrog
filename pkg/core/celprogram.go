@@ -431,22 +431,21 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 	if len(ReverseCeyeApiKey) == 0 || len(r.Domain) == 0 {
 		return false
 	}
+
 	time.Sleep(time.Second * time.Duration(timeout))
+
 	sub := strings.Split(r.Domain, ".")[0]
 	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", ReverseCeyeApiKey, sub)
 
-	// log.Log().Info(urlStr)
-
 	req, _ := http.NewRequest("GET", urlStr, nil)
-	resp, err := FastClient.SampleHTTPRequest(req)
+	resp, err := FastClientReverse.SampleHTTPRequest(req)
 	if err != nil {
 		log.Log().Error(err.Error())
 		return false
 	}
+
 	if !bytes.Contains(resp.Body, []byte(`"data": []`)) { // api返回结果不为空
-		fmt.Println("true:", string(resp.Body))
 		return true
 	}
-	fmt.Println("false:", string(resp.Body))
 	return false
 }

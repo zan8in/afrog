@@ -62,118 +62,140 @@ var VariableMapPool = sync.Pool{
 	},
 }
 
+var FastClientPool = sync.Pool{
+	New: func() interface{} {
+		return &http2.FastClient{}
+	},
+}
+
 var ReverseCeyeApiKey string
 var ReverseCeyeDomain string
 
 var lock sync.Mutex
-var FastClient *http2.FastClient
+
+var FastClientReverse *http2.FastClient // 用于 reverse http client
 
 func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.options = &options
 	c.target = target
 	c.pocItem = &pocItem
+
 	ReverseCeyeApiKey = options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = options.Config.Reverse.Ceye.Domain
+
 	if len(ReverseCeyeApiKey) == 0 || len(ReverseCeyeDomain) == 0 {
 		log.Log().Error("Rerverse CeyeApiKey or CeyeDomain is Empty.")
 		return nil
 	}
+
 	return c
 }
 
 func (c *Checker) Check() error {
 	var err error
-	FastClient = &http2.FastClient{}
-	FastClient.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
-	FastClient.Client = http2.New(c.options)
+
+	// init fasthttp client
+	fc := FastClientPool.Get().(*http2.FastClient)
+	fc.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
+	fc.Client = http2.New(c.options)
 
 	// init variablemap from sync.pool
 	c.variableMap = VariableMapPool.Get().(map[string]interface{})
+
 	// init result
 	c.result = ResultPool.Get().(*Result)
 	c.result.Target = c.target
 	c.result.PocInfo = c.pocItem
 
-	//log.Log().Debug(fmt.Sprintf("Run afrog Poc [%s] for %s", c.pocItem.Id, c.target))
+	// init cel
 	c.customLib = NewCustomLib()
 
-	// set
+	// update set cel and variablemap
 	if len(c.pocItem.Set) > 0 {
 		// c.customLib.WriteRuleSetOptions(c.pocItem.Set)
 		c.UpdateVariableMap(c.pocItem.Set)
 	}
 
-	// payloads
+	// update payloads cel and variablemap
 	if len(c.pocItem.Payloads.Payloads) > 0 {
 		// c.customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
 		c.UpdateVariableMap(c.pocItem.Payloads.Payloads)
 	}
 
-	// 处理 rule
+	// rule
 	for _, ruleMap := range c.pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
+
 		// translate : http
 		if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
 			if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
 				c.target = "http://" + c.target
 			}
-			// 原始请求
+
+			// original request
 			c.originalRequest, err = http.NewRequest("GET", c.target, nil)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
 				return err
 			}
-			// 设置User-Agent
+
+			// set User-Agent
 			if len(c.options.Config.ConfigHttp.UserAgent) > 0 {
 				c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
 			} else {
 				c.originalRequest.Header.Set("User-Agent", utils.RandomUA())
 			}
 
-			FastClient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
-			err = FastClient.HTTPRequest(c.originalRequest, rule, c.variableMap)
+			// run fasthttp client
+			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
+			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
 				return err
 			}
 
+			// run cel expression
 			isVul, err := c.customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
 				return err
 			}
+
 			// set result function eg: r1() r2()
 			c.customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
-			// output
+			// update output cel and variablemap
 			if len(rule.Output) > 0 {
 				// c.customLib.WriteRuleSetOptions(rule.Output)
 				c.UpdateVariableMap(rule.Output)
 			}
 
-			// save result of request、response、target、pocinfo eg.
+			// save result eg: request、response、target、pocinfo etc.
 			c.pocResult = PocResultPool.Get().(*PocResult)
 			c.pocResult.IsVul = isVul.Value().(bool)
 			c.pocResult.ResultRequest = c.variableMap["request"].(*proto.Request)
 			c.pocResult.ResultResponse = c.variableMap["response"].(*proto.Response)
-			// 保存每次request和response，用于调试和结果展示
+			// save to allresult slice
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
-			// log.Log().Info(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
+			// debug per rule result
+			// log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
 		}
 	}
 
+	// run final cel expression
 	isVul, err := c.customLib.RunEval(c.pocItem.Expression, c.variableMap)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
 		return err
 	}
+
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
-	// print result info (调试)
+	// print result info for debug
 	c.PrintTraceInfo()
 
 	return err
@@ -187,28 +209,38 @@ func (c *Checker) PrintTraceInfo() {
 	reslt := c.result.PrintResultInfo()
 	if reslt != "" {
 		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", reslt))
-		// lock.Lock()
-		// utils.BufferWriteAppend("./result.txt", reslt)
-		// lock.Unlock()
+
+		// save to result.txt file
+		lock.Lock()
+		utils.BufferWriteAppend("./result.txt", reslt)
+		lock.Unlock()
 	}
-	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }
 
-// Update Set/Payload VariableMap
+// update set、payload、output variableMap etc.
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 	for _, item := range args {
 		key := item.Key.(string)
 		value := item.Value.(string)
+
 		if value == "newReverse()" {
 			c.variableMap[key] = c.newRerverse()
 			c.customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+
+			// if reverse()，initilize a fasthttpclient
+			FastClientReverse = FastClientPool.Get().(*http2.FastClient)
+			FastClientReverse.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
+			FastClientReverse.Client = http2.New(c.options)
 			continue
 		}
+
 		out, err := c.customLib.RunEval(value, c.variableMap)
 		if err != nil {
-			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] err, %s", key, value, err.Error()))
-			continue
+			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] Eval err, %s", key, value, err.Error()))
+			return
 		}
+
 		switch value := out.Value().(type) {
 		case *proto.UrlType:
 			c.variableMap[key] = utils.UrlTypeToString(value)
