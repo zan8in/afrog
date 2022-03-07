@@ -15,6 +15,7 @@ type Config struct {
 	PocSizeWaitGroup    int32      `yaml:"poc_sizewaitgroup"`
 	TargetSizeWaitGroup int32      `yaml:"target_sizewaitgroup"`
 	ConfigHttp          ConfigHttp `yaml:"http"`
+	Reverse             Reverse    `yaml:"reverse"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -27,6 +28,15 @@ type ConfigHttp struct {
 	MaxResponseBodySize int    `yaml:"max_responsebody_sizse"`
 	MaxRedirectCount    int    `yaml:"max_redirect_count"`
 	UserAgent           string `yaml:"user_agent"`
+}
+
+type Reverse struct {
+	Ceye Ceye `yaml:"ceye"`
+}
+
+type Ceye struct {
+	ApiKey string `yaml:"api-key"`
+	Domain string `yaml:"domain`
 }
 
 const afrogConfigFilename = ".afrog-config.yaml"
@@ -51,6 +61,10 @@ func New() (*Config, error) {
 		configHttp.MaxRedirectCount = 5
 		configHttp.UserAgent = ""
 		c.ConfigHttp = configHttp
+		reverse := c.Reverse
+		reverse.Ceye.ApiKey = "bba3368c28118247ddc4785630b8fca0"
+		reverse.Ceye.Domain = "7gn2sm.ceye.io"
+		c.Reverse = reverse
 		WriteConfiguration(&c)
 	}
 	return ReadConfiguration()

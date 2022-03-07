@@ -1,6 +1,8 @@
 package config
 
-import "github.com/zan8in/afrog/pkg/utils"
+import (
+	"github.com/zan8in/afrog/pkg/utils"
+)
 
 type Options struct {
 	// afrog-config.yaml configuration file

@@ -1,4 +1,4 @@
-package celgo
+package core
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
 	"github.com/zan8in/afrog/pkg/errors"
+	"github.com/zan8in/afrog/pkg/log"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"gopkg.in/yaml.v2"
 )
@@ -68,13 +69,13 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{
 type runCallback func(interface{}, error)
 
 // Step 1: 创建 cel 库
-func NewCustomLib() CustomLib {
+func NewCustomLib() *CustomLib {
 	c := CustomLibPool.Get().(CustomLib)
 	reg := types.NewEmptyRegistry()
 
 	c.envOptions = ReadComplieOptions(reg)
 	c.programOptions = ReadProgramOptions(reg)
-	return c
+	return &c
 }
 
 // Step 2: 创建 cel 环境
@@ -90,14 +91,17 @@ func (c *CustomLib) NewCelEnv() (env *cel.Env, err error) {
 func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.Val, error) {
 	ast, iss := env.Compile(expression)
 	if iss.Err() != nil {
+		log.Log().Error(fmt.Sprintf("cel env.Compile err, %s", iss.Err().Error()))
 		return nil, iss.Err()
 	}
 	prg, err := env.Program(ast)
 	if err != nil {
+		log.Log().Error(fmt.Sprintf("cel env.Program err, %s", err.Error()))
 		return nil, err
 	}
 	out, _, err := prg.Eval(params)
 	if err != nil {
+		log.Log().Error(fmt.Sprintf("cel prg.Eval err, %s", err.Error()))
 		return nil, err
 	}
 	return out, nil
@@ -117,7 +121,7 @@ func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
 			d = decls.NewVar(key, decls.Int)
 		case string:
 			if strings.HasPrefix(vv, "newReverse") {
-				d = decls.NewVar(key, decls.NewObjectType("gocel.Reverse"))
+				d = decls.NewVar(key, decls.NewObjectType("proto.Reverse"))
 			} else if strings.HasPrefix(vv, "randomInt") {
 				d = decls.NewVar(key, decls.Int)
 			} else {
@@ -146,5 +150,8 @@ func (c *CustomLib) WriteRuleFunctionsROptions(funcName string, returnBool bool)
 				return types.Bool(returnBool)
 			},
 		}))
+}
 
+func (c *CustomLib) UpdateCompileOption(k string, t *exprpb.Type) {
+	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(k, t)))
 }

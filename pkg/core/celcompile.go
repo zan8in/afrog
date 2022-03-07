@@ -1,4 +1,4 @@
-package celgo
+package core
 
 import (
 	"github.com/google/cel-go/cel"
@@ -20,6 +20,7 @@ var (
 		cel.Declarations(
 			decls.NewVar("request", decls.NewObjectType("proto.Request")),
 			decls.NewVar("response", decls.NewObjectType("proto.Response")),
+			// decls.NewVar("reverse", decls.NewObjectType("proto.Reverse")),
 		),
 		cel.Declarations(
 			// string
@@ -120,6 +121,11 @@ var (
 			decls.NewFunction("bmatches",
 				decls.NewInstanceOverload("string_bmatches_bytes",
 					[]*exprpb.Type{decls.String, decls.Bytes},
+					decls.Bool)),
+			// reverse
+			decls.NewFunction("wait",
+				decls.NewInstanceOverload("reverse_wait_int",
+					[]*exprpb.Type{decls.Any, decls.Int},
 					decls.Bool)),
 		),
 	}

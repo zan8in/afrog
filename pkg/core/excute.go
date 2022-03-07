@@ -1,9 +1,6 @@
 package core
 
 import (
-	"math/rand"
-	"time"
-
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
@@ -50,8 +47,7 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		}(target, poc1)
 	}
 	wg.WaitGroup.Wait()
-	// log.Log().Debug(fmt.Sprintf("scan targets count:%d", len(allTargets)))
-	randSleep()
+	utils.RandSleep(500)
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
@@ -64,10 +60,5 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 	if err := c.Check(); err != nil {
 		log.Log().Error(err.Error())
 	}
-	randSleep()
-}
-
-func randSleep() {
-	ms := 500 + rand.Intn(500)
-	time.Sleep(time.Duration(ms) * time.Millisecond)
+	utils.RandSleep(500)
 }

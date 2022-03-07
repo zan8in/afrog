@@ -2,13 +2,15 @@ package core
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
-	"github.com/zan8in/afrog/pkg/operators/celgo"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
@@ -24,6 +26,7 @@ type Checker struct {
 	variableMap     map[string]interface{}
 	result          *Result
 	pocResult       *PocResult
+	customLib       *CustomLib
 }
 
 var CheckerPool = sync.Pool{
@@ -58,18 +61,31 @@ var VariableMapPool = sync.Pool{
 	},
 }
 
+var ReverseCeyeApiKey string
+var ReverseCeyeDomain string
+
 var lock sync.Mutex
+var FastClient *http2.FastClient
 
 func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.options = &options
 	c.target = target
 	c.pocItem = &pocItem
+	ReverseCeyeApiKey = options.Config.Reverse.Ceye.ApiKey
+	ReverseCeyeDomain = options.Config.Reverse.Ceye.Domain
+	if len(ReverseCeyeApiKey) == 0 || len(ReverseCeyeDomain) == 0 {
+		log.Log().Error("Rerverse CeyeApiKey or CeyeDomain is Empty.")
+		return nil
+	}
 	return c
 }
 
 func (c *Checker) Check() error {
 	var err error
+	FastClient = &http2.FastClient{}
+	FastClient.Client = http2.New(c.options)
+
 	// init variablemap from sync.pool
 	c.variableMap = VariableMapPool.Get().(map[string]interface{})
 	// init result
@@ -78,18 +94,18 @@ func (c *Checker) Check() error {
 	c.result.PocInfo = c.pocItem
 
 	//log.Log().Debug(fmt.Sprintf("Run afrog Poc [%s] for %s", c.pocItem.Id, c.target))
-	customLib := celgo.NewCustomLib()
+	c.customLib = NewCustomLib()
 
 	// set
 	if len(c.pocItem.Set) > 0 {
-		c.UpdateVariableMap(customLib, c.pocItem.Set)
-		customLib.WriteRuleSetOptions(c.pocItem.Set)
+		c.customLib.WriteRuleSetOptions(c.pocItem.Set)
+		c.UpdateVariableMap(c.pocItem.Set)
 	}
 
 	// payloads
 	if len(c.pocItem.Payloads.Payloads) > 0 {
-		c.UpdateVariableMap(customLib, c.pocItem.Payloads.Payloads)
-		customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
+		c.customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
+		c.UpdateVariableMap(c.pocItem.Payloads.Payloads)
 	}
 
 	// 处理 rule
@@ -104,6 +120,7 @@ func (c *Checker) Check() error {
 			// 原始请求
 			c.originalRequest, err = http.NewRequest("GET", c.target, nil)
 			if err != nil {
+				log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
 				return err
 			}
 			// 设置User-Agent
@@ -113,19 +130,19 @@ func (c *Checker) Check() error {
 				c.originalRequest.Header.Set("User-Agent", utils.RandomUA())
 			}
 
-			fastclient := http2.FastClient{}
-			fastclient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
-			fastclient.Client = http2.New(c.options)
-			err = fastclient.HTTPRequest(c.originalRequest, rule, c.variableMap)
+			FastClient.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
+			err = FastClient.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
+				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
 				return err
 			}
 
-			isVul, err := customLib.RunEval(rule.Expression, c.variableMap)
+			isVul, err := c.customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
+				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
 				return err
 			}
-			customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
+			c.customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
 			// save result of request、response、target、pocinfo eg.
 			c.pocResult = PocResultPool.Get().(*PocResult)
@@ -135,12 +152,13 @@ func (c *Checker) Check() error {
 			// 保存每次request和response，用于调试和结果展示
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
-			log.Log().Info(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
+			// log.Log().Info(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
 		}
 	}
 
-	isVul, err := customLib.RunEval(c.pocItem.Expression, c.variableMap)
+	isVul, err := c.customLib.RunEval(c.pocItem.Expression, c.variableMap)
 	if err != nil {
+		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
 		return err
 	}
 	// save final result
@@ -153,10 +171,10 @@ func (c *Checker) Check() error {
 }
 
 func (c *Checker) PrintTraceInfo() {
-	log.Log().Info("------------------------start----------------------------------------")
-	for i, v := range c.result.AllPocResult {
-		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
-	}
+	// log.Log().Info("------------------------start----------------------------------------")
+	// for i, v := range c.result.AllPocResult {
+	// 	log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
+	// }
 	reslt := c.result.PrintResultInfo()
 	if reslt != "" {
 		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", reslt))
@@ -164,21 +182,22 @@ func (c *Checker) PrintTraceInfo() {
 		// utils.BufferWriteAppend("./result.txt", reslt)
 		// lock.Unlock()
 	}
-	log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }
 
 // Update Set/Payload VariableMap
-func (c *Checker) UpdateVariableMap(customLib celgo.CustomLib, args yaml.MapSlice) error {
+func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 	for _, item := range args {
 		key := item.Key.(string)
 		value := item.Value.(string)
 		if value == "newReverse()" {
-			// c.variableMap[key] = reverse.NewReverse() // todo
+			c.variableMap[key] = c.newRerverse()
 			continue
 		}
-		out, err := customLib.RunEval(value, c.variableMap)
+		out, err := c.customLib.RunEval(value, c.variableMap)
 		if err != nil {
-			return err
+			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] err, %s", key, value, err.Error()))
+			continue
 		}
 		switch value := out.Value().(type) {
 		case *proto.UrlType:
@@ -189,7 +208,6 @@ func (c *Checker) UpdateVariableMap(customLib celgo.CustomLib, args yaml.MapSlic
 			c.variableMap[key] = fmt.Sprintf("%v", out)
 		}
 	}
-	return nil
 }
 
 // 替换变量的值
@@ -211,4 +229,18 @@ func (c *Checker) AssignVariableMap(find string) string {
 		break
 	}
 	return find
+}
+
+func (c *Checker) newRerverse() *proto.Reverse {
+	letters := "1234567890abcdefghijklmnopqrstuvwxyz"
+	randSource := rand.New(rand.NewSource(time.Now().Unix()))
+	sub := utils.RandomStr(randSource, letters, 8)
+	urlStr := fmt.Sprintf("http://%s.%s", sub, ReverseCeyeDomain)
+	u, _ := url.Parse(urlStr)
+	return &proto.Reverse{
+		Url:                utils.ParseUrl(u),
+		Domain:             u.Hostname(),
+		Ip:                 "",
+		IsDomainNameServer: false,
+	}
 }

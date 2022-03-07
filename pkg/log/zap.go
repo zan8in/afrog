@@ -34,7 +34,7 @@ var (
 func Log() *zap.Logger {
 	logOnce.Do(func() {
 		core := zapcore.NewCore(getEncoder(), getLogWriter(), defaultLevel)
-		log = zap.New(core, zap.AddCaller())
+		log = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(0))
 		defer log.Sync()
 	})
 	return log

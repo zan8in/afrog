@@ -1,4 +1,4 @@
-package celgo
+package core
 
 import (
 	"bytes"
@@ -6,9 +6,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/dlclark/regexp2"
@@ -16,10 +18,10 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
+	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
 )
-
-// prefrence: https://github.com/WAY29/pocV/blob/main/pkg/xray/cel/implementation.go
 
 var (
 	NewProgramOptions = []cel.ProgramOption{
@@ -338,81 +340,51 @@ var (
 					return types.Bool(isMatch)
 				},
 			},
+			// reverse
+			&functions.Overload{
+				Operator: "reverse_wait_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					reverse, ok := lhs.Value().(*proto.Reverse)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+					}
+					timeout, ok := rhs.Value().(int64)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
+					}
+					return types.Bool(reverseCheck(reverse, timeout))
+				},
+			},
 		),
 	}
 )
 
 func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
-	allProgramOpitons := []cel.ProgramOption{
-		// regex
-		cel.Functions(
-			&functions.Overload{
-				Operator: "string_submatch_string",
-				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					var (
-						resultMap = make(map[string]string)
-					)
-
-					v1, ok := lhs.(types.String)
-					if !ok {
-						return types.ValOrErr(lhs, "unexpected type '%v' passed to submatch", lhs.Type())
-					}
-					v2, ok := rhs.(types.String)
-					if !ok {
-						return types.ValOrErr(rhs, "unexpected type '%v' passed to submatch", rhs.Type())
-					}
-
-					re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					if m, _ := re.FindStringMatch(string(v2)); m != nil {
-						gps := m.Groups()
-						for n, gp := range gps {
-							if n == 0 {
-								continue
-							}
-							resultMap[gp.Name] = gp.String()
-						}
-					}
-					return types.NewStringStringMap(reg, resultMap)
-				},
-			},
-			&functions.Overload{
-				Operator: "string_bsubmatch_bytes",
-				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					var (
-						resultMap = make(map[string]string)
-					)
-
-					v1, ok := lhs.(types.String)
-					if !ok {
-						return types.ValOrErr(lhs, "unexpected type '%v' passed to bsubmatch", lhs.Type())
-					}
-					v2, ok := rhs.(types.Bytes)
-					if !ok {
-						return types.ValOrErr(rhs, "unexpected type '%v' passed to bsubmatch", rhs.Type())
-					}
-
-					re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {
-						gps := m.Groups()
-						for n, gp := range gps {
-							if n == 0 {
-								continue
-							}
-							resultMap[gp.Name] = gp.String()
-						}
-					}
-
-					return types.NewStringStringMap(reg, resultMap)
-				},
-			},
-			// &functions.Overload{
-			// 	Operator: "newReverse",
-			// 	Function: func(values ...ref.Val) ref.Val {
-			// 		return reg.NativeToValue(xrayNewReverse())
-			// 	},
-			// },
-		),
-	}
+	allProgramOpitons := []cel.ProgramOption{}
 	allProgramOpitons = append(allProgramOpitons, NewProgramOptions...)
 	return allProgramOpitons
+}
+
+func reverseCheck(r *proto.Reverse, timeout int64) bool {
+	if len(ReverseCeyeApiKey) == 0 || len(r.Domain) == 0 {
+		return false
+	}
+	time.Sleep(time.Second * time.Duration(timeout))
+	sub := strings.Split(r.Domain, ".")[0]
+	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", ReverseCeyeApiKey, sub)
+
+	// log.Log().Info(urlStr)
+
+	req, _ := http.NewRequest("GET", urlStr, nil)
+	resp, err := FastClient.SampleHTTPRequest(req)
+	if err != nil {
+		log.Log().Error(err.Error())
+		return false
+	}
+	if !bytes.Contains(resp.Body, []byte(`"data": []`)) { // api返回结果不为空
+		fmt.Println("true:", string(resp.Body))
+		return true
+	}
+	fmt.Println("false:", string(resp.Body))
+	return false
 }

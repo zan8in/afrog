@@ -105,6 +105,18 @@ func UrlTypeToString(u *proto.UrlType) string {
 	return buf.String()
 }
 
+func ParseUrl(u *url.URL) *proto.UrlType {
+	nu := &proto.UrlType{}
+	nu.Scheme = u.Scheme
+	nu.Domain = u.Hostname()
+	nu.Host = u.Host
+	nu.Port = u.Port()
+	nu.Path = u.EscapedPath()
+	nu.Query = u.RawQuery
+	nu.Fragment = u.Fragment
+	return nu
+}
+
 func ReverseString(s string) string {
 	runes := []rune(s)
 	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {

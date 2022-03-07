@@ -23,7 +23,6 @@ import (
 type FastClient struct {
 	Client      *fasthttp.Client
 	MaxRedirect int32
-	VariableMap map[string]interface{}
 }
 
 var protoRequestPool sync.Pool = sync.Pool{
@@ -71,8 +70,6 @@ func New(options *config.Options) *fasthttp.Client {
 func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
 	var err error
 
-	fc.VariableMap = variableMap
-
 	fastReq := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(fastReq)
 
@@ -81,7 +78,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	// set fastReq.Header from poc.Rule
 	fastReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for k, v := range rule.Request.Headers {
-		fastReq.Header.Set(k, fc.AssignVariableMap(v))
+		fastReq.Header.Set(k, fc.AssignVariableMap(v, variableMap))
 	}
 	// set fastReq.Header method from poc.Rule
 	fastReq.Header.SetMethod(rule.Request.Method)
@@ -97,7 +94,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	}
 	tempPath = strings.ReplaceAll(tempPath, " ", "%20")
 	tempPath = strings.ReplaceAll(tempPath, "+", "%20")
-	fastReq.URI().Update(fc.AssignVariableMap(strings.TrimSpace(tempPath)))
+	fastReq.URI().Update(fc.AssignVariableMap(strings.TrimSpace(tempPath), variableMap))
 
 	// set fastReq Body from poc.Rule
 	contentType := string(fastReq.Header.ContentType())
@@ -106,9 +103,9 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		if err != nil {
 			return err
 		}
-		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(multipartBody))))
+		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(multipartBody), variableMap)))
 	} else {
-		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(rule.Request.Body))))
+		fastReq.SetBody([]byte(fc.AssignVariableMap(strings.TrimSpace(rule.Request.Body), variableMap)))
 	}
 
 	fastResp := fasthttp.AcquireResponse()
@@ -189,7 +186,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	tempResultResponse.RawHeader = fastResp.Header.Header()
 	// tempResultResponse.Conn.Source.Addr = fastResp.LocalAddr().String()
 	// tempResultResponse.Conn.Destination.Addr = fastResp.RemoteAddr().String()
-	fc.VariableMap["response"] = tempResultResponse
+	variableMap["response"] = tempResultResponse
 
 	// fc.VariableMap["request"] variable assignment
 	tempResultRequest := GetProtoRequestPool()
@@ -215,9 +212,90 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	tempResultRequest.Body = fastReq.Body()
 	tempResultRequest.RawHeader = fastReq.Header.Header()
 	tempResultRequest.Raw = []byte(string(fastReq.Header.Header()) + string(fastReq.Body()))
-	fc.VariableMap["request"] = tempResultRequest
+	variableMap["request"] = tempResultRequest
 
 	return err
+}
+
+// reverse http request
+func (fc *FastClient) SampleHTTPRequest(httpRequest *http.Request) (*proto.Response, error) {
+	var err error
+	tempResultResponse := GetProtoResponsePool()
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	CopyRequest(httpRequest, fastReq, nil)
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
+	}
+
+	// set fastResp body
+	var respBody []byte
+	contentEncoding := strings.ToLower(string(fastResp.Header.Peek("Content-Encoding")))
+	switch contentEncoding {
+	case "", "none", "identity":
+		respBody = fastResp.Body()
+	case "gzip":
+		respBody, err = fastResp.BodyGunzip()
+	case "deflate":
+		respBody, err = fastResp.BodyInflate()
+	default:
+		respBody = []byte{}
+	}
+	if err != nil {
+		return tempResultResponse, err
+	}
+	fastResp.SetBody(respBody)
+
+	// fc.VariableMap["response"] variable assignment
+	tempResultResponse.Status = int32(fastResp.StatusCode())
+	u, err := url.Parse(fastReq.URI().String())
+	if err != nil {
+		return tempResultResponse, err
+	}
+	urlType := &proto.UrlType{
+		Scheme:   u.Scheme,
+		Domain:   u.Hostname(),
+		Host:     u.Host,
+		Port:     u.Port(),
+		Path:     u.Path,
+		Query:    u.RawQuery,
+		Fragment: u.Fragment,
+	}
+	tempResultResponse.Url = urlType
+	newheader := make(map[string]string)
+	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
+	for _, h := range respHeaderSlice {
+		hslice := strings.SplitN(h, ":", 2)
+		if len(hslice) != 2 {
+			continue
+		}
+		k := strings.ToLower(hslice[0])
+		v := strings.TrimLeft(hslice[1], " ")
+		if newheader[k] != "" {
+			newheader[k] += v
+		} else {
+			newheader[k] = v
+		}
+	}
+	tempResultResponse.Headers = newheader
+	tempResultResponse.ContentType = string(fastResp.Header.ContentType())
+	tempResultResponse.Body = fastResp.Body()
+	tempResultResponse.Raw = []byte(fastResp.String())
+	tempResultResponse.RawHeader = fastResp.Header.Header()
+
+	return tempResultResponse, err
 }
 
 func httpConnError(err error) (string, bool) {
@@ -278,8 +356,8 @@ func DealMultipart(contentType string, ruleBody string) (result string, err erro
 // find string 规定要查找的值
 // oldstr 规定被搜索的字符串
 // newstr 规定替换的值
-func (fc *FastClient) AssignVariableMap(find string) string {
-	for k, v := range fc.VariableMap {
+func (fc *FastClient) AssignVariableMap(find string, variableMap map[string]interface{}) string {
+	for k, v := range variableMap {
 		_, isMap := v.(map[string]string)
 		if isMap {
 			continue
