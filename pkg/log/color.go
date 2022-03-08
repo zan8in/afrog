@@ -14,7 +14,7 @@ func GetColor(level string, log string) string {
 	case utils.INFO:
 		result = color.BlueString(log)
 	case utils.LOW:
-		result = color.GreenString(log)
+		result = color.CyanString(log)
 	case utils.MEDIUM:
 		result = color.YellowString(log)
 	case utils.HIGH:
@@ -22,7 +22,7 @@ func GetColor(level string, log string) string {
 	case utils.CRITICAL:
 		result = color.RedString(log)
 	default:
-		result = log
+		result = color.GreenString(log)
 	}
 	return result
 }

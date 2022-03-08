@@ -78,7 +78,7 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintResultInfoConsole() string {
-	colorPocId := log.GetColor("low", "["+r.PocInfo.Id+"]")
+	colorPocId := log.GetColor("", "["+r.PocInfo.Id+"]")
 	colorSecruity := log.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]")
 	fmt.Println(colorPocId + colorSecruity + r.Target)
 	return colorPocId + colorSecruity + r.Target
