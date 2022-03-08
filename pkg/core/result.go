@@ -1,8 +1,10 @@
 package core
 
 import (
+	"fmt"
 	"strconv"
 
+	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 )
@@ -73,4 +75,11 @@ func (r *Result) PrintResultInfo() string {
 		result = "[" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 	}
 	return result
+}
+
+func (r *Result) PrintResultInfoConsole() string {
+	colorPocId := log.GetColor("low", "["+r.PocInfo.Id+"]")
+	colorSecruity := log.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]")
+	fmt.Println(colorPocId + colorSecruity + r.Target)
+	return colorPocId + colorSecruity + r.Target
 }

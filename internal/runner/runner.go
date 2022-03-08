@@ -2,7 +2,6 @@ package runner
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
@@ -36,9 +35,9 @@ func New(options *config.Options) (*Runner, error) {
 		return nil, errors.New("could not find targets")
 	}
 
-	for k, v := range options.Targets {
-		fmt.Println(k, v)
-	}
+	// for k, v := range options.Targets {
+	// 	fmt.Println(k, v)
+	// }
 
 	// init pocs
 	if len(options.PocsFilePath) > 0 {
@@ -49,12 +48,12 @@ func New(options *config.Options) (*Runner, error) {
 		log.Log().Fatal("Could not find poc yaml file")
 	}
 
-	for k, v := range options.PocsDirectory {
-		fmt.Println(k, v)
-	}
-	for k, v := range allPocsYamlSlice {
-		fmt.Println(k, v)
-	}
+	// for k, v := range options.PocsDirectory {
+	// 	fmt.Println(k, v)
+	// }
+	// for k, v := range allPocsYamlSlice {
+	// 	fmt.Println(k, v)
+	// }
 
 	// return nil, nil
 	//log.Log().Debug(utils.ToString(allPocsSlice))
