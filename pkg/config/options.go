@@ -13,4 +13,16 @@ type Options struct {
 
 	// Target URLs/Domains to scan
 	Targets utils.StringSlice
+
+	// Target URLs/Domains to scan
+	Target string
+
+	// TargetsFilePath specifies the targets from a file to scan.
+	TargetsFilePath string
+
+	// PocsFilePath specifies the directory of pocs to scan.
+	PocsFilePath string
+
+	// output file to write found issues/vulnerabilities
+	Output string
 }

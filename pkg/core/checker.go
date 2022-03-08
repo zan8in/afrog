@@ -195,25 +195,28 @@ func (c *Checker) Check() error {
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
+	// output save to file
+	rst := c.result.PrintResultInfo()
+	if len(c.options.Output) > 0 {
+		lock.Lock()
+		utils.BufferWriteAppend(c.options.Output, rst)
+		lock.Unlock()
+	}
+
 	// print result info for debug
-	c.PrintTraceInfo()
+	c.PrintTraceInfo(rst)
 
 	return err
 }
 
-func (c *Checker) PrintTraceInfo() {
+func (c *Checker) PrintTraceInfo(rst string) {
 	// log.Log().Info("------------------------start----------------------------------------")
 	// for i, v := range c.result.AllPocResult {
 	// 	log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
 	// }
-	reslt := c.result.PrintResultInfo()
-	if reslt != "" {
-		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", reslt))
 
-		// save to result.txt file
-		lock.Lock()
-		utils.BufferWriteAppend("./result.txt", reslt)
-		lock.Unlock()
+	if rst != "" {
+		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", rst))
 	}
 	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }

@@ -23,7 +23,7 @@ import (
 var (
 	defaultLogFileName = "./logs"
 
-	defaultLevel = zapcore.DebugLevel
+	defaultLevel = zapcore.FatalLevel
 
 	log *zap.Logger
 
