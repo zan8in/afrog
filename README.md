@@ -45,8 +45,12 @@ GLOBAL OPTIONS:
 更多配置，请修改 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
 ```
 window: C:/Users/账户名/.config/afrog/
-linux: /home/账户名/.config/afrog/
 ```
+因为 linux 下必须 root 权限运行，所以 afrog-config.yaml 文件位置是
+```
+linux: /root/.config/afrog/
+```
+
 以下是 afrog 配置的所有内容
 ```
 version: 1.0.6
@@ -75,8 +79,12 @@ reverse:
 POC 目录，默认位置：{home}/afrog-pocs/
 ```
 window: C:/Users/账户名/afrog-pocs/
-linux: /home/账户名/.config/afrog-pocs/
 ```
+因为 linux 下必须 root 权限运行，所以 POC 目录位置是
+```
+linux: /root/.config/afrog-pocs/
+```
+
 POC 脚本语法参考  [xray 2.0](https://docs.xray.cool/#/guide/poc/v2)，以下是 `CVE-2022-22947.yaml` 基本结构
 
 ```
@@ -152,6 +160,7 @@ afrog -t http://example.com -P ./pocs
 ```
 afrog -l urls.txt -P ./pocs -o ./result.txt
 ```
+**🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
 
 ### 感谢
 

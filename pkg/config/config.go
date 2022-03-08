@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -39,7 +40,7 @@ type Ceye struct {
 	Domain string `yaml:"domain`
 }
 
-const afrogConfigFilename = ".afrog-config.yaml"
+const afrogConfigFilename = "afrog-config.yaml"
 const Version = "1.0.6"
 
 // Create and initialize afrog-config.yaml configuration info
@@ -77,6 +78,7 @@ func isExistConfigFile() error {
 	}
 
 	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
+	fmt.Println(configFile)
 	if utils.Exists(configFile) {
 		return nil
 	}
