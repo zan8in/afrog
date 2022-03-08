@@ -1,4 +1,5 @@
-<center> <h1>afrog</h1>基于 YAML 语法模板的定制化快速漏洞扫描器<br/>一只快乐的青蛙！🐸</center>
+<h1 align="center">afrog</h1>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>一只快乐的青蛙！🐸</p>
 
 ### 用法
 ```
@@ -27,12 +28,12 @@ GLOBAL OPTIONS:
    --version, -v                     print the version (default: false)
 ```
 ### afrog 配置文件
-更多配置，请修改配置文件 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
+更多配置，请修改 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
 ```
 window: C:/Users/账户名/.config/afrog/
 linux: /home/账户名/.config/afrog/
 ```
-以下是 afrog 配置文件的所有内容
+以下是 afrog 配置的所有内容
 ```
 version: 1.0.6
 
