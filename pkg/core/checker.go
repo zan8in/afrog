@@ -200,7 +200,7 @@ func (c *Checker) Check() error {
 		rst := c.result.PrintResultInfoConsole()
 		if len(c.options.Output) > 0 {
 			// output save to file
-			utils.BufferWriteAppend(c.options.Output, rst)
+			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo())
 		}
 		lock.Unlock()
 

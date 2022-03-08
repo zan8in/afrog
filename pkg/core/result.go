@@ -70,11 +70,8 @@ func (r *Result) ReadPocInfo() string {
 }
 
 func (r *Result) PrintResultInfo() string {
-	result := ""
-	if r.IsVul {
-		result = "[" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
-	}
-	return result
+
+	return "[" + r.PocInfo.Id + "][" + r.PocInfo.Info.Severity + "]" + r.Target
 }
 
 func (r *Result) PrintResultInfoConsole() string {
