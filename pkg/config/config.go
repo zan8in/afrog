@@ -27,7 +27,6 @@ type ConfigHttp struct {
 	Concurrency         int    `yaml:"concurrency"`
 	MaxConnsPerHost     int    `yaml:"max_conns_per_host"`
 	MaxResponseBodySize int    `yaml:"max_responsebody_sizse"`
-	MaxRedirectCount    int    `yaml:"max_redirect_count"`
 	UserAgent           string `yaml:"user_agent"`
 }
 
@@ -60,7 +59,6 @@ func New() (*Config, error) {
 		configHttp.Concurrency = 4096
 		configHttp.MaxConnsPerHost = 10000
 		configHttp.MaxResponseBodySize = 1024 * 1024 * 2
-		configHttp.MaxRedirectCount = 5
 		configHttp.UserAgent = ""
 		c.ConfigHttp = configHttp
 		reverse := c.Reverse
