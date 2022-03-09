@@ -166,5 +166,5 @@ afrog -l urls.txt -P ./pocs -o ./result.txt
 
 ### 感谢
 
-[jjf012](https://github.com/jjf012) 、[jweny](https://github.com/jweny) 、[WAY29](https://github.com/WAY29)
+[jjf012](https://github.com/jjf012) 、[jweny](https://github.com/jweny) 、[WAY29](https://github.com/WAY29)、 [xray](https://github.com/chaitin/xray)
 
