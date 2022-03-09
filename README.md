@@ -44,8 +44,8 @@ GLOBAL OPTIONS:
 ### afrog 配置文件
 更多配置，请修改 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
 ```
-window: C:/Users/账户名/.config/afrog/
-mac: /home/账户名/.config/afrog/
+window: C:/Users/[yourname]/.config/afrog/
+mac: /home/[yourname]/.config/afrog/
 ```
 因为 linux 下必须 root 权限运行，所以 afrog-config.yaml 文件位置是
 ```
@@ -79,8 +79,8 @@ reverse:
 ### POC 脚本
 POC 目录，默认位置：{home}/afrog-pocs/
 ```
-window: C:/Users/账户名/afrog-pocs/
-mac: /home/账户名 /afrog-pocs/
+window: C:/Users/[yourname]/afrog-pocs/
+mac: /home/[yourname]/afrog-pocs/
 ```
 因为 linux 下必须 root 权限运行，所以 POC 目录位置是
 ```
