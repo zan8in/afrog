@@ -41,6 +41,44 @@ GLOBAL OPTIONS:
    --help, -h                        show help (default: false)
    --version, -v                     print the version (default: false)
 ```
+
+### 运行 afrog
+扫描单个目标
+```
+afrog -t http://example.com
+```
+扫描多个目标
+```
+afrog -T urls.txt
+```
+例如：urls.txt
+```
+http://example.com
+http://test.com
+http://github.com
+```
+指定 POC 脚本目录
+```
+afrog -t http://example.com -P ./pocs
+```
+输出扫描结果到文件
+```
+afrog -l urls.txt -P ./pocs -o ./result.txt
+```
+**🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
+
+POC 语法 afrog 与 xray 2.0 区别
+
+|         xray          | afrog |
+| :-------------------: | :---: |
+|    transport: http    |   √   |
+| transport: tcp  / udp |   ×   |
+|          set          |   √   |
+|       payloads        |   √   |
+|         rules         |   √   |
+|        details        |   ×   |
+
+
 ### afrog 配置文件
 更多配置，请修改 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
 ```
@@ -128,41 +166,6 @@ rules:
 expression: r1() && r2()
 ```
 
-POC 语法 afrog 与 xray 2.0 区别
-
-|         xray          | afrog |
-| :-------------------: | :---: |
-|    transport: http    |   √   |
-| transport: tcp  / udp |   ×   |
-|          set          |   √   |
-|       payloads        |   √   |
-|         rules         |   √   |
-|        details        |   ×   |
-
-### 运行 afrog
-扫描单个目标
-```
-afrog -t http://example.com
-```
-扫描多个目标
-```
-afrog -T urls.txt
-```
-例如：urls.txt
-```
-http://example.com
-http://test.com
-http://github.com
-```
-指定 POC 脚本目录
-```
-afrog -t http://example.com -P ./pocs
-```
-输出扫描结果到文件
-```
-afrog -l urls.txt -P ./pocs -o ./result.txt
-```
-**🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
 
 ### 感谢
 
