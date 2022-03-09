@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -78,7 +77,6 @@ func isExistConfigFile() error {
 	}
 
 	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
-	fmt.Println(configFile)
 	if utils.Exists(configFile) {
 		return nil
 	}

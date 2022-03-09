@@ -1,11 +1,11 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️功能测试进行中...<br/>一只快乐的青蛙！🐸</p>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 投递接收进行中...<br/>[ zanbin168@qq.com ]<br/>一只快乐的青蛙！🐸</p>
 
 ### 特点
 
-* [x] 支持 90% 的 xray 2.0 语法 （够用）
+* [x] 支持 xray 2.0 核心语法
 
-* [x] 长期更新维护 POC（免费）
+* [x] 长期维护、更新 POC（免费）
 
 * [x] 轻松二次开发，整合到其他项目
 
@@ -13,7 +13,7 @@
 
 * [ ] 网页版，增加用户体验
 
-* [ ] 可查看扫描过程中 `request` 和 `response` 数据包详情
+* [ ] 查看扫描结果的 `request` 和 `response` 数据包
 
 ### 用法
 ```
@@ -45,6 +45,7 @@ GLOBAL OPTIONS:
 更多配置，请修改 afrog-config.yaml，默认位置：{home}/.config/afrog/afrog-config.yaml
 ```
 window: C:/Users/账户名/.config/afrog/
+mac: /home/账户名/.config/afrog/
 ```
 因为 linux 下必须 root 权限运行，所以 afrog-config.yaml 文件位置是
 ```
@@ -79,6 +80,7 @@ reverse:
 POC 目录，默认位置：{home}/afrog-pocs/
 ```
 window: C:/Users/账户名/afrog-pocs/
+mac: /home/账户名 /afrog-pocs/
 ```
 因为 linux 下必须 root 权限运行，所以 POC 目录位置是
 ```
