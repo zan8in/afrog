@@ -129,6 +129,10 @@ var (
 				decls.NewInstanceOverload("reverse_wait_int",
 					[]*exprpb.Type{decls.Any, decls.Int},
 					decls.Bool)),
+			// other
+			decls.NewFunction("sleep",
+				decls.NewOverload("sleep_int", []*exprpb.Type{decls.Int},
+					decls.Null)),
 		),
 	}
 )

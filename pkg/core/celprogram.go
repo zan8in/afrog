@@ -355,6 +355,18 @@ var (
 					return types.Bool(reverseCheck(reverse, timeout))
 				},
 			},
+			// other
+			&functions.Overload{
+				Operator: "sleep_int",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Int)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sleep", value.Type())
+					}
+					time.Sleep(time.Duration(v) * time.Second)
+					return nil
+				},
+			},
 		),
 	}
 )
