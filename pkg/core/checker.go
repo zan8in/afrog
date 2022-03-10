@@ -149,6 +149,7 @@ func (c *Checker) Check() error {
 			}
 
 			// run fasthttp client
+			utils.RandSleep(100) // firewall just test.
 			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
@@ -181,7 +182,7 @@ func (c *Checker) Check() error {
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
 			// debug per rule result
-			// log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
+			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
 		}
 	}
 
@@ -212,10 +213,10 @@ func (c *Checker) Check() error {
 }
 
 func (c *Checker) PrintTraceInfo(rst string) {
-	// log.Log().Info("------------------------start----------------------------------------")
-	// for i, v := range c.result.AllPocResult {
-	// 	log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
-	// }
+	log.Log().Info("------------------------start----------------------------------------")
+	for i, v := range c.result.AllPocResult {
+		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
+	}
 	if rst != "" {
 		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", rst))
 	}
