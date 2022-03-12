@@ -2,6 +2,8 @@
 <p align="center">POC，全称 Proof of Concept，指一段漏洞证明的说明或攻击样例<br/><br/>❤️POC 欢迎投递</p>
 
 ### cnvd
+- 2020
+  - CNVD-2020-62422
 
 ### cve
 
@@ -27,12 +29,16 @@
 
 - default-panel 默认登陆页面
   - emessage-panel
+  - openerp-database
+  - utt-panel
 - default-pwd 默认密码
   - grafana-default-password
   - minio-default-password
   - datang-ac-default-password-cnvd-2021-04128
   - dlink-default-password
   - wayos-default-password
+  - openerp-default-password
+  - utt-default-password
 
 ### unauthorized 未授权访问
 
