@@ -1,9 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -425,4 +427,26 @@ func PutProtoResponsePool(rsp *proto.Response) {
 		rsp.Reset()
 		protoResponsePool.Put(rsp)
 	}
+}
+
+func ParseRequest(oReq *http.Request) (*proto.Request, error) {
+	req := &proto.Request{}
+	req.Method = oReq.Method
+	req.Url = Url2UrlType(oReq.URL)
+	header := make(map[string]string)
+	for k := range oReq.Header {
+		header[k] = oReq.Header.Get(k)
+	}
+	req.Headers = header
+	req.ContentType = oReq.Header.Get("Content-Type")
+	if oReq.Body == nil || oReq.Body == http.NoBody {
+	} else {
+		data, err := ioutil.ReadAll(oReq.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body = data
+		oReq.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	}
+	return req, nil
 }
