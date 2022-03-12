@@ -1,11 +1,11 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 投递接收进行中...<br/>[ zanbin168@qq.com ]<br/>一只快乐的青蛙！🐸</p>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>🐸</p>
 
 ### 特点
 
 * [x] 支持 xray 2.0 核心语法
 
-* [x] 长期维护、更新 POC（免费）
+* [x] 长期维护、更新 POC（./afrog-pocs）
 
 * [x] 轻松二次开发，整合到其他项目
 
