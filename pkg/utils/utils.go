@@ -124,3 +124,24 @@ func ReverseString(s string) string {
 	}
 	return string(runes)
 }
+
+func IsSeverityMatchingCvssScore(severity string, score float64) string {
+	if score == 0.0 {
+		return ""
+	}
+	var expected string
+
+	if score >= 0.1 && score <= 3.9 {
+		expected = "low"
+	} else if score >= 4.0 && score <= 6.9 {
+		expected = "medium"
+	} else if score >= 7.0 && score <= 8.9 {
+		expected = "high"
+	} else if score >= 9.0 && score <= 10.0 {
+		expected = "critical"
+	}
+	if expected != "" && expected != severity {
+		return expected
+	}
+	return ""
+}

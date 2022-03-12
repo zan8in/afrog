@@ -1,0 +1,31 @@
+id: dahua
+
+info:
+  name: dahua
+  author: zan8in
+  severity: info
+  tags: dahua
+
+transport: http
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200 && -1466785234 == faviconHash(bytes(response.body))
+  r1:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200 && 2019488876 == faviconHash(bytes(response.body))
+  r2:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200 && 833190513 == faviconHash(bytes(response.body))
+  r3:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200 && 1281253102 == faviconHash(bytes(response.body))
+expression: r0() || r1() || r2() || r3()

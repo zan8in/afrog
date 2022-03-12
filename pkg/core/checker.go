@@ -95,7 +95,7 @@ func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker
 func (c *Checker) Check() error {
 	var err error
 
-	log.Log().Error(fmt.Sprintf("afrog scan [%s][%s]", c.pocItem.Id, c.target))
+	// log.Log().Error(fmt.Sprintf("afrog scan [%s][%s]", c.pocItem.Id, c.target))
 
 	// init fasthttp client
 	fc := FastClientPool.Get().(*http2.FastClient)
@@ -166,7 +166,7 @@ func (c *Checker) Check() error {
 			}
 
 			// run fasthttp client
-			utils.RandSleep(100) // firewall just test.
+			utils.RandSleep(500) // firewall just test.
 			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
