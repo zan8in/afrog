@@ -28,18 +28,6 @@ type FastClient struct {
 	DialTimeout int32
 }
 
-var protoRequestPool sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return new(proto.Request)
-	},
-}
-
-var protoResponsePool sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return new(proto.Response)
-	},
-}
-
 // fasthttp initialization
 // configuration proxy、readtimeout、writetimeout、max_idle、concurrency、max_responsebody_sizse、max_redirect_count eg.
 func New(options *config.Options) *fasthttp.Client {
@@ -155,7 +143,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	fastResp.SetBody(respBody)
 
 	// fc.VariableMap["response"] variable assignment
-	tempResultResponse := GetProtoResponsePool()
+	tempResultResponse := AcquireProtoResponsePool()
 	tempResultResponse.Status = int32(fastResp.StatusCode())
 	u, err := url.Parse(fastReq.URI().String())
 	if err != nil {
@@ -196,7 +184,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	variableMap["response"] = tempResultResponse
 
 	// fc.VariableMap["request"] variable assignment
-	tempResultRequest := GetProtoRequestPool()
+	tempResultRequest := AcquireProtoRequestPool()
 	tempResultRequest.Method = string(fastReq.Header.Method())
 	tempResultRequest.Url = urlType
 	newReqheader := make(map[string]string)
@@ -227,7 +215,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 // reverse http request
 func (fc *FastClient) SampleHTTPRequest(httpRequest *http.Request) (*proto.Response, error) {
 	var err error
-	tempResultResponse := GetProtoResponsePool()
+	tempResultResponse := AcquireProtoResponsePool()
 
 	fastReq := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(fastReq)
@@ -407,22 +395,34 @@ func Url2UrlType(u *url.URL) *proto.UrlType {
 	}
 }
 
-func GetProtoRequestPool() *proto.Request {
+var protoRequestPool sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return new(proto.Request)
+	},
+}
+
+var protoResponsePool sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return new(proto.Response)
+	},
+}
+
+func AcquireProtoRequestPool() *proto.Request {
 	return protoRequestPool.Get().(*proto.Request)
 }
 
-func PutProtoRequestPool(req *proto.Request) {
+func ReleaseProtoRequestPool(req *proto.Request) {
 	if req != nil {
 		req.Reset()
 		protoRequestPool.Put(req)
 	}
 }
 
-func GetProtoResponsePool() *proto.Response {
+func AcquireProtoResponsePool() *proto.Response {
 	return protoResponsePool.Get().(*proto.Response)
 }
 
-func PutProtoResponsePool(rsp *proto.Response) {
+func ReleaseProtoResponsePool(rsp *proto.Response) {
 	if rsp != nil {
 		rsp.Reset()
 		protoResponsePool.Put(rsp)

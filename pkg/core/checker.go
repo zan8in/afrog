@@ -112,8 +112,9 @@ func (c *Checker) Check() error {
 
 	// init cel
 	c.customLib = NewCustomLib()
-	tempRequest := http2.GetProtoRequestPool()
-	defer http2.PutProtoRequestPool(tempRequest)
+
+	// update request variablemap
+	tempRequest := http2.AcquireProtoRequestPool()
 	if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
 		if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
 			c.target = "http://" + c.target
@@ -163,20 +164,6 @@ func (c *Checker) Check() error {
 			if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
 				c.target = "http://" + c.target
 			}
-
-			// original request
-			// c.originalRequest, err = http.NewRequest("GET", c.target, nil)
-			// if err != nil {
-			// 	log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
-			// 	return err
-			// }
-
-			// // set User-Agent
-			// if len(c.options.Config.ConfigHttp.UserAgent) > 0 {
-			// 	c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
-			// } else {
-			// 	c.originalRequest.Header.Set("User-Agent", utils.RandomUA())
-			// }
 
 			// run fasthttp client
 			utils.RandSleep(100) // firewall just test.
