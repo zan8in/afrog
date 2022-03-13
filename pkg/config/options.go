@@ -25,4 +25,7 @@ type Options struct {
 
 	// output file to write found issues/vulnerabilities
 	Output string
+
+	// Scan count num(targets * allpocs)
+	Count int
 }
