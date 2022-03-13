@@ -1,0 +1,21 @@
+id: shiro
+
+info:
+    name: shiro
+    author: 胖胖的ALEX
+    severity: info
+    description: fofa app="APACHE-Shiro"
+set:
+    randstr: randomLowercase(6)
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /
+            follow_redirects: true
+            headers:
+              cookie: JSESSIONID={{randstr}};rememberMe=123;
+        expression: response.status == 200 && (response.headers["set-cookie"].contains("rememberMe=deleteMe") || response.headers["cookie"].contains("rememberMe=deleteMe"))
+expression: r0()

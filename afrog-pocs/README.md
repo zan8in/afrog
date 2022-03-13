@@ -4,11 +4,15 @@
 ### cnvd
 - 2020
   - CNVD-2020-62422
+- 2021
+  - CNVD-2021-09650
 
 ### cve
 
 - 2018
   - uwsgi-cve-2018-7490
+- 2020
+  - CVE-2020-26413
 - 2021
   - apache-httpd-cve-2021-41773-path-traversal
   - gitlab-ssrf-cve-2021-22214
@@ -22,8 +26,12 @@
 ### fingerprinting 指纹识别
 - swagger-api
 - dahua（未验证）
-- Dlink-web
-- WayOS
+- dlink-web
+- wayos
+- atlassian-jira
+- shiro
+- thinkphp
+- gitlab
 
 ### login 登录
 
@@ -39,6 +47,7 @@
   - wayos-default-password
   - openerp-default-password
   - utt-default-password
+  - gitlab-weak-login
 
 ### unauthorized 未授权访问
 - springboot-actuator-unauth
@@ -48,4 +57,7 @@
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
 - yonyou-nc-bsh-servlet-bshservlet-rce
+- springboot-h2-db-rce
+- huijietong-cloud-fileread
+- 
 
