@@ -51,10 +51,10 @@ func New() (*Config, error) {
 		c.TargetSizeWaitGroup = 8
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
-		configHttp.DialTimeout = 10
-		configHttp.ReadTimeout = "100000ms"
-		configHttp.WriteTimeout = "100000ms"
-		configHttp.MaxIdle = "1h"
+		configHttp.DialTimeout = 5
+		configHttp.ReadTimeout = "5000ms"
+		configHttp.WriteTimeout = "5000ms"
+		configHttp.MaxIdle = "5s"
 		configHttp.MaxRedirect = 5
 		configHttp.Concurrency = 4096
 		configHttp.MaxConnsPerHost = 10000
