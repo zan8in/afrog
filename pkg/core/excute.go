@@ -53,7 +53,7 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 	}
 	wg.WaitGroup.Wait()
 
-	utils.RandSleep(500)
+	// utils.RandSleep(500)
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
@@ -68,5 +68,5 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 		log.Log().Error(err.Error())
 	}
 
-	utils.RandSleep(500)
+	// utils.RandSleep(500)
 }
