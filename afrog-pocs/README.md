@@ -41,6 +41,9 @@
   - utt-default-password
 
 ### unauthorized 未授权访问
+- springboot-actuator-unauth
+- druid-monitor-unauth
+- elasticsearch-unauth
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread

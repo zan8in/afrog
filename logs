@@ -1,0 +1,23 @@
+2022-03-13 11:01:40	error	core/cel.go:93	cel env.Compile err, ERROR: <input>:1:1: Syntax error: mismatched input '<EOF>' expecting {'[', '{', '(', '.', '-', '!', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
+2022-03-13 11:01:40	error	core/checker.go:180	rule map RunEval err, Eval Error: ERROR: <input>:1:1: Syntax error: mismatched input '<EOF>' expecting {'[', '{', '(', '.', '-', '!', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
+2022-03-13 11:01:40	error	core/excute.go:68	Eval Error: ERROR: <input>:1:1: Syntax error: mismatched input '<EOF>' expecting {'[', '{', '(', '.', '-', '!', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
+2022-03-13 11:06:18	error	http/http.go:121	WARN conn error: conn_close
+
+2022-03-13 11:06:18	error	core/checker.go:173	rule map fasthttp.HTTPRequest err, the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:18	error	core/excute.go:68	the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:18	error	http/http.go:121	WARN conn error: conn_close
+
+2022-03-13 11:06:18	error	core/checker.go:173	rule map fasthttp.HTTPRequest err, the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:18	error	core/excute.go:68	the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:21	error	http/http.go:121	WARN conn error: conn_close
+
+2022-03-13 11:06:21	error	core/checker.go:173	rule map fasthttp.HTTPRequest err, the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:21	error	core/excute.go:68	the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:21	error	http/http.go:121	WARN conn error: conn_close
+
+2022-03-13 11:06:21	error	core/checker.go:173	rule map fasthttp.HTTPRequest err, the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:21	error	core/excute.go:68	the server closed connection before returning the first response byte. Make sure the server returns 'Connection: close' response header before closing the connection
+2022-03-13 11:06:28	error	http/http.go:121	WARN conn error: timeout
+
+2022-03-13 11:06:28	error	core/checker.go:173	rule map fasthttp.HTTPRequest err, timeout
+2022-03-13 11:06:28	error	core/excute.go:68	timeout

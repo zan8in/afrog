@@ -1,0 +1,17 @@
+id: druid-monitor-unauth
+
+info:
+    name: druid-monitor-unauth
+    author: met7or
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /druid/index.html
+        expression: response.status == 200 && response.body.bcontains(b"Druid Stat Index") && response.body.bcontains(b"DruidVersion") && response.body.bcontains(b"DruidDrivers")
+expression: r0()
