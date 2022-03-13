@@ -6,11 +6,13 @@
   - CNVD-2020-62422
 - 2021
   - CNVD-2021-09650
+  - ruijie-uac-cnvd-2021-14536
 
 ### cve
-
+- 2016
+  - CVE-2016-3088
 - 2018
-  - uwsgi-cve-2018-7490
+  - CVE-2018-7490
 - 2020
   - CVE-2020-26413
 - 2021
@@ -18,10 +20,14 @@
   - gitlab-ssrf-cve-2021-22214
   - CVE-2021-22205
   - CVE-2021-33044（未验证）
+  - CVE-2021-36749
 - 2022
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
 
 ### exposures 信息泄露
+- alibaba-canal-info-leak
+- phpinfo
+- ruijie-eg-info-leak
 
 ### fingerprinting 指纹识别
 - swagger-api
@@ -48,6 +54,8 @@
   - openerp-default-password
   - utt-default-password
   - gitlab-weak-login
+  - activemq-default-password
+  - alibaba-canal-default-password
 
 ### unauthorized 未授权访问
 - springboot-actuator-unauth
@@ -59,5 +67,7 @@
 - yonyou-nc-bsh-servlet-bshservlet-rce
 - springboot-h2-db-rce
 - huijietong-cloud-fileread
-- 
+- alibaba-nacos-v1-auth-bypass
+- ruijie-eg-cli-rce
+- ruijie-eg-file-read
 

