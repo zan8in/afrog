@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/zan8in/afrog/pkg/proto"
 )
@@ -144,4 +145,9 @@ func IsSeverityMatchingCvssScore(severity string, score float64) string {
 		return expected
 	}
 	return ""
+}
+
+func GetNowDateTime() string {
+	now := time.Now()
+	return now.Format("2006-01-02 15:04:05")
 }

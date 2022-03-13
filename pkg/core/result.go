@@ -7,6 +7,7 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
+	"github.com/zan8in/afrog/pkg/utils"
 )
 
 type Result struct {
@@ -75,8 +76,8 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintResultInfoConsole() string {
-	colorPocId := log.GetColor("", "["+r.PocInfo.Id+"]")
+	colorPocId := log.GetColor("", utils.GetNowDateTime()+"["+r.PocInfo.Id+"]")
 	colorSecruity := log.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]")
-	fmt.Println(colorPocId + colorSecruity + r.Target)
+	fmt.Printf("\r" + colorPocId + colorSecruity + r.Target + "\r\n")
 	return colorPocId + colorSecruity + r.Target
 }
