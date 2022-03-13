@@ -30,6 +30,8 @@ type Checker struct {
 	customLib       *CustomLib
 }
 
+var CurrentCount = 0
+
 var CheckerPool = sync.Pool{
 	New: func() interface{} {
 		return &Checker{
@@ -166,7 +168,7 @@ func (c *Checker) Check() error {
 			}
 
 			// run fasthttp client
-			utils.RandSleep(500) // firewall just test.
+			// utils.RandSleep(100) // firewall just test.
 			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
@@ -199,7 +201,7 @@ func (c *Checker) Check() error {
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
 			// debug per rule result
-			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
+			//log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
 		}
 	}
 
@@ -213,15 +215,18 @@ func (c *Checker) Check() error {
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
+	lock.Lock()
+	CurrentCount++
+	fmt.Printf("\r(%d/%d)", CurrentCount, c.options.Count)
 	if c.result.IsVul {
 		c.result.PrintResultInfoConsole()
 		if len(c.options.Output) > 0 {
 			// output save to file
-			lock.Lock()
 			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo())
-			lock.Unlock()
 		}
 	}
+	lock.Unlock()
+
 	// print result info for debug
 	c.PrintTraceInfo(c.result.PrintResultInfo())
 
