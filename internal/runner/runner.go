@@ -48,6 +48,9 @@ func New(options *config.Options) (*Runner, error) {
 		log.Log().Fatal("Could not find poc yaml file")
 	}
 
+	// init scan sum
+	options.Count = len(options.Targets) * len(allPocsYamlSlice)
+
 	// for k, v := range options.PocsDirectory {
 	// 	fmt.Println(k, v)
 	// }
