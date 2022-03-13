@@ -259,7 +259,7 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 		out, err := c.customLib.RunEval(value, c.variableMap)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] Eval err, %s", key, value, err.Error()))
-			return
+			continue
 		}
 
 		switch value := out.Value().(type) {
