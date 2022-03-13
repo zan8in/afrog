@@ -9,8 +9,15 @@
   - ruijie-uac-cnvd-2021-14536
 
 ### cve
+- 2014
+  - elasticsearch-cve-2014-3120
+- 2015
+  - elasticsearch-cve-2015-1427
+  - elasticsearch-cve-2015-3337-lfi
+  - elasticsearch-cve-2015-5531
 - 2016
   - CVE-2016-3088
+  - zabbix-cve-2016-10134-sqli
 - 2018
   - CVE-2018-7490
 - 2020
@@ -56,18 +63,20 @@
   - gitlab-weak-login
   - activemq-default-password
   - alibaba-canal-default-password
+  - zabbix-default-password
 
 ### unauthorized 未授权访问
 - springboot-actuator-unauth
 - druid-monitor-unauth
 - elasticsearch-unauth
+- zabbix-authentication-bypass
+- alibaba-nacos-v1-auth-bypass
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
 - yonyou-nc-bsh-servlet-bshservlet-rce
 - springboot-h2-db-rce
 - huijietong-cloud-fileread
-- alibaba-nacos-v1-auth-bypass
 - ruijie-eg-cli-rce
 - ruijie-eg-file-read
 
