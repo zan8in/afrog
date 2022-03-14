@@ -170,7 +170,7 @@ func (c *Checker) Check() error {
 			}
 
 			// run fasthttp client
-			// utils.RandSleep(100) // firewall just test.
+			utils.RandSleep(500) // firewall just test.
 			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {

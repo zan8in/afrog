@@ -47,8 +47,8 @@ func New() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
 		c.ConfigVersion = Version
-		c.PocSizeWaitGroup = 8
-		c.TargetSizeWaitGroup = 8
+		c.PocSizeWaitGroup = 25
+		c.TargetSizeWaitGroup = 6
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 5
@@ -87,7 +87,7 @@ func isExistConfigFile() error {
 func (c *Config) GetConfigPath() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "1"
+		return ""
 	}
 
 	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
