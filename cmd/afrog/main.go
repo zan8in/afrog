@@ -27,7 +27,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "指定扫描的URL/Host"},
 		&cli.StringFlag{Name: "targetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "指定需要扫描的URL/Host文件（一行一个）"},
-		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "指定需要扫描的POC脚本的路径"},
+		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）"},
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "输出扫描结果到文件"},
 	}
 
