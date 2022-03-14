@@ -84,6 +84,19 @@ func isExistConfigFile() error {
 	return errors.New("could not get config file")
 }
 
+func (c *Config) GetConfigPath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "1"
+	}
+
+	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
+	if !utils.Exists(configFile) {
+		return ""
+	}
+	return configFile
+}
+
 func getConfigFile() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,7 @@ func (c *Catalog) GetPocsPath(definitions []string) []string {
 		} else {
 			paths, err := c.GetPocPath(t)
 			if err != nil {
-				fmt.Printf("Could not find poc '%s': %s\n", t, err)
+				// fmt.Printf("Could not find poc '%s': %s\n", t, err)
 			}
 			for _, path := range paths {
 				if _, ok := processed[path]; !ok {

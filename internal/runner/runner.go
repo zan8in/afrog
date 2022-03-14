@@ -2,11 +2,12 @@ package runner
 
 import (
 	"errors"
+	"fmt"
 
+	"github.com/fatih/color"
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -35,28 +36,26 @@ func New(options *config.Options) (*Runner, error) {
 		return nil, errors.New("could not find targets")
 	}
 
-	// for k, v := range options.Targets {
-	// 	fmt.Println(k, v)
-	// }
-
 	// init pocs
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
+		// console print
+		otherpocdir := color.BlueString("指定脚本  " + options.PocsFilePath)
+		fmt.Println(otherpocdir)
 	}
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
 	if len(allPocsYamlSlice) == 0 {
-		log.Log().Fatal("Could not find poc yaml file")
+		return nil, errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
+	}
+
+	// console print
+	if len(options.Output) > 0 {
+		otherpocdir := color.BlueString("输出文件  " + options.Output)
+		fmt.Println(otherpocdir)
 	}
 
 	// init scan sum
 	options.Count = len(options.Targets) * len(allPocsYamlSlice)
-
-	// for k, v := range options.PocsDirectory {
-	// 	fmt.Println(k, v)
-	// }
-	// for k, v := range allPocsYamlSlice {
-	// 	fmt.Println(k, v)
-	// }
 
 	// return nil, nil
 	//log.Log().Debug(utils.ToString(allPocsSlice))

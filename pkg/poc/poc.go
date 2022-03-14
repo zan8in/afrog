@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/zan8in/afrog/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -102,6 +103,19 @@ func InitPocHomeDirectory() (string, error) {
 		return pocsDir, err
 	}
 	return pocsDir, err
+}
+
+func GetPocPath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "1"
+	}
+
+	configFile := filepath.Join(homeDir, afrogPocsDirectory)
+	if !utils.Exists(configFile) {
+		return ""
+	}
+	return configFile
 }
 
 // Read a poc yaml file from disk.

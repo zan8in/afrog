@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/fatih/color"
+
 	"github.com/urfave/cli/v2"
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
@@ -32,8 +34,13 @@ func main() {
 	app.Action = func(c *cli.Context) error {
 		var err error
 
+		title := color.HiBlueString("一款基于 YAML 语法模板的定制化快速漏洞扫描器 - afrog V" + c.App.Version)
+		defconfig := color.BlueString("默认配置  " + options.Config.GetConfigPath())
+		defpocdir := color.BlueString("默认脚本  " + poc.GetPocPath())
+		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir)
+
 		if _, err := runner.New(options); err != nil {
-			log.Log().Fatal(err.Error())
+			return err
 		}
 
 		return err
@@ -41,7 +48,8 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Log().Fatal(fmt.Sprintf("app run err, %s", err.Error()))
+		// log.Log().Fatal(fmt.Sprintf("app run err, %s", err.Error()))
+		fmt.Println(color.HiRedString("启动 afrog 出错，%s", err.Error()))
 	}
 }
 
