@@ -126,12 +126,14 @@ func (c *Checker) Check() error {
 		c.originalRequest, err = http.NewRequest("GET", c.target, nil)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
+			c.UpdateCurrentCount()
 			return err
 		}
 
 		tempRequest, err = http2.ParseRequest(c.originalRequest)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
+			c.UpdateCurrentCount()
 			return err
 		}
 
@@ -173,6 +175,7 @@ func (c *Checker) Check() error {
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
+				c.UpdateCurrentCount()
 				return err
 			}
 
@@ -180,6 +183,7 @@ func (c *Checker) Check() error {
 			isVul, err := c.customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
+				c.UpdateCurrentCount()
 				return err
 			}
 
@@ -209,39 +213,46 @@ func (c *Checker) Check() error {
 	isVul, err := c.customLib.RunEval(c.pocItem.Expression, c.variableMap)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
+		c.UpdateCurrentCount()
 		return err
 	}
 
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
-	lock.Lock()
-	CurrentCount++
-	fmt.Printf("\r(%d/%d)", CurrentCount, c.options.Count)
-	if c.result.IsVul {
-		c.result.PrintResultInfoConsole()
-		if len(c.options.Output) > 0 {
-			// output save to file
-			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo())
-		}
-	}
-	lock.Unlock()
+	c.UpdateCurrentCount()
 
-	// print result info for debug
-	c.PrintTraceInfo(c.result.PrintResultInfo())
+	c.PrintTraceInfo()
 
 	return err
 }
 
-func (c *Checker) PrintTraceInfo(rst string) {
-	log.Log().Info("------------------------start----------------------------------------")
+// print result && show progress bar etc.
+func (c *Checker) UpdateCurrentCount() {
+	lock.Lock()
+
+	CurrentCount++
+
+	fmt.Printf("\r%d/%d | %d%% ", CurrentCount, c.options.Count, CurrentCount*100/c.options.Count)
+
+	if c.result.IsVul {
+		c.result.PrintResultInfoConsole()
+		if len(c.options.Output) > 0 {
+			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo()) // output save to file
+		}
+	}
+
+	lock.Unlock()
+}
+
+// print result info for debug
+func (c *Checker) PrintTraceInfo() {
 	for i, v := range c.result.AllPocResult {
 		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
 	}
-	if rst != "" {
-		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", rst))
+	if c.result.PrintResultInfo() != "" {
+		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", c.result.PrintResultInfo()))
 	}
-	// log.Log().Info("^^^^^^^^^^^^^^^^^^^^^^^^end^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
 }
 
 // update set、payload、output variableMap etc.
