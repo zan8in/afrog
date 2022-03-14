@@ -1,0 +1,18 @@
+id: couchdb-unauth
+
+info:
+    name: couchdb-unauth
+    author: FiveAourThe(https://github.com/FiveAourThe)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /_config
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"httpd_design_handlers") && response.body.bcontains(b"external_manager") && response.body.bcontains(b"replicator_manager")
+expression: r0()

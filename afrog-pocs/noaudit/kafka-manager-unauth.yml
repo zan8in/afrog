@@ -1,0 +1,19 @@
+id: kafka-manager-unauth
+
+info:
+    name: kafka-manager-unauth
+    author: Aquilao(https://github.com/Aquilao)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"Kafka Manager</a>") && response.body.bcontains(b"<title>Kafka Manager</title>") && response.body.bcontains(b"Add Cluster")
+expression: r0()
+

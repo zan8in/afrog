@@ -1,0 +1,17 @@
+id: spark-api-unauth
+
+info:
+    name: spark-api-unauth
+    author: betta(https://github.com/betta-cyber)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /v1/submissions
+        expression: response.status == 400 && response.body.bcontains(b"Missing an action") && response.body.bcontains(b"serverSparkVersion")
+expression: r0()

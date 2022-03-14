@@ -1,0 +1,18 @@
+id: bt742-pma-unauthorized-access
+
+info:
+    name: bt742-pma-unauthorized-access
+    author: Facker007(https://github.com/Facker007)
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /pma/
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"information_schema") && response.body.bcontains(b"phpMyAdmin") && response.body.bcontains(b"server_sql.php")
+expression: r0()

