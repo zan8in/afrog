@@ -71,13 +71,13 @@ func (r *Result) ReadPocInfo() string {
 }
 
 func (r *Result) PrintResultInfo() string {
-
-	return "[" + r.PocInfo.Id + "][" + r.PocInfo.Info.Severity + "]" + r.Target
+	return "[" + utils.GetNowDateTime() + "] [" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 }
 
 func (r *Result) PrintResultInfoConsole() string {
-	colorPocId := log.GetColor("", utils.GetNowDateTime()+"["+r.PocInfo.Id+"]")
+	colorTime := log.GetColor("time", "["+utils.GetNowDateTime()+"]")
+	colorPocId := log.GetColor("", "["+r.PocInfo.Id+"]")
 	colorSecruity := log.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]")
-	fmt.Printf("\r" + colorPocId + colorSecruity + r.Target + "\r\n")
+	fmt.Printf("\r" + colorTime + " " + colorPocId + " " + colorSecruity + " " + r.Target + "\r\n")
 	return colorPocId + colorSecruity + r.Target
 }

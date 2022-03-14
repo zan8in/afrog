@@ -17,7 +17,7 @@ func (c *Catalog) GetPocsPath(definitions []string) []string {
 	allPocs := []string{}
 
 	for _, t := range definitions {
-		if strings.HasPrefix(t, "http") && (strings.HasSuffix(t, ".yaml") || strings.HasSuffix(t, ".yml")) {
+		if strings.HasSuffix(t, ".yaml") || strings.HasSuffix(t, ".yml") {
 			if _, ok := processed[t]; !ok {
 				processed[t] = true
 				allPocs = append(allPocs, t)

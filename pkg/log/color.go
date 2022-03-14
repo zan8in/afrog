@@ -24,5 +24,8 @@ func GetColor(level string, log string) string {
 	default:
 		result = color.GreenString(log)
 	}
+	if level == "time" {
+		result = color.HiCyanString(log)
+	}
 	return result
 }
