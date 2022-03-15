@@ -18,8 +18,13 @@
 - 2016
   - CVE-2016-3088
   - zabbix-cve-2016-10134-sqli
+- 2017
+  - hikvision-cve-2017-7921
 - 2018
   - CVE-2018-7490
+- 2019
+  - citrix-cve-2019-19781-path-traversal
+  - solr-cve-2019-0193
 - 2020
   - CVE-2020-26413
 - 2021
