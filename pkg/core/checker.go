@@ -175,16 +175,16 @@ func (c *Checker) Check() error {
 			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
-				c.UpdateCurrentCount()
-				return err
+				c.customLib.WriteRuleFunctionsROptions(k, false)
+				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// run cel expression
 			isVul, err := c.customLib.RunEval(rule.Expression, c.variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
-				c.UpdateCurrentCount()
-				return err
+				c.customLib.WriteRuleFunctionsROptions(k, false)
+				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// set result function eg: r1() r2()
@@ -249,9 +249,6 @@ func (c *Checker) UpdateCurrentCount() {
 func (c *Checker) PrintTraceInfo() {
 	for i, v := range c.result.AllPocResult {
 		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
-	}
-	if c.result.PrintResultInfo() != "" {
-		log.Log().Info(fmt.Sprintf("\r\nResult: %s\r\n", c.result.PrintResultInfo()))
 	}
 }
 
