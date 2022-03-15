@@ -20,6 +20,7 @@
   - zabbix-cve-2016-10134-sqli
 - 2017
   - hikvision-cve-2017-7921
+  - CVE-2017-12149
 - 2018
   - CVE-2018-7490
 - 2019
@@ -33,6 +34,7 @@
   - CVE-2021-22205
   - CVE-2021-33044（未验证）
   - CVE-2021-36749
+  - CVE-2021-44228（未验证）
 - 2022
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
 
