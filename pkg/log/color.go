@@ -22,7 +22,7 @@ func GetColor(level string, log string) string {
 	case utils.CRITICAL:
 		result = color.RedString(log)
 	default:
-		result = color.GreenString(log)
+		result = color.HiGreenString(log)
 	}
 	if level == "time" {
 		result = color.HiCyanString(log)
