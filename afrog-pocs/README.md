@@ -9,6 +9,8 @@
   - ruijie-uac-cnvd-2021-14536
 
 ### cve
+- 2010
+  - jboss-cve-2010-1871
 - 2014
   - elasticsearch-cve-2014-3120
 - 2015
@@ -39,6 +41,7 @@
   - CVE-2021-33044（未验证）
   - CVE-2021-36749
   - CVE-2021-44228（未验证）
+  - hikvision-unauthenticated-rce-cve-2021-36260
 - 2022
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
 
@@ -75,6 +78,7 @@
   - activemq-default-password
   - alibaba-canal-default-password
   - zabbix-default-password
+  - hikvision-intercom-service-default-password
 
 ### unauthorized 未授权访问
 - springboot-actuator-unauth
@@ -82,6 +86,7 @@
 - elasticsearch-unauth
 - zabbix-authentication-bypass
 - alibaba-nacos-v1-auth-bypass
+- jboss-unauth
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -96,4 +101,5 @@
 - sangfor-edr-cssp-rce
 - sangfor-edr-tool-rce
 - sangfor-edr-arbitrary-admin-login
+- hikvision-info-leak
 

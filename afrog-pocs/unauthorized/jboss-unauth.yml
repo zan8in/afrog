@@ -4,6 +4,8 @@ info:
     name: jboss-unauth
     author: FiveAourThe(https://github.com/FiveAourThe)
     severity: high
+    reference:
+        - https://xz.aliyun.com/t/6103
 
 manual: true
 transport: http
