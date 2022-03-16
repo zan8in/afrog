@@ -33,7 +33,7 @@ func (pr *PocResult) ReadFullResultRequestInfo() string {
 	result += "\r\n"
 
 	for k, v := range pr.ResultRequest.Headers {
-		result += k + ": " + v + "\r\n"
+		result += k + ":" + v + "\r\n"
 	}
 	result += "\r\n\r\n" + string(pr.ResultRequest.GetBody())
 	return result
