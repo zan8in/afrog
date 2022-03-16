@@ -85,7 +85,8 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	}
 	tempPath = strings.ReplaceAll(tempPath, " ", "%20")
 	tempPath = strings.ReplaceAll(tempPath, "+", "%20")
-	fastReq.URI().Update(fc.AssignVariableMap(strings.TrimSpace(tempPath), variableMap))
+	tempPath = fc.AssignVariableMap(strings.TrimSpace(tempPath), variableMap)
+	fastReq.URI().Update(tempPath)
 	fastReq.SetRequestURI(httpRequest.URL.String() + tempPath) // fixed no such host error.
 
 	// set fastReq Body from poc.Rule
