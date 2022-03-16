@@ -26,8 +26,12 @@
 - 2019
   - citrix-cve-2019-19781-path-traversal
   - solr-cve-2019-0193
+  - dlink-cve-2019-17506
+  - dlink-cve-2019-16920-rce
 - 2020
   - CVE-2020-26413
+  - dlink-cve-2020-9376-dump-credentials
+  - dlink-cve-2020-25078-account-disclosure
 - 2021
   - apache-httpd-cve-2021-41773-path-traversal
   - gitlab-ssrf-cve-2021-22214
@@ -86,4 +90,6 @@
 - huijietong-cloud-fileread
 - ruijie-eg-cli-rce
 - ruijie-eg-file-read
+- dlink-850l-info-leak
+- dlink-dsl-2888a-rce
 
