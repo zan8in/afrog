@@ -92,4 +92,8 @@
 - ruijie-eg-file-read
 - dlink-850l-info-leak
 - dlink-dsl-2888a-rce
+- sangfor-ba-rce
+- sangfor-edr-cssp-rce
+- sangfor-edr-tool-rce
+- sangfor-edr-arbitrary-admin-login
 
