@@ -205,7 +205,14 @@ func (c *Checker) Check() error {
 			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
 
 			// debug per rule result
-			//log.Log().Debug(fmt.Sprintf("result:::::::::::::%v", isVul.Value().(bool)))
+			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
+
+			// brute
+			if rule.Request.Brute && isVul.Value().(bool) {
+				c.result.IsVul = isVul.Value().(bool)
+				c.UpdateCurrentCount()
+				return err
+			}
 		}
 	}
 

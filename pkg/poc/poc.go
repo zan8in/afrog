@@ -65,6 +65,7 @@ type RuleRequest struct {
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
+	Brute           bool              `yaml:"brute"` // 如果brute=true，则认为poc成立，不继续验证
 }
 
 // 以下开始是 信息部分
