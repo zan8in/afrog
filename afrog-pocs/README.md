@@ -102,4 +102,10 @@
 - sangfor-edr-tool-rce
 - sangfor-edr-arbitrary-admin-login
 - hikvision-info-leak
+- seeyon-a6-employee-info-leak
+- seeyon-ajax-unauthorized-access
+- seeyon-oa-cookie-leak
+- seeyon-session-leak
+- seeyon-wooyun-2015-0108235-sqli
+- seeyon-wooyun-2015-148227
 
