@@ -10,25 +10,21 @@ transport: http
 rules:
   r0:
     request:
-      handler: allor
       method: GET
       path: /
     expression: response.status == 200 && -1466785234 == faviconHash(bytes(response.body))
   r1:
     request:
-      handler: allor
       method: GET
       path: /
     expression: response.status == 200 && 2019488876 == faviconHash(bytes(response.body))
   r2:
     request:
-      handler: allor
       method: GET
       path: /
     expression: response.status == 200 && 833190513 == faviconHash(bytes(response.body))
   r3:
     request:
-      handler: allor
       method: GET
       path: /
     expression: response.status == 200 && 1281253102 == faviconHash(bytes(response.body))

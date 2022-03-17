@@ -2,20 +2,18 @@ id: gitlab
 
 info:
     name: gitlab
-    author: 胖胖的ALEX
+    author: zan8in
     severity: info
     description: fofa app="GitLab"
 
 rules:
     r0:
         request:
-            handler: allor
             method: GET
             path: /explore
         expression: response.status == 200 && response.body.bcontains(b"<title>Projects · Explore · GitLab</title>")
     r1:
         request:
-            handler: allor
             method: GET
             path: /users/sign_in
         expression: response.status == 200 && response.body.bcontains(b"GitLab") && response.body.bcontains(b"https://about.gitlab.com")

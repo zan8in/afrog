@@ -11,7 +11,6 @@ transport: http
 rules:
     r0:
         request:
-            handler: allor
             method: POST
             path: /j_spring_security_check
             body: |
@@ -20,7 +19,6 @@ rules:
           response.status == 302 && !response.headers["location"].contains("loginError")
     r1:
         request:
-            handler: allor
             method: POST
             path: /j_spring_security_check
             body: |
