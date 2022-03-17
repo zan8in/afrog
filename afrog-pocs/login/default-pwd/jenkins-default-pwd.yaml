@@ -11,13 +11,19 @@ transport: http
 rules:
     r0:
         request:
+            method: GET
+            path: /login
+        expression: |
+          response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
+    r1:
+        request:
             method: POST
             path: /j_spring_security_check
             body: |
               j_username=admin&j_password=admin&from=&Submit=Sign+in
         expression: |
           response.status == 302 && !response.headers["location"].contains("loginError")
-    r1:
+    r2:
         request:
             method: POST
             path: /j_spring_security_check
@@ -25,4 +31,5 @@ rules:
               j_username=jenkins&j_password=password&from=&Submit=Sign+in
         expression: |
           response.status == 302 && !response.headers["location"].contains("loginError")
-expression: r0() || r1()
+expression: |
+    r0() && (r1() || r2())
