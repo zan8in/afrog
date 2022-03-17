@@ -1,9 +1,11 @@
-id: apache-storm-unauthorized-access
+id: apache-storm-unauth
 
 info:
-    name: apache-storm-unauthorized-access
-    author: wulalalaaa(https://github.com/wulalalaaa)
-    severity: high
+  name: Apache Storm Unauth
+  author: pikpikcu
+  severity: medium
+  reference: https://storm.apache.org/releases/current/STORM-UI-REST-API.html
+  tags: apache,unauth,misconfig
 
 manual: true
 transport: http

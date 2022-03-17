@@ -14,5 +14,5 @@ rules:
             method: GET
             path: /nifi-api/flow/current-user
             follow_redirects: false
-        expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"\"identity\":\"anonymous\",\"anonymous\":true")
+        expression: response.status == 200 && response.headers["content-type"].contains("json") && response.body.bcontains(b"\"identity\":\"anonymous\",\"anonymous\":true")
 expression: r0()
