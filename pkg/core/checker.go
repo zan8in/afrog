@@ -214,24 +214,19 @@ func (c *Checker) Check() error {
 			// debug per rule result
 			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
 
-			if (c.pocHandler == poc.ALLOR && isVul.Value().(bool)) || (c.pocHandler == poc.ALLAND && !isVul.Value().(bool)) {
-				c.result.IsVul = isVul.Value().(bool)
+			if c.pocHandler == poc.ALLOR && isVul.Value().(bool) {
+				fmt.Println(c.pocItem.Id, c.pocHandler, c.target, "+++++++++++++")
+				c.result.IsVul = true
+				c.UpdateCurrentCount()
+				return err
+			}
+			if c.pocHandler == poc.ALLAND && !isVul.Value().(bool) {
+				fmt.Println(c.pocItem.Id, c.pocHandler, c.target, "=============")
+				c.result.IsVul = false
 				c.UpdateCurrentCount()
 				return err
 			}
 		}
-	}
-
-	if c.pocHandler == poc.ALLOR {
-		c.result.IsVul = false
-		c.UpdateCurrentCount()
-		return err
-	}
-
-	if c.pocHandler == poc.ALLAND {
-		c.result.IsVul = true
-		c.UpdateCurrentCount()
-		return err
 	}
 
 	// run final cel expression
