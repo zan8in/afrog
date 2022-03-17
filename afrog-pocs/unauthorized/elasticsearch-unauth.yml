@@ -4,6 +4,14 @@ info:
     name: elasticsearch-unauth
     author: p0wd3r
     severity: high
+    description: |
+        /_nodes #查看节点数据
+        /_cat/indices #索引
+        _cat/indices
+        /_plugin/head
+        /_nodes/
+        /_status
+        /_search?pretty
 
 manual: true
 transport: http

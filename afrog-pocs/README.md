@@ -63,13 +63,13 @@
 - shiro
 - thinkphp
 - gitlab
+- jenkins-api-panel
+- jenkins-login
+- emessage-panel
+- openerp-database
+- utt-panel
 
 ### login 登录
-
-- default-panel 默认登陆页面
-  - emessage-panel
-  - openerp-database
-  - utt-panel
 - default-pwd 默认密码
   - grafana-default-password
   - minio-default-password
