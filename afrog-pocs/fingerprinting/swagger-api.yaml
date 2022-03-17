@@ -9,7 +9,7 @@ info:
 rules:
   r0:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger-ui.html
     expression: |
@@ -21,7 +21,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r1:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger/ui/index
     expression: |
@@ -33,7 +33,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r2:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger/index.html
     expression: |
@@ -45,7 +45,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r3:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger/swagger-ui.html
     expression: |
@@ -57,7 +57,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r4:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /api-docs/swagger.json
     expression: |
@@ -69,7 +69,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r5:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /api-docs/swagger.yaml
     expression: |
@@ -81,7 +81,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r6:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger.json
     expression: |
@@ -93,7 +93,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r7:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger.yaml
     expression: |
@@ -105,7 +105,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r8:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger/v1/swagger.json
     expression: |
@@ -117,7 +117,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r9:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /swagger/v1/swagger.yaml
     expression: |
@@ -129,7 +129,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r10:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /api/index.html
     expression: |
@@ -141,7 +141,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r11:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /api/docs/
     expression: |
@@ -153,7 +153,7 @@ rules:
       response.body.bcontains(b'**token**:'))
   r12:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /api_docs
     expression: |

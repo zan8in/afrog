@@ -10,7 +10,7 @@ transport: http
 rules:
   r0:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /login.html
       follow_redirects: true
@@ -27,7 +27,7 @@ rules:
       response.body.bcontains(b"D-Link"))
   r1:
     request:
-      brute: true
+      handler: allor
       method: GET
       path: /info/Login.html
       follow_redirects: true
