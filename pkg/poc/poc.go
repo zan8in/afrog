@@ -11,6 +11,11 @@ import (
 // https://docs.xray.cool/#/guide/poc/v2
 // Rule有序，参考：https://github.com/WAY29/pocV/blob/main/pkg/xray/structs/poc.go
 
+const (
+	ALLOR  = "allor"
+	ALLAND = "alland"
+)
+
 type Poc struct {
 	Id         string        `yaml:"id"`        //  脚本名称
 	Transport  string        `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http
@@ -65,7 +70,6 @@ type RuleRequest struct {
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
-	Brute           bool              `yaml:"brute"` // 如果brute=true，则认为poc成立，不继续验证
 }
 
 // 以下开始是 信息部分

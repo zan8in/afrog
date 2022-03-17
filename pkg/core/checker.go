@@ -23,6 +23,7 @@ type Checker struct {
 	options         *config.Options
 	target          string
 	pocItem         *poc.Poc
+	pocHandler      string
 	originalRequest *http.Request // 原始request
 	variableMap     map[string]interface{}
 	result          *Result
@@ -91,13 +92,19 @@ func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker
 		return nil
 	}
 
+	c.pocHandler = ""
+	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
+		c.pocHandler = poc.ALLAND
+	}
+	if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
+		c.pocHandler = poc.ALLOR
+	}
+
 	return c
 }
 
 func (c *Checker) Check() error {
 	var err error
-
-	// log.Log().Error(fmt.Sprintf("afrog scan [%s][%s]", c.pocItem.Id, c.target))
 
 	// init fasthttp client
 	fc := FastClientPool.Get().(*http2.FastClient)
@@ -207,13 +214,24 @@ func (c *Checker) Check() error {
 			// debug per rule result
 			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
 
-			// brute
-			if rule.Request.Brute && isVul.Value().(bool) {
+			if (c.pocHandler == poc.ALLOR && isVul.Value().(bool)) || (c.pocHandler == poc.ALLAND && !isVul.Value().(bool)) {
 				c.result.IsVul = isVul.Value().(bool)
 				c.UpdateCurrentCount()
 				return err
 			}
 		}
+	}
+
+	if c.pocHandler == poc.ALLOR {
+		c.result.IsVul = false
+		c.UpdateCurrentCount()
+		return err
+	}
+
+	if c.pocHandler == poc.ALLAND {
+		c.result.IsVul = true
+		c.UpdateCurrentCount()
+		return err
 	}
 
 	// run final cel expression
