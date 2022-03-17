@@ -3,7 +3,7 @@ id: CNVD-2020-62422
 info:
   name: seeyon-cnvd-2020-62422-readfile
   author: Aquilao(https://github.com/Aquilao)
-  severity: info
+  severity: medium
   reference:
     - https://www.cnvd.org.cn/flaw/show/CNVD-2020-62422
   tags: seeyon,cnvd
