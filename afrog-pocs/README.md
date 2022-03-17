@@ -26,6 +26,8 @@
 - 2018
   - CVE-2018-7490
   - CVE-2018-8033
+  - CVE-2018-1000600
+  - CVE-2018-1000861
 - 2019
   - citrix-cve-2019-19781-path-traversal
   - solr-cve-2019-0193
@@ -95,6 +97,7 @@
 - apache-nifi-api-unauthorized-access
 - apache-storm-unauth
 - apache-storm-unauthorized-access
+- jenkins-unauthorized-access
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
