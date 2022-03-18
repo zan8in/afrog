@@ -1,13 +1,15 @@
 <h1 align="center">afrog</h1>
 <p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>🐸</p>
 
+<p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
+
 ### 特点
 
-* [x] 支持 xray 2.0 核心语法
+* [x] 性能卓越，最少请求，最佳结果
+
+* [x] 实时显示，扫描进度
 
 * [x] 长期维护、更新 POC（./afrog-pocs）
-
-* [x] 轻松二次开发，整合到其他项目
 
 * [x] 命令行版，方便部署在 `vps` 上扫描
 
