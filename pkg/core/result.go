@@ -23,6 +23,14 @@ type PocResult struct {
 	IsVul          bool
 }
 
+var LogColor *log.Color
+
+func init() {
+	if LogColor == nil {
+		LogColor = log.NewColor()
+	}
+}
+
 func (pr *PocResult) ReadFullResultRequestInfo() string {
 	result := "\r\n" + pr.ResultRequest.Url.GetScheme() + "://" + pr.ResultRequest.Url.GetHost() + pr.ResultRequest.Url.GetPath()
 	if len(pr.ResultRequest.Url.GetQuery()) > 0 {
@@ -74,10 +82,6 @@ func (r *Result) PrintResultInfo() string {
 	return "[" + utils.GetNowDateTime() + "] [" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 }
 
-func (r *Result) PrintResultInfoConsole() string {
-	colorTime := log.GetColor("time", "["+utils.GetNowDateTime()+"]")
-	colorPocId := log.GetColor("", "["+r.PocInfo.Id+"]")
-	colorSecruity := log.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]")
-	fmt.Printf("\r" + colorTime + " " + colorPocId + " " + colorSecruity + " " + r.Target + "\r\n")
-	return colorPocId + colorSecruity + r.Target
+func (r *Result) PrintColorResultInfoConsole() {
+	fmt.Printf("\r" + LogColor.Time("["+utils.GetNowDateTime()+"]") + " " + LogColor.Vulner("["+r.PocInfo.Id+"]") + " " + LogColor.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]") + " " + r.Target + "\r\n")
 }

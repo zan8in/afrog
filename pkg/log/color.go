@@ -3,29 +3,50 @@ package log
 import (
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/gookit/color"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
-func GetColor(level string, log string) string {
-	var result string
+type Color struct {
+	Info     func(a ...interface{}) string
+	Low      func(a ...interface{}) string
+	Midium   func(a ...interface{}) string
+	High     func(a ...interface{}) string
+	Critical func(a ...interface{}) string
+	Vulner   func(a ...interface{}) string
+	Time     func(a ...interface{}) string
+}
+
+func NewColor() *Color {
+	return &Color{
+		Info:     color.FgBlue.Render,
+		Low:      color.FgCyan.Render,
+		Midium:   color.FgYellow.Render,
+		High:     color.FgLightRed.Render,
+		Critical: color.FgRed.Render,
+		Vulner:   color.FgLightGreen.Render,
+		Time:     color.FgCyan.Render,
+	}
+}
+
+func (c *Color) GetColor(level string, log string) string {
 	level = strings.ToLower(level)
 	switch utils.SeverityMap[level] {
 	case utils.INFO:
-		result = color.BlueString(log)
+		return c.Info(log)
 	case utils.LOW:
-		result = color.CyanString(log)
+		return c.Low(log)
 	case utils.MEDIUM:
-		result = color.YellowString(log)
+		return c.Midium(log)
 	case utils.HIGH:
-		result = color.RedString(log)
+		return c.High(log)
 	case utils.CRITICAL:
-		result = color.HiRedString(log)
+		return c.Critical(log)
 	default:
-		result = color.HiGreenString(log)
+		if level == "time" {
+			return c.Low(log)
+		} else {
+			return c.Vulner(log)
+		}
 	}
-	if level == "time" {
-		result = color.HiCyanString(log)
-	}
-	return result
 }

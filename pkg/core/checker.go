@@ -253,7 +253,7 @@ func (c *Checker) UpdateCurrentCount() {
 	CurrentCount++
 
 	if c.result.IsVul {
-		c.result.PrintResultInfoConsole()
+		c.result.PrintColorResultInfoConsole()
 		if len(c.options.Output) > 0 {
 			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo()) // output save to file
 		}
