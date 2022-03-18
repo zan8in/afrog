@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>🐸</p>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
 
