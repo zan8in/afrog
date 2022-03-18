@@ -215,13 +215,11 @@ func (c *Checker) Check() error {
 			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
 
 			if c.pocHandler == poc.ALLOR && isVul.Value().(bool) {
-				fmt.Println(c.pocItem.Id, c.pocHandler, c.target, "+++++++++++++")
 				c.result.IsVul = true
 				c.UpdateCurrentCount()
 				return err
 			}
 			if c.pocHandler == poc.ALLAND && !isVul.Value().(bool) {
-				fmt.Println(c.pocItem.Id, c.pocHandler, c.target, "=============")
 				c.result.IsVul = false
 				c.UpdateCurrentCount()
 				return err
@@ -233,6 +231,7 @@ func (c *Checker) Check() error {
 	isVul, err := c.customLib.RunEval(c.pocItem.Expression, c.variableMap)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
+		c.result.IsVul = false
 		c.UpdateCurrentCount()
 		return err
 	}
@@ -253,14 +252,14 @@ func (c *Checker) UpdateCurrentCount() {
 
 	CurrentCount++
 
-	fmt.Printf("\r%d/%d | %d%% ", CurrentCount, c.options.Count, CurrentCount*100/c.options.Count)
-
 	if c.result.IsVul {
 		c.result.PrintResultInfoConsole()
 		if len(c.options.Output) > 0 {
 			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo()) // output save to file
 		}
 	}
+
+	fmt.Printf("\r%d/%d | %d%% ", CurrentCount, c.options.Count, CurrentCount*100/c.options.Count)
 
 	lock.Unlock()
 }
