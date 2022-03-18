@@ -23,14 +23,6 @@ type PocResult struct {
 	IsVul          bool
 }
 
-var LogColor *log.Color
-
-func init() {
-	if LogColor == nil {
-		LogColor = log.NewColor()
-	}
-}
-
 func (pr *PocResult) ReadFullResultRequestInfo() string {
 	result := "\r\n" + pr.ResultRequest.Url.GetScheme() + "://" + pr.ResultRequest.Url.GetHost() + pr.ResultRequest.Url.GetPath()
 	if len(pr.ResultRequest.Url.GetQuery()) > 0 {
@@ -83,5 +75,5 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole() {
-	fmt.Printf("\r" + LogColor.Time("["+utils.GetNowDateTime()+"]") + " " + LogColor.Vulner("["+r.PocInfo.Id+"]") + " " + LogColor.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]") + " " + r.Target + "\r\n")
+	fmt.Printf("\r" + log.LogColor.Time("["+utils.GetNowDateTime()+"]") + " " + log.LogColor.Vulner("["+r.PocInfo.Id+"]") + " " + log.LogColor.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]") + " " + r.Target + "\r\n")
 }

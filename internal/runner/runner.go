@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/fatih/color"
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -40,7 +40,7 @@ func New(options *config.Options) (*Runner, error) {
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
-		otherpocdir := color.BlueString("指定脚本  " + options.PocsFilePath)
+		otherpocdir := log.LogColor.Info("指定脚本  " + options.PocsFilePath)
 		fmt.Println(otherpocdir)
 	}
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
@@ -50,7 +50,7 @@ func New(options *config.Options) (*Runner, error) {
 
 	// console print
 	if len(options.Output) > 0 {
-		otherpocdir := color.BlueString("输出文件  " + options.Output)
+		otherpocdir := log.LogColor.Info("输出文件  " + options.Output)
 		fmt.Println(otherpocdir)
 	}
 

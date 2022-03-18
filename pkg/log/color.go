@@ -15,6 +15,15 @@ type Color struct {
 	Critical func(a ...interface{}) string
 	Vulner   func(a ...interface{}) string
 	Time     func(a ...interface{}) string
+	Title    func(a ...interface{}) string
+}
+
+var LogColor *Color
+
+func init() {
+	if LogColor == nil {
+		LogColor = NewColor()
+	}
 }
 
 func NewColor() *Color {
@@ -26,6 +35,7 @@ func NewColor() *Color {
 		Critical: color.FgRed.Render,
 		Vulner:   color.FgLightGreen.Render,
 		Time:     color.FgCyan.Render,
+		Title:    color.FgLightBlue.Render,
 	}
 }
 
