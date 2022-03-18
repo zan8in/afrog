@@ -52,8 +52,6 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		}(target, poc1)
 	}
 	wg.WaitGroup.Wait()
-
-	// utils.RandSleep(500)
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
@@ -63,10 +61,8 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 		}
 	}()
 
-	c := NewChecker(*e.options, target, poc)
+	c := NewChecker(e.options, target, poc)
 	if err := c.Check(); err != nil {
 		log.Log().Error(err.Error())
 	}
-
-	// utils.RandSleep(500)
 }

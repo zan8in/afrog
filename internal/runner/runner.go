@@ -8,6 +8,7 @@ import (
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -16,8 +17,25 @@ type Runner struct {
 	catalog *catalog.Catalog
 }
 
-func New(options *config.Options) (*Runner, error) {
+func New(options *config.Options, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
+
+	// init callback
+	options.ApiCallBack = acb
+
+	// init poc home directory
+	pocsDir, err := poc.InitPocHomeDirectory()
+	if err != nil {
+		return err
+	}
+	options.PocsDirectory.Set(pocsDir)
+
+	// init config file
+	config, err := config.New()
+	if err != nil {
+		return err
+	}
+	options.Config = config
 
 	// init targets
 	if len(options.Target) > 0 {
@@ -26,41 +44,38 @@ func New(options *config.Options) (*Runner, error) {
 	if len(options.TargetsFilePath) > 0 {
 		allTargets, err := utils.ReadFileLineByLine(options.TargetsFilePath)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for _, t := range allTargets {
 			options.Targets.Set(t)
 		}
 	}
 	if len(options.Targets) == 0 {
-		return nil, errors.New("could not find targets")
+		return errors.New("could not find targets")
 	}
 
 	// init pocs
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
-		otherpocdir := log.LogColor.Info("指定脚本  " + options.PocsFilePath)
-		fmt.Println(otherpocdir)
+		fmt.Println(log.LogColor.Info("指定脚本  " + options.PocsFilePath))
 	}
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
 	if len(allPocsYamlSlice) == 0 {
-		return nil, errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
+		return errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
 	}
 
 	// console print
 	if len(options.Output) > 0 {
-		otherpocdir := log.LogColor.Info("输出文件  " + options.Output)
-		fmt.Println(otherpocdir)
+		fmt.Println(log.LogColor.Info("输出文件  " + options.Output))
 	}
 
 	// init scan sum
 	options.Count = len(options.Targets) * len(allPocsYamlSlice)
 
-	// return nil, nil
-	//log.Log().Debug(utils.ToString(allPocsSlice))
+	//
 	e := core.New(options)
 	e.Execute(allPocsYamlSlice)
 
-	return runner, nil
+	return nil
 }

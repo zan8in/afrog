@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 )
@@ -14,13 +15,11 @@ import (
 var options = &config.Options{}
 
 func main() {
-	readConfig()
-
 	app := cli.NewApp()
-	app.Name = runner.ShowBanner(options.Config.ConfigVersion)
+	app.Name = runner.ShowBanner(config.Version)
 	app.Usage = " "
 	app.UsageText = "afrog [命令]"
-	app.Version = options.Config.ConfigVersion
+	app.Version = config.Version
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "指定扫描的URL/Host"},
@@ -30,14 +29,32 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-		var err error
 
 		title := log.LogColor.Title("一款基于 YAML 语法模板的定制化快速漏洞扫描器 - afrog V" + c.App.Version)
 		defconfig := log.LogColor.Info("默认配置  " + options.Config.GetConfigPath())
 		defpocdir := log.LogColor.Info("默认脚本  " + poc.GetPocPath())
 		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir)
 
-		if _, err := runner.New(options); err != nil {
+		err := runner.New(options, func(result interface{}) {
+			r := result.(*core.Result)
+
+			options.OptLock.Lock()
+
+			options.CurrentCount++
+
+			if r.IsVul {
+				r.PrintColorResultInfoConsole()
+
+				if len(r.Output) > 0 {
+					r.WriteOutput()
+				}
+			}
+
+			options.OptLock.Unlock()
+
+			fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
+		})
+		if err != nil {
 			return err
 		}
 
@@ -46,32 +63,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		// log.Log().Fatal(fmt.Sprintf("app run err, %s", err.Error()))
 		fmt.Println(log.LogColor.High("启动 afrog 出错，%s", err.Error()))
 	}
-}
-
-func readConfig() {
-	// options.Targets.Set("https://202.65.121.62:7199")
-	// options.Targets.Set("https://34.141.128.122")
-	// options.Targets.Set("http://121.196.164.206:9000")
-	// options.Targets.Set("http://139.9.119.190:9001")
-	// options.Targets.Set("http://127.0.0.1")
-	// allTargets, _ := utils.ReadFileLineByLine("./urls.txt")
-	// for _, t := range allTargets {
-	// 	options.Targets.Set(t)
-	// 	// utils.BufferWriteAppend("./result.txt", t)
-	// }
-
-	pocsDir, err := poc.InitPocHomeDirectory()
-	if err != nil {
-		log.Log().Fatal(err.Error())
-	}
-	options.PocsDirectory.Set(pocsDir)
-
-	config, err := config.New()
-	if err != nil {
-		log.Log().Fatal(err.Error())
-	}
-	options.Config = config
 }

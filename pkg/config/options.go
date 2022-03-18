@@ -1,6 +1,8 @@
 package config
 
 import (
+	"sync"
+
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -28,4 +30,15 @@ type Options struct {
 
 	// Scan count num(targets * allpocs)
 	Count int
+
+	// Current Scan count num
+	CurrentCount int
+
+	// Thread lock
+	OptLock sync.Mutex
+
+	// Callback scan result
+	ApiCallBack ApiCallBack
 }
+
+type ApiCallBack func(interface{})

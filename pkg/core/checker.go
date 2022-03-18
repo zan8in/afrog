@@ -31,8 +31,6 @@ type Checker struct {
 	customLib       *CustomLib
 }
 
-var CurrentCount = 0
-
 var CheckerPool = sync.Pool{
 	New: func() interface{} {
 		return &Checker{
@@ -74,13 +72,11 @@ var FastClientPool = sync.Pool{
 var ReverseCeyeApiKey string
 var ReverseCeyeDomain string
 
-var lock sync.Mutex
-
 var FastClientReverse *http2.FastClient // 用于 reverse http client
 
-func NewChecker(options config.Options, target string, pocItem poc.Poc) *Checker {
+func NewChecker(options *config.Options, target string, pocItem poc.Poc) *Checker {
 	c := CheckerPool.Get().(*Checker)
-	c.options = &options
+	c.options = options
 	c.target = target
 	c.pocItem = &pocItem
 
@@ -118,6 +114,7 @@ func (c *Checker) Check() error {
 	c.result = ResultPool.Get().(*Result)
 	c.result.Target = c.target
 	c.result.PocInfo = c.pocItem
+	c.result.Output = c.options.Output
 
 	// init cel
 	c.customLib = NewCustomLib()
@@ -133,14 +130,16 @@ func (c *Checker) Check() error {
 		c.originalRequest, err = http.NewRequest("GET", c.target, nil)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
-			c.UpdateCurrentCount()
+			c.result.IsVul = false
+			c.options.ApiCallBack(c.result)
 			return err
 		}
 
 		tempRequest, err = http2.ParseRequest(c.originalRequest)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
-			c.UpdateCurrentCount()
+			c.result.IsVul = false
+			c.options.ApiCallBack(c.result)
 			return err
 		}
 
@@ -216,12 +215,12 @@ func (c *Checker) Check() error {
 
 			if c.pocHandler == poc.ALLOR && isVul.Value().(bool) {
 				c.result.IsVul = true
-				c.UpdateCurrentCount()
+				c.options.ApiCallBack(c.result)
 				return err
 			}
 			if c.pocHandler == poc.ALLAND && !isVul.Value().(bool) {
 				c.result.IsVul = false
-				c.UpdateCurrentCount()
+				c.options.ApiCallBack(c.result)
 				return err
 			}
 		}
@@ -232,36 +231,18 @@ func (c *Checker) Check() error {
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
 		c.result.IsVul = false
-		c.UpdateCurrentCount()
+		c.options.ApiCallBack(c.result)
 		return err
 	}
 
 	// save final result
 	c.result.IsVul = isVul.Value().(bool)
 
-	c.UpdateCurrentCount()
+	c.options.ApiCallBack(c.result)
 
 	c.PrintTraceInfo()
 
 	return err
-}
-
-// print result && show progress bar etc.
-func (c *Checker) UpdateCurrentCount() {
-	lock.Lock()
-
-	CurrentCount++
-
-	if c.result.IsVul {
-		c.result.PrintColorResultInfoConsole()
-		if len(c.options.Output) > 0 {
-			utils.BufferWriteAppend(c.options.Output, c.result.PrintResultInfo()) // output save to file
-		}
-	}
-
-	fmt.Printf("\r%d/%d | %d%% ", CurrentCount, c.options.Count, CurrentCount*100/c.options.Count)
-
-	lock.Unlock()
 }
 
 // print result info for debug

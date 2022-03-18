@@ -15,6 +15,7 @@ type Result struct {
 	Target       string
 	PocInfo      *poc.Poc
 	AllPocResult []PocResult
+	Output       string
 }
 
 type PocResult struct {
@@ -68,6 +69,10 @@ func (r *Result) ReadPocInfo() string {
 		result += "    CvssScore: " + strconv.FormatFloat(r.PocInfo.Info.Classification.CvssScore, 'f', 1, 64) + "\r\n"
 	}
 	return result
+}
+
+func (r *Result) WriteOutput() {
+	utils.BufferWriteAppend(r.Output, "["+utils.GetNowDateTime()+"] ["+r.PocInfo.Id+"] ["+r.PocInfo.Info.Severity+"] "+r.Target) // output save to file
 }
 
 func (r *Result) PrintResultInfo() string {
