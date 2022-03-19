@@ -227,7 +227,7 @@ func (fc *FastClient) SampleHTTPRequest(httpRequest *http.Request) (*proto.Respo
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*15)
+	err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*6)
 	if err != nil {
 		errName, known := httpConnError(err)
 		if known {
@@ -451,4 +451,8 @@ func ParseRequest(oReq *http.Request) (*proto.Request, error) {
 		oReq.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 	}
 	return req, nil
+}
+
+func (fc *FastClient) Reset() {
+	*fc = FastClient{}
 }
