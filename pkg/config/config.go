@@ -57,7 +57,7 @@ func New() (*Config, error) {
 		configHttp.MaxIdle = "5s"
 		configHttp.MaxRedirect = 5
 		configHttp.Concurrency = 4096
-		configHttp.MaxConnsPerHost = 10000
+		configHttp.MaxConnsPerHost = 16888 // MaxConnsPerHost是一个限流的参数，保证对一个Host最大的打开连接数，如果超过这个数字，则会直接拒绝，这里默认值是512，但如果你打算用来做压测之类的事情，需要增加这个值，比如这里我就增加到了16384
 		configHttp.MaxResponseBodySize = 1024 * 1024 * 2
 		configHttp.UserAgent = ""
 		c.ConfigHttp = configHttp
