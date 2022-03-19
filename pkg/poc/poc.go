@@ -175,3 +175,13 @@ func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*m = RuleMapSlice(newRuleSlice)
 	return nil
 }
+
+func (poc *Poc) Reset() {
+	poc.Id = ""
+	poc.Transport = ""
+	poc.Set = nil
+	poc.Payloads = Payloads{}
+	poc.Rules = nil
+	poc.Expression = ""
+	poc.Info = Info{}
+}

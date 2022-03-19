@@ -20,66 +20,22 @@ import (
 )
 
 type Checker struct {
-	options         *config.Options
-	target          string
-	pocItem         *poc.Poc
-	pocHandler      string
-	originalRequest *http.Request // 原始request
-	variableMap     map[string]interface{}
-	result          *Result
-	pocResult       *PocResult
-	customLib       *CustomLib
-}
-
-var CheckerPool = sync.Pool{
-	New: func() interface{} {
-		return &Checker{
-			originalRequest: &http.Request{},
-			variableMap:     make(map[string]interface{}),
-		}
-	},
-}
-
-var ResultPool = sync.Pool{
-	New: func() interface{} {
-		return &Result{
-			PocInfo: &poc.Poc{},
-		}
-	},
-}
-
-var PocResultPool = sync.Pool{
-	New: func() interface{} {
-		return &PocResult{
-			ResultRequest:  &proto.Request{},
-			ResultResponse: &proto.Response{},
-		}
-	},
-}
-
-var VariableMapPool = sync.Pool{
-	New: func() interface{} {
-		return make(map[string]interface{})
-	},
-}
-
-var FastClientPool = sync.Pool{
-	New: func() interface{} {
-		return &http2.FastClient{}
-	},
+	Options         *sync.Pool
+	Target          *sync.Pool
+	PocItem         *sync.Pool
+	PocHandler      *sync.Pool
+	OriginalRequest *sync.Pool
+	VariableMap     *sync.Pool
+	Result          *sync.Pool
+	PocResult       *sync.Pool
+	CustomLib       *sync.Pool
+	FastClient      *sync.Pool
 }
 
 var ReverseCeyeApiKey string
 var ReverseCeyeDomain string
 
-var FastClientReverse *http2.FastClient // 用于 reverse http client
-
 func NewChecker(options *config.Options, target string, pocItem poc.Poc) *Checker {
-	c := CheckerPool.Get().(*Checker)
-	c.options = options
-	c.target = target
-	c.pocItem = &pocItem
-
 	ReverseCeyeApiKey = options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = options.Config.Reverse.Ceye.Domain
 
@@ -88,188 +44,288 @@ func NewChecker(options *config.Options, target string, pocItem poc.Poc) *Checke
 		return nil
 	}
 
-	c.pocHandler = ""
-	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
-		c.pocHandler = poc.ALLAND
+	return &Checker{
+		Options: &sync.Pool{
+			New: func() interface{} {
+				return options
+			},
+		},
+		Target: &sync.Pool{
+			New: func() interface{} {
+				return target
+			},
+		},
+		PocItem: &sync.Pool{
+			New: func() interface{} {
+				return &pocItem
+			},
+		},
+		PocHandler: &sync.Pool{
+			New: func() interface{} {
+				pocHandler := ""
+				if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
+					pocHandler = poc.ALLAND
+				}
+				if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
+					pocHandler = poc.ALLOR
+				}
+				return pocHandler
+			},
+		},
+		OriginalRequest: &sync.Pool{
+			New: func() interface{} {
+				return &http.Request{}
+			},
+		},
+		VariableMap: &sync.Pool{
+			New: func() interface{} {
+				return make(map[string]interface{})
+			},
+		},
+		Result: &sync.Pool{
+			New: func() interface{} {
+				return &Result{
+					Target:  target,
+					PocInfo: &pocItem,
+					Output:  options.Output,
+				}
+			},
+		},
+		PocResult: &sync.Pool{
+			New: func() interface{} {
+				return &PocResult{}
+			},
+		},
+		CustomLib: &sync.Pool{
+			New: func() interface{} {
+				return NewCustomLib()
+			},
+		},
+		FastClient: &sync.Pool{
+			New: func() interface{} {
+				return &http2.FastClient{}
+			},
+		},
 	}
-	if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
-		c.pocHandler = poc.ALLOR
-	}
-
-	return c
 }
 
-func (c *Checker) Check() error {
-	var err error
+func (c *Checker) ReleaseVariableMap(vmap map[string]interface{}) {
+	if vmap != nil {
+		vmap = nil
+		c.VariableMap.Put(vmap)
+	}
+}
 
-	// init fasthttp client
-	fc := FastClientPool.Get().(*http2.FastClient)
-	fc.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
-	fc.Client = http2.New(c.options)
+func (c *Checker) ReleaseTarget(r string) {
+	if len(r) > 0 {
+		r = ""
+		c.Target.Put(r)
+	}
+}
 
-	// init variablemap from sync.pool
-	c.variableMap = VariableMapPool.Get().(map[string]interface{})
+func (c *Checker) ReleaseHandler(h string) {
+	if len(h) > 0 {
+		h = ""
+		c.Target.Put(h)
+	}
+}
 
-	// init result
-	c.result = ResultPool.Get().(*Result)
-	c.result.Target = c.target
-	c.result.PocInfo = c.pocItem
-	c.result.Output = c.options.Output
+func (c *Checker) ReleaseOriginalRequest(o *http.Request) {
+	if o != nil {
+		*o = http.Request{}
+		c.OriginalRequest.Put(o)
+	}
+}
 
-	// init cel
-	c.customLib = NewCustomLib()
+var FastClientReverse *http2.FastClient // 用于 reverse http client
+
+func (c *Checker) Check() (err error) {
+
+	options := c.Options.Get().(*config.Options)
+	defer c.Options.Put(options)
+
+	fc := c.FastClient.Get().(*http2.FastClient)
+	fc.Client = http2.New(options)
+	fc.DialTimeout = options.Config.ConfigHttp.DialTimeout
+	defer c.FastClient.Put(fc)
+	defer fc.Reset()
+
+	variableMap := c.VariableMap.Get().(map[string]interface{})
+	defer c.ReleaseVariableMap(variableMap)
+
+	target := c.Target.Get().(string)
+	defer c.ReleaseTarget(target)
+
+	pocItem := c.PocItem.Get().(*poc.Poc)
+	defer c.PocItem.Put(pocItem)
+	defer pocItem.Reset()
+
+	result := c.Result.Get().(*Result)
+	defer c.Result.Put(result)
+	defer result.Reset()
+
+	customLib := c.CustomLib.Get().(*CustomLib)
+	defer c.CustomLib.Put(customLib)
+	defer customLib.Reset()
+
+	originalRequest := c.OriginalRequest.Get().(*http.Request)
+	defer c.ReleaseOriginalRequest(originalRequest)
+
+	pocResult := c.PocResult.Get().(*PocResult)
+	defer c.PocResult.Put(pocResult)
+	defer pocResult.Reset()
+
+	pocHandler := c.PocHandler.Get().(string)
+	defer c.ReleaseHandler(pocHandler)
 
 	// update request variablemap
 	tempRequest := http2.AcquireProtoRequestPool()
-	if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
-		if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
-			c.target = "http://" + c.target
+	defer http2.ReleaseProtoRequestPool(tempRequest)
+	if pocItem.Transport != "tcp" && pocItem.Transport != "udp" {
+		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+			target = "http://" + target
 		}
 
 		// original request
-		c.originalRequest, err = http.NewRequest("GET", c.target, nil)
+		originalRequest, err = http.NewRequest("GET", target, nil)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
-			c.result.IsVul = false
-			c.options.ApiCallBack(c.result)
+			result.IsVul = false
+			options.ApiCallBack(result)
 			return err
 		}
 
-		tempRequest, err = http2.ParseRequest(c.originalRequest)
+		tempRequest, err = http2.ParseRequest(originalRequest)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
-			c.result.IsVul = false
-			c.options.ApiCallBack(c.result)
+			result.IsVul = false
+			options.ApiCallBack(result)
 			return err
 		}
 
 		// set User-Agent
-		if len(c.options.Config.ConfigHttp.UserAgent) > 0 {
-			c.originalRequest.Header.Set("User-Agent", c.options.Config.ConfigHttp.UserAgent)
+		if len(options.Config.ConfigHttp.UserAgent) > 0 {
+			originalRequest.Header.Set("User-Agent", options.Config.ConfigHttp.UserAgent)
 		} else {
-			c.originalRequest.Header.Set("User-Agent", utils.RandomUA())
+			originalRequest.Header.Set("User-Agent", utils.RandomUA())
 		}
 	}
-	c.variableMap["request"] = tempRequest
+	tempVariableMap := tempRequest
+	variableMap["request"] = tempVariableMap
 
 	// update set cel and variablemap
-	if len(c.pocItem.Set) > 0 {
-		// c.customLib.WriteRuleSetOptions(c.pocItem.Set)
-		c.UpdateVariableMap(c.pocItem.Set)
+	if len(pocItem.Set) > 0 {
+		c.UpdateVariableMap(pocItem.Set, variableMap, customLib, fc)
 	}
 
 	// update payloads cel and variablemap
-	if len(c.pocItem.Payloads.Payloads) > 0 {
-		// c.customLib.WriteRuleSetOptions(c.pocItem.Payloads.Payloads)
-		c.UpdateVariableMap(c.pocItem.Payloads.Payloads)
+	if len(pocItem.Payloads.Payloads) > 0 {
+		c.UpdateVariableMap(pocItem.Payloads.Payloads, variableMap, customLib, fc)
 	}
 
 	// rule
-	for _, ruleMap := range c.pocItem.Rules {
+	for _, ruleMap := range pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
 
 		// translate : http
-		if c.pocItem.Transport != "tcp" && c.pocItem.Transport != "udp" {
-			if !strings.HasPrefix(c.target, "http://") && !strings.HasPrefix(c.target, "https://") {
-				c.target = "http://" + c.target
-			}
+		if pocItem.Transport != "tcp" && pocItem.Transport != "udp" {
 
 			// run fasthttp client
 			utils.RandSleep(500) // firewall just test.
-			fc.MaxRedirect = c.options.Config.ConfigHttp.MaxRedirect
-			err = fc.HTTPRequest(c.originalRequest, rule, c.variableMap)
+
+			fc.MaxRedirect = options.Config.ConfigHttp.MaxRedirect
+
+			err = fc.HTTPRequest(originalRequest, rule, variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
-				c.customLib.WriteRuleFunctionsROptions(k, false)
+				customLib.WriteRuleFunctionsROptions(k, false)
 				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// run cel expression
-			isVul, err := c.customLib.RunEval(rule.Expression, c.variableMap)
+			isVul, err := customLib.RunEval(rule.Expression, variableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
-				c.customLib.WriteRuleFunctionsROptions(k, false)
+				customLib.WriteRuleFunctionsROptions(k, false)
 				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// set result function eg: r1() r2()
-			c.customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
+			customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
 			// update output cel and variablemap
 			if len(rule.Output) > 0 {
-				// c.customLib.WriteRuleSetOptions(rule.Output)
-				c.UpdateVariableMap(rule.Output)
+				c.UpdateVariableMap(rule.Output, variableMap, customLib, fc)
 			}
 
 			// save result eg: request、response、target、pocinfo etc.
-			c.pocResult = PocResultPool.Get().(*PocResult)
-			c.pocResult.IsVul = isVul.Value().(bool)
-			c.pocResult.ResultRequest = c.variableMap["request"].(*proto.Request)
-			c.pocResult.ResultResponse = c.variableMap["response"].(*proto.Response)
+			pocResult.IsVul = isVul.Value().(bool)
+			pocResult.ResultRequest = variableMap["request"].(*proto.Request)
+			pocResult.ResultResponse = variableMap["response"].(*proto.Response)
 			// save to allresult slice
-			c.result.AllPocResult = append(c.result.AllPocResult, *c.pocResult)
+			result.AllPocResult = append(result.AllPocResult, pocResult)
 
 			// debug per rule result
 			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
 
-			if c.pocHandler == poc.ALLOR && isVul.Value().(bool) {
-				c.result.IsVul = true
-				c.options.ApiCallBack(c.result)
+			if pocHandler == poc.ALLOR && isVul.Value().(bool) {
+				result.IsVul = true
+				options.ApiCallBack(result)
 				return err
 			}
-			if c.pocHandler == poc.ALLAND && !isVul.Value().(bool) {
-				c.result.IsVul = false
-				c.options.ApiCallBack(c.result)
+			if pocHandler == poc.ALLAND && !isVul.Value().(bool) {
+				result.IsVul = false
+				options.ApiCallBack(result)
 				return err
 			}
 		}
 	}
 
 	// run final cel expression
-	isVul, err := c.customLib.RunEval(c.pocItem.Expression, c.variableMap)
+	isVul, err := customLib.RunEval(pocItem.Expression, variableMap)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
-		c.result.IsVul = false
-		c.options.ApiCallBack(c.result)
+		result.IsVul = false
+		options.ApiCallBack(result)
 		return err
 	}
 
 	// save final result
-	c.result.IsVul = isVul.Value().(bool)
+	result.IsVul = isVul.Value().(bool)
 
-	c.options.ApiCallBack(c.result)
+	options.ApiCallBack(result)
 
-	c.PrintTraceInfo()
+	c.PrintTraceInfo(result)
 
 	return err
 }
 
 // print result info for debug
-func (c *Checker) PrintTraceInfo() {
-	for i, v := range c.result.AllPocResult {
+func (c *Checker) PrintTraceInfo(result *Result) {
+	for i, v := range result.AllPocResult {
 		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
 	}
 }
 
 // update set、payload、output variableMap etc.
-func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
+func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]interface{}, customLib *CustomLib, fc *http2.FastClient) {
 	for _, item := range args {
 		key := item.Key.(string)
 		value := item.Value.(string)
 
 		if value == "newReverse()" {
-			c.variableMap[key] = c.newRerverse()
-			c.customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+			variableMap[key] = c.newRerverse()
+			customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
 
 			// if reverse()，initilize a fasthttpclient
-			FastClientReverse = FastClientPool.Get().(*http2.FastClient)
-			FastClientReverse.DialTimeout = c.options.Config.ConfigHttp.DialTimeout
-			FastClientReverse.Client = http2.New(c.options)
+			FastClientReverse = c.FastClient.Get().(*http2.FastClient)
+			FastClientReverse.DialTimeout = c.Options.Get().(*config.Options).Config.ConfigHttp.DialTimeout
+			FastClientReverse.Client = http2.New(c.Options.Get().(*config.Options))
 			continue
 		}
 
-		out, err := c.customLib.RunEval(value, c.variableMap)
+		out, err := customLib.RunEval(value, variableMap)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] Eval err, %s", key, value, err.Error()))
 			continue
@@ -277,17 +333,17 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 
 		switch value := out.Value().(type) {
 		case *proto.UrlType:
-			c.variableMap[key] = utils.UrlTypeToString(value)
-			c.customLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
+			variableMap[key] = utils.UrlTypeToString(value)
+			customLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
 		case int64:
-			c.variableMap[key] = int(value)
-			c.customLib.UpdateCompileOption(key, decls.Int)
+			variableMap[key] = int(value)
+			customLib.UpdateCompileOption(key, decls.Int)
 		case map[string]string:
-			c.variableMap[key] = value
-			c.customLib.UpdateCompileOption(key, StrStrMapType)
+			variableMap[key] = value
+			customLib.UpdateCompileOption(key, StrStrMapType)
 		default:
-			c.variableMap[key] = fmt.Sprintf("%v", out)
-			c.customLib.UpdateCompileOption(key, decls.String)
+			variableMap[key] = fmt.Sprintf("%v", out)
+			customLib.UpdateCompileOption(key, decls.String)
 		}
 	}
 }
@@ -296,8 +352,8 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 // find string 规定要查找的值
 // oldstr 规定被搜索的字符串
 // newstr 规定替换的值
-func (c *Checker) AssignVariableMap(find string) string {
-	for k, v := range c.variableMap {
+func (c *Checker) AssignVariableMap(find string, variableMap map[string]interface{}) string {
+	for k, v := range variableMap {
 		_, isMap := v.(map[string]string)
 		if isMap {
 			continue

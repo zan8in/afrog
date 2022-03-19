@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
@@ -29,11 +28,11 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return c.programOptions
 }
 
-var CustomLibPool = sync.Pool{
-	New: func() interface{} {
-		return CustomLib{}
-	},
-}
+// var CustomLibPool = sync.Pool{
+// 	New: func() interface{} {
+// 		return CustomLib{}
+// 	},
+// }
 
 func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, call runCallback) {
 	env, err := c.NewCelEnv()
@@ -70,11 +69,11 @@ type runCallback func(interface{}, error)
 
 // Step 1: 创建 cel 库
 func NewCustomLib() *CustomLib {
-	c := CustomLibPool.Get().(CustomLib)
+	c := &CustomLib{}
 	reg := types.NewEmptyRegistry()
 	c.envOptions = ReadComplieOptions(reg)
 	c.programOptions = ReadProgramOptions(reg)
-	return &c
+	return c
 }
 
 // Step 2: 创建 cel 环境
@@ -155,4 +154,8 @@ func (c *CustomLib) WriteRuleFunctionsROptions(funcName string, returnBool bool)
 
 func (c *CustomLib) UpdateCompileOption(k string, t *exprpb.Type) {
 	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(k, t)))
+}
+
+func (c *CustomLib) Reset() {
+	*c = CustomLib{}
 }
