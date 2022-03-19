@@ -34,6 +34,7 @@
   - solr-cve-2019-0193
   - dlink-cve-2019-17506
   - dlink-cve-2019-16920-rce
+  - CVE-2019-10758
 - 2020
   - CVE-2020-26413
   - dlink-cve-2020-9376-dump-credentials
