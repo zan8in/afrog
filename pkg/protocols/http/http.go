@@ -111,7 +111,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		}
 		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
 	} else {
-		dialtimeout := 15
+		dialtimeout := 6
 		if fc.DialTimeout > 0 {
 			dialtimeout = int(fc.DialTimeout)
 		}

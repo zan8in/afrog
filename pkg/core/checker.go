@@ -266,7 +266,7 @@ func (c *Checker) Check() (err error) {
 			result.AllPocResult = append(result.AllPocResult, pocResult)
 
 			// debug per rule result
-			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), rule.Request.Path))
+			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), pocResult.ResultRequest.Url.Path))
 
 			if pocHandler == poc.ALLOR && isVul.Value().(bool) {
 				result.IsVul = true
