@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>共 <span style="color:red;font-weight:bold">[395]</span> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
 
@@ -7,7 +7,7 @@
 
 * [x] 性能卓越，最少请求，最佳结果
 * [x] 实时显示，扫描进度
-* [x] 长期维护、更新 POC（./afrog-pocs <span style="color:red;font-weight:bold">[395]</span>）
+* [x] 长期维护、更新 POC（./afrog-pocs ）
 * [x] 命令行版，方便部署在 `vps` 上扫描
 * [x] API 接口，轻松接入其他项目
 * [ ] 网页版，增加用户体验
