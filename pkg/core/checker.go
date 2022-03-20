@@ -347,27 +347,6 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]i
 	}
 }
 
-// 替换变量的值
-// find string 规定要查找的值
-// oldstr 规定被搜索的字符串
-// newstr 规定替换的值
-func (c *Checker) AssignVariableMap(find string, variableMap map[string]interface{}) string {
-	for k, v := range variableMap {
-		_, isMap := v.(map[string]string)
-		if isMap {
-			continue
-		}
-		newstr := fmt.Sprintf("%v", v)
-		oldstr := "{{" + k + "}}"
-		if !strings.Contains(find, oldstr) {
-			continue
-		}
-		find = strings.ReplaceAll(find, oldstr, newstr)
-		break
-	}
-	return find
-}
-
 func (c *Checker) newRerverse() *proto.Reverse {
 	letters := "1234567890abcdefghijklmnopqrstuvwxyz"
 	randSource := rand.New(rand.NewSource(time.Now().Unix()))

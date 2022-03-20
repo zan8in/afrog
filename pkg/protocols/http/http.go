@@ -349,10 +349,6 @@ func DealMultipart(contentType string, ruleBody string) (result string, err erro
 	return multiPartContent, nil
 }
 
-// 替换变量的值
-// find string 规定要查找的值
-// oldstr 规定被搜索的字符串
-// newstr 规定替换的值
 func (fc *FastClient) AssignVariableMap(find string, variableMap map[string]interface{}) string {
 	for k, v := range variableMap {
 		_, isMap := v.(map[string]string)
