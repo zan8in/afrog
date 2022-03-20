@@ -50,14 +50,17 @@
   - CVE-2021-36260
   - CVE-2021-40438
   - CVE-2021-29490
-  - CVE-2022-24990
   - CVE-2020-28188
+-2022
+  - CVE-2022-24990
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
-
+  - CVE-2022-23131
+  
 ### exposures 信息泄露
 - alibaba-canal-info-leak
 - phpinfo
 - ruijie-eg-info-leak
+
 
 ### fingerprinting 指纹识别
 - swagger-api
@@ -76,6 +79,7 @@
 - terramaster-login
 - CVE-2020-15568
 - CVE-2020-28187
+- zabbix-server-login
 
 ### login 登录
 - default-pwd 默认密码
@@ -104,6 +108,7 @@
 - apache-storm-unauth
 - apache-storm-unauthorized-access
 - jenkins-unauthorized-access
+- zabbix-dashboards-access
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
