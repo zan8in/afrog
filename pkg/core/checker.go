@@ -210,8 +210,7 @@ func (c *Checker) Check() (err error) {
 			originalRequest.Header.Set("User-Agent", utils.RandomUA())
 		}
 	}
-	tempVariableMap := tempRequest
-	variableMap["request"] = tempVariableMap
+	variableMap["request"] = tempRequest
 
 	// update set cel and variablemap
 	if len(pocItem.Set) > 0 {
