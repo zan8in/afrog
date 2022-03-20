@@ -1,0 +1,18 @@
+id: terramaster-login
+
+info:
+  name: TerraMaster Login Panel
+  author: gy741
+  severity: info
+  tags: panel,terramaster,login
+
+manual: true
+transport: http
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+        expression: |
+          response.status == 200 && (response.body.bcontains(b'<title>TOS Loading</title>') || response.headers["server"] == "TOS" || response.headers["x-powered-by"] == "TerraMaster")
+expression: r0()

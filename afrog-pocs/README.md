@@ -51,7 +51,7 @@
   - CVE-2021-40438
   - CVE-2021-29490
   - CVE-2022-24990
-- 2022
+  - CVE-2020-28188
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
 
 ### exposures 信息泄露
@@ -73,6 +73,9 @@
 - emessage-panel
 - openerp-database
 - utt-panel
+- terramaster-login
+- CVE-2020-15568
+- CVE-2020-28187
 
 ### login 登录
 - default-pwd 默认密码
