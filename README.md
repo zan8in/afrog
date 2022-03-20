@@ -7,7 +7,7 @@
 
 * [x] 性能卓越，最少请求，最佳结果
 * [x] 实时显示，扫描进度
-* [x] 长期维护、更新 POC（./afrog-pocs <b style="color:red">[395]</b>）
+* [x] 长期维护、更新 POC（./afrog-pocs <span style="color:red;font-weight:bold">[395]</span>）
 * [x] 命令行版，方便部署在 `vps` 上扫描
 * [x] API 接口，轻松接入其他项目
 * [ ] 网页版，增加用户体验
