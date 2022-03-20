@@ -6,15 +6,11 @@
 ### 特点
 
 * [x] 性能卓越，最少请求，最佳结果
-
 * [x] 实时显示，扫描进度
-
-* [x] 长期维护、更新 POC（./afrog-pocs）
-
+* [x] 长期维护、更新 POC（./afrog-pocs <b style="color:red">[395]</b>）
 * [x] 命令行版，方便部署在 `vps` 上扫描
-
+* [x] API 接口，轻松接入其他项目
 * [ ] 网页版，增加用户体验
-
 * [ ] 查看扫描结果的 `request` 和 `response` 数据包
 
 ### 用法
@@ -69,16 +65,67 @@ afrog -l urls.txt -P ./pocs -o ./result.txt
 ```
 **🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
 
-POC 语法 afrog 与 xray 2.0 区别
+### API 接口
 
-|         xray          | afrog |
-| :-------------------: | :---: |
-|    transport: http    |   √   |
-| transport: tcp  / udp |   ×   |
-|          set          |   √   |
-|       payloads        |   √   |
-|         rules         |   √   |
-|        details        |   ×   |
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/zan8in/afrog/internal/runner"
+	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/core"
+)
+
+func main() {
+
+	options := config.Options{
+		Target:          "127.0.0.1",    // 指定扫描的URL/Host
+		TargetsFilePath: "./urls.txt",   // 指定需要扫描的URL/Host文件（一行一个）
+		PocsFilePath:    "./afrog-pocs", // 指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）
+		Output:          "./result.txt", // 输出扫描结果到文件
+	}
+
+	err := runner.New(&options, func(result interface{}) {
+		r := result.(*core.Result) // result 结构体里有你要的任何数据^^
+
+		options.OptLock.Lock()
+		defer options.OptLock.Unlock()
+
+		options.CurrentCount++ // 扫描进度计数器（当前扫描数）
+
+		if r.IsVul {
+			r.PrintColorResultInfoConsole() // 如果存在漏洞，打印结果到 console
+
+			if len(r.Output) > 0 {
+				r.WriteOutput() // 扫描结果写入文件
+			}
+		}
+
+		// 扫描进度实时显示
+		fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+```
+
+程序输出：
+
+```shell
+指定脚本  ./afrog-pocs
+输出文件  ./result.txt
+[2022-03-20 18:30:18] [cnvd-2021-09650] [high] http://150.*.106.*:9000
+[2022-03-20 18:30:21] [dlink-cve-2019-16920-rce] [critical] http://119.*.*.137:9000
+[2022-03-20 18:30:32] [CVE-2021-44228] [critical] https://45.*.*.237
+[2022-03-20 18:30:32] [CVE-2021-44228] [critical] http://119.*.142.*:9051
+[2022-03-20 18:30:35] [CVE-2019-10758] [critical] http://124.*.*.235:9000
+[2022-03-20 18:30:55] [CVE-2018-1000600] [high] http://124.*.*.235:9000
+[2022-03-20 18:30:58] [CVE-2021-44228] [critical] http://124.*.*.235:9000
+5392/591315 | 0% 
+```
 
 
 ### afrog 配置文件
@@ -168,6 +215,16 @@ rules:
 expression: r1() && r2()
 ```
 
+### afrog 与 xray 2.0 区别
+
+|         xray          | afrog |
+| :-------------------: | :---: |
+|    transport: http    |   √   |
+| transport: tcp  / udp |   ×   |
+|          set          |   √   |
+|       payloads        |   √   |
+|         rules         |   √   |
+|        details        |   ×   |
 
 ### 感谢
 
