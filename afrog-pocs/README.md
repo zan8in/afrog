@@ -137,4 +137,6 @@
 - seeyon-wooyun-2015-0108235-sqli
 - seeyon-wooyun-2015-148227
 - apache-flink-upload-rce
+- dahua-dss-file-read
+- ruijie-smartweb-password-disclosure
 
