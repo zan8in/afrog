@@ -55,6 +55,12 @@
   - CVE-2022-24990
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
   - CVE-2022-23131
+  - CVE-2022-24112(未验证)
+  - CVE-2022-23134
+  - CVE-2022-23178(未验证)
+  - CVE-2022-24124
+  - CVE-2022-24260(未验证)
+  - CVE-2022-25369(未验证)
   
 ### exposures 信息泄露
 - alibaba-canal-info-leak
