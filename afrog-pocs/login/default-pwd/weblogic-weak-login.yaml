@@ -19,54 +19,63 @@ transport: http
 rules:
     r11:
         request:
+            todo: TODO_FAILURE_NOT_CONTINUE
             method: GET
             path: /console/login/LoginForm.jsp
         expression: |
             response.status == 200 && "WebLogic Server Version: (.*?)<".bmatches(response.body)
     r0:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=weblogic&j_password=weblogic&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp")
     r1:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=weblogic&j_password=weblogic1&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
     r2:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=weblogic&j_password=welcome1&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
     r3:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=weblogic&j_password=Oracle@123&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
     r4:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=weblogic&j_password=weblogic123&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
     r5:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=admin&j_password=12345678&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
     r6:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=admin&j_password=security&j_character_encoding=UTF-8
         expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp")
     r7:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /console/j_security_check
             body: j_username=system&j_password=password&j_character_encoding=UTF-8

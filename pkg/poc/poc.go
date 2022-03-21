@@ -12,8 +12,10 @@ import (
 // Rule有序，参考：https://github.com/WAY29/pocV/blob/main/pkg/xray/structs/poc.go
 
 const (
-	ALLOR  = "allor"
-	ALLAND = "alland"
+	ALLOR                     = "allor"
+	ALLAND                    = "alland"
+	TODO_FAILURE_NOT_CONTINUE = "TODO_FAILURE_NOT_CONTINUE" // 请求失败不继续
+	TODO_SUCCESS_NOT_CONTINUE = "TODO_SUCCESS_NOT_CONTINUE" // 请求成功不继续
 )
 
 type Poc struct {
@@ -70,6 +72,7 @@ type RuleRequest struct {
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
+	Todo            string            `yaml:"todo"`
 }
 
 // 以下开始是 信息部分

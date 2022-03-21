@@ -268,6 +268,18 @@ func (c *Checker) Check() (err error) {
 			// debug per rule result
 			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), pocResult.ResultRequest.Url.Path))
 
+			if rule.Request.Todo == poc.TODO_FAILURE_NOT_CONTINUE && !isVul.Value().(bool) {
+				result.IsVul = false
+				options.ApiCallBack(result)
+				return err
+			}
+
+			if rule.Request.Todo == poc.TODO_SUCCESS_NOT_CONTINUE && isVul.Value().(bool) {
+				result.IsVul = true
+				options.ApiCallBack(result)
+				return err
+			}
+
 			if pocHandler == poc.ALLOR && isVul.Value().(bool) {
 				result.IsVul = true
 				options.ApiCallBack(result)
@@ -295,7 +307,7 @@ func (c *Checker) Check() (err error) {
 
 	options.ApiCallBack(result)
 
-	c.PrintTraceInfo(result)
+	// c.PrintTraceInfo(result)
 
 	return err
 }

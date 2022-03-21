@@ -39,6 +39,7 @@ func main() {
 			r := result.(*core.Result)
 
 			options.OptLock.Lock()
+			defer options.OptLock.Unlock()
 
 			options.CurrentCount++
 
@@ -50,7 +51,7 @@ func main() {
 				}
 			}
 
-			options.OptLock.Unlock()
+			// PrintTraceInfo(r)
 
 			fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
 		})
@@ -64,5 +65,11 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println(log.LogColor.High("启动 afrog 出错，%s", err.Error()))
+	}
+}
+
+func PrintTraceInfo(result *core.Result) {
+	for i, v := range result.AllPocResult {
+		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
 	}
 }
