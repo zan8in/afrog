@@ -1,9 +1,12 @@
 <h1 align="center">afrog</h1>
 <p align="center">Fast and customisable vulnerability scanner based on simple YAML based CEL-GO.<br/>❤️POC <b>[422]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
+<p align="center" dir="auto">
+  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/README_zh.md">中文文档</a>
+</p>
 
-### **[中文文档](https://github.com/zan8in/afrog/blob/main/README_zh.md)**
+<p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
 
 ### Features
 
