@@ -25,6 +25,7 @@
   - hikvision-cve-2017-7921
   - CVE-2017-12149
   - couchdb-cve-2017-12635
+  - weblogic-cve-2017-10271
 - 2018
   - CVE-2018-7490
   - CVE-2018-8033
@@ -41,6 +42,8 @@
   - jira-cve-2019-8449
   - jira-cve-2019-11581
   - jira-ssrf-cve-2019-8451
+  - weblogic-cve-2019-2725
+  - weblogic-cve-2019-2729
 - 2020
   - CVE-2020-26413
   - dlink-cve-2020-9376-dump-credentials
@@ -49,6 +52,8 @@
   - jira-cve-2020-14179
   - jira-cve-2020-14181
   - kong-cve-2020-11710-unauth
+  - solarwinds-cve-2020-10148
+  - weblogic-cve-2020-14750
 - 2021
   - CVE-2021-41773
   - CVE-2021-22214
@@ -97,6 +102,14 @@
 - zabbix-server-login
 - apache-dubbo-detect
 - jupyter-notebook-tech
+- kubernetes-dashboard
+- kubernetes-resource-report
+- kubernetes-metrics
+- kubernetes-enterprise-manager
+- kubernetes-mirantis
+- kubernetes-version
+- azure-kubernetes-service
+- weblogic-login
 
 ### login 登录
 - default-pwd 默认密码
@@ -113,6 +126,8 @@
   - zabbix-default-password
   - hikvision-intercom-service-default-password
   - apache-ambari-default-password
+  - rabbitmq-default-password
+  - weblogic-weak-login
 
 ### unauthorized 未授权访问
 - springboot-actuator-unauth
@@ -140,6 +155,9 @@
 - docker-registry-api-unauth
 - hadoop-yarn-unauth
 - jupyter-notebook-unauthorized-access
+- kubernetes-unauth
+- spark-api-unauth
+- spark-webui-unauth
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -171,4 +189,8 @@
 - thinkphp-v6-file-write
 - thinkphp-5023-rce
 - couchdb-adminparty
+- solr-velocity-template-rce
+- solr-fileread
+- solr-admin-query
+- weblogic-ssrf
 

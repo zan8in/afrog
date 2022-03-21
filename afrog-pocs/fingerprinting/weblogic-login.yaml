@@ -1,0 +1,19 @@
+id: weblogic-login
+
+info:
+  name: Weblogic Login Panel
+  author: bing0o,meme-lord
+  severity: info
+  tags: panel,oracle,weblogic,login
+  description: |
+    shodan-query: product:"Oracle Weblogic"
+
+transport: http
+rules:
+    r0:
+        request:
+            method: GET
+            path: /console/login/LoginForm.jsp
+        expression: |
+          response.status == 200 && "WebLogic Server Version: (.*?)<".bmatches(response.body)
+expression: r0()

