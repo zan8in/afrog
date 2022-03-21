@@ -1,0 +1,16 @@
+id: jira-unauthenticated-user-picker
+
+info:
+  name: Jira Unauthenticated User Picker
+  author: TechbrunchFR
+  severity: info
+  tags: atlassian,jira
+
+transport: http
+rules:
+    r0:
+        request:
+            method: GET
+            path: /secure/popups/UserPickerBrowser.jspa
+        expression: response.body.bcontains(b'user-picker')
+expression: r0()

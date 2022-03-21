@@ -1,0 +1,19 @@
+id: jira-service-desk-signup
+
+info:
+  name: Jira Service Desk Signup
+  author: TechbrunchFR
+  severity: medium
+  tags: jira,atlassian,service
+
+transport: http
+rules:
+    r0:
+        request:
+            method: POST
+            path: /servicedesk/customer/user/signup
+            headers:
+              Content-Type: application/json
+            body: '{"email":"invalid","signUpContext":{},"secondaryEmail":"","usingNewUi":true}'
+        expression: response.status == 400 && response.body.bcontains(b'signup.validation.errors')
+expression: r0()

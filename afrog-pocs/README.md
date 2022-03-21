@@ -35,11 +35,17 @@
   - dlink-cve-2019-17506
   - dlink-cve-2019-16920-rce
   - CVE-2019-10758
+  - jira-cve-2019-8442
+  - jira-cve-2019-8449
+  - jira-cve-2019-11581
+  - jira-ssrf-cve-2019-8451
 - 2020
   - CVE-2020-26413
   - dlink-cve-2020-9376-dump-credentials
   - dlink-cve-2020-25078-account-disclosure
   - apache-kylin-unauth-cve-2020-13937
+  - jira-cve-2020-14179
+  - jira-cve-2020-14181
 - 2021
   - CVE-2021-41773
   - CVE-2021-22214
@@ -115,6 +121,15 @@
 - apache-storm-unauthorized-access
 - jenkins-unauthorized-access
 - zabbix-dashboards-access
+- jira-unauthenticated-resolutions
+- jira-unauthenticated-screens
+- jira-unauthenticated-user-picker
+- jira-unauthenticated-dashboards
+- jira-unauthenticated-installed-gadgets
+- jira-unauthenticated-projectcategories
+- jira-unauthenticated-adminprojects
+- jira-unauthenticated-projects
+- jira-service-desk-signup
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -139,4 +154,10 @@
 - apache-flink-upload-rce
 - dahua-dss-file-read
 - ruijie-smartweb-password-disclosure
+- thinkphp-2-rce
+- thinkphp-501-rce
+- thinkphp-509-information-disclosure
+- thinkphp-5022-rce
+- thinkphp-v6-file-write
+- thinkphp-5023-rce
 
