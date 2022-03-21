@@ -1,0 +1,15 @@
+id: jupyter-notebook-tech
+
+info:
+    name: jupyter-notebook-tech
+    author: zan8in
+    severity: info
+
+transport: http
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+        expression: response.status == 200 && response.body.bcontains(b'<div id="ipython-main-app" class="container">') || response.body.bcontains(b'<div id="ipython_notebook" class="nav navbar-brand">' || response.body.bcontains(b'<title>Jupyter Notebook</title>'))
+expression: r0()

@@ -17,6 +17,7 @@
   - elasticsearch-cve-2015-1427
   - elasticsearch-cve-2015-3337-lfi
   - elasticsearch-cve-2015-5531
+  - CVE-2015-7450
 - 2016
   - CVE-2016-3088
   - zabbix-cve-2016-10134-sqli
@@ -95,6 +96,7 @@
 - CVE-2020-28187
 - zabbix-server-login
 - apache-dubbo-detect
+- jupyter-notebook-tech
 
 ### login 登录
 - default-pwd 默认密码
@@ -137,6 +139,7 @@
 - docker-api-unauthorized
 - docker-registry-api-unauth
 - hadoop-yarn-unauth
+- jupyter-notebook-unauthorized-access
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
