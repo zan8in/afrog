@@ -1,26 +1,25 @@
 <h1 align="center">afrog</h1>
-<p align="center">Fast and customisable vulnerability scanner based on simple YAML based CEL-GO.<br/>❤️POC <b>[422]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>共 <b>[422]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
 
-### **[中文文档]()**
+### **[English document]()**
 
-### Features
+### 特点
 
-* [x] Great performance, least requests, best results
-* [x] Real-time display, scanning progress 
-* [x] Long-term maintenance, update POC （./afrog-pocs ）
-* [x] Command line version, easy to deploy and scan on `vps` 
-* [x] API interface, easy access to other projects 
-* [ ] Web version to increase user experience 
-* [ ] View `request` and `response` packets of scan results 
+* [x] 性能卓越，最少请求，最佳结果
+* [x] 实时显示，扫描进度
+* [x] 长期维护、更新 POC（./afrog-pocs ）
+* [x] 命令行版，方便部署在 `vps` 上扫描
+* [x] API 接口，轻松接入其他项目
+* [ ] 网页版，增加用户体验
+* [ ] 查看扫描结果的 `request` 和 `response` 数据包
 
-### Usage
-
+### 用法
 ```
 afrog -h
 ```
-This will display help for the tool. Here are all the switches it supports.
+这将显示 afrog 的帮助，以下是所有支持的命令
 ```
 NAME:
    afrog 是一款基于 YAML 语法模板的定制化快速漏洞扫描器 -  
@@ -43,33 +42,32 @@ GLOBAL OPTIONS:
    --version, -v                     print the version (default: false)
 ```
 
-### Running afrog
-
-Scan a single target.
+### 运行 afrog
+扫描单个目标
 ```
 afrog -t http://example.com
 ```
-Scan multiple targets.
+扫描多个目标
 ```
 afrog -T urls.txt
 ```
-For example: `urls.txt `
+例如：`urls.txt`
 ```
 http://example.com
 http://test.com
 http://github.com
 ```
-Specify the POC script directory.
+指定 POC 脚本目录
 ```
 afrog -t http://example.com -P ./pocs
 ```
-Output scan results to a file.
+输出扫描结果到文件
 ```
 afrog -l urls.txt -P ./pocs -o ./result.txt
 ```
-**🐱Recommendation: Linux users please use the sudo command or switch to root **
+**🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
 
-### API interface 
+### API 接口
 
 ```go
 package main
@@ -116,7 +114,7 @@ func main() {
 }
 ```
 
-program output：
+程序输出：
 
 ```shell
 指定脚本  ./afrog-pocs
@@ -132,18 +130,18 @@ program output：
 ```
 
 
-### Afrog configuration file
-For more configuration, please modify  `afrog-config.yaml`，default location：`{home}/.config/afrog/afrog-config.yaml`
+### afrog 配置文件
+更多配置，请修改 `afrog-config.yaml`，默认位置：`{home}/.config/afrog/afrog-config.yaml`
 ```
 window: C:/Users/[yourname]/.config/afrog/
 mac: /home/[yourname]/.config/afrog/
 ```
-Because it must be run with `root` privileges under `linux`, the location of the `afrog-config.yaml` file is 
+因为` linux` 下必须 `root` 权限运行，所以 `afrog-config.yaml `文件位置是
 ```
 linux: /root/.config/afrog/
 ```
 
-Here's everything afrog configures 
+以下是 afrog 配置的所有内容
 ```
 version: 1.0.6
 
@@ -167,19 +165,18 @@ reverse:
     api-key: bba3368c28118247ddc4785630b8fca0      # 反连平台认证的 ApiKey, 独立部署时不能为空
     domain: 7gn2sm.ceye.io                         # 反连平台的 domain
 ```
-### POC
-POC directory, default location：`{home}/afrog-pocs/`
+### POC 脚本
+POC 目录，默认位置：`{home}/afrog-pocs/`
 ```
 window: C:/Users/[yourname]/afrog-pocs/
 mac: /home/[yourname]/afrog-pocs/
 ```
-Because it must be run with `root` privileges under` linux`, the POC directory location is 
-
+因为 `linux `下必须 `root` 权限运行，所以 POC 目录位置是
 ```
 linux: /root/.config/afrog-pocs/
 ```
 
-POC script syntax reference   [xray 2.0](https://docs.xray.cool/#/guide/poc/v2)，The following is the basic structure of `CVE-2022-22947.yaml` 
+POC 脚本语法参考  [xray 2.0](https://docs.xray.cool/#/guide/poc/v2)，以下是 `CVE-2022-22947.yaml` 基本结构
 
 ```
 id: CVE-2022-22947
@@ -220,7 +217,7 @@ rules:
 expression: r1() && r2()
 ```
 
-### Difference between afrog and xray 2.0
+### afrog 与 xray 2.0 区别
 
 |         xray          | afrog |
 | :-------------------: | :---: |
@@ -231,7 +228,7 @@ expression: r1() && r2()
 |         rules         |   √   |
 |        details        |   ×   |
 
-### Thank
+### 感谢
 
 [jjf012](https://github.com/jjf012) 、[jweny](https://github.com/jweny) 、[WAY29](https://github.com/WAY29)、 [xray](https://github.com/chaitin/xray)
 

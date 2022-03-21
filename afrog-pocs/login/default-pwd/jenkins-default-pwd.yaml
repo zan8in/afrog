@@ -17,6 +17,7 @@ rules:
           response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
     r1:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /j_spring_security_check
             body: |
@@ -25,6 +26,7 @@ rules:
           response.status == 302 && !response.headers["location"].contains("loginError")
     r2:
         request:
+            todo: TODO_SUCCESS_NOT_CONTINUE
             method: POST
             path: /j_spring_security_check
             body: |
