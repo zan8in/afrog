@@ -23,6 +23,7 @@
 - 2017
   - hikvision-cve-2017-7921
   - CVE-2017-12149
+  - couchdb-cve-2017-12635
 - 2018
   - CVE-2018-7490
   - CVE-2018-8033
@@ -46,6 +47,7 @@
   - apache-kylin-unauth-cve-2020-13937
   - jira-cve-2020-14179
   - jira-cve-2020-14181
+  - kong-cve-2020-11710-unauth
 - 2021
   - CVE-2021-41773
   - CVE-2021-22214
@@ -92,6 +94,7 @@
 - CVE-2020-15568
 - CVE-2020-28187
 - zabbix-server-login
+- apache-dubbo-detect
 
 ### login 登录
 - default-pwd 默认密码
@@ -130,6 +133,10 @@
 - jira-unauthenticated-adminprojects
 - jira-unauthenticated-projects
 - jira-service-desk-signup
+- couchdb-unauth
+- docker-api-unauthorized
+- docker-registry-api-unauth
+- hadoop-yarn-unauth
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -160,4 +167,5 @@
 - thinkphp-5022-rce
 - thinkphp-v6-file-write
 - thinkphp-5023-rce
+- couchdb-adminparty
 

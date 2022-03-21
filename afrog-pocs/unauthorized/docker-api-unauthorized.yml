@@ -1,7 +1,7 @@
-id: docker-api-unauthorized-rce
+id: docker-api-unauthorized
 
 info:
-    name: docker-api-unauthorized-rce
+    name: docker-api-unauthorized
     author: j4ckzh0u(https://github.com/j4ckzh0u)
     severity: high
 

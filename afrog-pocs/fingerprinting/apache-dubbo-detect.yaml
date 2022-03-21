@@ -1,0 +1,18 @@
+id: apache-dubbo-detect
+info:
+  name: Apache dubbo detect
+  author: ffffffff0x
+  severity: info
+  description: |
+    fofa-query: app="APACHE-dubbo"
+  tags: apache,dubbo,tech
+
+transport: http
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+        expression: response.headers["www-authenticate"].icontains("Basic realm=\"dubbo\"")
+    
+expression: r0()
