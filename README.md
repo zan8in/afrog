@@ -3,7 +3,7 @@
 
 <p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
 
-### **[中文文档]()**
+### **[中文文档]([afrog/README_zh.md at main · zan8in/afrog (github.com)](https://github.com/zan8in/afrog/blob/main/README_zh.md))**
 
 ### Features
 
