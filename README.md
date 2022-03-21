@@ -139,13 +139,9 @@ program output：
 For more configuration, please modify  `afrog-config.yaml`，default location：`{home}/.config/afrog/afrog-config.yaml`
 ```
 window: C:/Users/[yourname]/.config/afrog/
+linux: /home/[yourname]/.config/afrog/
 mac: /home/[yourname]/.config/afrog/
 ```
-Because it must be run with `root` privileges under `linux`, the location of the `afrog-config.yaml` file is 
-```
-linux: /root/.config/afrog/
-```
-
 Here's everything afrog configures 
 ```
 version: 1.0.6
@@ -174,14 +170,9 @@ reverse:
 POC directory, default location：`{home}/afrog-pocs/`
 ```
 window: C:/Users/[yourname]/afrog-pocs/
+linux: /root/[yourname]/.config/afrog-pocs/
 mac: /home/[yourname]/afrog-pocs/
 ```
-Because it must be run with `root` privileges under` linux`, the POC directory location is 
-
-```
-linux: /root/.config/afrog-pocs/
-```
-
 POC script syntax reference   [xray 2.0](https://docs.xray.cool/#/guide/poc/v2)，The following is the basic structure of `CVE-2022-22947.yaml` 
 
 ```
