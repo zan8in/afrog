@@ -62,8 +62,8 @@ func New() (*Config, error) {
 		configHttp.UserAgent = ""
 		c.ConfigHttp = configHttp
 		reverse := c.Reverse
-		reverse.Ceye.ApiKey = "bba3368c28118247ddc4785630b8fca0"
-		reverse.Ceye.Domain = "7gn2sm.ceye.io"
+		reverse.Ceye.ApiKey = ""
+		reverse.Ceye.Domain = ""
 		c.Reverse = reverse
 		WriteConfiguration(&c)
 	}
