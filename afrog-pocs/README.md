@@ -194,4 +194,13 @@
 - solr-fileread
 - solr-admin-query
 - weblogic-ssrf
+- e-cology-getsqldata-sql-inject
+- e-cology-arbitrary-file-upload
+- e-cology-filedownload-directory-traversal
+- e-cology-javabeanshell-rce
+- e-cology-springframework-directory-traversal
+- e-cology-syncuserinfo-sqli
+- e-cology-v8-sqli
+- e-cology-validate-sqli
+- e-cology-workflowcentertreedata-sqli
 
