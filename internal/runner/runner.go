@@ -37,6 +37,10 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	}
 	options.Config = config
 
+	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {
+		return errors.New("rerverse CeyeApiKey or CeyeDomain is Empty in your `/home/[yourname]/.config/afrog/afrog-config.yaml`")
+	}
+
 	// init targets
 	if len(options.Target) > 0 {
 		options.Targets.Set(options.Target)

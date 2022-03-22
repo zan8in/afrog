@@ -64,7 +64,7 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(log.LogColor.High("启动 afrog 出错，%s", err.Error()))
+		fmt.Println(log.LogColor.High("启动 afrog 出错，", err.Error()))
 	}
 }
 
