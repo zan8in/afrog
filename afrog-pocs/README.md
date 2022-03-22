@@ -203,4 +203,6 @@
 - e-cology-v8-sqli
 - e-cology-validate-sqli
 - e-cology-workflowcentertreedata-sqli
+- e-office-mysql-config-leak
+- e-bridge-saveyzjfile-file-read
 
