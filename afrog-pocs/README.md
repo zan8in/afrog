@@ -65,6 +65,7 @@
   - CVE-2021-40438
   - CVE-2021-29490
   - CVE-2020-28188
+  - CVE-2021-27905
 -2022
   - CVE-2022-24990
   - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
