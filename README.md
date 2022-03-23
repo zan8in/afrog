@@ -15,8 +15,9 @@
 * [x] Long-term maintenance, update POC （./afrog-pocs ）
 * [x] Command line version, easy to deploy and scan on `vps` 
 * [x] API interface, easy access to other projects 
+* [x] View `request` and `response` packets of scan results 
 * [ ] Web version to increase user experience 
-* [ ] View `request` and `response` packets of scan results 
+
 
 ### Usage
 
@@ -41,7 +42,7 @@ GLOBAL OPTIONS:
    --target value, -t value          指定扫描的URL/Host
    --targetFilePath value, -T value  指定需要扫描的URL/Host文件（一行一个）
    --PocsFilePath value, -P value    指定需要扫描的POC脚本的路径
-   --Output value, -o value          输出扫描结果到文件，比如：-o result.html
+   --Output value, -o value          输出扫描报告，比如：-o result.html
    --help, -h                        show help (default: false)
    --version, -v                     print the version (default: false)
 ```
@@ -83,15 +84,22 @@ import (
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/html"
 )
 
 func main() {
 
 	options := config.Options{
-		Target:          "127.0.0.1",    // 指定扫描的URL/Host
-		TargetsFilePath: "./urls.txt",   // 指定需要扫描的URL/Host文件（一行一个）
-		PocsFilePath:    "./afrog-pocs", // 指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）
-		Output:          "./result.txt", // 输出扫描结果到文件
+		Target:          "http://127.0.0.1", // 指定扫描的URL/Host
+		TargetsFilePath: "",                 // 指定需要扫描的URL/Host文件（一行一个）
+		PocsFilePath:    "./afrog-pocs",     // 指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）
+		Output:          "./result.html",    // 输出扫描报告，比如：-o result.html
+	}
+
+	htemplate := &html.HtmlTemplate{}
+	htemplate.Filename = options.Output
+	if err := htemplate.New(); err != nil {
+		return
 	}
 
 	err := runner.New(&options, func(result interface{}) {
@@ -106,7 +114,8 @@ func main() {
 			r.PrintColorResultInfoConsole() // 如果存在漏洞，打印结果到 console
 
 			if len(r.Output) > 0 {
-				r.WriteOutput() // 扫描结果写入文件
+				htemplate.Result = r
+				htemplate.Append()
 			}
 		}
 

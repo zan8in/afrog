@@ -15,8 +15,8 @@
 * [x] 长期维护、更新 POC（./afrog-pocs ）
 * [x] 命令行版，方便部署在 `vps` 上扫描
 * [x] API 接口，轻松接入其他项目
+* [x] 查看扫描结果的 `request` 和 `response` 数据包
 * [ ] 网页版，增加用户体验
-* [ ] 查看扫描结果的 `request` 和 `response` 数据包
 
 ### 用法
 ```
@@ -40,7 +40,7 @@ GLOBAL OPTIONS:
    --target value, -t value          指定扫描的URL/Host
    --targetFilePath value, -T value  指定需要扫描的URL/Host文件（一行一个）
    --PocsFilePath value, -P value    指定需要扫描的POC脚本的路径
-   --Output value, -o value          输出扫描结果到文件，比如：-o result.html
+   --Output value, -o value          输出扫描报告，比如：-o result.html
    --help, -h                        show help (default: false)
    --version, -v                     print the version (default: false)
 ```
@@ -64,9 +64,9 @@ http://github.com
 ```
 afrog -t http://example.com -P ./pocs
 ```
-输出扫描结果到文件
+输出扫描报告
 ```
-afrog -l urls.txt -P ./pocs -o ./result.txt
+afrog -l urls.txt -P ./pocs -o result.html
 ```
 **🐱建议：Linux 用户请使用 sudo 命令或切换成 root**
 
@@ -81,15 +81,22 @@ import (
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/html"
 )
 
 func main() {
 
 	options := config.Options{
-		Target:          "127.0.0.1",    // 指定扫描的URL/Host
-		TargetsFilePath: "./urls.txt",   // 指定需要扫描的URL/Host文件（一行一个）
-		PocsFilePath:    "./afrog-pocs", // 指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）
-		Output:          "./result.txt", // 输出扫描结果到文件
+		Target:          "http://127.0.0.1", // 指定扫描的URL/Host
+		TargetsFilePath: "",                 // 指定需要扫描的URL/Host文件（一行一个）
+		PocsFilePath:    "./afrog-pocs",     // 指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）
+		Output:          "./result.html",    // 输出扫描报告，比如：-o result.html
+	}
+
+	htemplate := &html.HtmlTemplate{}
+	htemplate.Filename = options.Output
+	if err := htemplate.New(); err != nil {
+		return
 	}
 
 	err := runner.New(&options, func(result interface{}) {
@@ -104,7 +111,8 @@ func main() {
 			r.PrintColorResultInfoConsole() // 如果存在漏洞，打印结果到 console
 
 			if len(r.Output) > 0 {
-				r.WriteOutput() // 扫描结果写入文件
+				htemplate.Result = r
+				htemplate.Append()
 			}
 		}
 
