@@ -17,6 +17,7 @@ urls*
 # Dependency directories (remove the comment below to include it)
 # vendor/
 release
+reports
 .vscode
 
 cmd/afrog/afrog.ico

@@ -27,7 +27,6 @@ type Checker struct {
 	OriginalRequest *sync.Pool
 	VariableMap     *sync.Pool
 	Result          *sync.Pool
-	PocResult       *sync.Pool
 	CustomLib       *sync.Pool
 	FastClient      *sync.Pool
 }
@@ -89,11 +88,6 @@ func NewChecker(options *config.Options, target string, pocItem poc.Poc) *Checke
 					PocInfo: &pocItem,
 					Output:  options.Output,
 				}
-			},
-		},
-		PocResult: &sync.Pool{
-			New: func() interface{} {
-				return &PocResult{}
 			},
 		},
 		CustomLib: &sync.Pool{
@@ -170,10 +164,6 @@ func (c *Checker) Check() (err error) {
 
 	originalRequest := c.OriginalRequest.Get().(*http.Request)
 	defer c.ReleaseOriginalRequest(originalRequest)
-
-	pocResult := c.PocResult.Get().(*PocResult)
-	defer c.PocResult.Put(pocResult)
-	defer pocResult.Reset()
 
 	pocHandler := c.PocHandler.Get().(string)
 	defer c.ReleaseHandler(pocHandler)
@@ -258,15 +248,7 @@ func (c *Checker) Check() (err error) {
 				c.UpdateVariableMap(rule.Output, variableMap, customLib, fc)
 			}
 
-			// save result eg: request、response、target、pocinfo etc.
-			pocResult.IsVul = isVul.Value().(bool)
-			pocResult.ResultRequest = variableMap["request"].(*proto.Request)
-			pocResult.ResultResponse = variableMap["response"].(*proto.Response)
-			// save to allresult slice
-			result.AllPocResult = append(result.AllPocResult, pocResult)
-
-			// debug per rule result
-			log.Log().Debug(fmt.Sprintf("result:::::::::::::%v,%s", isVul.Value().(bool), pocResult.ResultRequest.Url.Path))
+			result.AllPocResult = append(result.AllPocResult, &PocResult{IsVul: isVul.Value().(bool), ResultRequest: variableMap["request"].(*proto.Request), ResultResponse: variableMap["response"].(*proto.Response)})
 
 			if rule.Request.Todo == poc.TODO_FAILURE_NOT_CONTINUE && !isVul.Value().(bool) {
 				result.IsVul = false
@@ -306,8 +288,6 @@ func (c *Checker) Check() (err error) {
 	result.IsVul = isVul.Value().(bool)
 
 	options.ApiCallBack(result)
-
-	// c.PrintTraceInfo(result)
 
 	return err
 }

@@ -8,11 +8,13 @@ import (
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 )
 
 var options = &config.Options{}
+var htemplate = &html.HtmlTemplate{}
 
 func main() {
 	app := cli.NewApp()
@@ -35,6 +37,11 @@ func main() {
 		defpocdir := log.LogColor.Info("默认脚本  " + poc.GetPocPath())
 		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir)
 
+		htemplate.Filename = options.Output
+		if err := htemplate.New(); err != nil {
+			return err
+		}
+
 		err := runner.New(options, func(result interface{}) {
 			r := result.(*core.Result)
 
@@ -47,11 +54,10 @@ func main() {
 				r.PrintColorResultInfoConsole()
 
 				if len(r.Output) > 0 {
-					r.WriteOutput()
+					htemplate.Result = r
+					htemplate.Append()
 				}
 			}
-
-			// PrintTraceInfo(r)
 
 			fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
 		})
