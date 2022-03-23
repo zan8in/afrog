@@ -72,7 +72,7 @@ afrog -t http://example.com -P ./pocs
 ```
 Output scan results to a file.
 ```
-afrog -l urls.txt -P ./pocs -o ./result.txt
+afrog -T urls.txt -P ./pocs -o ./result.txt
 ```
 **🐱Recommendation: Linux users please use the sudo command or switch to root **
 
@@ -129,21 +129,6 @@ func main() {
 		fmt.Println(err)
 	}
 }
-```
-
-program output：
-
-```shell
-指定脚本  ./afrog-pocs
-输出文件  ./result.txt
-[2022-03-20 18:30:18] [cnvd-2021-09650] [high] http://150.*.106.*:9000
-[2022-03-20 18:30:21] [dlink-cve-2019-16920-rce] [critical] http://119.*.*.137:9000
-[2022-03-20 18:30:32] [CVE-2021-44228] [critical] https://45.*.*.237
-[2022-03-20 18:30:32] [CVE-2021-44228] [critical] http://119.*.142.*:9051
-[2022-03-20 18:30:35] [CVE-2019-10758] [critical] http://124.*.*.235:9000
-[2022-03-20 18:30:55] [CVE-2018-1000600] [high] http://124.*.*.235:9000
-[2022-03-20 18:30:58] [CVE-2021-44228] [critical] http://124.*.*.235:9000
-5392/591315 | 0% 
 ```
 
 
