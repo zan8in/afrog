@@ -5,8 +5,13 @@
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_zh.md">中文文档</a>
 </p>
+<p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/1.png"/></p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/zan8in/afrog/main/screen.png"/></p>
+<p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/2.png"/></p>
+
+<p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/3.png"/></p>
+
+<p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/6.png"/></p>
 
 ### Features
 
