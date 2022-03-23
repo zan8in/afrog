@@ -11,8 +11,6 @@
 
 <p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/3.png"/></p>
 
-<p align="center"><img src="https://github.com/zan8in/afrog/blob/main/images/6.png"/></p>
-
 ### 特点
 
 * [x] 性能卓越，最少请求，最佳结果
