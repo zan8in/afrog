@@ -40,7 +40,7 @@ GLOBAL OPTIONS:
    --target value, -t value          指定扫描的URL/Host
    --targetFilePath value, -T value  指定需要扫描的URL/Host文件（一行一个）
    --PocsFilePath value, -P value    指定需要扫描的POC脚本的路径
-   --Output value, -o value          输出扫描结果到文件
+   --Output value, -o value          输出扫描结果到文件，比如：-o result.html
    --help, -h                        show help (default: false)
    --version, -v                     print the version (default: false)
 ```
