@@ -32,6 +32,7 @@
   - CVE-2018-1000600
   - CVE-2018-1000861
   - CVE-2018-11759
+  - dedecms-cve-2018-6910
 - 2019
   - citrix-cve-2019-19781-path-traversal
   - solr-cve-2019-0193
@@ -205,4 +206,5 @@
 - e-cology-workflowcentertreedata-sqli
 - e-office-mysql-config-leak
 - e-bridge-saveyzjfile-file-read
+- dedecms-url-redirection
 
