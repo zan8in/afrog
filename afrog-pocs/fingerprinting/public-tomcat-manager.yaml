@@ -1,0 +1,22 @@
+id: public-tomcat-manager
+
+info:
+  name: Apache Tomcat Manager Disclosure
+  author: Ahmed Sherif,geeknik
+  severity: info
+  description: |
+    An Apache Tomcat Manager panel was discovered.
+    app="APACHE-Tomcat"
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /manager/html
+        expression: response.status == 401 && response.body.bcontains(b'<title>Apache Tomcat')
+    r1:
+        request:
+            method: GET
+            path: /host-manager/html
+        expression: response.status == 200 && response.body.bcontains(b'<title>Apache Tomcat')
+expression: r0() || r1()

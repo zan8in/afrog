@@ -1,0 +1,18 @@
+id: apache-apisix-panel
+
+info:
+  name: Apache APISIX Login Panel
+  author: pikpikcu
+  severity: info
+  description: |
+    An Apache APISIX login panel was detected.
+    title="Apache APISIX Dashboard"
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /user/login?redirect=%2F
+        expression: |
+            response.status == 200 && response.body.bcontains(b'<title>Apache APISIX Dashboard</title>')
+expression: r0()

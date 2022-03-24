@@ -82,6 +82,7 @@
 - alibaba-canal-info-leak
 - phpinfo
 - ruijie-eg-info-leak
+- avtech-dvr-exposure
 
 
 ### fingerprinting 指纹识别
@@ -112,6 +113,12 @@
 - kubernetes-version
 - azure-kubernetes-service
 - weblogic-login
+- activemq-panel
+- avtech-avn801-camera-panel
+- directadmin-login-panel
+- public-tomcat-manager
+- apache-apisix-panel
+- upupw-tz
 
 ### login 登录
 - default-pwd 默认密码
@@ -160,6 +167,7 @@
 - kubernetes-unauth
 - spark-api-unauth
 - spark-webui-unauth
+- unauthorized-hp-officepro-printer
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -207,4 +215,5 @@
 - e-office-mysql-config-leak
 - e-bridge-saveyzjfile-file-read
 - dedecms-url-redirection
+- targa-camera-lfi
 
