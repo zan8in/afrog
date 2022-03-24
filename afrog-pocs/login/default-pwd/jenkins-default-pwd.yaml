@@ -1,16 +1,16 @@
-id: jenkins-weak-password
+id: jenkins-default-pwd
 
 info:
-  name: Jenkins Weak Password
+  name: Jenkins Default Password
   author: zan8in
   severity: high
   tags: jenkins,default-login
 
-manual: true
 transport: http
 rules:
     r0:
         request:
+            todo: TODO_FAILURE_NOT_CONTINUE
             method: GET
             path: /login
         expression: |
