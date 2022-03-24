@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">Fast and customisable vulnerability scanner based on simple YAML based CEL-GO.<br/>❤️POC <b>[425]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">Fast and customisable vulnerability scanner based on simple YAML based CEL-GO.<br/>❤️POC <b>[434]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
