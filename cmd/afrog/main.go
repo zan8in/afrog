@@ -32,7 +32,7 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 
-		title := log.LogColor.Title("一款基于 YAML 语法模板的定制化快速漏洞扫描器 - afrog V" + c.App.Version)
+		title := log.LogColor.Title("一个挖洞工具 - afrog V" + c.App.Version)
 		defconfig := log.LogColor.Info("默认配置  " + options.Config.GetConfigPath())
 		defpocdir := log.LogColor.Info("默认脚本  " + poc.GetPocPath())
 		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir)
