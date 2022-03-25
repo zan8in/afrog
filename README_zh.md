@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款基于 YAML 语法模板的定制化快速漏洞扫描器<br/>❤️POC 欢迎投递<br/>共 <b>[434]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>❤️POC 欢迎投递<br/>共 <b>[435]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •

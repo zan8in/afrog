@@ -36,7 +36,7 @@ func New(options *config.Options) *fasthttp.Client {
 	maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
 	client := &fasthttp.Client{
 		TLSConfig:                     &tls.Config{InsecureSkipVerify: true},
-		MaxConnsPerHost:               options.Config.ConfigHttp.MaxConnsPerHost,
+		MaxConnsPerHost:               options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数
 		ReadTimeout:                   readTimeout,
 		WriteTimeout:                  writeTimeout,
 		MaxIdleConnDuration:           maxIdleConnDuration,
