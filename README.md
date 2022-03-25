@@ -160,8 +160,8 @@ http:
 
 reverse:
   ceye:      # 目前只支持 ceye.io，请替换成自己的 api-key 和 domain，使用共享的会影响扫描结果
-    api-key: bba3368c28118247ddc4785630b8fca0      # 反连平台认证的 ApiKey, 独立部署时不能为空
-    domain: 7gn2sm.ceye.io                         # 反连平台的 domain
+    api-key:       # 反连平台认证的 ApiKey, 独立部署时不能为空
+    domain:                          # 反连平台的 domain
 ```
 ### POC
 POC directory, default location：`{home}/afrog-pocs/`
