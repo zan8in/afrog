@@ -21,6 +21,8 @@
 * [x] View `request` and `response` packets of scan results 
 * [ ] Web version to increase user experience 
 
+### [Download](https://github.com/zan8in/afrog/releases)
+
 
 ### Usage
 

@@ -21,6 +21,8 @@
 * [x] 查看扫描结果的 `request` 和 `response` 数据包
 * [ ] 网页版，增加用户体验
 
+### [下载地址](https://github.com/zan8in/afrog/releases)
+
 ### 用法
 ```
 afrog -h
