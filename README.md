@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">A tool for finding vulnerabilities.<br/>❤️POC <b>[435]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">A tool for finding vulnerabilities.<br/>❤️POC <b>[437]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
@@ -15,11 +15,10 @@
 
 * [x] Great performance, least requests, best results
 * [x] Real-time display, scanning progress 
-* [x] Long-term maintenance, update POC （./afrog-pocs ）
+* [x] View `request` and `response` packets of scan results 
 * [x] Command line version, easy to deploy and scan on `vps` 
 * [x] API interface, easy access to other projects 
-* [x] View `request` and `response` packets of scan results 
-* [ ] Web version to increase user experience 
+* [x] Long-term maintenance, update POC （./afrog-pocs ）
 
 ### [Download](https://github.com/zan8in/afrog/releases)
 
@@ -32,7 +31,7 @@ afrog -h
 This will display help for the tool. Here are all the switches it supports.
 ```
 NAME:
-   afrog 是一款基于 YAML 语法模板的定制化快速漏洞扫描器 -  
+   afrog 一个挖洞工具 -  
 
 USAGE:
    afrog [命令]

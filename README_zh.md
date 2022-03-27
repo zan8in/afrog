@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️POC 欢迎投递<br/>共 <b>[435]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>❤️POC 欢迎投递<br/>共 <b>[437]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •
@@ -15,11 +15,10 @@
 
 * [x] 性能卓越，最少请求，最佳结果
 * [x] 实时显示，扫描进度
-* [x] 长期维护、更新 POC（./afrog-pocs ）
+* [x] 记录 POC 验证每一步的 `request` 和 `response` ，生成 html 报告
 * [x] 命令行版，方便部署在 `vps` 上扫描
 * [x] API 接口，轻松接入其他项目
-* [x] 查看扫描结果的 `request` 和 `response` 数据包
-* [ ] 网页版，增加用户体验
+* [x] 长期维护、更新 POC（./afrog-pocs ）
 
 ### [下载地址](https://github.com/zan8in/afrog/releases)
 
@@ -30,7 +29,7 @@ afrog -h
 这将显示 afrog 的帮助，以下是所有支持的命令
 ```
 NAME:
-   afrog 是一款基于 YAML 语法模板的定制化快速漏洞扫描器 -  
+   afrog 一个挖洞工具 -  
 
 USAGE:
    afrog [命令]

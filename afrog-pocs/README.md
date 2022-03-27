@@ -55,6 +55,7 @@
   - kong-cve-2020-11710-unauth
   - solarwinds-cve-2020-10148
   - weblogic-cve-2020-14750
+  - CVE-2020-28185
 - 2021
   - CVE-2021-41773
   - CVE-2021-22214
@@ -119,6 +120,7 @@
 - public-tomcat-manager
 - apache-apisix-panel
 - upupw-tz
+- huawei-hg532e-panel
 
 ### login 登录
 - default-pwd 默认密码
@@ -216,4 +218,4 @@
 - e-bridge-saveyzjfile-file-read
 - dedecms-url-redirection
 - targa-camera-lfi
-
+- egroupware-rce
