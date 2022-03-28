@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">A tool for finding vulnerabilities.<br/>❤️POC <b>[441]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">A tool for finding vulnerabilities.<br/>❤️POC <b>[440]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
