@@ -7,6 +7,7 @@ info:
   reference:
     - https://github.com/LandGrey/SpringBootVulExploit
   tags: actuator,springboot,unauth
+  
 transport: http
 rules:
   r0:
@@ -27,4 +28,10 @@ rules:
       path: /actuator
     expression: |
       response.body.bcontains(b"\"_links\":") && response.body.bcontains(b"\"self\":") && response.body.bcontains(b"\"health\"")
-expression: r0() || r1() || r2()
+  r3: 
+    request: 
+      method: GET
+      path: /appenv
+    expression: |
+      response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+expression: r0() || r1() || r2() || r3()

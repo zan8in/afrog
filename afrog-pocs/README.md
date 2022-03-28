@@ -84,7 +84,7 @@
 - phpinfo
 - ruijie-eg-info-leak
 - avtech-dvr-exposure
-
+- directory-display
 
 ### fingerprinting 指纹识别
 - swagger-api
@@ -121,6 +121,7 @@
 - apache-apisix-panel
 - upupw-tz
 - huawei-hg532e-panel
+- grafana-detect
 
 ### login 登录
 - default-pwd 默认密码
@@ -170,6 +171,7 @@
 - spark-api-unauth
 - spark-webui-unauth
 - unauthorized-hp-officepro-printer
+- jeecg-boot-unauth
 
 ### vulnerability 漏洞
 - landray-oa-custom-jsp-fileread
@@ -219,3 +221,4 @@
 - dedecms-url-redirection
 - targa-camera-lfi
 - egroupware-rce
+- grafana-file-read
