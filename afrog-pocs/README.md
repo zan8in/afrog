@@ -222,3 +222,4 @@
 - targa-camera-lfi
 - egroupware-rce
 - grafana-file-read
+- unifi-network-log4j-rce
