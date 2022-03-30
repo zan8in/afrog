@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -18,157 +17,51 @@ import (
 )
 
 type Checker struct {
-	Options         *sync.Pool
-	Target          *sync.Pool
-	PocItem         *sync.Pool
-	PocHandler      *sync.Pool
-	OriginalRequest *sync.Pool
-	VariableMap     *sync.Pool
-	Result          *sync.Pool
-	CustomLib       *sync.Pool
-	FastClient      *sync.Pool
+	Options         *config.Options
+	OriginalRequest *http.Request
+	VariableMap     map[string]interface{}
+	Result          *Result
+	CustomLib       *CustomLib
+	FastClient      *http2.FastClient
 }
 
 var ReverseCeyeApiKey string
 var ReverseCeyeDomain string
 
-func NewChecker(options *config.Options, target string, pocItem poc.Poc) *Checker {
+var FastClientReverse *http2.FastClient // 用于 reverse http client
+
+func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
+
+	options := c.Options
+
 	ReverseCeyeApiKey = options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = options.Config.Reverse.Ceye.Domain
 
-	if len(ReverseCeyeApiKey) == 0 || len(ReverseCeyeDomain) == 0 {
-		log.Log().Error("Rerverse CeyeApiKey or CeyeDomain is Empty.")
-		return nil
-	}
-
-	return &Checker{
-		Options: &sync.Pool{
-			New: func() interface{} {
-				return options
-			},
-		},
-		Target: &sync.Pool{
-			New: func() interface{} {
-				return target
-			},
-		},
-		PocItem: &sync.Pool{
-			New: func() interface{} {
-				return &pocItem
-			},
-		},
-		PocHandler: &sync.Pool{
-			New: func() interface{} {
-				pocHandler := ""
-				if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
-					pocHandler = poc.ALLAND
-				}
-				if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
-					pocHandler = poc.ALLOR
-				}
-				return pocHandler
-			},
-		},
-		OriginalRequest: &sync.Pool{
-			New: func() interface{} {
-				return &http.Request{}
-			},
-		},
-		VariableMap: &sync.Pool{
-			New: func() interface{} {
-				return make(map[string]interface{})
-			},
-		},
-		Result: &sync.Pool{
-			New: func() interface{} {
-				return &Result{
-					Target:  target,
-					PocInfo: &pocItem,
-					Output:  options.Output,
-				}
-			},
-		},
-		CustomLib: &sync.Pool{
-			New: func() interface{} {
-				return NewCustomLib()
-			},
-		},
-		FastClient: &sync.Pool{
-			New: func() interface{} {
-				return &http2.FastClient{}
-			},
-		},
-	}
-}
-
-func (c *Checker) ReleaseVariableMap(vmap map[string]interface{}) {
-	if vmap != nil {
-		vmap = nil
-		c.VariableMap.Put(vmap)
-	}
-}
-
-func (c *Checker) ReleaseTarget(r string) {
-	if len(r) > 0 {
-		r = ""
-		c.Target.Put(r)
-	}
-}
-
-func (c *Checker) ReleaseHandler(h string) {
-	if len(h) > 0 {
-		h = ""
-		c.Target.Put(h)
-	}
-}
-
-func (c *Checker) ReleaseOriginalRequest(o *http.Request) {
-	if o != nil {
-		*o = http.Request{}
-		c.OriginalRequest.Put(o)
-	}
-}
-
-var FastClientReverse *http2.FastClient // 用于 reverse http client
-
-func (c *Checker) Check() (err error) {
-
-	options := c.Options.Get().(*config.Options)
-	defer c.Options.Put(options)
-
-	fc := c.FastClient.Get().(*http2.FastClient)
+	fc := c.FastClient
 	fc.Client = http2.New(options)
 	fc.DialTimeout = options.Config.ConfigHttp.DialTimeout
-	defer c.FastClient.Put(fc)
-	defer fc.Reset()
 
-	variableMap := c.VariableMap.Get().(map[string]interface{})
-	defer c.ReleaseVariableMap(variableMap)
+	variableMap := c.VariableMap
 
-	target := c.Target.Get().(string)
-	defer c.ReleaseTarget(target)
+	result := c.Result
+	result.Target = target
+	result.PocInfo = &pocItem
 
-	pocItem := c.PocItem.Get().(*poc.Poc)
-	defer c.PocItem.Put(pocItem)
-	defer pocItem.Reset()
+	customLib := c.CustomLib
 
-	result := c.Result.Get().(*Result)
-	defer c.Result.Put(result)
-	defer result.Reset()
+	originalRequest := c.OriginalRequest
 
-	customLib := c.CustomLib.Get().(*CustomLib)
-	defer c.CustomLib.Put(customLib)
-	defer customLib.Reset()
-
-	originalRequest := c.OriginalRequest.Get().(*http.Request)
-	defer c.ReleaseOriginalRequest(originalRequest)
-
-	pocHandler := c.PocHandler.Get().(string)
-	defer c.ReleaseHandler(pocHandler)
+	pocHandler := ""
+	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
+		pocHandler = poc.ALLAND
+	}
+	if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
+		pocHandler = poc.ALLOR
+	}
 
 	// update request variablemap
-	tempRequest := http2.AcquireProtoRequestPool()
-	defer http2.ReleaseProtoRequestPool(tempRequest)
+	// tempRequest := http2.AcquireProtoRequestPool()
+	// defer http2.ReleaseProtoRequestPool(tempRequest)
 	if pocItem.Transport != "tcp" && pocItem.Transport != "udp" {
 		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
 			target = "http://" + target
@@ -183,7 +76,9 @@ func (c *Checker) Check() (err error) {
 			return err
 		}
 
-		tempRequest, err = http2.ParseRequest(originalRequest)
+		tempRequest, err := http2.ParseRequest(originalRequest)
+		variableMap["request"] = tempRequest
+
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
 			result.IsVul = false
@@ -198,7 +93,6 @@ func (c *Checker) Check() (err error) {
 			originalRequest.Header.Set("User-Agent", utils.RandomUA())
 		}
 	}
-	variableMap["request"] = tempRequest
 
 	// update set cel and variablemap
 	if len(pocItem.Set) > 0 {
@@ -308,9 +202,9 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]i
 			customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
 
 			// if reverse()，initilize a fasthttpclient
-			FastClientReverse = c.FastClient.Get().(*http2.FastClient)
-			FastClientReverse.DialTimeout = c.Options.Get().(*config.Options).Config.ConfigHttp.DialTimeout
-			FastClientReverse.Client = http2.New(c.Options.Get().(*config.Options))
+			FastClientReverse = c.FastClient
+			FastClientReverse.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
+			FastClientReverse.Client = http2.New(c.Options)
 			continue
 		}
 

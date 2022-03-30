@@ -449,28 +449,32 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 	req, _ := http.NewRequest("GET", urlStr, nil)
 
 	time.Sleep(time.Second * time.Duration(timeout))
+	// fmt.Println(sub)
 
 	redirectsCount := 0
 	for {
 		resp, err := FastClientReverse.SampleHTTPRequest(req)
 		if err != nil {
+			// fmt.Println("rediSampleHTTPRequest", err.Error())
 			log.Log().Error(err.Error())
 			return false
 		}
 
 		if !bytes.Contains(resp.Body, []byte(`"data": []`)) && bytes.Contains(resp.Body, []byte(`{"code": 200`)) { // api返回结果不为空
+			// fmt.Println(string(resp.Body))
 			return true
 		}
 
 		if bytes.Contains(resp.Body, []byte(`<title>503`)) { // api返回结果不为空
 			redirectsCount++
+			// fmt.Println("redirectsCount++", redirectsCount)
 			if redirectsCount > 1 {
 				return false
 			}
 			utils.RandSleep(500)
 			continue
 		}
-
+		// fmt.Println(string(resp.Body))
 		return false
 	}
 }
