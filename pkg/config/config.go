@@ -40,7 +40,7 @@ type Ceye struct {
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
-const Version = "1.2.0"
+const Version = "1.2.1"
 
 // Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
