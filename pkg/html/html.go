@@ -1,7 +1,6 @@
 package html
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -29,9 +28,9 @@ func (ht *HtmlTemplate) New() error {
 		}
 
 		ouputFile := filepath.Join(outputDirectory, ht.Filename)
-		if utils.Exists(ouputFile) {
-			return errors.New("output filename had existed")
-		}
+		// if utils.Exists(ouputFile) {
+		// 	return errors.New("output filename had existed")
+		// }
 
 		os.MkdirAll(outputDirectory, os.ModePerm)
 		ht.Filename = ouputFile
