@@ -459,7 +459,6 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		}
 
 		if !bytes.Contains(resp.Body, []byte(`"data": []`)) && bytes.Contains(resp.Body, []byte(`{"code": 200`)) { // api返回结果不为空
-			fmt.Println(string(resp.Body))
 			return true
 		}
 

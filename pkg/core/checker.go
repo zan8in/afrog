@@ -2,12 +2,10 @@ package core
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -340,9 +338,7 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]i
 }
 
 func (c *Checker) newRerverse() *proto.Reverse {
-	letters := "1234567890abcdefghijklmnopqrstuvwxyz"
-	randSource := rand.New(rand.NewSource(time.Now().Unix()))
-	sub := utils.RandomStr(randSource, letters, 8)
+	sub := utils.CreateRandomString(8)
 	urlStr := fmt.Sprintf("http://%s.%s", sub, ReverseCeyeDomain)
 	u, _ := url.Parse(urlStr)
 	return &proto.Reverse{
