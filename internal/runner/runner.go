@@ -64,7 +64,9 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 		// console print
 		fmt.Println(log.LogColor.Info("指定脚本  " + options.PocsFilePath))
 	}
+
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
+
 	if len(allPocsYamlSlice) == 0 {
 		return errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
 	}
