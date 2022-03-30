@@ -17,7 +17,7 @@
   - elasticsearch-cve-2015-1427
   - elasticsearch-cve-2015-3337-lfi
   - elasticsearch-cve-2015-5531
-  - CVE-2015-7450
+  - CVE-2015-7450 (已删除)
 - 2016
   - CVE-2016-3088
   - zabbix-cve-2016-10134-sqli
