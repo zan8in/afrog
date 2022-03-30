@@ -78,6 +78,7 @@
   - CVE-2022-24124
   - CVE-2022-24260(未验证)
   - CVE-2022-25369(未验证)
+  - CVE-2022-25568
   
 ### exposures 信息泄露
 - alibaba-canal-info-leak
