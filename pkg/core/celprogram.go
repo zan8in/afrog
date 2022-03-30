@@ -444,11 +444,11 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		return false
 	}
 
-	time.Sleep(time.Second * time.Duration(timeout))
-
 	sub := strings.Split(r.Domain, ".")[0]
 	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", ReverseCeyeApiKey, sub)
 	req, _ := http.NewRequest("GET", urlStr, nil)
+
+	time.Sleep(time.Second * time.Duration(timeout))
 
 	redirectsCount := 0
 	for {
@@ -459,6 +459,7 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		}
 
 		if !bytes.Contains(resp.Body, []byte(`"data": []`)) && bytes.Contains(resp.Body, []byte(`{"code": 200`)) { // api返回结果不为空
+			fmt.Println(string(resp.Body))
 			return true
 		}
 
