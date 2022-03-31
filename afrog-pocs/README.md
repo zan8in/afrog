@@ -224,3 +224,4 @@
 - egroupware-rce
 - grafana-file-read
 - unifi-network-log4j-rce
+- huawei-dg8045-home-gateway-exposures
