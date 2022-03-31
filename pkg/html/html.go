@@ -23,7 +23,7 @@ func (ht *HtmlTemplate) New() error {
 
 		filesuffix := path.Ext(ht.Filename)
 		if filesuffix != ".html" && filesuffix != ".htm" {
-			fmt.Println(log.LogColor.High("启动 afrog 出错，Output 文件后缀必须是 .html 或 .htm"))
+			fmt.Println(log.LogColor.High("Failed to start afrog，Output file suffix must be .html or .htm"))
 			return nil
 		}
 

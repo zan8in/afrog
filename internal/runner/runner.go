@@ -75,7 +75,7 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 
 	// console print
 	if len(options.Output) > 0 {
-		fmt.Println(log.LogColor.Info("输出文件  " + options.Output))
+		fmt.Println(log.LogColor.Low("Output Report " + options.Output))
 	}
 
 	// init scan sum
