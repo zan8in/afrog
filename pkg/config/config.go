@@ -50,8 +50,8 @@ func New() (*Config, error) {
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 5
-		configHttp.ReadTimeout = "5000ms"
-		configHttp.WriteTimeout = "5000ms"
+		configHttp.ReadTimeout = "6000ms"
+		configHttp.WriteTimeout = "6000ms"
 		configHttp.MaxIdle = "5s"
 		configHttp.MaxRedirect = 5
 		configHttp.Concurrency = 4096
@@ -60,8 +60,8 @@ func New() (*Config, error) {
 		configHttp.UserAgent = ""
 		c.ConfigHttp = configHttp
 		reverse := c.Reverse
-		reverse.Ceye.ApiKey = ""
-		reverse.Ceye.Domain = ""
+		reverse.Ceye.ApiKey = "fb1837116d366dd91f2aa9ab837efe66"
+		reverse.Ceye.Domain = "dflqxk.ceye.io"
 		c.Reverse = reverse
 		WriteConfiguration(&c)
 	}
