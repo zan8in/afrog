@@ -3,6 +3,7 @@ package runner
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
@@ -38,7 +39,8 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	options.Config = config
 
 	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {
-		return errors.New("rerverse CeyeApiKey or CeyeDomain is Empty in your `/home/[yourname]/.config/afrog/afrog-config.yaml`")
+		homeDir, _ := os.UserHomeDir()
+		return errors.New("please edit `api-key` and `domain` in `" + homeDir + "/.config/afrog/afrog-config.yaml`")
 	}
 
 	// init targets

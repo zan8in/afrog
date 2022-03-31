@@ -3,6 +3,7 @@ package poc
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/zan8in/afrog/pkg/utils"
 	"gopkg.in/yaml.v2"
@@ -124,6 +125,15 @@ func GetPocPath() string {
 		return ""
 	}
 	return configFile
+}
+
+func GetPocVersionNumber() (string, error) {
+	version := GetPocPath() + "/version"
+	v, err := utils.ReadFromFile(version)
+	if err != nil {
+		return "0", nil
+	}
+	return strings.TrimSpace(string(v)), nil
 }
 
 // Read a poc yaml file from disk.

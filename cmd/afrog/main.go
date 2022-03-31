@@ -11,6 +11,7 @@ import (
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
+	"github.com/zan8in/afrog/pkg/upgrade"
 )
 
 var options = &config.Options{}
@@ -32,10 +33,15 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 
-		title := log.LogColor.Title("一个挖洞工具 - afrog V" + c.App.Version)
-		defconfig := log.LogColor.Info("默认配置  " + options.Config.GetConfigPath())
-		defpocdir := log.LogColor.Info("默认脚本  " + poc.GetPocPath())
-		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir)
+		title := log.LogColor.Vulner("A tool for finding vulnerabilities - afrog V" + config.Version)
+
+		upgrade := upgrade.New()
+		upgrade.UpgradeAfrogPocs()
+
+		defconfig := log.LogColor.Low("Default Conf  " + options.Config.GetConfigPath())
+		defpocdir := log.LogColor.Low("Default Pocs  " + poc.GetPocPath())
+
+		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir + " v" + upgrade.LastestVersion + "")
 
 		htemplate.Filename = options.Output
 		if err := htemplate.New(); err != nil {
@@ -70,7 +76,7 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(log.LogColor.High("启动 afrog 出错，", err.Error()))
+		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
 	}
 }
 

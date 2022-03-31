@@ -11,7 +11,6 @@ import (
 
 // Config is a afrog-config.yaml catalog helper implementation
 type Config struct {
-	ConfigVersion       string     `yaml:"version"`
 	PocSizeWaitGroup    int32      `yaml:"poc_sizewaitgroup"`
 	TargetSizeWaitGroup int32      `yaml:"target_sizewaitgroup"`
 	ConfigHttp          ConfigHttp `yaml:"http"`
@@ -46,7 +45,6 @@ const Version = "1.2.1"
 func New() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
-		c.ConfigVersion = Version
 		c.PocSizeWaitGroup = 25
 		c.TargetSizeWaitGroup = 6
 		configHttp := c.ConfigHttp
