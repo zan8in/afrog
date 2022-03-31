@@ -33,7 +33,7 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 
-		title := log.LogColor.Vulner("A tool for finding vulnerabilities - afrog V" + config.Version)
+		title := log.LogColor.Vulner("一个挖洞工具 A tool for finding vulnerabilities - afrog V" + config.Version)
 
 		upgrade := upgrade.New()
 		upgrade.UpgradeAfrogPocs()
