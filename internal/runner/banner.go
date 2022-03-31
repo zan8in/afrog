@@ -1,6 +1,5 @@
 package runner
 
 func ShowBanner(vserion string) string {
-	return "一个挖洞工具 - afrog"
-
+	return "一个挖洞工具 A tool for finding vulnerabilities"
 }

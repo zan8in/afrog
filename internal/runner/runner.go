@@ -24,13 +24,6 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	// init callback
 	options.ApiCallBack = acb
 
-	// init poc home directory
-	pocsDir, err := poc.InitPocHomeDirectory()
-	if err != nil {
-		return err
-	}
-	options.PocsDirectory.Set(pocsDir)
-
 	// init config file
 	config, err := config.New()
 	if err != nil {
@@ -64,7 +57,14 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
-		fmt.Println(log.LogColor.Info("指定脚本  " + options.PocsFilePath))
+		fmt.Println(log.LogColor.Low("Select  Pocs  " + options.PocsFilePath))
+	} else {
+		// init poc home directory
+		pocsDir, err := poc.InitPocHomeDirectory()
+		if err != nil {
+			return err
+		}
+		options.PocsDirectory.Set(pocsDir)
 	}
 
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)

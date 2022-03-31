@@ -20,15 +20,15 @@ var htemplate = &html.HtmlTemplate{}
 func main() {
 	app := cli.NewApp()
 	app.Name = runner.ShowBanner(config.Version)
-	app.Usage = " "
-	app.UsageText = "afrog [命令]"
+	app.Usage = "V" + config.Version
+	app.UsageText = "afrog [command]\n\n\t afrog -t example.com -o result.html\n\t afrog -T urls.txt -o result.html\n\t afrog -t example.com -P ./pocs/poc-test.yaml -o result.html\n\t afrog -t example.com -P ./pocs/ -o result.html"
 	app.Version = config.Version
 
 	app.Flags = []cli.Flag{
-		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "指定扫描的URL/Host"},
-		&cli.StringFlag{Name: "targetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "指定需要扫描的URL/Host文件（一行一个）"},
-		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "指定需要扫描的POC脚本的路径（非必须，默认加载{home}/afrog-pocs）"},
-		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "输出扫描结果到html文件，比如：-o result.html"},
+		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "target URLs/hosts to scan"},
+		&cli.StringFlag{Name: "targetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "path to file containing a list of target URLs/hosts to scan (one per line)"},
+		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
+		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
 	}
 
 	app.Action = func(c *cli.Context) error {
