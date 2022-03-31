@@ -39,7 +39,7 @@ type Ceye struct {
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
-const Version = "1.2.1"
+const Version = "1.2.2"
 
 // Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
@@ -90,7 +90,7 @@ func (c *Config) GetConfigPath() string {
 
 	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
 	if !utils.Exists(configFile) {
-		return ""
+		return configFile
 	}
 	return configFile
 }

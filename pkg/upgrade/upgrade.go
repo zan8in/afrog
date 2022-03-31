@@ -67,7 +67,7 @@ func (u *Upgrade) UpgradeAfrogPocs() {
 		return
 	}
 	if isUp {
-		fmt.Println(log.LogColor.Info("Downloading latest release.."))
+		fmt.Println(log.LogColor.Info("Downloading latest release..."))
 		u.LastestVersion = u.RemoteVersion
 		u.Download()
 	}
