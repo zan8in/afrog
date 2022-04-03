@@ -31,7 +31,7 @@ type FastClient struct {
 	DialTimeout int32
 }
 
-func New(options *config.Options) {
+func Init(options *config.Options) {
 	readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)

@@ -16,7 +16,7 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 	ReverseCeyeApiKey = e.options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = e.options.Config.Reverse.Ceye.Domain
 
-	http2.New(e.options)
+	http2.Init(e.options)
 
 	var pocSlice []poc.Poc
 
@@ -67,11 +67,11 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
-	// defer func() {
-	// 	if r := recover(); r != nil {
-	// 		log.Log().Error("gorutine recover() error from pkg/core/exccute/executeExpression")
-	// 	}
-	// }()
+	defer func() {
+		if r := recover(); r != nil {
+			log.Log().Error("goroutine recover() error from pkg/core/execute/executeExpression")
+		}
+	}()
 
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
