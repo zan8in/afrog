@@ -28,12 +28,6 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return c.programOptions
 }
 
-// var CustomLibPool = sync.Pool{
-// 	New: func() interface{} {
-// 		return CustomLib{}
-// 	},
-// }
-
 func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, call runCallback) {
 	env, err := c.NewCelEnv()
 	if err != nil {
@@ -67,7 +61,6 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{
 
 type runCallback func(interface{}, error)
 
-// Step 1: 创建 cel 库
 func NewCustomLib() *CustomLib {
 	c := &CustomLib{}
 	reg := types.NewEmptyRegistry()
@@ -76,16 +69,11 @@ func NewCustomLib() *CustomLib {
 	return c
 }
 
-// Step 2: 创建 cel 环境
 func (c *CustomLib) NewCelEnv() (env *cel.Env, err error) {
 	env, err = cel.NewEnv(cel.Lib(c))
 	return env, err
 }
 
-// Step 3: 执行表达式
-// @env cel.Env cel环境
-// @expression string gocel表达式
-// @params map[string]interface 表达式变量值
 func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.Val, error) {
 	ast, iss := env.Compile(expression)
 	if iss.Err() != nil {
@@ -105,14 +93,11 @@ func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.V
 	return out, nil
 }
 
-//	如果有set：追加set变量到 cel options
-//	这里得注意下 reverse的顺序问题 map可能是随机的
 func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
 	for _, v := range args {
 		key := v.Key.(string)
 		value := v.Value
-		// 在执行之前是不知道变量的类型的，所以统一声明为字符型
-		// 所以randomInt虽然返回的是int型，在运算中却被当作字符型进行计算，需要重载string_*_string
+
 		var d *exprpb.Decl
 		switch vv := value.(type) {
 		case int64:
