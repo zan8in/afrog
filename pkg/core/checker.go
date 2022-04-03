@@ -25,31 +25,13 @@ type Checker struct {
 	FastClient      *http2.FastClient
 }
 
-var ReverseCeyeApiKey string
-var ReverseCeyeDomain string
-
-var FastClientReverse *http2.FastClient // 用于 reverse http client
-
 func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 
-	options := c.Options
+	c.Result.Target = target
+	c.Result.PocInfo = &pocItem
 
-	ReverseCeyeApiKey = options.Config.Reverse.Ceye.ApiKey
-	ReverseCeyeDomain = options.Config.Reverse.Ceye.Domain
-
-	fc := c.FastClient
-	fc.Client = http2.New(options)
-	fc.DialTimeout = options.Config.ConfigHttp.DialTimeout
-
-	variableMap := c.VariableMap
-
-	result := c.Result
-	result.Target = target
-	result.PocInfo = &pocItem
-
-	customLib := c.CustomLib
-
-	originalRequest := c.OriginalRequest
+	c.FastClient.MaxRedirect = c.Options.Config.ConfigHttp.MaxRedirect
+	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
 
 	pocHandler := ""
 	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
@@ -68,40 +50,40 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		}
 
 		// original request
-		originalRequest, err = http.NewRequest("GET", target, nil)
+		c.OriginalRequest, err = http.NewRequest("GET", target, nil)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
-			result.IsVul = false
-			options.ApiCallBack(result)
+			c.Result.IsVul = false
+			c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
-		tempRequest, err := http2.ParseRequest(originalRequest)
-		variableMap["request"] = tempRequest
+		tempRequest, err := http2.ParseRequest(c.OriginalRequest)
+		c.VariableMap["request"] = tempRequest
 
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
-			result.IsVul = false
-			options.ApiCallBack(result)
+			c.Result.IsVul = false
+			c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		// set User-Agent
-		if len(options.Config.ConfigHttp.UserAgent) > 0 {
-			originalRequest.Header.Set("User-Agent", options.Config.ConfigHttp.UserAgent)
+		if len(c.Options.Config.ConfigHttp.UserAgent) > 0 {
+			c.OriginalRequest.Header.Set("User-Agent", c.Options.Config.ConfigHttp.UserAgent)
 		} else {
-			originalRequest.Header.Set("User-Agent", utils.RandomUA())
+			c.OriginalRequest.Header.Set("User-Agent", utils.RandomUA())
 		}
 	}
 
 	// update set cel and variablemap
 	if len(pocItem.Set) > 0 {
-		c.UpdateVariableMap(pocItem.Set, variableMap, customLib, fc)
+		c.UpdateVariableMap(pocItem.Set)
 	}
 
 	// update payloads cel and variablemap
 	if len(pocItem.Payloads.Payloads) > 0 {
-		c.UpdateVariableMap(pocItem.Payloads.Payloads, variableMap, customLib, fc)
+		c.UpdateVariableMap(pocItem.Payloads.Payloads)
 	}
 
 	// rule
@@ -115,71 +97,68 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 			// run fasthttp client
 			utils.RandSleep(500) // firewall just test.
 
-			fc.MaxRedirect = options.Config.ConfigHttp.MaxRedirect
-
-			err = fc.HTTPRequest(originalRequest, rule, variableMap)
+			err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
-				customLib.WriteRuleFunctionsROptions(k, false)
+				c.CustomLib.WriteRuleFunctionsROptions(k, false)
 				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// run cel expression
-			isVul, err := customLib.RunEval(rule.Expression, variableMap)
+			isVul, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
 			if err != nil {
 				log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
-				customLib.WriteRuleFunctionsROptions(k, false)
+				c.CustomLib.WriteRuleFunctionsROptions(k, false)
 				continue // not return, becuase may be need test next pocitem. ？？？
 			}
 
 			// set result function eg: r1() r2()
-			customLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
+			c.CustomLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
 
 			// update output cel and variablemap
 			if len(rule.Output) > 0 {
-				c.UpdateVariableMap(rule.Output, variableMap, customLib, fc)
+				c.UpdateVariableMap(rule.Output)
 			}
 
-			result.AllPocResult = append(result.AllPocResult, &PocResult{IsVul: isVul.Value().(bool), ResultRequest: variableMap["request"].(*proto.Request), ResultResponse: variableMap["response"].(*proto.Response)})
+			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{IsVul: isVul.Value().(bool), ResultRequest: c.VariableMap["request"].(*proto.Request), ResultResponse: c.VariableMap["response"].(*proto.Response)})
 
 			if rule.Request.Todo == poc.TODO_FAILURE_NOT_CONTINUE && !isVul.Value().(bool) {
-				result.IsVul = false
-				options.ApiCallBack(result)
+				c.Result.IsVul = false
+				c.Options.ApiCallBack(c.Result)
 				return err
 			}
 
 			if rule.Request.Todo == poc.TODO_SUCCESS_NOT_CONTINUE && isVul.Value().(bool) {
-				result.IsVul = true
-				options.ApiCallBack(result)
+				c.Result.IsVul = true
+				c.Options.ApiCallBack(c.Result)
 				return err
 			}
 
 			if pocHandler == poc.ALLOR && isVul.Value().(bool) {
-				result.IsVul = true
-				options.ApiCallBack(result)
+				c.Result.IsVul = true
+				c.Options.ApiCallBack(c.Result)
 				return err
 			}
 			if pocHandler == poc.ALLAND && !isVul.Value().(bool) {
-				result.IsVul = false
-				options.ApiCallBack(result)
+				c.Result.IsVul = false
+				c.Options.ApiCallBack(c.Result)
 				return err
 			}
 		}
 	}
 
 	// run final cel expression
-	isVul, err := customLib.RunEval(pocItem.Expression, variableMap)
+	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
-		result.IsVul = false
-		options.ApiCallBack(result)
+		c.Result.IsVul = false
+		c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	// save final result
-	result.IsVul = isVul.Value().(bool)
-
-	options.ApiCallBack(result)
+	c.Result.IsVul = isVul.Value().(bool)
+	c.Options.ApiCallBack(c.Result)
 
 	return err
 }
@@ -192,23 +171,18 @@ func (c *Checker) PrintTraceInfo(result *Result) {
 }
 
 // update set、payload、output variableMap etc.
-func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]interface{}, customLib *CustomLib, fc *http2.FastClient) {
+func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 	for _, item := range args {
 		key := item.Key.(string)
 		value := item.Value.(string)
 
 		if value == "newReverse()" {
-			variableMap[key] = c.newRerverse()
-			customLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
-
-			// if reverse()，initilize a fasthttpclient
-			FastClientReverse = c.FastClient
-			FastClientReverse.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
-			FastClientReverse.Client = http2.New(c.Options)
+			c.VariableMap[key] = c.newRerverse()
+			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
 			continue
 		}
 
-		out, err := customLib.RunEval(value, variableMap)
+		out, err := c.CustomLib.RunEval(value, c.VariableMap)
 		if err != nil {
 			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] Eval err, %s", key, value, err.Error()))
 			continue
@@ -216,17 +190,17 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice, variableMap map[string]i
 
 		switch value := out.Value().(type) {
 		case *proto.UrlType:
-			variableMap[key] = utils.UrlTypeToString(value)
-			customLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
+			c.VariableMap[key] = utils.UrlTypeToString(value)
+			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
 		case int64:
-			variableMap[key] = int(value)
-			customLib.UpdateCompileOption(key, decls.Int)
+			c.VariableMap[key] = int(value)
+			c.CustomLib.UpdateCompileOption(key, decls.Int)
 		case map[string]string:
-			variableMap[key] = value
-			customLib.UpdateCompileOption(key, StrStrMapType)
+			c.VariableMap[key] = value
+			c.CustomLib.UpdateCompileOption(key, StrStrMapType)
 		default:
-			variableMap[key] = fmt.Sprintf("%v", out)
-			customLib.UpdateCompileOption(key, decls.String)
+			c.VariableMap[key] = fmt.Sprintf("%v", out)
+			c.CustomLib.UpdateCompileOption(key, decls.String)
 		}
 	}
 }

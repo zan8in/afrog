@@ -19,6 +19,7 @@ urls*
 release
 reports
 .vscode
+.idea
 
 cmd/afrog/afrog.ico
 cmd/afrog/build.cmd

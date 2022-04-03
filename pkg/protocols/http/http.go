@@ -22,19 +22,20 @@ import (
 	"github.com/zan8in/afrog/pkg/proto"
 )
 
+var (
+	F = &fasthttp.Client{}
+)
+
 type FastClient struct {
-	Client      *fasthttp.Client
 	MaxRedirect int32
 	DialTimeout int32
 }
 
-// fasthttp initialization
-// configuration proxy、readtimeout、writetimeout、max_idle、concurrency、max_responsebody_sizse、max_redirect_count eg.
-func New(options *config.Options) *fasthttp.Client {
+func New(options *config.Options) {
 	readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
-	client := &fasthttp.Client{
+	F = &fasthttp.Client{
 		TLSConfig:                     &tls.Config{InsecureSkipVerify: true},
 		MaxConnsPerHost:               options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数
 		ReadTimeout:                   readTimeout,
@@ -52,9 +53,8 @@ func New(options *config.Options) *fasthttp.Client {
 	}
 	if len(strings.TrimSpace(options.Config.ConfigHttp.Proxy)) > 0 {
 		// client.Dial = fasthttpproxy.FasthttpHTTPDialerTimeout("localhost:10808", time.Second*5) // http proxy 有问题，不支持https访问
-		client.Dial = fasthttpproxy.FasthttpSocksDialer("socks5://" + options.Config.ConfigHttp.Proxy)
+		F.Dial = fasthttpproxy.FasthttpSocksDialer("socks5://" + options.Config.ConfigHttp.Proxy)
 	}
-	return client
 }
 
 func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
@@ -109,13 +109,13 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		if fc.MaxRedirect > 0 {
 			maxrd = int(fc.MaxRedirect)
 		}
-		err = fc.Client.DoRedirects(fastReq, fastResp, maxrd)
+		err = F.DoRedirects(fastReq, fastResp, maxrd)
 	} else {
 		dialtimeout := 6
 		if fc.DialTimeout > 0 {
 			dialtimeout = int(fc.DialTimeout)
 		}
-		err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
+		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
 	}
 	if err != nil {
 		errName, known := httpConnError(err)
@@ -227,7 +227,7 @@ func (fc *FastClient) SampleHTTPRequest(httpRequest *http.Request) (*proto.Respo
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	err = fc.Client.DoTimeout(fastReq, fastResp, time.Second*6)
+	err = F.DoTimeout(fastReq, fastResp, time.Second*6)
 	if err != nil {
 		errName, known := httpConnError(err)
 		if known {

@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -453,7 +454,8 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 
 	redirectsCount := 0
 	for {
-		resp, err := FastClientReverse.SampleHTTPRequest(req)
+		fc := http2.FastClient{}
+		resp, err := fc.SampleHTTPRequest(req)
 		if err != nil {
 			// fmt.Println("rediSampleHTTPRequest", err.Error())
 			log.Log().Error(err.Error())
