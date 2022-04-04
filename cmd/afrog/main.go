@@ -19,7 +19,7 @@ var htemplate = &html.HtmlTemplate{}
 
 func main() {
 	app := cli.NewApp()
-	app.Name = runner.ShowBanner(config.Version)
+	app.Name = runner.ShowBanner()
 	app.Usage = "V" + config.Version
 	app.UsageText = "afrog [command]\n\n\t afrog -t example.com -o result.html\n\t afrog -T urls.txt -o result.html\n\t afrog -t example.com -P ./pocs/poc-test.yaml -o result.html\n\t afrog -t example.com -P ./pocs/ -o result.html"
 	app.Version = config.Version
@@ -33,7 +33,7 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 
-		title := log.LogColor.Vulner("一个挖洞工具 A tool for finding vulnerabilities - afrog V" + config.Version)
+		title := log.LogColor.Vulner(runner.ShowBanner() + " - V" + config.Version)
 
 		upgrade := upgrade.New()
 		upgrade.UpgradeAfrogPocs()
