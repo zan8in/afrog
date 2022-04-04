@@ -47,14 +47,13 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		}
 	}()
 
-	wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
-
 	allTargets := e.options.Targets
 	if len(allTargets) == 0 {
 		log.Log().Error("executeTargets failed, no targets")
 		return
 	}
 
+	wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
 	for _, target := range allTargets {
 		wg.WaitGroup.Add()
 		go func(target string, poc1 poc.Poc) {

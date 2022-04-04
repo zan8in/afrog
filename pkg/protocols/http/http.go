@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/zan8in/afrog/pkg/utils"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -29,6 +30,7 @@ var (
 type FastClient struct {
 	MaxRedirect int32
 	DialTimeout int32
+	UserAgent   string
 }
 
 func Init(options *config.Options) {
@@ -59,6 +61,186 @@ func Init(options *config.Options) {
 
 func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
 	var err error
+
+	protoRequest, err := ParseRequest(httpRequest)
+	if err != nil {
+		return err
+	}
+
+	variableMap["request"] = nil
+	variableMap["response"] = nil
+
+	newRuleHeader := make(map[string]string)
+	for k, v := range rule.Request.Headers {
+		newRuleHeader[k] = fc.AssignVariableMap(v, variableMap)
+	}
+	rule.Request.Headers = newRuleHeader
+	rule.Request.Path = fc.AssignVariableMap(strings.TrimSpace(rule.Request.Path), variableMap)
+	//rule.Request.Body = fc.AssignVariableMap(strings.TrimSpace(rule.Request.Body), variableMap)
+	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
+		multipartBody, err := DealMultipart(rule.Request.Headers["Content-Type"], rule.Request.Body)
+		if err != nil {
+			return err
+		}
+		rule.Request.Body = fc.AssignVariableMap(strings.TrimSpace(multipartBody), variableMap)
+	} else {
+		rule.Request.Body = fc.AssignVariableMap(strings.TrimSpace(rule.Request.Body), variableMap)
+	}
+
+	if strings.HasPrefix(rule.Request.Path, "/") {
+		protoRequest.Url.Path = strings.TrimRight(httpRequest.URL.Path, "/") + rule.Request.Path
+	} else if strings.HasPrefix(rule.Request.Path, "^") {
+		protoRequest.Url.Path = "/" + rule.Request.Path[1:]
+	}
+
+	protoRequest.Url.Path = strings.ReplaceAll(protoRequest.Url.Path, " ", "%20")
+	protoRequest.Url.Path = strings.ReplaceAll(protoRequest.Url.Path, "+", "%20")
+
+	if rule.Request.Method == "POST" && len(rule.Request.Headers["Content-Type"]) == 0 {
+		if rule.Request.Headers == nil {
+			rule.Request.Headers = make(map[string]string)
+		}
+		rule.Request.Headers["Content-Type"] = "application/x-www-form-urlencoded"
+	}
+
+	finalRequest, err := http.NewRequest(rule.Request.Method, fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), strings.NewReader(rule.Request.Body))
+	if err != nil {
+		return err
+	}
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	var rawHeader strings.Builder
+	newheader := make(map[string]string)
+	for k, v := range rule.Request.Headers {
+		fastReq.Header.Set(k, v)
+
+		newheader[k] = v
+
+		rawHeader.WriteString(k)
+		rawHeader.WriteString(": ")
+		rawHeader.WriteString(v)
+		rawHeader.WriteString("\n")
+	}
+
+	if len(fc.UserAgent) > 0 {
+		fastReq.Header.Set("User-Agent", fc.UserAgent)
+	} else {
+		fastReq.Header.Set("User-Agent", utils.RandomUA())
+	}
+
+	fastReq.Header.SetMethod(rule.Request.Method)
+
+	if len(rule.Request.Headers["Host"]) == 0 {
+		fastReq.Header.SetHost(finalRequest.Host)
+	}
+	if len(rule.Request.Headers["Content-Length"]) == 0 {
+		fastReq.Header.SetContentLength(int(finalRequest.ContentLength))
+	}
+	fastReq.SetBody([]byte(rule.Request.Body))
+	fastReq.URI().Update(finalRequest.URL.String())
+	fastReq.SetRequestURI(finalRequest.URL.String())
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	if rule.Request.FollowRedirects {
+		maxrd := 5 // follow redirects default 5
+		if fc.MaxRedirect > 0 {
+			maxrd = int(fc.MaxRedirect)
+		}
+		err = F.DoRedirects(fastReq, fastResp, maxrd)
+	} else {
+		dialtimeout := 6
+		if fc.DialTimeout > 0 {
+			dialtimeout = int(fc.DialTimeout)
+		}
+		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
+	}
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
+	}
+
+	// set fastResp body
+	var respBody []byte
+	contentEncoding := strings.ToLower(string(fastResp.Header.Peek("Content-Encoding")))
+	switch contentEncoding {
+	case "", "none", "identity":
+		respBody = fastResp.Body()
+	case "gzip":
+		respBody, err = fastResp.BodyGunzip()
+	case "deflate":
+		respBody, err = fastResp.BodyInflate()
+	default:
+		respBody = []byte{}
+	}
+	if err != nil {
+		return err
+	}
+	fastResp.SetBody(respBody)
+
+	// fc.VariableMap["response"] variable assignment
+	tempResultResponse := &proto.Response{}
+	tempResultResponse.Status = int32(fastResp.StatusCode())
+	u, err := url.Parse(fastReq.URI().String())
+	if err != nil {
+		return err
+	}
+	urlType := &proto.UrlType{
+		Scheme:   u.Scheme,
+		Domain:   u.Hostname(),
+		Host:     u.Host,
+		Port:     u.Port(),
+		Path:     u.Path,
+		Query:    u.RawQuery,
+		Fragment: u.Fragment,
+	}
+	tempResultResponse.Url = urlType
+	newheader2 := make(map[string]string)
+	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
+	for _, h := range respHeaderSlice {
+		hslice := strings.SplitN(h, ":", 2)
+		if len(hslice) != 2 {
+			continue
+		}
+		k := strings.ToLower(hslice[0])
+		v := strings.TrimLeft(hslice[1], " ")
+		if newheader2[k] != "" {
+			newheader2[k] += v
+		} else {
+			newheader2[k] = v
+		}
+	}
+	tempResultResponse.Headers = newheader2
+	tempResultResponse.ContentType = string(fastResp.Header.ContentType())
+	tempResultResponse.Body = fastResp.Body()
+	tempResultResponse.Raw = []byte(fastResp.String())
+	tempResultResponse.RawHeader = fastResp.Header.Header()
+	variableMap["response"] = tempResultResponse
+
+	protoRequest.Method = rule.Request.Method
+	protoRequest.Url = urlType
+	protoRequest.RawHeader = []byte(strings.Trim(rawHeader.String(), "\n"))
+	protoRequest.Raw = []byte(string(fastReq.Header.String()) + "\n" + string(fastReq.Body()))
+	protoRequest.Headers = newheader
+	protoRequest.ContentType = newheader["content-type"]
+	protoRequest.Body = []byte(rule.Request.Body)
+	variableMap["request"] = protoRequest
+
+	return err
+}
+
+func (fc *FastClient) HTTPRequest2(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
+	var err error
+
+	variableMap["request"] = nil
+	variableMap["response"] = nil
 
 	fastReq := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(fastReq)
@@ -366,7 +548,8 @@ func (fc *FastClient) AssignVariableMap(find string, variableMap map[string]inte
 }
 
 func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) {
-	dstRequest.SetRequestURI(req.URL.String())
+	//dstRequest.SetRequestURI(req.URL.String())
+	dstRequest.URI().Update(req.URL.String())
 	dstRequest.Header.SetMethod(req.Method)
 	for name, values := range req.Header {
 		// Loop over all values for the name.
@@ -378,6 +561,7 @@ func CopyRequest(req *http.Request, dstRequest *fasthttp.Request, data []byte) {
 			}
 		}
 	}
+	dstRequest.SetBody(data)
 	dstRequest.SetBodyRaw(data)
 }
 
