@@ -25,10 +25,11 @@ func main() {
 	app.Version = config.Version
 
 	app.Flags = []cli.Flag{
-		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "target URLs/hosts to scan"},
-		&cli.StringFlag{Name: "targetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "path to file containing a list of target URLs/hosts to scan (one per line)"},
+		&cli.StringFlag{Name: "Target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "target URLs/hosts to scan"},
+		&cli.StringFlag{Name: "TargetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "path to file containing a list of target URLs/hosts to scan (one per line)"},
 		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
+		&cli.BoolFlag{Name: "Silent", Aliases: []string{"silent"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -54,7 +55,9 @@ func main() {
 			options.OptLock.Lock()
 			defer options.OptLock.Unlock()
 
-			options.CurrentCount++
+			if !options.Silent {
+				options.CurrentCount++
+			}
 
 			if r.IsVul {
 				r.PrintColorResultInfoConsole()
@@ -65,7 +68,9 @@ func main() {
 				}
 			}
 
-			fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
+			if !options.Silent {
+				fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
+			}
 		})
 		if err != nil {
 			return err

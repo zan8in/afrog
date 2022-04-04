@@ -28,6 +28,9 @@ type Options struct {
 	// output file to write found issues/vulnerabilities
 	Output string
 
+	// no progress if silent is true
+	Silent bool
+
 	// Scan count num(targets * allpocs)
 	Count int
 
