@@ -45,8 +45,8 @@ const Version = "1.2.3"
 func New() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
-		c.PocSizeWaitGroup = 25
-		c.TargetSizeWaitGroup = 6
+		c.PocSizeWaitGroup = 10
+		c.TargetSizeWaitGroup = 25
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 5

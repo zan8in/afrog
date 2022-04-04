@@ -1,0 +1,28 @@
+id: CVE-2022-22947
+
+info:
+  name: Spring Cloud Gateway Code Injection
+  author: alex
+  severity: critical
+  description: |
+    Spring Cloud Gateway 远程代码执行漏洞（CVE-2022-22947）发生在Spring Cloud Gateway...
+    影响版本：Spring Cloud Gateway 3.1.x < 3.1.1 、Spring Cloud Gateway < 3.0.7
+    官方已发布安全版本，请及时下载更新，下载地址：https://github.com/spring-cloud/spring-cloud-gateway
+    FOFA：app="vmware-SpringBoot-framework"
+  reference:
+    - https://mp.weixin.qq.com/s/qIAcycsO_L9JKisG5Bgg_w	 // 必须是列表（数组）形式
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /phpinfo.php
+    exppression: response.status == 200 && response.body.bcontains(b'PHP Version')
+    stop_if_match: true
+  r1:
+    request:
+      method: GET
+      path: /info.php
+    expresssion: response.status == 200 && response.body.bcontains(b'PHP Version')
+    stop_if_mismatch: true
+expression: r0() || r1()
