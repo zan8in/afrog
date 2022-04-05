@@ -1,0 +1,32 @@
+id: jumpserver-unauth-rce
+
+info:
+    name: Jumpserver Unauth RCE
+    author: mvhz81
+    severity: critical
+
+set:
+    r1: randomLowercase(5)
+rules:
+    authentication0:
+        request:
+            method: GET
+            path: /api/v1/authentication/connection-token/
+        expression: response.status == 401 && response.content_type.contains("application/json") && response.body.bcontains(b"not_authenticated")
+    authentication1:
+        request:
+            method: GET
+            path: /api/v1/authentication/connection-token/?user-only={{r1}}
+        expression: response.status == 404 && response.content_type.contains("application/json") && response.body.bcontains(b"\"\"")
+    users0:
+        request:
+            method: GET
+            path: /api/v1/users/connection-token/
+        expression: response.status == 401 && response.content_type.contains("application/json") && response.body.bcontains(b"not_authenticated")
+    users1:
+        request:
+            method: GET
+            path: /api/v1/users/connection-token/?user-only={{r1}}
+        expression: response.status == 404 && response.content_type.contains("application/json") && response.body.bcontains(b"\"\"")
+expression: users0() && users1() || authentication0() && authentication1()
+

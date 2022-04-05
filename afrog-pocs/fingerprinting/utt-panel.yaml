@@ -1,14 +1,12 @@
-id: UTT艾泰网络管理系统
+id: utt-panel
 
 info:
-  name: UTT艾泰网络管理系统
+  name: UTT 艾泰网络管理系统
   author: zan8in
   severity: info
   metadata:
     fofa-query: app="UTT-安全网络管理系统"
-  tags: UTT,艾泰
 
-transport: http
 rules:
   r0:
     request:
@@ -17,6 +15,5 @@ rules:
       follow_redirects: true
     expression: |
       response.status == 200 && response.body.bcontains(b"noAuth/noAuthAspOut.asp?optType=lang") && response.body.bcontains(b"company_msg")
-  
-expression: r0() 
+expression: r0()
 

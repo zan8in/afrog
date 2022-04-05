@@ -1,0 +1,15 @@
+id: laravel-improper-webdir
+
+info:
+    name: Laravel Improper Webdir
+    author: Dem0ns (https://github.com/dem0ns)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /storage/logs/laravel.log
+        expression: response.status == 200 && (response.content_type.contains("plain") || response.content_type.contains("octet-stream")) && (response.body.bcontains(b"vendor\\laravel\\framework") || response.body.bcontains(b"vendor/laravel/framework")) && (response.body.bcontains(b"stacktrace") || response.body.bcontains(b"Stack trace"))
+expression: r0()
+

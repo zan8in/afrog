@@ -4,9 +4,7 @@ info:
   name: OpenERP database instances
   author: impramodsargar
   severity: info
-  tags: openerp,panel
 
-transport: http
 rules:
   r0:
     request:

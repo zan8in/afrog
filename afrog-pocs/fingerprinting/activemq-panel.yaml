@@ -1,7 +1,7 @@
 id: activemq-panel
 
 info:
-    name: activemq-panel
+    name: Apache ActiveMQ Panel
     author: pdteam
     severity: info
     description: |

@@ -1,0 +1,16 @@
+id: thinkphp-detect
+
+info:
+    name: ThinkPHP detect
+    author: zan8in
+    severity: info
+    description: fofa app="ThinkPHP"
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+            follow_redirects: true
+        expression: response.status == 200 && response.headers["x-powered-by"].contains("ThinkPHP")
+expression: r0()

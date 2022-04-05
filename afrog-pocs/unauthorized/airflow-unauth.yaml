@@ -1,0 +1,15 @@
+id: airflow-unauth
+
+info:
+    name: Airflow Unauth
+    author: pa55w0rd(www.pa55w0rd.online/)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /admin/
+        expression: response.status == 200 && response.body.bcontains(b"<title>Airflow - DAGs</title>") && response.body.bcontains(b"<h2>DAGs</h2>")
+expression: r0()
+

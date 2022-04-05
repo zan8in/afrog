@@ -4,9 +4,7 @@ info:
   name: Jira Unauthenticated User Picker
   author: TechbrunchFR
   severity: info
-  tags: atlassian,jira
 
-transport: http
 rules:
     r0:
         request:

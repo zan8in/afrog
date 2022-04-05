@@ -1,7 +1,7 @@
-id: grafana-detect
+id: grafana-panel
 
 info:
-  name: Grafana panel detect
+  name: Grafana Panel
   author: organiccrap
   severity: info
   description: |

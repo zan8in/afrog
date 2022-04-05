@@ -5,11 +5,9 @@ info:
   author: pussycat0x
   severity: low
   description: Information Disclosure of Garbage Collection
-  tags: kubernetes,exposure,devops
-  reference: 
+  reference:
     - https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#metrics-in-kubernetes
 
-transport: http
 rules:
     r0:
         request:

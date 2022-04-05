@@ -1,0 +1,20 @@
+id: docker-registry-api-unauth
+
+info:
+    name: Docker Registry Api Unauth
+    author: p0wd3r
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /v2/
+        expression: response.status == 200 && "docker-distribution-api-version" in response.headers && response.headers["docker-distribution-api-version"].contains("registry/2.0")
+    r1:
+        request:
+            method: GET
+            path: /v2/_catalog
+        expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"repositories")
+expression: r0() && r1()
+
