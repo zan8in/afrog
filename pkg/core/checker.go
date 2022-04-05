@@ -34,19 +34,18 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
 	c.FastClient.UserAgent = c.Options.Config.ConfigHttp.UserAgent
 
-	pocHandler := ""
+	matchCondition := ""
 	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
-		pocHandler = poc.ALLAND
+		matchCondition = poc.STOP_IF_FIRST_MISMATCH
 	}
 	if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
-		pocHandler = poc.ALLOR
+		matchCondition = poc.STOP_IF_FIRST_MATCH
 	}
 
 	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
 		target = "http://" + target
 	}
 
-	// original request
 	c.OriginalRequest, err = http.NewRequest("GET", target, nil)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
@@ -76,67 +75,56 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		k := ruleMap.Key
 		rule := ruleMap.Value
 
-		utils.RandSleep(500) // firewall just test.
+		utils.RandSleep(500)
 
-		err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap)
-		if err != nil {
-			log.Log().Error(fmt.Sprintf("rule map fasthttp.HTTPRequest err, %s", err.Error()))
-			c.CustomLib.WriteRuleFunctionsROptions(k, false)
-			continue
+		isMatch := false
+		if err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap); err == nil {
+			evalResult, _ := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
+			isMatch = evalResult.Value().(bool)
 		}
 
-		// run cel expression
-		isVul, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
-		if err != nil {
-			log.Log().Error(fmt.Sprintf("rule map RunEval err, %s", err.Error()))
-			c.CustomLib.WriteRuleFunctionsROptions(k, false)
-			continue // not return, because may be need test next pocItem. ？？？
-		}
+		c.CustomLib.WriteRuleFunctionsROptions(k, isMatch)
 
-		// set result function eg: r1() r2()
-		c.CustomLib.WriteRuleFunctionsROptions(k, isVul.Value().(bool))
-
-		// update output cel and variableMap
 		if len(rule.Output) > 0 {
 			c.UpdateVariableMap(rule.Output)
 		}
 
-		c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{IsVul: isVul.Value().(bool), ResultRequest: c.VariableMap["request"].(*proto.Request), ResultResponse: c.VariableMap["response"].(*proto.Response)})
+		c.Result.AllPocResult = append(c.Result.AllPocResult,
+			&PocResult{IsVul: isMatch, ResultRequest: c.VariableMap["request"].(*proto.Request), ResultResponse: c.VariableMap["response"].(*proto.Response)})
 
-		if rule.Request.Todo == poc.TODO_FAILURE_NOT_CONTINUE && !isVul.Value().(bool) {
+		if rule.StopIfMismatch && !isMatch {
 			c.Result.IsVul = false
 			c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
-		if rule.Request.Todo == poc.TODO_SUCCESS_NOT_CONTINUE && isVul.Value().(bool) {
+		if rule.StopIfMatch && isMatch {
 			c.Result.IsVul = true
 			c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
-		if pocHandler == poc.ALLOR && isVul.Value().(bool) {
-			c.Result.IsVul = true
+		if matchCondition == poc.STOP_IF_FIRST_MISMATCH && !isMatch {
+			c.Result.IsVul = false
 			c.Options.ApiCallBack(c.Result)
 			return err
 		}
-		if pocHandler == poc.ALLAND && !isVul.Value().(bool) {
-			c.Result.IsVul = false
+
+		if matchCondition == poc.STOP_IF_FIRST_MATCH && isMatch {
+			c.Result.IsVul = true
 			c.Options.ApiCallBack(c.Result)
 			return err
 		}
 	}
 
-	// run final cel expression
 	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
 	if err != nil {
-		log.Log().Error(fmt.Sprintf("final RunEval err, %s", err.Error()))
+		log.Log().Error(fmt.Sprintf("Final RunEval Error: %s", err.Error()))
 		c.Result.IsVul = false
 		c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
-	// save final result
 	c.Result.IsVul = isVul.Value().(bool)
 	c.Options.ApiCallBack(c.Result)
 

@@ -13,10 +13,8 @@ import (
 // Rule有序，参考：https://github.com/WAY29/pocV/blob/main/pkg/xray/structs/poc.go
 
 const (
-	ALLOR                     = "allor"
-	ALLAND                    = "alland"
-	TODO_FAILURE_NOT_CONTINUE = "TODO_FAILURE_NOT_CONTINUE" // 请求失败不继续
-	TODO_SUCCESS_NOT_CONTINUE = "TODO_SUCCESS_NOT_CONTINUE" // 请求成功不继续
+	STOP_IF_FIRST_MATCH    = "STOP_IF_FIRST_MATCH"
+	STOP_IF_FIRST_MISMATCH = "STOP_IF_FIRST_MISMATCH"
 )
 
 type Poc struct {
@@ -47,16 +45,20 @@ type RuleMap struct {
 // 用于帮助yaml解析，保证Rule有序
 type RuleMapSlice []RuleMap
 type Rule struct {
-	Request    RuleRequest   `yaml:"request"`
-	Expression string        `yaml:"expression"`
-	Output     yaml.MapSlice `yaml:"output"`
-	order      int
+	Request        RuleRequest   `yaml:"request"`
+	Expression     string        `yaml:"expression"`
+	Output         yaml.MapSlice `yaml:"output"`
+	StopIfMatch    bool          `yaml:"stop_if_match"`
+	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
+	order          int
 }
 
 type ruleAlias struct {
-	Request    RuleRequest   `yaml:"request"`
-	Expression string        `yaml:"expression"`
-	Output     yaml.MapSlice `yaml:"output"`
+	Request        RuleRequest   `yaml:"request"`
+	Expression     string        `yaml:"expression"`
+	Output         yaml.MapSlice `yaml:"output"`
+	StopIfMatch    bool          `yaml:"stop_if_match"`
+	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
 }
 
 // http/tcp/udp cache 是否使用缓存的请求，如果该选项为 true，那么如果在一次探测中其它脚本对相同目标发送过相同请求，那么便使用之前缓存的响应，而不发新的数据包
@@ -64,7 +66,6 @@ type ruleAlias struct {
 // read_timeout 用于tcp/udp请求，发送请求之后的读取超时时间（注 实际是一个 int， 但是为了能够变量渲染，设置为 string）
 // connection_id 用于tcp/udp请求，连接 id ,同一个连接 id 复用连接(注 不允许用0； cache 为 true 的时候可能会导致请求不会发送，所以如果有特殊需求记得 cache: false)
 type RuleRequest struct {
-	Cache           bool              `yaml:"cache"`
 	Content         string            `yaml:"content"`       // tcp/udp专用
 	ReadTimeout     string            `yaml:"read_timeout"`  // tcp/udp专用
 	ConnectionId    string            `yaml:"connection_id"` // tcp/udp专用
@@ -73,7 +74,6 @@ type RuleRequest struct {
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
-	Todo            string            `yaml:"todo"`
 }
 
 // 以下开始是 信息部分
@@ -162,6 +162,8 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	r.Request = tmp.Request
 	r.Expression = tmp.Expression
 	r.Output = tmp.Output
+	r.StopIfMatch = tmp.StopIfMatch
+	r.StopIfMismatch = tmp.StopIfMismatch
 	r.order = order
 
 	order += 1
