@@ -79,7 +79,7 @@ func (u *Upgrade) Download() {
 		fmt.Println(log.LogColor.Low(err.Error()))
 		return
 	}
-
+	os.RemoveAll(u.HomeDir + upPathName)
 	utils.RandSleep(1000)
 
 	u.Unzip(resp.Filename)
