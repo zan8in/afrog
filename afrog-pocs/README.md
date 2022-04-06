@@ -59,6 +59,7 @@ rules:
     exppression: response.status == 200 && response.body.bcontains(b'PHP Version')
     stop_if_match: true
   r1:
+    before_sleep: 6
     request:
       method: GET
       path: /info.php
@@ -82,6 +83,8 @@ expresssion：子规则的验证表达式，用于验证 r0 或 r1 是否匹配�
 stop_if_match: 如果匹配就停止
 
 stop_if_mismatch：如果不匹配就停止
+
+before_sleep: 顾名思义，http 请求前 sleep 6 秒钟
 
 expression: 最外面的 `expression` 是 `rules` 的验证表达式，`r0() || r1()` 表示 `r0` 和 `r1` 两个规则，匹配一个表达式就为 `true`，代表漏洞存在。
 

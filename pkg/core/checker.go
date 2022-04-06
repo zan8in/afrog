@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -75,6 +76,9 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		k := ruleMap.Key
 		rule := ruleMap.Value
 
+		if rule.BeforeSleep != 0 {
+			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
+		}
 		utils.RandSleep(500)
 
 		isMatch := false
@@ -94,8 +98,14 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 			c.UpdateVariableMap(rule.Output)
 		}
 
-		c.Result.AllPocResult = append(c.Result.AllPocResult,
-			&PocResult{IsVul: isMatch, ResultRequest: c.VariableMap["request"].(*proto.Request), ResultResponse: c.VariableMap["response"].(*proto.Response)})
+		pocRstTemp := PocResult{IsVul: isMatch}
+		if c.VariableMap["response"] != nil {
+			pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
+		}
+		if c.VariableMap["request"] != nil {
+			pocRstTemp.ResultRequest = c.VariableMap["request"].(*proto.Request)
+		}
+		c.Result.AllPocResult = append(c.Result.AllPocResult, &pocRstTemp)
 
 		if rule.StopIfMismatch && !isMatch {
 			c.Result.IsVul = false

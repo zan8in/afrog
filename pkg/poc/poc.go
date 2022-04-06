@@ -50,6 +50,7 @@ type Rule struct {
 	Output         yaml.MapSlice `yaml:"output"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
+	BeforeSleep    int           `yaml:"before_sleep"`
 	order          int
 }
 
@@ -59,6 +60,7 @@ type ruleAlias struct {
 	Output         yaml.MapSlice `yaml:"output"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
+	BeforeSleep    int           `yaml:"before_sleep"`
 }
 
 // http/tcp/udp cache 是否使用缓存的请求，如果该选项为 true，那么如果在一次探测中其它脚本对相同目标发送过相同请求，那么便使用之前缓存的响应，而不发新的数据包
@@ -164,6 +166,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	r.Output = tmp.Output
 	r.StopIfMatch = tmp.StopIfMatch
 	r.StopIfMismatch = tmp.StopIfMismatch
+	r.BeforeSleep = tmp.BeforeSleep
 	r.order = order
 
 	order += 1
