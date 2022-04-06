@@ -4,6 +4,8 @@ info:
     name: ShopXO File Read
     author: Print1n(http://print1n.top)
     severity: high
+    reference:
+        - https://mp.weixin.qq.com/s/69cDWCDoVXRhehqaHPgYog
 
 rules:
     Linux0:
