@@ -79,8 +79,13 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 
 		isMatch := false
 		if err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap); err == nil {
-			evalResult, _ := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
-			isMatch = evalResult.Value().(bool)
+			evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
+			if err == nil {
+				isMatch = evalResult.Value().(bool)
+			}
+		}
+		if err != nil {
+			log.Log().Error(fmt.Sprintf("RunEval %s", err.Error()))
 		}
 
 		c.CustomLib.WriteRuleFunctionsROptions(k, isMatch)
