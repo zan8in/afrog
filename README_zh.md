@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️POC 欢迎投递<br/>共 <b>[442]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>❤️POC 欢迎投递<br/>共 <b>[432]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •

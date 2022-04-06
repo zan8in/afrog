@@ -1,227 +1,89 @@
 <h1 align="center">afrog-pocs</h1>
 <p align="center">POC，全称 Proof of Concept，指一段漏洞证明的说明或攻击样例<br/><br/>❤️POC 欢迎投递</p>
 
-### cnvd
-- 2020
-  - CNVD-2020-62422
-- 2021
-  - CNVD-2021-09650
-  - ruijie-uac-cnvd-2021-14536
+### 文件名
 
-### cve
-- 2010
-  - jboss-cve-2010-1871
-- 2014
-  - elasticsearch-cve-2014-3120
-- 2015
-  - elasticsearch-cve-2015-1427
-  - elasticsearch-cve-2015-3337-lfi
-  - elasticsearch-cve-2015-5531
-  - CVE-2015-7450 (已删除)
-- 2016
-  - CVE-2016-3088
-  - zabbix-cve-2016-10134-sqli
-- 2017
-  - hikvision-cve-2017-7921
-  - CVE-2017-12149
-  - couchdb-cve-2017-12635
-  - weblogic-cve-2017-10271
-- 2018
-  - CVE-2018-7490
-  - CVE-2018-8033
-  - CVE-2018-1000600
-  - CVE-2018-1000861
-  - CVE-2018-11759
-  - dedecms-cve-2018-6910
-- 2019
-  - citrix-cve-2019-19781-path-traversal
-  - solr-cve-2019-0193
-  - dlink-cve-2019-17506
-  - dlink-cve-2019-16920-rce
-  - CVE-2019-10758
-  - jira-cve-2019-8442
-  - jira-cve-2019-8449
-  - jira-cve-2019-11581
-  - jira-ssrf-cve-2019-8451
-  - weblogic-cve-2019-2725
-  - weblogic-cve-2019-2729
-- 2020
-  - CVE-2020-26413
-  - dlink-cve-2020-9376-dump-credentials
-  - dlink-cve-2020-25078-account-disclosure
-  - apache-kylin-unauth-cve-2020-13937
-  - jira-cve-2020-14179
-  - jira-cve-2020-14181
-  - kong-cve-2020-11710-unauth
-  - solarwinds-cve-2020-10148
-  - weblogic-cve-2020-14750
-  - CVE-2020-28185
-- 2021
-  - CVE-2021-41773
-  - CVE-2021-22214
-  - CVE-2021-22205
-  - CVE-2021-33044（未验证）
-  - CVE-2021-36749
-  - CVE-2021-44228（未验证）
-  - CVE-2021-36260
-  - CVE-2021-40438
-  - CVE-2021-29490
-  - CVE-2020-28188
-  - CVE-2021-27905
--2022
-  - CVE-2022-24990
-  - Spring-Cloud-Gateway-Code-Injection-CVE-2022-22947
-  - CVE-2022-23131
-  - CVE-2022-24112(未验证)
-  - CVE-2022-23134
-  - CVE-2022-23178(未验证)
-  - CVE-2022-24124
-  - CVE-2022-24260(未验证)
-  - CVE-2022-25369(未验证)
-  - CVE-2022-25568
-  
-### exposures 信息泄露
-- alibaba-canal-info-leak
-- phpinfo
-- ruijie-eg-info-leak
-- avtech-dvr-exposure
-- directory-display
+后缀 `.yaml`
 
-### fingerprinting 指纹识别
-- swagger-api
-- dahua（未验证）
-- dlink-web
-- wayos
-- atlassian-jira
-- shiro
-- thinkphp
-- gitlab
-- jenkins-api-panel
-- jenkins-login
-- emessage-panel
-- openerp-database
-- utt-panel
-- terramaster-login
-- CVE-2020-15568
-- CVE-2020-28187
-- zabbix-server-login
-- apache-dubbo-detect
-- jupyter-notebook-tech
-- kubernetes-dashboard
-- kubernetes-resource-report
-- kubernetes-metrics
-- kubernetes-enterprise-manager
-- kubernetes-mirantis
-- kubernetes-version
-- azure-kubernetes-service
-- weblogic-login
-- activemq-panel
-- avtech-avn801-camera-panel
-- directadmin-login-panel
-- public-tomcat-manager
-- apache-apisix-panel
-- upupw-tz
-- huawei-hg532e-panel
-- grafana-detect
+```azure
+CVE-2022-0202.yaml
+```
 
-### login 登录
-- default-pwd 默认密码
-  - grafana-default-password
-  - minio-default-password
-  - datang-ac-default-password-cnvd-2021-04128
-  - dlink-default-password
-  - wayos-default-password
-  - openerp-default-password
-  - utt-default-password
-  - gitlab-weak-login
-  - activemq-default-password
-  - alibaba-canal-default-password
-  - zabbix-default-password
-  - hikvision-intercom-service-default-password
-  - apache-ambari-default-password
-  - rabbitmq-default-password
-  - weblogic-weak-login
+### id
 
-### unauthorized 未授权访问
-- springboot-actuator-unauth
-- druid-monitor-unauth
-- elasticsearch-unauth
-- zabbix-authentication-bypass
-- alibaba-nacos-v1-auth-bypass
-- jboss-unauth
-- apache-nifi-api-unauthorized-access
-- apache-storm-unauth
-- apache-storm-unauthorized-access
-- jenkins-unauthorized-access
-- zabbix-dashboards-access
-- jira-unauthenticated-resolutions
-- jira-unauthenticated-screens
-- jira-unauthenticated-user-picker
-- jira-unauthenticated-dashboards
-- jira-unauthenticated-installed-gadgets
-- jira-unauthenticated-projectcategories
-- jira-unauthenticated-adminprojects
-- jira-unauthenticated-projects
-- jira-service-desk-signup
-- couchdb-unauth
-- docker-api-unauthorized
-- docker-registry-api-unauth
-- hadoop-yarn-unauth
-- jupyter-notebook-unauthorized-access
-- kubernetes-unauth
-- spark-api-unauth
-- spark-webui-unauth
-- unauthorized-hp-officepro-printer
-- jeecg-boot-unauth
+`[公司]产品-漏洞名称|CVE/CNVD-2021-XXXX`
 
-### vulnerability 漏洞
-- landray-oa-custom-jsp-fileread
-- yonyou-nc-bsh-servlet-bshservlet-rce
-- springboot-h2-db-rce
-- huijietong-cloud-fileread
-- ruijie-eg-cli-rce
-- ruijie-eg-file-read
-- dlink-850l-info-leak
-- dlink-dsl-2888a-rce
-- sangfor-ba-rce
-- sangfor-edr-cssp-rce
-- sangfor-edr-tool-rce
-- sangfor-edr-arbitrary-admin-login
-- hikvision-info-leak
-- seeyon-a6-employee-info-leak
-- seeyon-ajax-unauthorized-access
-- seeyon-oa-cookie-leak
-- seeyon-session-leak
-- seeyon-wooyun-2015-0108235-sqli
-- seeyon-wooyun-2015-148227
-- apache-flink-upload-rce
-- dahua-dss-file-read
-- ruijie-smartweb-password-disclosure
-- thinkphp-2-rce
-- thinkphp-501-rce
-- thinkphp-509-information-disclosure
-- thinkphp-5022-rce
-- thinkphp-v6-file-write
-- thinkphp-5023-rce
-- couchdb-adminparty
-- solr-velocity-template-rce
-- solr-fileread
-- solr-admin-query
-- weblogic-ssrf
-- e-cology-getsqldata-sql-inject
-- e-cology-arbitrary-file-upload
-- e-cology-filedownload-directory-traversal
-- e-cology-javabeanshell-rce
-- e-cology-springframework-directory-traversal
-- e-cology-syncuserinfo-sqli
-- e-cology-v8-sqli
-- e-cology-validate-sqli
-- e-cology-workflowcentertreedata-sqli
-- e-office-mysql-config-leak
-- e-bridge-saveyzjfile-file-read
-- dedecms-url-redirection
-- targa-camera-lfi
-- egroupware-rce
-- grafana-file-read
-- unifi-network-log4j-rce
-- huawei-dg8045-home-gateway-exposures
+```yaml
+id: CVE-2022-0202  // good
+id: seeyon-ajax-unauth  // good
+id: zhiyuan-oa-unauth   // bad
+```
+### info
+
+包含 `name`、`author`、`severity`、`description`、`reference`
+
+```yaml
+id: CVE-2022-22947
+info:
+  name: Spring Cloud Gateway Code Injection
+  author: alex
+  severity: critical
+  description: |
+    Spring Cloud Gateway 远程代码执行漏洞（CVE-2022-22947）发生在Spring Cloud Gateway...
+    影响版本：Spring Cloud Gateway 3.1.x < 3.1.1 、Spring Cloud Gateway < 3.0.7
+    官方已发布安全版本，请及时下载更新，下载地址：https://github.com/spring-cloud/spring-cloud-gateway
+    FOFA：app="vmware-SpringBoot-framework"
+  reference:
+    - https://mp.weixin.qq.com/s/qIAcycsO_L9JKisG5Bgg_w	 // 必须是列表（数组）形式
+```
+name：漏洞名称，尽量英文且官方用语
+
+author：大佬名称
+
+severity: 漏洞等级，分为`critical`、`high`、`mideum`、`low`、`info`，请参考 [[National Vulnerability Database]](https://nvd.nist.gov/vuln/detail/cve-2020-11710)
+
+description: （可选填）包含 `漏洞描述`、`漏洞影响`、`网络测绘`、`修复建议` 等
+
+reference: （可选填）参考链接，必须数组形式，否则 poc 无法验证
+
+### rules
+
+示例
+
+``` yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /phpinfo.php
+    exppression: response.status == 200 && response.body.bcontains(b'PHP Version')
+    stop_if_match: true
+  r1:
+    request:
+      method: GET
+      path: /info.php
+    expresssion: response.status == 200 && response.body.bcontains(b'PHP Version')
+    stop_if_mismatch: true
+expression: r0() || r1()
+```
+
+rules：定义规则组
+
+r0 / r1 :  子规则，自定义名称，不能重复
+
+request:  表示 http request 请求
+
+method:  表示 http request method 方法
+
+path:  表示 http request URL 请求的 PATH
+
+expresssion：子规则的验证表达式，用于验证 r0 或 r1 是否匹配规则。比如：`response.status == 200 && response.body.bcontains(b'PHP Version')`表示 request 请求返回状态码必须是 200 且 源码必须含有 `PHP Version` 关键字
+
+stop_if_match: 如果匹配就停止
+
+stop_if_mismatch：如果不匹配就停止
+
+expression: 最外面的 `expression` 是 `rules` 的验证表达式，`r0() || r1()` 表示 `r0` 和 `r1` 两个规则，匹配一个表达式就为 `true`，代表漏洞存在。
+
+> 如果 rules 表达式都是 `||`关系，比如：r0() || r1() || r2() ... ，默认执行 `stop_if_match` 动作。同理，如果表达式都是 `&&` 关系，默认执行 `stop_if_mismatch` 动作。
+
