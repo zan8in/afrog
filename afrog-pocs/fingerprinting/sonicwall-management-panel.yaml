@@ -1,0 +1,14 @@
+id: sonicwall-management-panel
+
+info:
+  name: SonicWall Management Panel
+  author: PR3R00T
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /auth.html
+    expression: response.status == 200 && response.body.bcontains(b'<title>SonicWall - Authentication</title>') && response.body.bcontains(b'SonicWall Administrator')
+expression: r0()

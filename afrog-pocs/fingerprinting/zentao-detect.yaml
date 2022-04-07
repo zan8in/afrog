@@ -1,0 +1,14 @@
+id: zentao-detect
+
+info:
+  name: Zentao detect
+  author: pikpikcu
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /zentao/index.php?mode=getconfig
+    expression: response.status == 200 && response.body.bcontains(b'"sessionName":"zentaosid"') && response.body.bcontains(b'{"version":"') && "\"version\":\"([v0-9.]+)\"".bmatches(response.body)
+expression: r0()

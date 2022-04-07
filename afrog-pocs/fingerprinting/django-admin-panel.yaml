@@ -1,0 +1,14 @@
+id: django-admin-panel
+
+info:
+  name: Python Django Admin Panel
+  author: pdteam
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin/login/?next=/admin/
+    expression: response.status == 200 && response.body.bcontains(b"<a href=\"/admin/\">Django administration</a>")
+expression: r0()
