@@ -66,4 +66,4 @@ afrog -t http://example.com -P ./testing/ -o result.html
 
 # 交流群
 
-![](http://binbin.run/afrog-release/images/afrog.jpg)
+<img src="http://binbin.run/afrog-release/images/afrog.jpg" style="zoom: 33%;" />
