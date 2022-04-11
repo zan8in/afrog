@@ -65,3 +65,6 @@ Output html report
 
 ![](https://github.com/zan8in/afrog/blob/main/images/3.png)
 
+# 交流群
+
+<img src="http://binbin.run/afrog-release/images/afrog.jpg" width="33%" />

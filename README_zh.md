@@ -66,4 +66,4 @@ afrog -t http://example.com -P ./testing/ -o result.html
 
 # 交流群
 
-<img src="http://binbin.run/afrog-release/images/afrog.jpg" style="max-width: 33%;" />
+<img src="http://binbin.run/afrog-release/images/afrog.jpg" width="33%" />
