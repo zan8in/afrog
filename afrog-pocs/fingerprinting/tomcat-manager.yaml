@@ -1,22 +1,24 @@
-id: tomcat-manager
+id: tomcat-panel
 
 info:
-  name: Apache Tomcat Manager Disclosure
-  author: Ahmed Sherif,geeknik
+  name: Apache Tomcat Panel
+  author: philippedelteil,dhiyaneshDk
   severity: info
   description: |
     An Apache Tomcat Manager panel was discovered.
     app="APACHE-Tomcat"
 
+set:
+  randstr: randomLowercase(12)
 rules:
     r0:
-        request:
-            method: GET
-            path: /manager/html
-        expression: response.status == 401 && response.body.bcontains(b'<title>Apache Tomcat')
+      request:
+          method: GET
+          path: /
+      expression: response.raw_header.bcontains(b'tomcat') || response.body.ibcontains(b'apache tomcat') ||  response.body.ibcontains(b'/manager/html') ||  response.body.ibcontains(b'/manager/status')  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)
     r1:
-        request:
-            method: GET
-            path: /host-manager/html
-        expression: response.status == 200 && response.body.bcontains(b'<title>Apache Tomcat')
+      request:
+        method: GET
+        path: /{{randstr}}
+      expression: response.raw_header.bcontains(b'tomcat') || response.body.ibcontains(b'apache tomcat') ||  response.body.ibcontains(b'/manager/html') ||  response.body.ibcontains(b'/manager/status')  ||   "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)
 expression: r0() || r1()

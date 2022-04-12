@@ -1,0 +1,26 @@
+id: tomcat-default-login
+
+info:
+  name: Apahce Tomcat Manager Default Login
+  author: pdteam
+  severity: high
+
+set:
+  adminb64: base64('admin:admin')
+  tomcatb64: base64('tomcat:tomcat')
+rules:
+  r0:
+    request:
+      method: GET
+      path: /manager/html
+      headers:
+        Authorization: Basic {{adminb64}}
+    expression: response.status == 200 && response.body.bcontains(b'Apache Tomcat')
+  r1:
+    request:
+      method: GET
+      path: /manager/html
+      headers:
+        Authorization: Basic {{tomcatb64}}
+    expression: response.status == 200 && response.body.bcontains(b'Apache Tomcat')
+expression: r0() || r1()
