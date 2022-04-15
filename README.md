@@ -1,14 +1,15 @@
 <h1 align="center">afrog</h1>
-<p align="center">A tool for finding vulnerabilities.<br/>❤️POC <b>[455]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[455]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC directory</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">PoC directory</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_zh.md">中文文档</a>
 </p>
 
+
 # What is afrog
 
-afrog is a tool for finding vulnerabilities. If you want to finding  vulnerabilities such as SQL injection, XSS, file inclusion, etc., AWVS does a better job. Otherwise, you can try afrog for free. 
+afrog is a tool for finding vulnerabilities. If you want to finding  vulnerabilities such as SQL injection, XSS, file inclusion, etc., AWVS does a better job. Otherwise, you can try afrog. 
 
 # Features
 
@@ -16,8 +17,8 @@ afrog is a tool for finding vulnerabilities. If you want to finding  vulnerabili
 * [x] Great performance, least requests, best results
 * [x] Real-time display, scanning progress 
 * [x] View `request` and `response` packets of scan results 
-* [x] Start the program to automatically update the local POC library  
-* [x] Long-term maintenance, update POC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/afrog-pocs) ）
+* [x] Start the program to automatically update the local PoC library  
+* [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/afrog-pocs) ）
 * [x] API interface, easy access to other projects 
 
 # Download afrog
@@ -46,14 +47,14 @@ http://github.com
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/twoscan.png)
 
-Test a single POC file
+Test a single PoC file
 
 ```
 afrog -t http://example.com -P ./testing/poc-test.yaml -o result.html
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/threescan.png)
 
-Test multiple POC files 
+Test multiple PoC files 
 
 ```
 afrog -t http://example.com -P ./testing/ -o result.html
@@ -70,7 +71,7 @@ Output html report
 
 This tool is only for **legally authorized** enterprise security construction behavior. If you need to test the usability of this tool, please build a target environment by yourself.
 
-In order to avoid malicious use, all POCs included in this project are theoretical judgments of vulnerabilities, there is no vulnerability exploitation process, and no real attacks or exploits will be launched on the target.
+In order to avoid malicious use, all PoCs included in this project are theoretical judgments of vulnerabilities, there is no vulnerability exploitation process, and no real attacks or exploits will be launched on the target.
 
 When using this tool for detection, you should ensure that the behavior complies with local laws and regulations and has obtained sufficient authorization. **Do not scan unauthorized targets. **
 
