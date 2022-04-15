@@ -12,6 +12,7 @@ afrog is a tool for finding vulnerabilities. If you want to finding  vulnerabili
 
 # Features
 
+* [x] Based on xray kernel, not like xray ([afrog template syntax](https://github.com/zan8in/afrog/blob/main/afrog-pocs/README.md))
 * [x] Great performance, least requests, best results
 * [x] Real-time display, scanning progress 
 * [x] View `request` and `response` packets of scan results 

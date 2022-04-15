@@ -12,6 +12,7 @@ afrog 是一个挖洞工具。如果你想挖 SQL 注入、XSS、文件包含等
 
 # 特点
 
+* [x] 基于 xray 内核，又不像 xray（[afrog 模板语法](https://github.com/zan8in/afrog/blob/main/afrog-pocs/README.md)）
 * [x] 性能卓越，最少请求，最佳结果
 * [x] 实时显示，扫描进度
 * [x] 输出 html 报告，方便查看 `request` 和 `response`
