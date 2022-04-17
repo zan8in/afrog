@@ -32,7 +32,6 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
 			c.Options.ApiCallBack(c.Result)
-			fmt.Println(c.Result)
 			log.Log().Error(fmt.Sprintf("goroutine recover() error from pkg/core/Check, %v\n", r))
 		}
 	}()
