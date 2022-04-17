@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"github.com/zan8in/afrog/pkg/protocols/raw"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,6 +28,14 @@ type Checker struct {
 }
 
 func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			c.Result.IsVul = false
+			c.Options.ApiCallBack(c.Result)
+			fmt.Println(c.Result)
+			log.Log().Error(fmt.Sprintf("goroutine recover() error from pkg/core/Check, %v\n", r))
+		}
+	}()
 
 	c.Result.Target = target
 	c.Result.PocInfo = &pocItem
@@ -82,7 +91,13 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		utils.RandSleep(500)
 
 		isMatch := false
-		if err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap); err == nil {
+		if len(rule.Request.Raw) > 0 {
+			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Config.ConfigHttp.DialTimeout))}
+			err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
+		} else {
+			err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap)
+		}
+		if err == nil {
 			evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
 			if err == nil {
 				isMatch = evalResult.Value().(bool)

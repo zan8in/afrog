@@ -66,12 +66,6 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Log().Error("goroutine recover() error from pkg/core/execute/executeExpression")
-		}
-	}()
-
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
 	if err := c.Check(target, poc); err != nil {

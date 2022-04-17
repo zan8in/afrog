@@ -10,6 +10,7 @@ require (
 	github.com/karrick/godirwalk v1.16.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
+	github.com/projectdiscovery/rawhttp v0.0.8
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/urfave/cli/v2 v2.3.0
@@ -25,6 +26,7 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/klauspost/compress v1.14.1 // indirect
+	github.com/projectdiscovery/retryablehttp-go v1.0.2 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

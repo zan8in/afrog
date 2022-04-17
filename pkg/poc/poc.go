@@ -71,6 +71,7 @@ type RuleRequest struct {
 	Content         string            `yaml:"content"`       // tcp/udp专用
 	ReadTimeout     string            `yaml:"read_timeout"`  // tcp/udp专用
 	ConnectionId    string            `yaml:"connection_id"` // tcp/udp专用
+	Raw             string            `yaml:"raw"`           // raw 专用
 	Method          string            `yaml:"method"`
 	Path            string            `yaml:"path"`
 	Headers         map[string]string `yaml:"headers"`
