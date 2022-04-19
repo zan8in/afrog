@@ -81,4 +81,4 @@ Before installing and using this tool, please **must read carefully and fully un
 
 # 交流群
 
-<img src="http://binbin.run/afrog-release/images/afrog.jpg" width="33%" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.jpg" width="33%" />
