@@ -145,25 +145,42 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	if rule.Request.FollowRedirects {
-		maxrd := 5 // follow redirects default 5
-		if fc.MaxRedirect > 0 {
-			maxrd = int(fc.MaxRedirect)
-		}
-		err = F.DoRedirects(fastReq, fastResp, maxrd)
-	} else {
-		dialtimeout := 6
-		if fc.DialTimeout > 0 {
-			dialtimeout = int(fc.DialTimeout)
-		}
-		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
-	}
-	if err != nil {
-		errName, known := httpConnError(err)
-		if known {
-			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+	// 新增功能：HTTP请求超时，自动重连机制（3次，每次累加超时时间）
+	repeatCount := 0
+	for {
+		if rule.Request.FollowRedirects {
+			maxrd := 5 // follow redirects default 5
+			if fc.MaxRedirect > 0 {
+				maxrd = int(fc.MaxRedirect)
+			}
+			err = F.DoRedirects(fastReq, fastResp, maxrd)
 		} else {
-			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+			dialtimeout := 6
+			if fc.DialTimeout > 0 {
+				dialtimeout = int(fc.DialTimeout)
+			}
+			if repeatCount > 0 {
+				dialtimeout = dialtimeout + dialtimeout*repeatCount
+			}
+			err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
+		}
+		if err != nil {
+			errName, known := httpConnError(err)
+			if known {
+				log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+			} else {
+				log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+			}
+			// errName == "timeout"
+			if errName == "timeout" {
+				repeatCount++
+				if repeatCount > 1 {
+					break
+				}
+			}
+		}
+		if err == nil {
+			break
 		}
 	}
 
