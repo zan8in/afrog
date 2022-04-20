@@ -66,6 +66,12 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Log().Error("gorutine recover() error from pkg/core/exccute/executeExpression")
+		}
+	}() // https://github.com/zan8in/afrog/issues/7
+
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
 	if err := c.Check(target, poc); err != nil {
