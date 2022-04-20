@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/log"
@@ -12,8 +13,9 @@ import (
 )
 
 type HtmlTemplate struct {
-	Result   *core.Result
-	Filename string
+	Result      *core.Result
+	Filename    string
+	AppendMutex sync.Mutex
 }
 
 const outputDirectory = "./reports"

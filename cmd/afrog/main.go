@@ -29,7 +29,7 @@ func main() {
 		&cli.StringFlag{Name: "TargetFilePath", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "path to file containing a list of target URLs/hosts to scan (one per line)"},
 		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
-		&cli.BoolFlag{Name: "Silent", Aliases: []string{"silent"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
+		&cli.BoolFlag{Name: "Silent", Aliases: []string{"s"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -63,8 +63,12 @@ func main() {
 				r.PrintColorResultInfoConsole()
 
 				if len(r.Output) > 0 {
-					htemplate.Result = r
-					htemplate.Append()
+					go func() {
+						htemplate.AppendMutex.Lock()
+						htemplate.Result = r
+						htemplate.Append()
+						htemplate.AppendMutex.Unlock()
+					}()
 				}
 			}
 
