@@ -171,12 +171,13 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			} else {
 				log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
 			}
-			// errName == "timeout"
 			if errName == "timeout" {
 				repeatCount++
 				if repeatCount > 1 {
 					break
 				}
+			} else {
+				break
 			}
 		}
 		if err == nil {
