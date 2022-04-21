@@ -8,12 +8,12 @@
 
 # 什么是 afrog
 
-afrog 是一个挖洞工具。如果你想挖 SQL 注入、XSS、文件包含等漏洞，AWVS 做得更好，否则试试 afrog。
+afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖洞）工具，PoC 涉及 CVE、CNVD、默认口令、信息泄露、指纹识别、未授权访问、任意文件读取、命令执行等多种漏洞类型，帮助网络安全从业者快速验证并及时修复漏洞。
 
 # 特点
 
 * [x] 基于 xray 内核，又不像 xray（[afrog 模板语法](https://github.com/zan8in/afrog/blob/main/afrog-pocs/README.md)）
-* [x] 性能卓越，最少请求，最佳结果
+* [x] 性能卓越，快速稳定
 * [x] 实时显示，扫描进度
 * [x] 输出 html 报告，方便查看 `request` 和 `response`
 * [x] 启动程序，自动更新本地 PoC 库
