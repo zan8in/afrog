@@ -63,12 +63,8 @@ func main() {
 				r.PrintColorResultInfoConsole()
 
 				if len(r.Output) > 0 {
-					go func() {
-						htemplate.AppendMutex.Lock()
-						htemplate.Result = r
-						htemplate.Append()
-						htemplate.AppendMutex.Unlock()
-					}()
+					htemplate.Result = r
+					htemplate.Append()
 				}
 			}
 
