@@ -1,9 +1,9 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[468]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[471]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •
-  <a href="https://github.com/zan8in/afrog/README_en.md">英文文档</a>
+  <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
 
 # 什么是 afrog
