@@ -24,7 +24,7 @@ afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖�
 
 ### [下载地址](https://github.com/zan8in/afrog/releases)
 
-# 运行
+# 例子
 
 扫描单个目标
 ```
