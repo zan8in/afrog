@@ -4,6 +4,8 @@ info:
     name: Laravel Debug Info Leak
     author: Dem0ns (https://github.com/dem0ns)
     severity: high
+    description: |
+        Laravel 开启 Debug mode，可能泄露web路径、数据库账号密码等敏感信息
 
 rules:
     r0:
