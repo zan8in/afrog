@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/zan8in/afrog/pkg/utils"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -33,16 +34,15 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
-
-		title := log.LogColor.Vulner(runner.ShowBanner() + " - V" + config.Version)
-
 		upgrade := upgrade.New()
 		upgrade.UpgradeAfrogPocs()
+
+		showBanner(upgrade.LastestAfrogVersion)
 
 		defconfig := log.LogColor.Low("Default Conf  " + options.Config.GetConfigPath())
 		defpocdir := log.LogColor.Low("Default Pocs  " + poc.GetPocPath())
 
-		fmt.Println(title + "\r\n" + defconfig + "\r\n" + defpocdir + " v" + upgrade.LastestVersion + "")
+		fmt.Println(defconfig + "\r\n" + defpocdir + " v" + upgrade.LastestVersion + "")
 
 		htemplate.Filename = options.Output
 		if err := htemplate.New(); err != nil {
@@ -85,8 +85,12 @@ func main() {
 	}
 }
 
-func PrintTraceInfo(result *core.Result) {
-	for i, v := range result.AllPocResult {
-		log.Log().Info(fmt.Sprintf("\r\n%s（%d）\r\n%s\r\n\r\n%s（%d）\r\n%s\r\n", "Request:", i, v.ReadFullResultRequestInfo(), "Response:", i, v.ReadFullResultResponseInfo()))
+func showBanner(afrogLatestversion string) {
+	title := log.LogColor.Vulner(runner.ShowBanner() + " - V" + config.Version)
+	old := ""
+	if utils.Compare(afrogLatestversion, ">", config.Version) {
+		old = log.LogColor.Critical(" (outdated)")
+		old += log.LogColor.Title(" --> https://github.com/zan8in/afrog/releases/tag/v" + afrogLatestversion)
 	}
+	fmt.Println(title + old)
 }

@@ -15,10 +15,11 @@ import (
 )
 
 type Upgrade struct {
-	HomeDir        string
-	CurrVersion    string
-	RemoteVersion  string
-	LastestVersion string
+	HomeDir             string
+	CurrVersion         string
+	RemoteVersion       string
+	LastestVersion      string
+	LastestAfrogVersion string
 }
 
 const (
@@ -26,6 +27,7 @@ const (
 	upPathName      = "/afrog-pocs"
 	upPath          = "/afrog-pocs.zip"
 	upRemoteVersion = "/version"
+	afrogVersion    = "/afrog.version"
 )
 
 func New() *Upgrade {
@@ -53,7 +55,23 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 	u.CurrVersion = curVersion
 	u.RemoteVersion = strings.TrimSpace(string(remoteVersion))
 
+	u.LastestAfrogVersion, _ = getAfrogVersion()
+
 	return utils.Compare(strings.TrimSpace(string(remoteVersion)), ">", curVersion), nil
+}
+
+func getAfrogVersion() (string, error) {
+	resp, err := http.Get(upHost + afrogVersion)
+	if err != nil {
+		return "", errors.New("failed to get remote version number")
+	}
+	defer resp.Body.Close()
+
+	afrogversion, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.New("failed to get remote version number")
+	}
+	return strings.TrimSpace(string(afrogversion)), nil
 }
 
 func (u *Upgrade) UpgradeAfrogPocs() {
