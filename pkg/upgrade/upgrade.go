@@ -53,7 +53,7 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 	u.CurrVersion = curVersion
 	u.RemoteVersion = strings.TrimSpace(string(remoteVersion))
 
-	return strings.TrimSpace(string(remoteVersion)) > curVersion, nil
+	return utils.Compare(strings.TrimSpace(string(remoteVersion)), ">", curVersion), nil
 }
 
 func (u *Upgrade) UpgradeAfrogPocs() {
