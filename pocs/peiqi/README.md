@@ -19,7 +19,7 @@ title: zan8in/afrog
           alt="afrog"
         />
         <p slot="content">
-          afrog 是一个挖洞工具。如果你想挖 SQL 注入、XSS、文件包含等漏洞，AWVS 做得更好，否则试试 afrog。
+          afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖洞）工具，PoC 涉及 CVE、CNVD、默认口令、信息泄露、指纹识别、未授权访问、任意文件读取、命令执行等多种漏洞类型，帮助网络安全从业者快速验证并及时修复漏洞。
         </p>
         </a-tooltip>
       </a-comment>
@@ -40,12 +40,13 @@ title: zan8in/afrog
           <a>2022-03-28</a>
         </a-descriptions-item>
         <a-descriptions-item label="作者寄语">
-          Poc 共[455]个，持续更新，喜欢请点赞🌟⭐，不迷路～
+          Poc 共[497]个，持续更新，喜欢请点赞🌟⭐，不迷路～
         </a-descriptions-item>
       </a-descriptions>
     </a-page-header>
   </div>
 </template>
+
 
 <style>
 tr:last-child td {
