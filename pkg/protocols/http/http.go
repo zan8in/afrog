@@ -495,6 +495,54 @@ func (fc *FastClient) SampleHTTPRequest(httpRequest *http.Request) (*proto.Respo
 	return tempResultResponse, err
 }
 
+func ReverseHttpRequest(httpRequest *http.Request) ([]byte, error) {
+	var err error
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	CopyRequest(httpRequest, fastReq, nil)
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	err = F.DoTimeout(fastReq, fastResp, time.Second*30)
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
+	}
+
+	return fastResp.Body(), err
+}
+
+func GetTitleRedirect(httpRequest *http.Request, redirect int) ([]byte, int, error) {
+	var err error
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	CopyRequest(httpRequest, fastReq, nil)
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	err = F.DoRedirects(fastReq, fastResp, redirect)
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
+	}
+
+	return fastResp.Body(), fastResp.StatusCode(), err
+}
+
 func httpConnError(err error) (string, bool) {
 	errName := ""
 	known := false
