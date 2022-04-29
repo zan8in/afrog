@@ -454,20 +454,20 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 
 	redirectsCount := 0
 	for {
-		fc := http2.FastClient{}
-		resp, err := fc.SampleHTTPRequest(req)
+		//fc := http2.FastClient{}
+		resp, err := http2.ReverseHttpRequest(req)
 		if err != nil {
 			// fmt.Println("rediSampleHTTPRequest", err.Error())
 			log.Log().Error(err.Error())
 			return false
 		}
 
-		if !bytes.Contains(resp.Body, []byte(`"data": []`)) && bytes.Contains(resp.Body, []byte(`{"code": 200`)) { // api返回结果不为空
+		if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) { // api返回结果不为空
 			// fmt.Println(string(resp.Body))
 			return true
 		}
 
-		if bytes.Contains(resp.Body, []byte(`<title>503`)) { // api返回结果不为空
+		if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
 			redirectsCount++
 			// fmt.Println("redirectsCount++", redirectsCount)
 			if redirectsCount > 1 {
