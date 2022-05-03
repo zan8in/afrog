@@ -16,6 +16,7 @@ type Color struct {
 	Vulner   func(a ...interface{}) string
 	Time     func(a ...interface{}) string
 	Title    func(a ...interface{}) string
+	Banner   func(a ...interface{}) string
 }
 
 var LogColor *Color
@@ -28,14 +29,15 @@ func init() {
 
 func NewColor() *Color {
 	return &Color{
-		Info:     color.FgBlue.Render,
+		Info:     color.HiCyan.Render,
 		Low:      color.FgCyan.Render,
 		Midium:   color.FgYellow.Render,
 		High:     color.FgLightRed.Render,
-		Critical: color.FgRed.Render,
+		Critical: color.RGB(180, 84, 255).Sprint,
 		Vulner:   color.FgLightGreen.Render,
-		Time:     color.FgCyan.Render,
+		Time:     color.Gray.Render,
 		Title:    color.FgLightBlue.Render,
+		Banner:   color.FgLightGreen.Render,
 	}
 }
 

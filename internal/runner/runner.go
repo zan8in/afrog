@@ -8,7 +8,6 @@ import (
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -57,7 +56,7 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
-		fmt.Println(log.LogColor.Low("Select  Pocs  " + options.PocsFilePath))
+		fmt.Println("   " + options.PocsFilePath)
 	} else {
 		// init poc home directory
 		pocsDir, err := poc.InitPocHomeDirectory()
@@ -75,11 +74,13 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 
 	// console print
 	if len(options.Output) > 0 {
-		fmt.Println(log.LogColor.Low("Output Report " + options.Output))
+		fmt.Println("   ./reports/" + options.Output)
 	}
 
 	// init scan sum
 	options.Count = len(options.Targets) * len(allPocsYamlSlice)
+
+	fmt.Println(ShowUsage())
 
 	//
 	e := core.New(options)

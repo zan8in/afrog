@@ -21,8 +21,8 @@ var htemplate = &html.HtmlTemplate{}
 func main() {
 	app := cli.NewApp()
 	app.Name = runner.ShowBanner()
-	app.Usage = "V" + config.Version
-	app.UsageText = "afrog [command]\n\n\t afrog -t example.com -o result.html\n\t afrog -T urls.txt -o result.html\n\t afrog -t example.com -P ./pocs/poc-test.yaml -o result.html\n\t afrog -t example.com -P ./pocs/ -o result.html"
+	app.Usage = "v" + config.Version
+	app.UsageText = runner.ShowUsage()
 	app.Version = config.Version
 
 	app.Flags = []cli.Flag{
@@ -39,10 +39,9 @@ func main() {
 
 		showBanner(upgrade.LastestAfrogVersion)
 
-		defconfig := log.LogColor.Low("Default Conf  " + options.Config.GetConfigPath())
-		defpocdir := log.LogColor.Low("Default Pocs  " + poc.GetPocPath())
-
-		fmt.Println(defconfig + "\r\n" + defpocdir + " v" + upgrade.LastestVersion + "")
+		fmt.Println("PATH:")
+		fmt.Println("   " + options.Config.GetConfigPath())
+		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
 
 		htemplate.Filename = options.Output
 		if err := htemplate.New(); err != nil {
@@ -81,16 +80,17 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
+		fmt.Println(runner.ShowUsage())
 		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
 	}
 }
 
 func showBanner(afrogLatestversion string) {
-	title := log.LogColor.Vulner(runner.ShowBanner() + " - V" + config.Version)
+	title := "NAME:\n   " + log.LogColor.Banner(runner.ShowBanner()) + " - v" + config.Version
 	old := ""
 	if utils.Compare(afrogLatestversion, ">", config.Version) {
-		old = log.LogColor.Critical(" (outdated)")
+		old = log.LogColor.High(" (outdated)")
 		old += log.LogColor.Title(" --> https://github.com/zan8in/afrog/releases/tag/v" + afrogLatestversion)
 	}
-	fmt.Println(title + old)
+	fmt.Println(title + old + "\n")
 }

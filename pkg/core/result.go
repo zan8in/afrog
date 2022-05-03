@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
@@ -80,7 +81,10 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole() {
-	fmt.Printf("\r" + log.LogColor.Time("["+utils.GetNowDateTime()+"]") + " " + log.LogColor.Vulner("["+r.PocInfo.Id+"]") + " " + log.LogColor.GetColor(r.PocInfo.Info.Severity, "["+r.PocInfo.Info.Severity+"]") + " " + r.Target + "\r\n")
+	fmt.Printf("\r" + log.LogColor.Time(utils.GetNowDateTime()) + " " +
+		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
+		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
+			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + r.Target + "\r\n")
 }
 
 func (r *Result) Reset() {
