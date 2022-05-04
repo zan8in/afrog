@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,4 +151,14 @@ func IsSeverityMatchingCvssScore(severity string, score float64) string {
 func GetNowDateTime() string {
 	now := time.Now()
 	return now.Format("2006-01-02 15:04:05")
+}
+
+func GetNumberText(number int) string {
+	num := strconv.Itoa(number)
+	if len(num) == 1 {
+		num = "00" + num
+	} else if len(num) == 2 {
+		num = "0" + num
+	}
+	return num
 }

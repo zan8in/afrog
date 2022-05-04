@@ -15,6 +15,7 @@ import (
 type HtmlTemplate struct {
 	Result   *core.Result
 	Filename string
+	Number   string
 }
 
 const outputDirectory = "./reports"
@@ -48,10 +49,10 @@ func (ht *HtmlTemplate) Html() string {
 	}
 	title := fmt.Sprintf(`<table>
 	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
-		<td class="vuln">%s</td>
+		<td class="vuln">%s&nbsp;&nbsp;%s</td>
 		<td class="security %s">%s</td>
 		<td class="url">%s</td>
-	</thead>`, htResult.PocInfo.Id, htResult.PocInfo.Info.Severity, strings.ToUpper(htResult.PocInfo.Info.Severity), htResult.Target)
+	</thead>`, ht.Number, htResult.PocInfo.Id, htResult.PocInfo.Info.Severity, strings.ToUpper(htResult.PocInfo.Info.Severity), htResult.Target)
 
 	info := fmt.Sprintf("<b>name:</b> %s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>author:</b> %s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>security:</b> %s",
 		htResult.PocInfo.Info.Name, htResult.PocInfo.Info.Author, htResult.PocInfo.Info.Severity,
@@ -74,7 +75,30 @@ func (ht *HtmlTemplate) Html() string {
 
 	body := ""
 	for _, v := range htResult.AllPocResult {
-		fullurl := fmt.Sprintf("%s://%s%s", v.ResultRequest.Url.Scheme, v.ResultRequest.Url.Host, v.ResultRequest.Url.Path)
+		if !v.IsVul {
+			continue
+		}
+		schema := ""
+		host := ""
+		path := ""
+		query := ""
+		frament := ""
+		reqraw := []byte{}
+		respraw := []byte{}
+		if v.ResultRequest.Url != nil {
+			schema = v.ResultRequest.Url.Scheme
+			host = v.ResultRequest.Url.Host
+			path = v.ResultRequest.Url.Path
+			if len(v.ResultRequest.Url.Query) > 0 {
+				query = "?" + v.ResultRequest.Url.Query
+			}
+			if len(v.ResultRequest.Url.Fragment) > 0 {
+				frament = "#" + v.ResultRequest.Url.Fragment
+			}
+			reqraw = v.ResultRequest.GetRaw()
+			respraw = v.ResultResponse.GetRaw()
+		}
+		fullurl := fmt.Sprintf("%s://%s%s%s%s", schema, host, path, query, frament)
 		body += fmt.Sprintf(`<tr>
 		<td colspan="3" style="background:#f8f8f8"><a href="%s" target="_blank">%s</a></td>
 	</tr><tr>
@@ -91,7 +115,7 @@ func (ht *HtmlTemplate) Html() string {
 			</div>
 			</td>
 		</tr>
-	`, fullurl, fullurl, v.ResultRequest.GetRaw(), v.ResultResponse.GetRaw())
+	`, fullurl, fullurl, reqraw, respraw)
 	}
 
 	footer := "</tbody></table>"
@@ -102,8 +126,10 @@ func (ht *HtmlTemplate) Html() string {
 func (ht *HtmlTemplate) Append() {
 	r := ht.Html()
 	if len(r) > 0 {
-		utils.BufferWriteAppend(ht.Filename, r)
+		utils.AppendString(ht.Filename, r)
+		// fmt.Println(err)
 	}
+	// fmt.Println(len(r))
 }
 
 func header() string {

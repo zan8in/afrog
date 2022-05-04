@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/zan8in/afrog/pkg/utils"
 	"os"
+	"sync"
 
 	"github.com/urfave/cli/v2"
 	"github.com/zan8in/afrog/internal/runner"
@@ -13,10 +13,13 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/upgrade"
+	"github.com/zan8in/afrog/pkg/utils"
 )
 
 var options = &config.Options{}
 var htemplate = &html.HtmlTemplate{}
+var lock sync.Mutex
+var number = 0
 
 func main() {
 	app := cli.NewApp()
@@ -37,7 +40,7 @@ func main() {
 		upgrade := upgrade.New()
 		upgrade.UpgradeAfrogPocs()
 
-		showBanner(upgrade.LastestAfrogVersion)
+		runner.ShowBanner2(upgrade.LastestAfrogVersion)
 
 		fmt.Println("PATH:")
 		fmt.Println("   " + options.Config.GetConfigPath())
@@ -51,25 +54,29 @@ func main() {
 		err := runner.New(options, func(result interface{}) {
 			r := result.(*core.Result)
 
-			options.OptLock.Lock()
-			defer options.OptLock.Unlock()
+			lock.Lock()
+			defer lock.Unlock()
 
 			if !options.Silent {
 				options.CurrentCount++
 			}
 
 			if r.IsVul {
-				r.PrintColorResultInfoConsole()
+				number++
 
 				if len(r.Output) > 0 {
 					htemplate.Result = r
+					htemplate.Number = utils.GetNumberText(number)
 					htemplate.Append()
 				}
+
+				r.PrintColorResultInfoConsole(utils.GetNumberText(number))
 			}
 
 			if !options.Silent {
 				fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
 			}
+
 		})
 		if err != nil {
 			return err
@@ -83,14 +90,4 @@ func main() {
 		fmt.Println(runner.ShowUsage())
 		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
 	}
-}
-
-func showBanner(afrogLatestversion string) {
-	title := "NAME:\n   " + log.LogColor.Banner(runner.ShowBanner()) + " - v" + config.Version
-	old := ""
-	if utils.Compare(afrogLatestversion, ">", config.Version) {
-		old = log.LogColor.High(" (outdated)")
-		old += log.LogColor.Title(" --> https://github.com/zan8in/afrog/releases/tag/v" + afrogLatestversion)
-	}
-	fmt.Println(title + old + "\n")
 }

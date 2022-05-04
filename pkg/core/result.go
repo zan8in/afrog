@@ -80,8 +80,8 @@ func (r *Result) PrintResultInfo() string {
 	return "[" + utils.GetNowDateTime() + "] [" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 }
 
-func (r *Result) PrintColorResultInfoConsole() {
-	fmt.Printf("\r" + log.LogColor.Time(utils.GetNowDateTime()) + " " +
+func (r *Result) PrintColorResultInfoConsole(number string) {
+	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
 			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + r.Target + "\r\n")

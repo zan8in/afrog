@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -81,7 +82,7 @@ func WriteFile(filename string, data []byte) error {
 }
 
 func BufferWriteAppend(filename string, param string) error {
-	fileHandle, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	fileHandle, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0660)
 	if err != nil {
 		return err
 	}
@@ -95,4 +96,27 @@ func BufferWriteAppend(filename string, param string) error {
 	buf.WriteString(param + "\n")
 	// 将缓冲中的数据写入
 	return buf.Flush()
+}
+
+const (
+	NEW_FILE_PERM = 0666
+)
+
+// AppendString appends the contents of the string to filename.
+func AppendString(filename, content string) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, NEW_FILE_PERM)
+	if err != nil {
+		return err
+	}
+	data := []byte(content)
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+		// fmt.Println(err)
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+		// fmt.Println(err)
+	}
+	return err
 }
