@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/log"
@@ -46,48 +47,51 @@ func (ht *HtmlTemplate) Html() string {
 		return ""
 	}
 	title := fmt.Sprintf(`<table>
-	<thead onclick="$(this).next('tbody').toggle()" style="background:#eaeaea">
+	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
 		<td class="vuln">%s</td>
 		<td class="security %s">%s</td>
 		<td class="url">%s</td>
-	</thead>`, htResult.PocInfo.Id, htResult.PocInfo.Info.Severity, htResult.PocInfo.Info.Severity, htResult.Target)
+	</thead>`, htResult.PocInfo.Id, htResult.PocInfo.Info.Severity, strings.ToUpper(htResult.PocInfo.Info.Severity), htResult.Target)
 
-	info := fmt.Sprintf("Name: %s\tAuthor: %s\tSecurity: %s",
+	info := fmt.Sprintf("<b>name:</b> %s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>author:</b> %s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>security:</b> %s",
 		htResult.PocInfo.Info.Name, htResult.PocInfo.Info.Author, htResult.PocInfo.Info.Severity,
 	)
 	if len(htResult.PocInfo.Info.Description) > 0 {
-		info += "<br/>Description: " + htResult.PocInfo.Info.Description
+		info += "<br/><b>description:</b> " + htResult.PocInfo.Info.Description
 	}
 	if len(htResult.PocInfo.Info.Reference) > 0 {
-		info += "<br/>Reference: "
+		info += "<br/><b>reference:</b> "
 		for _, rv := range htResult.PocInfo.Info.Reference {
-			info += "<br/> - <a href='" + rv + "' target='_blank'>" + rv + "</a>"
+			info += "<br/>&nbsp;&nbsp;- <a href='" + rv + "' target='_blank'>" + rv + "</a>"
 		}
 	}
 
 	header := "<tbody>"
 
 	bodyinfo := fmt.Sprintf(`<tr>
-			<td colspan="3">%s</td>
+			<td colspan="3" style="color: #333">%s</td>
 		</tr>`, info)
 
 	body := ""
 	for _, v := range htResult.AllPocResult {
+		fullurl := fmt.Sprintf("%s://%s%s", v.ResultRequest.Url.Scheme, v.ResultRequest.Url.Host, v.ResultRequest.Url.Path)
 		body += fmt.Sprintf(`<tr>
-		<td colspan="3" style="background:#eaeaea">%s</td>
+		<td colspan="3" style="background:#f8f8f8"><a href="%s" target="_blank">%s</a></td>
 	</tr><tr>
 			<td colspan="3">
 				<div class="clr">
-				<div class="request">
+				<div class="request w50">
+				<div class="toggleR" onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">→</div>
 <xmp>%s</xmp>
 				</div>
-				<div class="response">
+				<div class="response w50">
+				<div class="toggleL" onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">←</div>
 <xmp>%s</xmp>
 				</div>
 			</div>
 			</td>
 		</tr>
-	`, v.ResultRequest.GetUrl(), v.ResultRequest.GetRaw(), v.ResultResponse.GetRaw())
+	`, fullurl, fullurl, v.ResultRequest.GetRaw(), v.ResultResponse.GetRaw())
 	}
 
 	footer := "</tbody></table>"
@@ -119,12 +123,10 @@ func header() string {
 			ol,ul{list-style:none}
 			table{border-collapse:collapse;border-spacing:0}
 			body{
-				font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
-				font-size: 12px;
-				line-height: 1.5;
+				font-family: 0.3em/1em -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,"Microsoft Yahei",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
 				color: hsl(212.7, 13.3%, 16.3%);
 				background-color: hsl(0, 0%, 100%);
-				padding: 10px 10px;
+				padding: 5px 5px;
 				min-width: 1220px;
 				overflow: scroll;
 			}
@@ -139,40 +141,61 @@ func header() string {
 			.clr {clear: both;}
 			.request {
 				float: left;
-				width: 500px;
 				overflow-x: auto;
 				overflow-y: auto;
+				position: relative;
+			}
+			.request .toggleR {
+				z-index:999999;
+				position: absolute;
+				padding: 0px 10px;
+				background: black;
+				color: white;
+				top:-5px;
+				left:50%;
+				cursor: pointer;
+			}
+			.w50 {
+				width: 50%
+			}
+			.w100 {
+				width: 100%
 			}
 			.response {
 				float: left;
-				width: 56%;
 				overflow-x: auto;
 				overflow-y: auto;
-				margin-left: 20px;
 				max-height: 800px;
+				position: relative;
+			}
+			.response .toggleL {
+				z-index:999999;
+				position: absolute;
+				padding: 0px 10px;
+				background: black;
+				color: white;
+				top:-5px;
+				left:50%;
+				cursor: pointer;
 			}
 			.vuln {
-				width: 500px;
 				text-align: left;
 				font-weight:bold;
 			}
 			.security {
-				width: 18%;
 				text-align: left;
 			}
 			.url {
-				width: 38%;
 				text-align: left;
 				font-weight:bold;
 			}
 			table {
 				table-layout:fixed;
 				width: 100%;
-				border: 1px solid #b2b2b2;
 				margin-bottom: 10px;
 			}
 			table td {
-				padding:6px 6px;
+				padding:3px 6px;
 			}
 			tbody {
 				display: none;
@@ -180,11 +203,11 @@ func header() string {
 			thead {
 				cursor: pointer;
 			}
-			.critical {color: red;font-weight: bold;}
-			.high {color: red;font-weight: bold;}
-			.low  {color: blue;font-weight: bold;}
-			.medium{color: orange;font-weight: bold;}
-			.info  {color: darkblue;font-weight: bold;}
+			.critical {color: #b454ff;font-weight: bold;}
+			.high {color: #E74856;font-weight: bold;}
+			.low  {color: #327FBA;font-weight: bold;}
+			.medium{color: #C19C00;font-weight: bold;}
+			.info  {color: #61D6D6;font-weight: bold;}
 			
 		</style>
 		<script>
