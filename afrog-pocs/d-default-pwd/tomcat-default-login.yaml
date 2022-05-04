@@ -15,12 +15,12 @@ rules:
       path: /manager/html
       headers:
         Authorization: Basic {{adminb64}}
-    expression: response.status == 200 && response.body.bcontains(b'Apache Tomcat')
+    expression: response.status == 200 && response.body.bcontains(b"Apache Tomcat") && response.body.bcontains(b"Server Information") && response.body.bcontains(b"Hostname")
   r1:
     request:
       method: GET
       path: /manager/html
       headers:
         Authorization: Basic {{tomcatb64}}
-    expression: response.status == 200 && response.body.bcontains(b'Apache Tomcat')
+    expression: response.status == 200 && response.body.bcontains(b"Apache Tomcat") && response.body.bcontains(b"Server Information") && response.body.bcontains(b"Hostname")
 expression: r0() || r1()
