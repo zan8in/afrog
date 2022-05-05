@@ -25,6 +25,10 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 
 ### [Release Download](https://github.com/zan8in/afrog/releases)
 
+# Guide
+
+### [Go to Guide](https://github.com/zan8in/afrog/blob/main/GUIDE_en.md)
+
 # Example
 
 Scan a single target.
