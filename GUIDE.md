@@ -6,6 +6,7 @@
   <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
+
 # 方法1：二进制安装（推荐）
 
 ① 下载压缩包 [前往下载](https://github.com/zan8in/afrog/releases)
