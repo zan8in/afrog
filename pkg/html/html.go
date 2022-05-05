@@ -16,6 +16,7 @@ type HtmlTemplate struct {
 	Result   *core.Result
 	Filename string
 	Number   string
+	Syncfile *utils.Syncfile
 }
 
 const outputDirectory = "./reports"
@@ -30,14 +31,18 @@ func (ht *HtmlTemplate) New() error {
 		}
 
 		ouputFile := filepath.Join(outputDirectory, ht.Filename)
-		// if utils.Exists(ouputFile) {
-		// 	return errors.New("output filename had existed")
-		// }
 
 		os.MkdirAll(outputDirectory, os.ModePerm)
 		ht.Filename = ouputFile
 
-		return utils.WriteFile(ouputFile, []byte(header()))
+		os.Remove(ht.Filename)
+
+		sf, err := utils.NewSyncfile(ht.Filename)
+		if err != nil {
+			return err
+		}
+		ht.Syncfile = sf
+		sf.Write(header())
 	}
 	return nil
 }
@@ -124,12 +129,11 @@ func (ht *HtmlTemplate) Html() string {
 }
 
 func (ht *HtmlTemplate) Append() {
-	r := ht.Html()
-	if len(r) > 0 {
-		utils.AppendString(ht.Filename, r)
-		// fmt.Println(err)
+	content := ht.Html()
+	if len(content) > 0 {
+		// utils.AppendString(ht.Filename, r)
+		ht.Syncfile.Write(content)
 	}
-	// fmt.Println(len(r))
 }
 
 func header() string {

@@ -55,7 +55,6 @@ func main() {
 			r := result.(*core.Result)
 
 			lock.Lock()
-			defer lock.Unlock()
 
 			if !options.Silent {
 				options.CurrentCount++
@@ -76,6 +75,8 @@ func main() {
 			if !options.Silent {
 				fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
 			}
+
+			lock.Unlock()
 
 		})
 		if err != nil {

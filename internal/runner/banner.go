@@ -9,7 +9,7 @@ import (
 )
 
 func ShowBanner() string {
-	return "afrog"
+	return "afrog 五一劳动节版"
 }
 
 func ShowUsage() string {
