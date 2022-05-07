@@ -9,6 +9,7 @@ import (
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
@@ -34,7 +35,7 @@ func main() {
 		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
 		&cli.BoolFlag{Name: "Silent", Aliases: []string{"s"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
-		&cli.BoolFlag{Name: "NoFinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable output fingerprint in the console"},
+		&cli.BoolFlag{Name: "NoFinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -66,13 +67,23 @@ func main() {
 			}
 
 			if r.IsVul {
-				number++
+				if r.FingerResult != nil {
+					// Fingerprint Scan
+					fr := r.FingerResult.(fingerprint.Result)
+					fmt.Printf("\r" + fr.Url + " " +
+						log.LogColor.Low(""+fr.StatusCode+"") + " " +
+						log.LogColor.Title(fr.Title) + " " +
+						log.LogColor.Critical(fr.Name) + "\r\n")
+				} else {
+					// PoC Scan
+					number++
 
-				htemplate.Result = r
-				htemplate.Number = utils.GetNumberText(number)
-				htemplate.Append()
+					htemplate.Result = r
+					htemplate.Number = utils.GetNumberText(number)
+					htemplate.Append()
 
-				r.PrintColorResultInfoConsole(utils.GetNumberText(number))
+					r.PrintColorResultInfoConsole(utils.GetNumberText(number))
+				}
 			}
 
 			if !options.Silent {

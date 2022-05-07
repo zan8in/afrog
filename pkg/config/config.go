@@ -48,7 +48,7 @@ func New() (*Config, error) {
 		c := Config{}
 		c.PocSizeWaitGroup = 10
 		c.TargetSizeWaitGroup = 25
-		c.FingerprintSizeWaitGroup = 200
+		c.FingerprintSizeWaitGroup = 100
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 5

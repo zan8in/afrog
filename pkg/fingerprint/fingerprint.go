@@ -2,12 +2,10 @@ package fingerprint
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	_ "embed"
@@ -15,7 +13,7 @@ import (
 	"github.com/axgle/mahonia"
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/core"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
@@ -23,9 +21,6 @@ type Service struct {
 	Options     *config.Options
 	fpSlice     []FingerPrint
 	ResultSlice []Result
-	mutex       sync.Mutex
-	count       int
-	currcount   int
 }
 
 type Result struct {
@@ -58,11 +53,12 @@ func New(options *config.Options) (*Service, error) {
 	if err := json.Unmarshal(content, &fpSlice); err != nil {
 		return nil, err
 	}
+
+	options.Count += len(options.Targets)
+
 	return &Service{
-		fpSlice:   fpSlice,
-		Options:   options,
-		count:     len(options.Targets),
-		currcount: 0,
+		fpSlice: fpSlice,
+		Options: options,
 	}, nil
 }
 
@@ -72,11 +68,11 @@ func (s *Service) Execute() {
 
 func (s *Service) executeFingerPrintDetection() {
 	if len(s.Options.Targets) > 0 {
-		size := 200
+		size := 100
 		if s.Options.Config.FingerprintSizeWaitGroup > 0 {
 			size = int(s.Options.Config.FingerprintSizeWaitGroup)
 		}
-		fmt.Println("FINGERPRINT:")
+
 		swg := sizedwaitgroup.New(size)
 		for _, url := range s.Options.Targets {
 			swg.Add()
@@ -88,7 +84,6 @@ func (s *Service) executeFingerPrintDetection() {
 			}(url)
 		}
 		swg.Wait()
-		fmt.Println()
 	}
 }
 
@@ -108,7 +103,7 @@ func (s *Service) processFingerPrintInputPair(url string) error {
 		return nil
 	}
 
-	data, headers, statuscode, err := http2.GetFingerprintRedirect(req, 1)
+	data, headers, statuscode, err := http2.GetFingerprintRedirect(req)
 	if err != nil {
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
@@ -178,19 +173,12 @@ func (s *Service) processFingerPrintInputPair(url string) error {
 }
 
 func (s *Service) PrintColorResultInfoConsole(result Result) {
-	s.mutex.Lock()
-	s.currcount++
+	r := &core.Result{}
 
+	r.IsVul = false
 	if len(result.StatusCode) != 0 {
 		s.ResultSlice = append(s.ResultSlice, result)
-		if !s.Options.NoFinger {
-			fmt.Printf("\r" + result.Url + " " +
-				log.LogColor.Low(""+result.StatusCode+"") + " " +
-				log.LogColor.Title(result.Title) + " " +
-				log.LogColor.Critical(result.Name) + "\r\n")
-		}
+		r.FingerResult = result
 	}
-
-	fmt.Printf("\r%d/%d | %d%%", s.currcount, s.count, s.currcount*100/s.count)
-	s.mutex.Unlock()
+	s.Options.ApiCallBack(r)
 }

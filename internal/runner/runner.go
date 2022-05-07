@@ -10,6 +10,7 @@ import (
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
+	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -85,10 +86,13 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	fmt.Println(ShowUsage())
 
 	// fingerprint
-	s, _ := fingerprint.New(options)
-	s.Execute()
-	if len(s.ResultSlice) > 0 {
-		htemplate.AppendFinger(s.ResultSlice)
+	if !options.NoFinger {
+		s, _ := fingerprint.New(options)
+		s.Execute()
+		if len(s.ResultSlice) > 0 {
+			htemplate.AppendFinger(s.ResultSlice)
+			printFingerResultConsole()
+		}
 	}
 
 	//
@@ -96,4 +100,10 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	e.Execute(allPocsYamlSlice)
 
 	return nil
+}
+
+func printFingerResultConsole() {
+	fmt.Printf("\r" + log.LogColor.Time("000 "+utils.GetNowDateTime()) + " " +
+		log.LogColor.Vulner("Fingerprint") + " " + log.LogColor.Info("INFO") + "\r\n")
+
 }

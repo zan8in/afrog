@@ -573,7 +573,7 @@ var (
 	strLocation = []byte("Location")
 )
 
-func GetFingerprintRedirect(httpRequest *http.Request, redirect int) ([]byte, map[string][]string, int, error) {
+func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]string, int, error) {
 	var err error
 
 	fastReq := fasthttp.AcquireRequest()
@@ -584,10 +584,10 @@ func GetFingerprintRedirect(httpRequest *http.Request, redirect int) ([]byte, ma
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	maxrd := 0
+	currd := 0
 	for {
-		maxrd++
-		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
+		currd++
+		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(6))
 		statusCode := fastResp.Header.StatusCode()
 		if statusCode != fasthttp.StatusMovedPermanently &&
 			statusCode != fasthttp.StatusFound &&
@@ -605,7 +605,7 @@ func GetFingerprintRedirect(httpRequest *http.Request, redirect int) ([]byte, ma
 		u := fastReq.URI()
 		u.UpdateBytes(location)
 
-		if maxrd > 5 {
+		if currd >= 3 {
 			break
 		}
 	}

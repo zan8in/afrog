@@ -150,14 +150,16 @@ func (ht *HtmlTemplate) htmlFinger(resultSlice []fingerprint.Result) string {
 	}
 	title := `<table class="tablefinger">
 	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
-		<td class="vuln" colspan=2 style="text-align:center">Fingerprint</td>
+	<td class="vuln">000&nbsp;&nbsp;Fingerprint</td>
+	<td class="security info">INFO</td>
+	<td class="url">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
 	</thead>`
 
 	header := "<tbody>"
 
 	body := ""
 	for _, v := range resultSlice {
-		body += fmt.Sprintf(`<tr class="fingerprint"><td class=''><a href="%s" class='fingerhref' target="_blank">%s</a>&nbsp;&nbsp;<span class='info'>[%s]</span></td><td class=''><span class='low' style="font-weight:normal">%s</span>&nbsp;&nbsp;<span class='critical'>%s</span></td></tr>`, v.Url, v.Url, v.StatusCode, v.Title, v.Name)
+		body += fmt.Sprintf(`<tr class="fingerprint"><td ><a href="%s" class='fingerhref' target="_blank">%s</a>&nbsp;&nbsp;<span class='info'>[%s]</span></td><td colspan=2><span class='low' style="font-weight:normal">%s</span>&nbsp;&nbsp;<span class='critical'>%s</span></td></tr>`, v.Url, v.Url, v.StatusCode, v.Title, v.Name)
 	}
 
 	footer := "</tbody></table>"
@@ -270,11 +272,11 @@ func header() string {
 			.title {color: darkblue#font-weight:bold}
 
 			.tablefinger {
-				border-collapse:collapse; 
-    			border-spacing:0; 
-				word-wrap: break-word; 
-				word-break: break-all;
-				table-layout: auto;
+				// border-collapse:collapse; 
+    			// border-spacing:0; 
+				// word-wrap: break-word; 
+				// word-break: break-all;
+				// table-layout: auto;
 			}
 			.fingerprint:hover {
 				background: #f9f9f9

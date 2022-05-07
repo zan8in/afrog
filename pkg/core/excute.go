@@ -1,8 +1,6 @@
 package core
 
 import (
-	"fmt"
-
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
@@ -31,7 +29,6 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 		pocSlice = append(pocSlice, p)
 	}
 
-	fmt.Println("\nVULNERABLILITY:")
 	swg := e.workPool.PocSwg
 	for _, p := range pocSlice {
 		swg.Add()
