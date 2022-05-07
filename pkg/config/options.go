@@ -31,6 +31,9 @@ type Options struct {
 	// no progress if silent is true
 	Silent bool
 
+	// disable output fingerprint in the console
+	NoFinger bool
+
 	// Scan count num(targets * allpocs)
 	Count int
 

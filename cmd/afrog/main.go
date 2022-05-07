@@ -34,6 +34,7 @@ func main() {
 		&cli.StringFlag{Name: "PocsFilePath", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
 		&cli.BoolFlag{Name: "Silent", Aliases: []string{"s"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
+		&cli.BoolFlag{Name: "NoFinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable output fingerprint in the console"},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -46,12 +47,16 @@ func main() {
 		fmt.Println("   " + options.Config.GetConfigPath())
 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
 
+		if len(options.Output) == 0 {
+			options.Output = utils.GetNowDateTimeReportName() + ".html"
+		}
+
 		htemplate.Filename = options.Output
 		if err := htemplate.New(); err != nil {
 			return err
 		}
 
-		err := runner.New(options, func(result interface{}) {
+		err := runner.New(options, htemplate, func(result interface{}) {
 			r := result.(*core.Result)
 
 			lock.Lock()
@@ -63,11 +68,9 @@ func main() {
 			if r.IsVul {
 				number++
 
-				if len(r.Output) > 0 {
-					htemplate.Result = r
-					htemplate.Number = utils.GetNumberText(number)
-					htemplate.Append()
-				}
+				htemplate.Result = r
+				htemplate.Number = utils.GetNumberText(number)
+				htemplate.Append()
 
 				r.PrintColorResultInfoConsole(utils.GetNumberText(number))
 			}

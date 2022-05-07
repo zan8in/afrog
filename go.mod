@@ -28,6 +28,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/klauspost/compress v1.14.1 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.2 // indirect
+	github.com/projectdiscovery/wappalyzergo v0.0.40 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

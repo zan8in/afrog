@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/zan8in/afrog/pkg/utils"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,9 +14,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/utils"
+
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
-	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
@@ -153,7 +154,32 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			if fc.MaxRedirect > 0 {
 				maxrd = int(fc.MaxRedirect)
 			}
-			err = F.DoRedirects(fastReq, fastResp, maxrd)
+			// err = F.DoRedirects(fastReq, fastResp, maxrd)
+			curmaxrd := 0
+			for {
+				curmaxrd++
+				err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
+				statusCode := fastResp.Header.StatusCode()
+				if statusCode != fasthttp.StatusMovedPermanently &&
+					statusCode != fasthttp.StatusFound &&
+					statusCode != fasthttp.StatusSeeOther &&
+					statusCode != fasthttp.StatusTemporaryRedirect &&
+					statusCode != fasthttp.StatusPermanentRedirect {
+					break
+				}
+
+				location := fastResp.Header.PeekBytes(strLocation)
+				if len(location) == 0 {
+					break
+				}
+
+				u := fastReq.URI()
+				u.UpdateBytes(location)
+
+				if curmaxrd > maxrd {
+					break
+				}
+			}
 		} else {
 			dialtimeout := 6
 			if fc.DialTimeout > 0 {
@@ -541,6 +567,66 @@ func GetTitleRedirect(httpRequest *http.Request, redirect int) ([]byte, int, err
 	}
 
 	return fastResp.Body(), fastResp.StatusCode(), err
+}
+
+var (
+	strLocation = []byte("Location")
+)
+
+func GetFingerprintRedirect(httpRequest *http.Request, redirect int) ([]byte, map[string][]string, int, error) {
+	var err error
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	CopyRequest(httpRequest, fastReq, nil)
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	maxrd := 0
+	for {
+		maxrd++
+		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
+		statusCode := fastResp.Header.StatusCode()
+		if statusCode != fasthttp.StatusMovedPermanently &&
+			statusCode != fasthttp.StatusFound &&
+			statusCode != fasthttp.StatusSeeOther &&
+			statusCode != fasthttp.StatusTemporaryRedirect &&
+			statusCode != fasthttp.StatusPermanentRedirect {
+			break
+		}
+
+		location := fastResp.Header.PeekBytes(strLocation)
+		if len(location) == 0 {
+			break
+		}
+
+		u := fastReq.URI()
+		u.UpdateBytes(location)
+
+		if maxrd > 5 {
+			break
+		}
+	}
+
+	newheader := make(map[string][]string)
+	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")
+	for _, h := range respHeaderSlice {
+		hslice := strings.SplitN(h, ":", 2)
+		if len(hslice) != 2 {
+			continue
+		}
+		k := strings.ToLower(hslice[0])
+		v := strings.TrimLeft(hslice[1], " ")
+		if len(newheader[k]) > 0 {
+			newheader[k] = append(newheader[k], v)
+		} else {
+			newheader[k] = []string{v}
+		}
+	}
+
+	return fastResp.Body(), newheader, fastResp.StatusCode(), err
 }
 
 func httpConnError(err error) (string, bool) {

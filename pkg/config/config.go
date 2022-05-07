@@ -11,10 +11,11 @@ import (
 
 // Config is a afrog-config.yaml catalog helper implementation
 type Config struct {
-	PocSizeWaitGroup    int32      `yaml:"poc_sizewaitgroup"`
-	TargetSizeWaitGroup int32      `yaml:"target_sizewaitgroup"`
-	ConfigHttp          ConfigHttp `yaml:"http"`
-	Reverse             Reverse    `yaml:"reverse"`
+	PocSizeWaitGroup         int32      `yaml:"poc_sizewaitgroup"`
+	TargetSizeWaitGroup      int32      `yaml:"target_sizewaitgroup"`
+	FingerprintSizeWaitGroup int32      `yaml:"fingerprint_sizewaitgroup"`
+	ConfigHttp               ConfigHttp `yaml:"http"`
+	Reverse                  Reverse    `yaml:"reverse"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -47,6 +48,7 @@ func New() (*Config, error) {
 		c := Config{}
 		c.PocSizeWaitGroup = 10
 		c.TargetSizeWaitGroup = 25
+		c.FingerprintSizeWaitGroup = 200
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 5

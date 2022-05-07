@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -136,6 +137,34 @@ func (ht *HtmlTemplate) Append() {
 	}
 }
 
+func (ht *HtmlTemplate) AppendFinger(resultSlice []fingerprint.Result) {
+	content := ht.htmlFinger(resultSlice)
+	if len(content) > 0 {
+		ht.Syncfile.Write(content)
+	}
+}
+
+func (ht *HtmlTemplate) htmlFinger(resultSlice []fingerprint.Result) string {
+	if len(resultSlice) == 0 {
+		return ""
+	}
+	title := `<table class="tablefinger">
+	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
+		<td class="vuln" colspan=2 style="text-align:center">Fingerprint</td>
+	</thead>`
+
+	header := "<tbody>"
+
+	body := ""
+	for _, v := range resultSlice {
+		body += fmt.Sprintf(`<tr class="fingerprint"><td class=''><a href="%s" class='fingerhref' target="_blank">%s</a>&nbsp;&nbsp;<span class='info'>[%s]</span></td><td class=''><span class='low' style="font-weight:normal">%s</span>&nbsp;&nbsp;<span class='critical'>%s</span></td></tr>`, v.Url, v.Url, v.StatusCode, v.Title, v.Name)
+	}
+
+	footer := "</tbody></table>"
+
+	return title + header + body + footer
+}
+
 func header() string {
 	return `
 	<!DOCTYPE html>
@@ -238,7 +267,26 @@ func header() string {
 			.low  {color: #327FBA;font-weight: bold;}
 			.medium{color: #C19C00;font-weight: bold;}
 			.info  {color: #61D6D6;font-weight: bold;}
-			
+			.title {color: darkblue#font-weight:bold}
+
+			.tablefinger {
+				border-collapse:collapse; 
+    			border-spacing:0; 
+				word-wrap: break-word; 
+				word-break: break-all;
+				table-layout: auto;
+			}
+			.fingerprint:hover {
+				background: #f9f9f9
+			}
+			.fingerhref {
+				color: #333;
+				text-decoration:underline
+			}
+			.w200{width:300px}
+			.w30 {width:120px}
+			.t10{width:10%}
+			.t30{width:30%}
 		</style>
 		<script>
 			/*! jQuery v1.11.1 | (c) 2005, 2014 jQuery Foundation, Inc. | jquery.org/license */
@@ -248,6 +296,6 @@ func header() string {
 		</script>
 	</head>
 	<body>
-		<div class="top">Afrog Report</div>
+	<div class="top"><a href="https://github.com/zan8in/afrog#%E5%85%8D%E8%B4%A3%E5%A3%B0%E6%98%8E" target="_blank" style="font-size:12px;color:red">免责声明</a>&nbsp;&nbsp;&nbsp;Afrog Report&nbsp;&nbsp;&nbsp;<span style="font-size:12px;font-weight:normal">` + utils.GetNowDate() + `</span></div>
 			`
 }

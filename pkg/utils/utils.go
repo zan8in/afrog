@@ -153,6 +153,16 @@ func GetNowDateTime() string {
 	return now.Format("2006-01-02 15:04:05")
 }
 
+func GetNowDate() string {
+	now := time.Now()
+	return now.Format("2006-01-02")
+}
+
+func GetNowDateTimeReportName() string {
+	now := time.Now()
+	return now.Format("20060102-150405")
+}
+
 func GetNumberText(number int) string {
 	num := strconv.Itoa(number)
 	if len(num) == 1 {

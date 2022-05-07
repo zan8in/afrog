@@ -8,6 +8,8 @@ import (
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/fingerprint"
+	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -17,7 +19,7 @@ type Runner struct {
 	catalog *catalog.Catalog
 }
 
-func New(options *config.Options, acb config.ApiCallBack) error {
+func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
 
 	// init callback
@@ -81,6 +83,13 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	options.Count = len(options.Targets) * len(allPocsYamlSlice)
 
 	fmt.Println(ShowUsage())
+
+	// fingerprint
+	s, _ := fingerprint.New(options)
+	s.Execute()
+	if len(s.ResultSlice) > 0 {
+		htemplate.AppendFinger(s.ResultSlice)
+	}
 
 	//
 	e := core.New(options)

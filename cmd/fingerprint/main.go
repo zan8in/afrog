@@ -9,8 +9,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/axgle/mahonia"
-	"github.com/remeh/sizedwaitgroup"
 	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/fingerprint"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -36,20 +36,14 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	// Typical use-case:
-	// 50 queries must be executed as quick as possible
-	// but without overloading the database, so only
-	// 8 routines should be started concurrently.
-	swg := sizedwaitgroup.New(20)
-	for _, url := range urls {
-		swg.Add()
-		go func(url string) {
-			defer swg.Done()
-			title(url)
-		}(url)
+	options.Targets = append(options.Targets, urls...)
+	service, err := fingerprint.New(options)
+	if err != nil {
+		return
 	}
+	service.Execute()
 
-	swg.Wait()
+	fmt.Println("endding.....")
 
 }
 
