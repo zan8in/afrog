@@ -3,7 +3,7 @@
 <p align="center" dir="auto">🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">POC 仓库</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">POC 仓库</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
 

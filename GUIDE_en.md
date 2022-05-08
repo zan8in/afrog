@@ -3,7 +3,7 @@
 <p align="center">A tool for finding vulnerabilities. <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">PoC directory</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC directory</a> •
   <a href="https://github.com/zan8in/afrog">中文文档</a>
 </p>
 

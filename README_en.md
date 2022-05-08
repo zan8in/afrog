@@ -2,7 +2,7 @@
 <p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[497]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/afrog-pocs">PoC directory</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC directory</a> •
   <a href="https://github.com/zan8in/afrog">中文文档</a>
 </p>
 
@@ -13,12 +13,12 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 
 # Features
 
-* [x] Based on xray kernel, not like xray ([afrog template syntax](https://github.com/zan8in/afrog/blob/main/afrog-pocs/README.md))
+* [x] Based on xray kernel, not like xray ([afrog template syntax](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md))
 * [x] Great performance, least requests, best results
 * [x] Real-time display, scanning progress 
 * [x] View `request` and `response` packets of scan results 
 * [x] Start the program to automatically update the local PoC library  
-* [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/afrog-pocs) ）
+* [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs) ）
 * [x] API interface, easy access to other projects 
 
 # Download afrog
