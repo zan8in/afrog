@@ -14,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/pocs"
 )
 
 type Runner struct {
@@ -60,20 +61,23 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// init pocs
+	allPocsYamlSlice := []string{}
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
 		fmt.Println("   " + options.PocsFilePath)
 	} else {
-		// init poc home directory
-		pocsDir, err := poc.InitPocHomeDirectory()
-		if err != nil {
-			return err
+		// init default afrog-pocs
+		if allDefaultPocsYamlSlice, err := pocs.GetPocs(); err == nil {
+			allPocsYamlSlice = append(allPocsYamlSlice, allDefaultPocsYamlSlice...)
 		}
-		options.PocsDirectory.Set(pocsDir)
+		// init ~/afrog-pocs
+		pocsDir, _ := poc.InitPocHomeDirectory()
+		if len(pocsDir) > 0 {
+			options.PocsDirectory.Set(pocsDir)
+		}
 	}
-
-	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
+	allPocsYamlSlice = append(allPocsYamlSlice, runner.catalog.GetPocsPath(options.PocsDirectory)...)
 
 	if len(allPocsYamlSlice) == 0 {
 		return errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")

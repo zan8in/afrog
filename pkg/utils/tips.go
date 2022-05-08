@@ -7,6 +7,7 @@ import (
 
 var (
 	tips = []string{
+		"现在 PoC 内置在编译后的程序里，~/afrog-pocs 仍保留，作用是实时同步最新的 PoC",
 		"现在会自动生成报告，也支持 -o 自定义报告名",
 		"Fingerprint 功能是先访问一遍 Targets，获取 Title 和 Web 指纹",
 		"afrog -t http://example.com",
