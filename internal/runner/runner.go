@@ -61,7 +61,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// init pocs
-	allPocsYamlSlice := []string{}
+	allPocsEmbedYamlSlice := []string{}
 	if len(options.PocsFilePath) > 0 {
 		options.PocsDirectory.Set(options.PocsFilePath)
 		// console print
@@ -69,7 +69,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	} else {
 		// init default afrog-pocs
 		if allDefaultPocsYamlSlice, err := pocs.GetPocs(); err == nil {
-			allPocsYamlSlice = append(allPocsYamlSlice, allDefaultPocsYamlSlice...)
+			allPocsEmbedYamlSlice = append(allPocsEmbedYamlSlice, allDefaultPocsYamlSlice...)
 		}
 		// init ~/afrog-pocs
 		pocsDir, _ := poc.InitPocHomeDirectory()
@@ -77,9 +77,9 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 			options.PocsDirectory.Set(pocsDir)
 		}
 	}
-	allPocsYamlSlice = append(allPocsYamlSlice, runner.catalog.GetPocsPath(options.PocsDirectory)...)
+	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
 
-	if len(allPocsYamlSlice) == 0 {
+	if len(allPocsYamlSlice) == 0 && len(allPocsEmbedYamlSlice) == 0 {
 		return errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
 	}
 
@@ -89,7 +89,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// init scan sum
-	options.Count = len(options.Targets) * len(allPocsYamlSlice)
+	options.Count = len(options.Targets) * (len(allPocsYamlSlice) + len(allPocsEmbedYamlSlice))
 
 	// fmt.Println(ShowUsage())
 
@@ -109,7 +109,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 	//
 	e := core.New(options)
-	e.Execute(allPocsYamlSlice)
+	e.Execute(allPocsYamlSlice, allPocsEmbedYamlSlice)
 
 	return nil
 }

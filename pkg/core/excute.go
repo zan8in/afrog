@@ -4,6 +4,7 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/pocs"
 )
 
 var (
@@ -11,16 +12,23 @@ var (
 	ReverseCeyeDomain string
 )
 
-func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
+func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSlice) {
 	ReverseCeyeApiKey = e.options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = e.options.Config.Reverse.Ceye.Domain
-
-	//http2.Init(e.options)
 
 	var pocSlice []poc.Poc
 
 	for _, pocYaml := range allPocsYamlSlice {
 		p, err := poc.ReadPocs(pocYaml)
+		if err != nil {
+			log.Log().Error(err.Error())
+			continue
+		}
+		pocSlice = append(pocSlice, p)
+	}
+
+	for _, pocEmbedYaml := range allPocsEmbedYamlSlice {
+		p, err := pocs.ReadPocs(pocEmbedYaml)
 		if err != nil {
 			log.Log().Error(err.Error())
 			continue

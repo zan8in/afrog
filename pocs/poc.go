@@ -2,11 +2,11 @@ package pocs
 
 import (
 	"embed"
-	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"strings"
+
+	"github.com/zan8in/afrog/pkg/poc"
+	"gopkg.in/yaml.v2"
 )
 
 //go:embed afrog-pocs/*
@@ -14,38 +14,32 @@ var f embed.FS
 
 func GetPocs() ([]string, error) {
 	allPocs := []string{}
+
 	err := fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		// fmt.Printf("path=%q, isDir=%v\n", path, d.IsDir())
 		if !d.IsDir() && strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
-			file := filepath.Base(path)
-			absPath, err := resolvePath(filepath.Dir(path))
-			if err != nil {
-				return err
-			}
-			allPocs = append(allPocs, filepath.Join(absPath, file))
+			allPocs = append(allPocs, path)
 		}
 		return nil
 	})
+
 	return allPocs, err
 }
 
-func resolvePath(pocName string) (string, error) {
-	if filepath.IsAbs(pocName) {
-		return pocName, nil
-	}
+func ReadPocs(path string) (poc.Poc, error) {
+	var poc = poc.Poc{}
 
-	curDirectory, err := os.Getwd()
+	file, err := f.Open(path)
 	if err != nil {
-		return "", err
+		return poc, err
 	}
+	defer file.Close()
 
-	pocPath := filepath.Join(curDirectory, "pocs", pocName)
-	if len(pocPath) > 0 {
-		return pocPath, nil
+	if err := yaml.NewDecoder(file).Decode(&poc); err != nil {
+		return poc, err
 	}
-
-	return "", fmt.Errorf("no such path found: %s", pocName)
+	return poc, nil
 }
