@@ -1,7 +1,7 @@
-id: tomcat-panel
+id: tomcat-detect
 
 info:
-  name: Apache Tomcat Panel
+  name: Apache Tomcat Detect
   author: philippedelteil,dhiyaneshDk
   severity: info
   description: |
