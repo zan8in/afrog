@@ -34,7 +34,7 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 Scan a single target.
 
 ```
-afrog -t http://example.com -o result.html
+afrog -t http://127.0.0.1 -o result.html
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/onescan.png)
 
@@ -45,23 +45,22 @@ afrog -T urls.txt -o result.html
 ```
 For example: `urls.txt `
 ```
-http://example.com
-http://test.com
-http://github.com
+http://192.168.139.129:8080
+http://127.0.0.1
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/twoscan.png)
 
 Test a single PoC file
 
 ```
-afrog -t http://example.com -P ./testing/poc-test.yaml -o result.html
+afrog -t http://127.0.0.1 -P ./testing/poc-test.yaml -o result.html
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/threescan.png)
 
 Test multiple PoC files 
 
 ```
-afrog -t http://example.com -P ./testing/ -o result.html
+afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 ```
 ![](https://github.com/zan8in/afrog/blob/main/images/fourscan.png)
 
