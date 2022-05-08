@@ -1,0 +1,16 @@
+id: minio-browser
+
+info:
+  name: MinIO Browser
+  author: pikpikcu
+  severity: info
+  description: |
+    shodan-query: title:"MinIO Browser"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /minio/login
+    expression: response.status == 200 && response.body.ibcontains(b'<title>minio browser</title>')
+expression: r0()

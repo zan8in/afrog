@@ -1,0 +1,35 @@
+id: jenkins-default-pwd
+
+info:
+  name: Jenkins Default Password
+  author: zan8in
+  severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /login
+        expression: |
+          response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
+        stop_if_mismatch: true
+    r1:
+        request:
+            method: POST
+            path: /j_spring_security_check
+            body: |
+              j_username=admin&j_password=admin&from=&Submit=Sign+in
+        expression: |
+          response.status == 302 && !response.headers["location"].contains("loginError")
+        stop_if_match: true
+    r2:
+        request:
+            method: POST
+            path: /j_spring_security_check
+            body: |
+              j_username=jenkins&j_password=password&from=&Submit=Sign+in
+        expression: |
+          response.status == 302 && !response.headers["location"].contains("loginError")
+        stop_if_match: true
+expression: |
+    r0() && (r1() || r2())

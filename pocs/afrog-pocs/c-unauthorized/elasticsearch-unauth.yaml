@@ -1,0 +1,28 @@
+id: elasticsearch-unauth
+
+info:
+    name: Elasticsearch Unauth
+    author: p0wd3r
+    severity: high
+    description: |
+        /_nodes #查看节点数据
+        /_cat/indices #索引
+        _cat/indices
+        /_plugin/head
+        /_nodes/
+        /_status
+        /_search?pretty
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+        expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"You Know, for Search")
+    r1:
+        request:
+            method: GET
+            path: /_cat
+        expression: response.status == 200 && response.body.bcontains(b"/_cat/master")
+expression: r0() && r1()
+

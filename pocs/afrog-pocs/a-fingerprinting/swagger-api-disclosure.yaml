@@ -1,0 +1,153 @@
+id: swagger-disclosure
+
+info:
+  name: Public Swagger API Desclosure
+  author: pdteam
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /swagger-ui.html
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r1:
+    request:
+      method: GET
+      path: /swagger/ui/index
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r2:
+    request:
+      method: GET
+      path: /swagger/index.html
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r3:
+    request:
+      method: GET
+      path: /swagger/swagger-ui.html
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r4:
+    request:
+      method: GET
+      path: /api-docs/swagger.json
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r5:
+    request:
+      method: GET
+      path: /api-docs/swagger.yaml
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r6:
+    request:
+      method: GET
+      path: /swagger.json
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r7:
+    request:
+      method: GET
+      path: /swagger.yaml
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r8:
+    request:
+      method: GET
+      path: /swagger/v1/swagger.json
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r9:
+    request:
+      method: GET
+      path: /swagger/v1/swagger.yaml
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r10:
+    request:
+      method: GET
+      path: /api/index.html
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r11:
+    request:
+      method: GET
+      path: /api/docs/
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+  r12:
+    request:
+      method: GET
+      path: /api_docs
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'swagger:') ||
+      response.body.bcontains(b'Swagger 2.0') ||
+      response.body.bcontains(b"\"swagger\":") ||
+      response.body.bcontains(b'Swagger UI') ||
+      response.body.bcontains(b'**token**:'))
+ 
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() || r10() || r11() || r12()

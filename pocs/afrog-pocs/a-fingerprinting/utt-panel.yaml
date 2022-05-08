@@ -1,0 +1,19 @@
+id: utt-panel
+
+info:
+  name: UTT 艾泰网络管理系统
+  author: zan8in
+  severity: info
+  metadata:
+    fofa-query: app="UTT-安全网络管理系统"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /noAuth/login.html
+      follow_redirects: true
+    expression: |
+      response.status == 200 && response.body.bcontains(b"noAuth/noAuthAspOut.asp?optType=lang") && response.body.bcontains(b"company_msg")
+expression: r0()
+

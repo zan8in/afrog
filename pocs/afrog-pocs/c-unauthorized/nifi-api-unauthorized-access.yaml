@@ -1,0 +1,14 @@
+id: nifi-api-unauthorized-access
+
+info:
+    name: Apache Nifi Api Unauthorized Access
+    author: wulalalaaa(https://github.com/wulalalaaa)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /nifi-api/flow/current-user
+        expression: response.status == 200 && response.headers["content-type"].contains("json") && response.body.bcontains(b"\"identity\":\"anonymous\",\"anonymous\":true")
+expression: r0()

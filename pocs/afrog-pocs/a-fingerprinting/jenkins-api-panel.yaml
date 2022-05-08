@@ -1,0 +1,15 @@
+id: jenkins-api-panel
+
+info:
+  name: Jenkins API Instance Detection Template
+  author: righettod
+  severity: info
+  description: Try to detect the presence of a Jenkins API instance via the API default XML endpoint
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /api/xml
+        expression: response.status == 200 && response.body.bcontains(b"hudson.model.Hudson")
+expression: r0()

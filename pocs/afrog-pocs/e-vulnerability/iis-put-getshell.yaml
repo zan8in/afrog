@@ -1,0 +1,25 @@
+id: iis-put-getshell
+
+info:
+    name: IIS Put Getshell
+    author: Cannae(github.com/thunderbarca)
+    severity: critical
+
+set:
+    filename: randomLowercase(6)
+    fileContent: randomLowercase(6)
+rules:
+    r0:
+        request:
+            method: PUT
+            path: /{{filename}}.txt
+            body: |
+                {{fileContent}}
+        expression: response.status == 201
+    r1:
+        request:
+            method: GET
+            path: /{{filename}}.txt
+        expression: response.status == 200 && response.body.bcontains(bytes(fileContent))
+expression: r0() && r1()
+

