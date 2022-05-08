@@ -150,36 +150,36 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	repeatCount := 0
 	for {
 		if rule.Request.FollowRedirects {
-			maxrd := 5 // follow redirects default 5
+			maxrd := 3 // follow redirects default 3
 			if fc.MaxRedirect > 0 {
 				maxrd = int(fc.MaxRedirect)
 			}
-			// err = F.DoRedirects(fastReq, fastResp, maxrd)
-			curmaxrd := 0
-			for {
-				curmaxrd++
-				err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
-				statusCode := fastResp.Header.StatusCode()
-				if statusCode != fasthttp.StatusMovedPermanently &&
-					statusCode != fasthttp.StatusFound &&
-					statusCode != fasthttp.StatusSeeOther &&
-					statusCode != fasthttp.StatusTemporaryRedirect &&
-					statusCode != fasthttp.StatusPermanentRedirect {
-					break
-				}
-
-				location := fastResp.Header.PeekBytes(strLocation)
-				if len(location) == 0 {
-					break
-				}
-
-				u := fastReq.URI()
-				u.UpdateBytes(location)
-
-				if curmaxrd > maxrd {
-					break
-				}
-			}
+			err = F.DoRedirects(fastReq, fastResp, maxrd)
+			//curmaxrd := 0
+			//for {
+			//	curmaxrd++
+			//	err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
+			//	statusCode := fastResp.Header.StatusCode()
+			//	if statusCode != fasthttp.StatusMovedPermanently &&
+			//		statusCode != fasthttp.StatusFound &&
+			//		statusCode != fasthttp.StatusSeeOther &&
+			//		statusCode != fasthttp.StatusTemporaryRedirect &&
+			//		statusCode != fasthttp.StatusPermanentRedirect {
+			//		break
+			//	}
+			//
+			//	location := fastResp.Header.PeekBytes(strLocation)
+			//	if len(location) == 0 {
+			//		break
+			//	}
+			//
+			//	u := fastReq.URI()
+			//	u.UpdateBytes(location)
+			//
+			//	if curmaxrd > maxrd {
+			//		break
+			//	}
+			//}
 		} else {
 			dialtimeout := 6
 			if fc.DialTimeout > 0 {
@@ -584,31 +584,32 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	currd := 0
-	for {
-		currd++
-		err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(6))
-		statusCode := fastResp.Header.StatusCode()
-		if statusCode != fasthttp.StatusMovedPermanently &&
-			statusCode != fasthttp.StatusFound &&
-			statusCode != fasthttp.StatusSeeOther &&
-			statusCode != fasthttp.StatusTemporaryRedirect &&
-			statusCode != fasthttp.StatusPermanentRedirect {
-			break
-		}
+	// currd := 0
+	// for {
+	// 	currd++
+	// 	err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(6))
+	// 	statusCode := fastResp.Header.StatusCode()
+	// 	if statusCode != fasthttp.StatusMovedPermanently &&
+	// 		statusCode != fasthttp.StatusFound &&
+	// 		statusCode != fasthttp.StatusSeeOther &&
+	// 		statusCode != fasthttp.StatusTemporaryRedirect &&
+	// 		statusCode != fasthttp.StatusPermanentRedirect {
+	// 		break
+	// 	}
 
-		location := fastResp.Header.PeekBytes(strLocation)
-		if len(location) == 0 {
-			break
-		}
+	// 	location := fastResp.Header.PeekBytes(strLocation)
+	// 	if len(location) == 0 {
+	// 		break
+	// 	}
 
-		u := fastReq.URI()
-		u.UpdateBytes(location)
+	// 	u := fastReq.URI()
+	// 	u.UpdateBytes(location)
 
-		if currd >= 3 {
-			break
-		}
-	}
+	// 	if currd >= 3 {
+	// 		break
+	// 	}
+	// }
+	err = F.DoRedirects(fastReq, fastResp, 3)
 
 	newheader := make(map[string][]string)
 	respHeaderSlice := strings.Split(fastResp.Header.String(), "\r\n")

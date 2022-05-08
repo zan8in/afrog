@@ -3,7 +3,6 @@ package core
 import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -16,7 +15,7 @@ func (e *Engine) Execute(allPocsYamlSlice utils.StringSlice) {
 	ReverseCeyeApiKey = e.options.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = e.options.Config.Reverse.Ceye.Domain
 
-	http2.Init(e.options)
+	//http2.Init(e.options)
 
 	var pocSlice []poc.Poc
 

@@ -175,10 +175,10 @@ func (s *Service) processFingerPrintInputPair(url string) error {
 func (s *Service) PrintColorResultInfoConsole(result Result) {
 	r := &core.Result{}
 
-	r.IsVul = false
 	if len(result.StatusCode) != 0 {
 		s.ResultSlice = append(s.ResultSlice, result)
 		r.FingerResult = result
+		r.IsVul = true
 	}
 	s.Options.ApiCallBack(r)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -37,6 +38,9 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		homeDir, _ := os.UserHomeDir()
 		return errors.New("please edit `api-key` and `domain` in `" + homeDir + "/.config/afrog/afrog-config.yaml`")
 	}
+
+	// init fasthttp
+	http2.Init(options)
 
 	// init targets
 	if len(options.Target) > 0 {
@@ -83,7 +87,11 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	// init scan sum
 	options.Count = len(options.Targets) * len(allPocsYamlSlice)
 
-	fmt.Println(ShowUsage())
+	// fmt.Println(ShowUsage())
+
+	if !options.NoTips {
+		fmt.Println(ShowTips())
+	}
 
 	// fingerprint
 	if !options.NoFinger {

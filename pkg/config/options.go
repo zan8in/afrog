@@ -34,6 +34,8 @@ type Options struct {
 	// disable output fingerprint in the console
 	NoFinger bool
 
+	NoTips bool
+
 	// Scan count num(targets * allpocs)
 	Count int
 

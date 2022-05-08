@@ -36,6 +36,7 @@ func main() {
 		&cli.StringFlag{Name: "Output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
 		&cli.BoolFlag{Name: "Silent", Aliases: []string{"s"}, Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
 		&cli.BoolFlag{Name: "NoFinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
+		&cli.BoolFlag{Name: "NoTips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},
 	}
 
 	app.Action = func(c *cli.Context) error {
@@ -69,11 +70,8 @@ func main() {
 			if r.IsVul {
 				if r.FingerResult != nil {
 					// Fingerprint Scan
-					fr := r.FingerResult.(fingerprint.Result)
-					fmt.Printf("\r" + fr.Url + " " +
-						log.LogColor.Low(""+fr.StatusCode+"") + " " +
-						log.LogColor.Title(fr.Title) + " " +
-						log.LogColor.Critical(fr.Name) + "\r\n")
+					//fr := r.FingerResult.(fingerprint.Result)
+					//printFingerprintInfoConsole(fr)
 				} else {
 					// PoC Scan
 					number++
@@ -104,5 +102,14 @@ func main() {
 	if err != nil {
 		fmt.Println(runner.ShowUsage())
 		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
+	}
+}
+
+func printFingerprintInfoConsole(fr fingerprint.Result) {
+	if len(fr.StatusCode) > 0 {
+		fmt.Printf("\r" + fr.Url + " " +
+			log.LogColor.Low(""+fr.StatusCode+"") + " " +
+			log.LogColor.Title(fr.Title) + " " +
+			log.LogColor.Critical(fr.Name) + "\r\n")
 	}
 }

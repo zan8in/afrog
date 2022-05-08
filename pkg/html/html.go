@@ -298,6 +298,6 @@ func header() string {
 		</script>
 	</head>
 	<body>
-	<div class="top"><a href="https://github.com/zan8in/afrog#%E5%85%8D%E8%B4%A3%E5%A3%B0%E6%98%8E" target="_blank" style="font-size:12px;color:red">免责声明</a>&nbsp;&nbsp;&nbsp;Afrog Report&nbsp;&nbsp;&nbsp;<span style="font-size:12px;font-weight:normal">` + utils.GetNowDate() + `</span></div>
+	<div class="top"><a href="https://github.com/zan8in/afrog#%E5%85%8D%E8%B4%A3%E5%A3%B0%E6%98%8E" target="_blank" style="font-size:12px;color:darkorange">Disclaimer</a>&nbsp;&nbsp;&nbsp;Afrog Report&nbsp;&nbsp;&nbsp;<span style="font-size:12px;font-weight:normal;color:darkgrey">` + utils.GetNowDate() + `</span></div>
 			`
 }
