@@ -2,9 +2,10 @@
 <p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[497]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">POC 仓库</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC 仓库</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
+
 
 # 什么是 afrog
 
@@ -26,7 +27,7 @@ afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖�
 
 # 使用指南
 
-### [前往查看使用指南](https://github.com/zan8in/afrog/blob/main/GUIDE.md)
+### [查看指南](https://github.com/zan8in/afrog/blob/main/GUIDE.md)
 
 # 例子
 
@@ -67,6 +68,10 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 ![](https://github.com/zan8in/afrog/blob/main/images/2.png)
 
 ![](https://github.com/zan8in/afrog/blob/main/images/3.png)
+
+# 如何贡献 PoC？
+
+查看教程
 
 # 免责声明
 
