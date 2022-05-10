@@ -21,7 +21,7 @@
 
 - 最后，点击`Submit new issue`按钮
 
-![con-1](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-1.png)
+![](https://github.com/zan8in/afrog/blob/main/images/icon-1.png)
 
 ## 方法2：Pull Request
 
@@ -35,7 +35,7 @@
 
 点击 afrog 项目 `fork` 按钮
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-2.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-2.png)
 
 ```
 git clone https://github.com/<your-username>/afrog
@@ -81,16 +81,16 @@ git push -u origin afrog_branch_name
 - 点击 `Pull Request`
 - 再点击`New pull request`
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-3.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-3.png)
 
 - `compare`选择你创建的新`branch`（下图）
 - 再点击`Create pull request`（下图）
 
-![con-5](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-5.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-5.png)
 
 - 填写`title`和`content`，点击`Create pull request `按钮（下图）
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-6.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-6.png)
 
 至此，您的`Pull Request`已提交，等待版主审核合并。
 

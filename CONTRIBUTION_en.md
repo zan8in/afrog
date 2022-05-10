@@ -22,7 +22,7 @@ There are two ways to contribute a PoC to afrog-poc.
 
 - Finally, click the `Submit new issue` button
 
-![con-1](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-1.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-1.png)
 
 ## Method 2: Pull Request
 
@@ -36,7 +36,7 @@ There are two ways to contribute a PoC to afrog-poc.
 
 Click the afrog project `fork` button
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-2.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-2.png)
 
 ```
 git clone https://github.com/<your-username>/afrog
@@ -82,16 +82,16 @@ git push -u origin afrog_branch_name
 - Click on `Pull Request`
 - Then click `New pull request`
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-3.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-3.png)
 
 - `compare` select the new `branch` you created (image below)
 - Then click `Create pull request` (below)
 
-![con-5](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-5.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-5.png)
 
 - Fill in `title` and `content`, click the `Create pull request` button (below)
 
-![](C:\Users\zanbi\go\src\github.com\zan8in\afrog\con-6.png)
+![](https://github.com/zan8in/afrog/blob/main/images/con-6.png)
 
 At this point, your `Pull Request` has been submitted, waiting for the moderator to review the merge.
 
