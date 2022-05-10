@@ -72,7 +72,7 @@ Output html report
 
 # How to contribute to PoC?
 
-View tutorial
+[View tutorial](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION_en.md)
 
 # Disclaimer
 

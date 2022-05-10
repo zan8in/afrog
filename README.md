@@ -71,7 +71,7 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 
 # 如何贡献 PoC？
 
-查看教程
+[查看教程](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md)
 
 # 免责声明
 
