@@ -26,7 +26,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = runner.ShowBanner()
 	app.Usage = "v" + config.Version
-	app.UsageText = runner.ShowUsage()
+	app.UsageText = runner.ShowTips()
 	app.Version = config.Version
 
 	app.Flags = []cli.Flag{
@@ -100,7 +100,7 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println(runner.ShowUsage())
+		fmt.Println(runner.ShowTips())
 		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
 	}
 }
