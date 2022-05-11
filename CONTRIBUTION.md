@@ -12,12 +12,12 @@
 
 ### 第二步：编写 Issues
 
-- 浏览器打开提交 issues 网址：[ISSUES 网址](https://github.com/zan8in/afrog/issues)
+- 点击 issues ：[ISSUES 网址](https://github.com/zan8in/afrog/issues)
 
 - 然后点击右上角`New Issues`按钮
 - 填写`title` ，比如：CVE-2022-1234
 - 然后，内容填写 `cve-2020-1234.yaml`代码
-- 接着，选择`label`选择 `afrog-poc`
+- 接着，`label`选择 `afrog-poc`
 
 - 最后，点击`Submit new issue`按钮
 
