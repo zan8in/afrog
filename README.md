@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[497]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[499]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC 仓库</a> •
@@ -20,6 +20,7 @@ afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖�
 * [x] 启动程序，自动更新本地 PoC 库
 * [x] 长期维护、更新 PoC（[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs)）
 * [x] API 接口，轻松接入其他项目
+* [x] 二次开发，参考 `cmd/afrog/main.go` 或加入 **[交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)** 咨询
 
 # 下载
 
