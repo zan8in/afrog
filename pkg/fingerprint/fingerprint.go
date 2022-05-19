@@ -17,6 +17,8 @@ import (
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
+// reference https://github.com/0x727/FingerprintHub
+
 type Service struct {
 	Options     *config.Options
 	fpSlice     []FingerPrint
