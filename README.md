@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️PoC 欢迎投递<br/>共 <b>[499]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一个挖洞工具<br/>不做【大而全】❤️ 专注【小而美】<br/>共 <b>[499]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC 仓库</a> •
@@ -72,7 +72,7 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 
 # 如何贡献 PoC？
 
-[查看教程](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md)
+### [查看教程](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md)
 
 # 免责声明
 
