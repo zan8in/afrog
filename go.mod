@@ -3,6 +3,7 @@ module github.com/zan8in/afrog
 go 1.17
 
 require (
+	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/dlclark/regexp2 v1.4.0
 	github.com/google/cel-go v0.9.0
@@ -24,11 +25,9 @@ require (
 require (
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e // indirect
-	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/klauspost/compress v1.14.1 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.2 // indirect
-	github.com/projectdiscovery/wappalyzergo v0.0.40 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

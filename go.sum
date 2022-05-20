@@ -100,8 +100,6 @@ github.com/projectdiscovery/retryablehttp-go v1.0.2 h1:LV1/KAQU+yeWhNVlvveaYFsjB
 github.com/projectdiscovery/retryablehttp-go v1.0.2/go.mod h1:dx//aY9V247qHdsRf0vdWHTBZuBQ2vm6Dq5dagxrDYI=
 github.com/projectdiscovery/stringsutil v0.0.0-20210830151154-f567170afdd9 h1:xbL1/7h0k6HE3RzPdYk9W/8pUxESrGWewTaZdIB5Pes=
 github.com/projectdiscovery/stringsutil v0.0.0-20210830151154-f567170afdd9/go.mod h1:oTRc18WBv9t6BpaN9XBY+QmG28PUpsyDzRht56Qf49I=
-github.com/projectdiscovery/wappalyzergo v0.0.40 h1:E/rADqztV3+APjE5u/SEH046Ylc1R2wzG7TZVATf0is=
-github.com/projectdiscovery/wappalyzergo v0.0.40/go.mod h1:vS+npIOANv7eKsEtODsyRQt2n1v8VofCwj2gjmq72EM=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
 github.com/remeh/sizedwaitgroup v1.0.0/go.mod h1:3j2R4OIe/SeS6YDhICBy22RWjJC5eNCJ1V+9+NVNYlo=
