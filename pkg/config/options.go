@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/zan8in/afrog/pkg/utils"
@@ -28,6 +29,11 @@ type Options struct {
 	// output file to write found issues/vulnerabilities
 	Output string
 
+	// search PoC by keyword , eg: -s tomcat
+	Search string
+
+	SearchKeywords []string
+
 	// no progress if silent is true
 	Silent bool
 
@@ -50,3 +56,27 @@ type Options struct {
 }
 
 type ApiCallBack func(interface{})
+
+func (o *Options) SetSearchKeyword() bool {
+	if len(o.Search) > 0 {
+		arr := strings.Split(o.Search, ",")
+		if len(arr) > 0 {
+			for _, v := range arr {
+				o.SearchKeywords = append(o.SearchKeywords, strings.TrimSpace(v))
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Options) CheckPocKeywords(id, name string) bool {
+	if len(o.SearchKeywords) > 0 {
+		for _, v := range o.SearchKeywords {
+			if strings.Contains(id, v) || strings.Contains(name, v) {
+				return true
+			}
+		}
+	}
+	return false
+}

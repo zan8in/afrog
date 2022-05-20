@@ -88,8 +88,8 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		fmt.Println("   ./reports/" + options.Output)
 	}
 
-	// init scan sum
-	options.Count = len(options.Targets) * (len(allPocsYamlSlice) + len(allPocsEmbedYamlSlice))
+	// // init scan sum
+	// options.Count = len(options.Targets) * (len(allPocsYamlSlice) + len(allPocsEmbedYamlSlice))
 
 	// fmt.Println(ShowUsage())
 

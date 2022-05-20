@@ -36,8 +36,23 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		pocSlice = append(pocSlice, p)
 	}
 
+	// added search poc by keywords
+	newPocSlice := []poc.Poc{}
+	if len(e.options.Search) > 0 && e.options.SetSearchKeyword() {
+		for _, v := range pocSlice {
+			if e.options.CheckPocKeywords(v.Id, v.Info.Name) {
+				newPocSlice = append(newPocSlice, v)
+			}
+		}
+	} else {
+		newPocSlice = append(newPocSlice, pocSlice...)
+	}
+
+	// init scan sum
+	e.options.Count += len(e.options.Targets) * len(newPocSlice)
+
 	swg := e.workPool.PocSwg
-	for _, p := range pocSlice {
+	for _, p := range newPocSlice {
 		swg.Add()
 		go func(p poc.Poc) {
 			defer swg.Done()
