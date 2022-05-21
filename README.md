@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一个挖洞工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[499]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[500]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC 仓库</a> •
@@ -9,18 +9,17 @@
 
 # 什么是 afrog
 
-afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描（挖洞）工具，PoC 涉及 CVE、CNVD、默认口令、信息泄露、指纹识别、未授权访问、任意文件读取、命令执行等多种漏洞类型，帮助网络安全从业者快速验证并及时修复漏洞。
+afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描工具，PoC 包含 CVE、CNVD、默认口令、信息泄露、指纹识别、未授权访问、任意文件读取、命令执行等多种漏洞类型，帮助网络安全从业者快速验证并及时修复漏洞。
 
 # 特点
 
-* [x] 基于 xray 内核，又不像 xray（[afrog 模板语法](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md)）
+* [x] 基于 xray 内核，又不像 xray（[**afrog 模板语法**](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md)）
 * [x] 性能卓越，快速稳定
 * [x] 实时显示，扫描进度
 * [x] 输出 html 报告，方便查看 `request` 和 `response`
 * [x] 启动程序，自动更新本地 PoC 库
 * [x] 长期维护、更新 PoC（[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs)）
-* [x] API 接口，轻松接入其他项目
-* [x] 二次开发，参考 `cmd/afrog/main.go` 或加入 **[交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)** 咨询
+* [x] 二次开发，参考 `cmd/afrog/main.go` 或加入 **[交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)**
 
 # 下载
 
