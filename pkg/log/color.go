@@ -17,6 +17,7 @@ type Color struct {
 	Time     func(a ...interface{}) string
 	Title    func(a ...interface{}) string
 	Banner   func(a ...interface{}) string
+	Bold     func(a ...interface{}) string
 }
 
 var LogColor *Color
@@ -38,6 +39,7 @@ func NewColor() *Color {
 		Time:     color.Gray.Render,
 		Title:    color.FgLightBlue.Render,
 		Banner:   color.FgLightGreen.Render,
+		Bold:     color.Bold.Render,
 	}
 }
 

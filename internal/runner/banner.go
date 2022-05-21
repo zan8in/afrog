@@ -9,7 +9,7 @@ import (
 )
 
 func ShowBanner() string {
-	return "afrog 内置PoC版"
+	return log.LogColor.Bold("afrog ") + log.LogColor.Banner("今年夏天")
 }
 
 func ShowUsage() string {
@@ -21,11 +21,11 @@ func ShowTips() string {
 }
 
 func ShowBanner2(afrogLatestversion string) {
-	title := "NAME:\n   " + log.LogColor.Banner(ShowBanner()) + " - v" + config.Version
+	title := "NAME:\n   " + ShowBanner() + " - v" + config.Version
 	old := ""
 	if utils.Compare(afrogLatestversion, ">", config.Version) {
-		old = log.LogColor.High(" (outdated)")
-		old += log.LogColor.Title(" --> https://github.com/zan8in/afrog/releases/tag/v" + afrogLatestversion)
+		old = " (" + log.LogColor.High(afrogLatestversion) + ")"
+		old += log.LogColor.Title(" -> https://github.com/zan8in/afrog/releases/tag/v" + afrogLatestversion)
 	}
 	fmt.Println(title + old + "\n")
 }

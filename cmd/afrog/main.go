@@ -38,17 +38,17 @@ func main() {
 		&cli.BoolFlag{Name: "silent", Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
 		&cli.BoolFlag{Name: "nofinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
 		&cli.BoolFlag{Name: "notips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},
+		&cli.BoolFlag{Name: "updatepocs", Aliases: []string{"up"}, Destination: &options.UpdatePocs, Value: false, Usage: "update afrog-pocs"},
 	}
 
 	app.Action = func(c *cli.Context) error {
 		upgrade := upgrade.New()
+		upgrade.IsUpdatePocs = options.UpdatePocs
 		upgrade.UpgradeAfrogPocs()
 
 		runner.ShowBanner2(upgrade.LastestAfrogVersion)
 
-		fmt.Println("PATH:")
-		fmt.Println("   " + options.Config.GetConfigPath())
-		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
+		printPathLog(upgrade)
 
 		if len(options.Output) == 0 {
 			options.Output = utils.GetNowDateTimeReportName() + ".html"
@@ -112,5 +112,19 @@ func printFingerprintInfoConsole(fr fingerprint.Result) {
 			log.LogColor.Low(""+fr.StatusCode+"") + " " +
 			log.LogColor.Title(fr.Title) + " " +
 			log.LogColor.Critical(fr.Name) + "\r\n")
+	}
+}
+
+func printPathLog(upgrade *upgrade.Upgrade) {
+	fmt.Println("PATH:")
+	fmt.Println("   " + options.Config.GetConfigPath())
+	if options.UpdatePocs {
+		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
+	} else {
+		if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
+			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
+		} else {
+			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
+		}
 	}
 }

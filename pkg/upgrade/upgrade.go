@@ -20,6 +20,7 @@ type Upgrade struct {
 	RemoteVersion       string
 	LastestVersion      string
 	LastestAfrogVersion string
+	IsUpdatePocs        bool
 }
 
 const (
@@ -37,6 +38,7 @@ func New() *Upgrade {
 
 func (u *Upgrade) CheckUpgrade() (bool, error) {
 	curVersion, err := poc.GetPocVersionNumber()
+	u.CurrVersion = curVersion
 	if err != nil {
 		return false, errors.New("failed to get local version number")
 	}
@@ -52,7 +54,6 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 		return false, errors.New("failed to get remote version number")
 	}
 
-	u.CurrVersion = curVersion
 	u.RemoteVersion = strings.TrimSpace(string(remoteVersion))
 
 	u.LastestAfrogVersion, _ = getAfrogVersion()
@@ -77,17 +78,17 @@ func getAfrogVersion() (string, error) {
 func (u *Upgrade) UpgradeAfrogPocs() {
 	isUp, err := u.CheckUpgrade()
 	if err != nil {
-		u.LastestVersion = u.CurrVersion
 		return
 	}
 	if !isUp {
-		u.LastestVersion = u.CurrVersion
 		return
 	}
 	if isUp {
-		fmt.Println(log.LogColor.Info("Downloading latest release..."))
 		u.LastestVersion = u.RemoteVersion
-		u.Download()
+		if u.IsUpdatePocs {
+			fmt.Println(log.LogColor.Info("Downloading latest release..."))
+			u.Download()
+		}
 	}
 }
 

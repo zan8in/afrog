@@ -40,7 +40,11 @@ type Options struct {
 	// disable output fingerprint in the console
 	NoFinger bool
 
+	// disable show tips
 	NoTips bool
+
+	// update afrog-pocs
+	UpdatePocs bool
 
 	// Scan count num(targets * allpocs)
 	Count int
