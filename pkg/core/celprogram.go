@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 
 	"github.com/dlclark/regexp2"
 	"github.com/google/cel-go/cel"
@@ -450,7 +451,7 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 	req, _ := http.NewRequest("GET", urlStr, nil)
 
 	time.Sleep(time.Second * time.Duration(timeout))
-	// fmt.Println(sub)
+	// fmt.Println(urlStr)
 
 	redirectsCount := 0
 	for {
@@ -463,7 +464,7 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		}
 
 		if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) { // api返回结果不为空
-			// fmt.Println(string(resp.Body))
+			// fmt.Println(string(resp), "===")
 			return true
 		}
 
@@ -476,7 +477,7 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 			utils.RandSleep(500)
 			continue
 		}
-		// fmt.Println(string(resp.Body))
+		// fmt.Println(string(resp), "---")
 		return false
 	}
 }

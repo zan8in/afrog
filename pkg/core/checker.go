@@ -2,11 +2,12 @@ package core
 
 import (
 	"fmt"
-	"github.com/zan8in/afrog/pkg/protocols/raw"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/zan8in/afrog/pkg/protocols/raw"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"

@@ -19,7 +19,6 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 * [x] View `request` and `response` packets of scan results 
 * [x] Start the program to automatically update the local PoC library  
 * [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs) ）
-* [x] API interface, easy access to other projects 
 * [x] For secondary development, refer to `cmd/afrog/main.go` or join **[communication group](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7% BE%A4)** Consulting
 
 # Download afrog
