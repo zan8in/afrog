@@ -87,4 +87,6 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 
 # 交流群
 
-<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.jpg" width="33%" />
+> 交流群人数已超限制，只能加好友，邀请入群
+
+<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
