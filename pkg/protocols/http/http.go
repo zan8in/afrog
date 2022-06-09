@@ -143,6 +143,10 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	fastReq.URI().Update(finalRequest.URL.String())
 	fastReq.SetRequestURI(finalRequest.URL.String())
 
+	// Fixed BUG: protoRequest.Raw 有的时候 body 为空，但不影响 http.client 请求结果
+	// 发现 fasthttp 在 dotimeout 请求完成 fastReq 的 fastReq.Body()值变为 空值。
+	tempReqBody := string(fastReq.Body())
+
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
@@ -271,7 +275,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	protoRequest.Method = rule.Request.Method
 	protoRequest.Url = urlType
 	protoRequest.RawHeader = []byte(strings.Trim(rawHeader.String(), "\n"))
-	protoRequest.Raw = []byte(string(fastReq.Header.String()) + "\n" + string(fastReq.Body()))
+	protoRequest.Raw = []byte(string(fastReq.Header.String()) + "\n" + tempReqBody)
 	protoRequest.Headers = newheader
 	protoRequest.ContentType = newheader["content-type"]
 	protoRequest.Body = []byte(rule.Request.Body)
