@@ -73,6 +73,9 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 
 ### [查看教程](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md)
 
+# PoC 列表
+### [查看 PoC 列表](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
+
 # 免责声明
 
 本工具仅面向**合法授权**的企业安全建设行为，如您需要测试本工具的可用性，请自行搭建靶机环境。

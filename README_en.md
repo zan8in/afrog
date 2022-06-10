@@ -74,6 +74,9 @@ Output html report
 
 ### [View tutorial](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION_en.md)
 
+# PoC List
+### [View PoC List](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
+
 # Disclaimer
 
 This tool is only for **legally authorized** enterprise security construction behavior. If you need to test the usability of this tool, please build a target environment by yourself.
