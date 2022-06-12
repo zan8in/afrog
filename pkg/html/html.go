@@ -183,6 +183,14 @@ func header() string {
 			a:focus {outline:none; -moz-outline:none;}
 			ol,ul{list-style:none}
 			table{border-collapse:collapse;border-spacing:0}
+			xmp {     
+				whitewhite-space: pre-wrap; /* css-3 */
+				whitewhite-space: -moz-pre-wrap; /* Mozilla, since 1999 */
+				whitewhite-space: -pre-wrap; /* Opera 4-6 */
+				whitewhite-space: -o-pre-wrap; /* Opera 7 */
+				word-wrap: break-word; /* Internet Explorer 5.5+ */
+				white-space: pre-wrap; /* Firefox */
+			}
 			body{
 				font-family: 0.3em/1em -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,"Microsoft Yahei",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
 				color: hsl(212.7, 13.3%, 16.3%);
