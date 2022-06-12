@@ -11,6 +11,7 @@ import (
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/zan8in/afrog/pkg/config"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/scan"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -20,17 +21,22 @@ var (
 )
 
 func main() {
-	// for i := 1; i < 255; i++ {
-	// 	ip1 := "192.168.66." + strconv.Itoa(i)
-	// 	fmt.Println(ip1)
-	// }
-
-	// return
-	urls, err := utils.ReadFileLineByLine("./test2.txt")
+	urls, err := utils.ReadFileLineByLine("./urls.txt")
 	if err != nil {
 		fmt.Println("urls is empty.")
 		return
 	}
+
+	for _, u := range urls {
+		ip, err := scan.Target2ip(u)
+		if err != nil {
+			fmt.Println(err.Error(), u)
+			continue
+		}
+		fmt.Println(u, ip)
+	}
+
+	return
 	config, err := config.New()
 	if err != nil {
 		fmt.Println("config is empty.")

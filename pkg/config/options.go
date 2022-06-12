@@ -40,6 +40,12 @@ type Options struct {
 	// disable output fingerprint in the console
 	NoFinger bool
 
+	// ports to scan eg: 80,443,8000-9000
+	Port string
+
+	// disable port scan
+	NoPortScan bool
+
 	// disable show tips
 	NoTips bool
 

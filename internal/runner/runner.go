@@ -97,6 +97,16 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		fmt.Println(ShowTips())
 	}
 
+	// fmt.Println("port scan before : ", len(options.Targets))
+
+	// if !options.NoPortScan {
+	// 	if scan, err := scan.New(options); err == nil {
+	// 		scan.Execute()
+	// 	}
+	// }
+
+	// fmt.Println("port scan after : ", len(options.Targets))
+
 	// fingerprint
 	if !options.NoFinger {
 		s, _ := fingerprint.New(options)
