@@ -44,6 +44,7 @@ func main() {
 		// 扫描进度实时显示
 		fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
 	})
+
 	if err != nil {
 		fmt.Println(err)
 	}

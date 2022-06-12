@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"regexp"
-	"time"
+	"strconv"
 	"unicode/utf8"
 
 	"github.com/axgle/mahonia"
@@ -21,6 +20,12 @@ var (
 )
 
 func main() {
+	// for i := 1; i < 255; i++ {
+	// 	ip1 := "192.168.66." + strconv.Itoa(i)
+	// 	fmt.Println(ip1)
+	// }
+
+	// return
 	urls, err := utils.ReadFileLineByLine("./test2.txt")
 	if err != nil {
 		fmt.Println("urls is empty.")
@@ -34,18 +39,14 @@ func main() {
 	options.Config = config
 	http2.Init(options)
 
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed(time.Now().UnixNano())
 
-	// Typical use-case:
-	// 50 queries must be executed as quick as possible
-	// but without overloading the database, so only
-	// 8 routines should be started concurrently.
-	swg := sizedwaitgroup.New(20)
+	swg := sizedwaitgroup.New(50)
 	for _, url := range urls {
 		swg.Add()
 		go func(url string) {
 			defer swg.Done()
-			title(url)
+			ipscan(url)
 		}(url)
 	}
 
@@ -53,16 +54,44 @@ func main() {
 
 }
 
-func title(url string) {
+func ipscan(url string) {
+	// Typical use-case:
+	// 50 queries must be executed as quick as possible
+	// but without overloading the database, so only
+	// 8 routines should be started concurrently.
+	portSlice := []int{80, 443, 8080, 7001}
+	swg := sizedwaitgroup.New(500)
+	// for i := 1; i < 65535; i++ {
+	for _, i := range portSlice {
+		swg.Add()
+		go func(url string, i int) {
+			defer swg.Done()
+			err := title(url, i, 0)
+			if err != nil {
+				title(url, i, 1)
+			}
+		}(url, i)
+	}
+
+	swg.Wait()
+}
+
+func title(url string, port, https int) error {
+	if https == 0 {
+		url = "http://" + url + ":" + strconv.Itoa(port)
+	} else {
+		url = "https://" + url + ":" + strconv.Itoa(port)
+	}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		//fmt.Println("NewRequest", url, err.Error())
-		return
+		return err
 	}
 	resp, status, err := http2.GetTitleRedirect(req, 3)
 	if err != nil {
-		//fmt.Println("FastRequest", url, resp, err.Error())
-		return
+		return err
+	}
+	if status < 200 || (status >= 300 && status < 400) || status >= 600 {
+		return err
 	}
 	titleArr := pTitle.FindStringSubmatch(string(resp))
 	if titleArr != nil {
@@ -76,4 +105,5 @@ func title(url string) {
 	} else {
 		fmt.Println(url, status)
 	}
+	return nil
 }

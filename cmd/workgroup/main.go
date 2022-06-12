@@ -16,7 +16,7 @@ func main() {
 	// but without overloading the database, so only
 	// 8 routines should be started concurrently.
 	swg := sizedwaitgroup.New(8)
-	for i := 0; i < 50; i++ {
+	for i := 1; i < 65535; i++ {
 		swg.Add()
 		go func(i int) {
 			defer swg.Done()
