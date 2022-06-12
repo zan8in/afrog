@@ -78,15 +78,21 @@ func getAfrogVersion() (string, error) {
 func (u *Upgrade) UpgradeAfrogPocs() {
 	isUp, err := u.CheckUpgrade()
 	if err != nil {
+		if u.IsUpdatePocs {
+			fmt.Println(log.LogColor.High("PoC Update failed, " + err.Error()))
+		}
 		return
 	}
 	if !isUp {
+		if u.IsUpdatePocs {
+			fmt.Println(log.LogColor.Vulner("Congratulations, the PoC is updated to the latest version"))
+		}
 		return
 	}
 	if isUp {
 		u.LastestVersion = u.RemoteVersion
 		if u.IsUpdatePocs {
-			fmt.Println(log.LogColor.Info("Downloading latest release..."))
+			fmt.Println(log.LogColor.Vulner("Downloading latest release..."))
 			u.Download()
 		}
 	}
@@ -113,8 +119,8 @@ func (u *Upgrade) Unzip(src string) {
 
 	_, err := uz.Extract(src, u.HomeDir)
 	if err != nil {
-		fmt.Println(log.LogColor.Low("Failed updated afrog-pocs ", err))
+		fmt.Println(log.LogColor.High("Failed updated afrog-pocs ", err))
 	}
 
-	fmt.Println(log.LogColor.Info("Successfully updated afrog-pocs to ", u.HomeDir+upPathName))
+	fmt.Println(log.LogColor.Vulner("Successfully updated afrog-pocs to ", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/")))
 }

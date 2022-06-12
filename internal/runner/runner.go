@@ -57,7 +57,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		}
 	}
 	if len(options.Targets) == 0 {
-		return errors.New("could not find targets")
+		return errors.New("not found targets")
 	}
 
 	// init pocs
@@ -80,7 +80,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
 
 	if len(allPocsYamlSlice) == 0 && len(allPocsEmbedYamlSlice) == 0 {
-		return errors.New("未找到可执行脚本(POC)，请检查`默认脚本`或指定新の脚本(POC)")
+		return errors.New("no found pocs")
 	}
 
 	// console print

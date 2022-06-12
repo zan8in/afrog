@@ -102,7 +102,7 @@ func main() {
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println(runner.ShowTips())
-		fmt.Println(log.LogColor.High("Failed to start afrog，", err.Error()))
+		fmt.Println(log.LogColor.High("start afrog failed，", err.Error()))
 	}
 }
 
