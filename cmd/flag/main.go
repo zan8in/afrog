@@ -10,6 +10,7 @@ import (
 
 func main() {
 	var language string
+	var severity *cli.StringSlice
 
 	app := &cli.App{
 		Flags: []cli.Flag{
@@ -19,9 +20,16 @@ func main() {
 				Usage:       "language for the greeting",
 				Destination: &language,
 			},
+			&cli.StringSliceFlag{
+				Name:        "severity",
+				Aliases:     []string{"se"},
+				Usage:       "pocs to run based on severity. Possible values: info, low, medium, high, critical",
+				Destination: severity,
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fmt.Println(language)
+			fmt.Println(severity.String())
 			return nil
 		},
 	}

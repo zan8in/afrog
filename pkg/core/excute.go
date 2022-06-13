@@ -44,6 +44,13 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 				newPocSlice = append(newPocSlice, v)
 			}
 		}
+	} else if len(e.options.Severity) > 0 && e.options.SetSeverityKeyword() {
+		// added severity filter @date: 2022.6.13 10:58
+		for _, v := range pocSlice {
+			if e.options.CheckPocSeverityKeywords(v.Info.Severity) {
+				newPocSlice = append(newPocSlice, v)
+			}
+		}
 	} else {
 		newPocSlice = append(newPocSlice, pocSlice...)
 	}

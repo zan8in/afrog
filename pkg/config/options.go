@@ -37,6 +37,11 @@ type Options struct {
 	// no progress if silent is true
 	Silent bool
 
+	// pocs to run based on severity. Possible values: info, low, medium, high, critical
+	Severity string
+
+	SeverityKeywords []string
+
 	// disable output fingerprint in the console
 	NoFinger bool
 
@@ -84,6 +89,30 @@ func (o *Options) CheckPocKeywords(id, name string) bool {
 	if len(o.SearchKeywords) > 0 {
 		for _, v := range o.SearchKeywords {
 			if strings.Contains(id, v) || strings.Contains(name, v) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (o *Options) SetSeverityKeyword() bool {
+	if len(o.Severity) > 0 {
+		arr := strings.Split(o.Severity, ",")
+		if len(arr) > 0 {
+			for _, v := range arr {
+				o.SeverityKeywords = append(o.SeverityKeywords, strings.TrimSpace(v))
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func (o *Options) CheckPocSeverityKeywords(severity string) bool {
+	if len(o.SeverityKeywords) > 0 {
+		for _, v := range o.SeverityKeywords {
+			if strings.EqualFold(severity, v) {
 				return true
 			}
 		}
