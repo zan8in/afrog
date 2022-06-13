@@ -1,4 +1,4 @@
-name: etcd-unauth
+id: etcd-unauth
 
 info:
     name: ETCD Unauth
