@@ -95,6 +95,6 @@ afrog -t http://127.0.0.1 -P ./testing/ -o result.html
 <img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
 
 ## 404星链计划
-<img src lazysrc="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
+<img src lazysrc="https://raw.githubusercontent.com/knownsec/404StarLink-Project/master/logo.png" width="30%">
 
 afrog 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
