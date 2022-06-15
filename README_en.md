@@ -7,11 +7,11 @@
 </p>
 
 
-# What is afrog
+## What is afrog
 
 afrog is an excellent performance, fast and stable, PoC customizable vulnerability scanning (hole digging) tool. PoC involves CVE, CNVD, default password, information leakage, fingerprint identification, unauthorized access, arbitrary file reading, command execution, etc. It helps network security practitioners quickly verify and fix vulnerabilities in a timely manner.
 
-# Features
+## Features
 
 * [x] Based on xray kernel, not like xray ([afrog template syntax](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md))
 * [x] Great performance, least requests, best results
@@ -21,15 +21,15 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 * [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs) ）
 * [x] For secondary development, refer to `cmd/afrog/main.go` or join **[communication group](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7% BE%A4)** Consulting
 
-# Download afrog
+## Download afrog
 
 ### [Release Download](https://github.com/zan8in/afrog/releases)
 
-# Guide
+## Guide
 
 ### [Go to Guide](https://github.com/zan8in/afrog/blob/main/GUIDE_en.md)
 
-# Example
+## Example
 
 Scan a single target.
 
@@ -70,14 +70,14 @@ Output html report
 
 ![](https://github.com/zan8in/afrog/blob/main/images/3.png)
 
-# How to contribute to PoC?
+## How to contribute to PoC?
 
 ### [View tutorial](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION_en.md)
 
-# PoC List
+## PoC List
 ### [View PoC List](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
 
-# Disclaimer
+## Disclaimer
 
 This tool is only for **legally authorized** enterprise security construction behavior. If you need to test the usability of this tool, please build a target environment by yourself.
 
@@ -90,6 +90,6 @@ If you have any illegal behavior in the process of using this tool, you shall be
 Before installing and using this tool, please **must read carefully and fully understand the contents of each clause**. Restrictions, disclaimers or other clauses involving your significant rights and interests may be bolded or underlined to remind you to pay attention . Unless you have fully read, fully understood and accepted all the terms of this agreement, please do not install and use this tool. Your use behavior or your acceptance of this agreement in any other express or implied manner shall be deemed that you have read and agreed to be bound by this agreement.
 
 ## 404Starlink
-<img src lazysrc="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
+<img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
 
 afrog has joined [404Starlink](https://github.com/knownsec/404StarLink)
