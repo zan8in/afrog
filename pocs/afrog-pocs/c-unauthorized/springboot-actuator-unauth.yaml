@@ -26,4 +26,10 @@ rules:
       path: /appenv
     expression: |
       response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
-expression: r0() || r1() || r2()
+  r3: 
+    request: 
+      method: GET
+      path: /api/actuator/env
+    expression: |
+      response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+expression: r0() || r1() || r2() || r3()
