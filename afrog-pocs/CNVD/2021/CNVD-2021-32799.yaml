@@ -1,0 +1,21 @@
+id: CNVD-2021-32799
+
+info:
+  name: 天擎终端安全管理系统前台 SQL 注入漏洞
+  author: 你是猪
+  severity: high
+  description: |
+    主要影响： 天擎前台SQL注入
+    FOFA：app="360天擎终端安全管理系统"
+    进一步利用/验证方法，参考下面 reference 链接
+  reference:
+    - https://blog.51cto.com/u_9691128/4295047
+    - https://www.cnvd.org.cn/patchInfo/show/270651
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/dp/rptsvcsyncpoint?ccid=1
+    expression: response.status == 200 && response.body.bcontains(b'"reason":') && response.body.bcontains(b'"success"') && response.body.bcontains(b'"antiadwa":') && response.body.bcontains(b'"clientupgrade":')
+expression: r0()
