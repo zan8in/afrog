@@ -3,15 +3,16 @@ package raw
 import (
 	"errors"
 	"fmt"
-	"github.com/projectdiscovery/rawhttp"
-	"github.com/zan8in/afrog/pkg/proto"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/projectdiscovery/rawhttp"
+	"github.com/zan8in/afrog/pkg/proto"
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
 var (
