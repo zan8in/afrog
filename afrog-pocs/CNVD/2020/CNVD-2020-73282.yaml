@@ -14,5 +14,6 @@ rules:
             headers:
                 Content-Type: application/x-www-form-urlencoded; charset=UTF-8
             body: username=admin&password=hicomadmin&language=zh-cn
-        expression: response.status == 200 && response.body.bcontains(b'true')
+        expression: |
+            response.status == 200 && response.body.bcontains(b'"success":true') && response.body.bcontains(b'"message":') && response.raw_header.bcontains(b'Set-Cookie')  && response.raw_header.bcontains(b'FWSESSID=')
 expression: r1()
