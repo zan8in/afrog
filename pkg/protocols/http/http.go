@@ -636,7 +636,7 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 	return fastResp.Body(), newheader, fastResp.StatusCode(), err
 }
 
-func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, error) {
+func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, *proto.UrlType, error) {
 	var err error
 
 	fastReq := fasthttp.AcquireRequest()
@@ -659,7 +659,21 @@ func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, error) {
 		}
 	}
 
-	return fastResp.Body(), []byte(fastResp.String()), []byte(string(fastReq.Header.String()) + "\n" + string(fastReq.Body())), fastResp.StatusCode(), err
+	u, err := url.Parse(fastReq.URI().String())
+	if err != nil {
+		return nil, nil, nil, 0, &proto.UrlType{}, err
+	}
+	urlType := &proto.UrlType{
+		Scheme:   u.Scheme,
+		Domain:   u.Hostname(),
+		Host:     u.Host,
+		Port:     u.Port(),
+		Path:     u.Path,
+		Query:    u.RawQuery,
+		Fragment: u.Fragment,
+	}
+
+	return fastResp.Body(), []byte(fastResp.String()), []byte(string(fastReq.Header.String()) + "\n" + string(fastReq.Body())), fastResp.StatusCode(), urlType, err
 }
 
 func httpConnError(err error) (string, bool) {

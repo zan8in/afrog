@@ -25,6 +25,7 @@ type Poc struct {
 	Rules      RuleMapSlice  `yaml:"rules"`
 	Expression string        `yaml:"expression"`
 	Info       Info          `yaml:"info"`
+	Gopoc      string        `yaml:"gopoc"` // Gopoc 脚本名称
 }
 
 // TODO REMARK

@@ -65,6 +65,22 @@ func Host2ip(target string) (string, error) {
 	}
 }
 
+func URL2port(target string) (string, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", err
+	}
+	return u.Port(), nil
+}
+
+func URL2schema(target string) (string, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", err
+	}
+	return u.Scheme, nil
+}
+
 // IsIP checks if a string is either IP version 4 or 6. Alias for `net.ParseIP`
 func IsIP(str string) bool {
 	return net.ParseIP(str) != nil
