@@ -168,7 +168,6 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	fun := gopoc.GetGoPocFunc(gopocName)
 	r, err := fun(gpa)
 	if err != nil {
-		fmt.Println(err.Error())
 		c.Result.IsVul = false
 		c.Result.PocInfo = gpa.Poc
 		c.Options.ApiCallBack(c.Result)

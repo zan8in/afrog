@@ -88,7 +88,8 @@ func (o *Options) SetSearchKeyword() bool {
 func (o *Options) CheckPocKeywords(id, name string) bool {
 	if len(o.SearchKeywords) > 0 {
 		for _, v := range o.SearchKeywords {
-			if strings.Contains(id, v) || strings.Contains(name, v) {
+			v = strings.ToLower(v)
+			if strings.Contains(strings.ToLower(id), v) || strings.Contains(strings.ToLower(name), v) {
 				return true
 			}
 		}

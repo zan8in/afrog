@@ -37,16 +37,18 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		pocSlice = append(pocSlice, p)
 	}
 
-	// added gopoc @date: 2022.6.19
-	gopocNameSlice := gopoc.MapGoPocName()
-	if len(gopocNameSlice) > 0 {
-		for _, v := range gopocNameSlice {
-			poc := poc.Poc{}
-			poc.Gopoc = v
-			poc.Id = v
-			poc.Info.Name = v
-			poc.Info.Severity = "unkown"
-			pocSlice = append(pocSlice, poc)
+	if len(e.options.PocsFilePath) == 0 {
+		// added gopoc @date: 2022.6.19
+		gopocNameSlice := gopoc.MapGoPocName()
+		if len(gopocNameSlice) > 0 {
+			for _, v := range gopocNameSlice {
+				poc := poc.Poc{}
+				poc.Gopoc = v
+				poc.Id = v
+				poc.Info.Name = v
+				poc.Info.Severity = "unkown"
+				pocSlice = append(pocSlice, poc)
+			}
 		}
 	}
 
