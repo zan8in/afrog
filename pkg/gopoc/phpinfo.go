@@ -9,14 +9,19 @@ import (
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
-func pocInfo() poc.Info {
-	return poc.Info{
-		Name:        "phpinfo disclosure",
-		Author:      "zan8in",
-		Severity:    "low",
-		Description: "phpinfo disclosure...",
-		Reference: []string{
-			"http://php.net",
+var pocName = "GO-phpinfo"
+
+func pocInfo() poc.Poc {
+	return poc.Poc{
+		Id: pocName,
+		Info: poc.Info{
+			Name:        "phpinfo disclosure",
+			Author:      "zan8in",
+			Severity:    "low",
+			Description: "phpinfo disclosure...",
+			Reference: []string{
+				"http://php.net",
+			},
 		},
 	}
 }
@@ -29,14 +34,14 @@ func check(args *GoPocArgs) (Result, error) {
 	// start
 	req, _ := http.NewRequest("GET", args.Target+"/info.php", nil)
 
-	body, respraw, reqraw, status, err := http2.Gopochttp(req)
+	body, respraw, reqraw, status, url, err := http2.Gopochttp(req)
 	if err != nil {
 		return result, err
 	}
 
 	if status == 200 && bytes.Contains(body, []byte(`PHP Extension`)) && bytes.Contains(body, []byte(`PHP Version`)) {
 		result.IsVul = true
-		result.SetAllPocResult(reqraw, respraw)
+		result.SetAllPocResult(true, url, reqraw, respraw)
 		return result, nil
 	}
 
@@ -44,5 +49,5 @@ func check(args *GoPocArgs) (Result, error) {
 }
 
 func init() {
-	GoPocRegister("phpinfo", check)
+	GoPocRegister(pocName, check)
 }
