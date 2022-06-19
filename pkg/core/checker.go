@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
 
 	"github.com/google/cel-go/checker/decls"
@@ -159,6 +160,31 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 	c.Options.ApiCallBack(c.Result)
 
 	return err
+}
+
+func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
+	gpa := gopoc.New(target)
+
+	fun := gopoc.GetGoPocFunc(gopocName)
+	r, err := fun(gpa)
+	if err != nil {
+		fmt.Println(err.Error())
+		c.Result.IsVul = false
+		c.Result.PocInfo = gpa.Poc
+		c.Options.ApiCallBack(c.Result)
+		return
+	}
+
+	c.Result.IsVul = true
+	c.Result.PocInfo = gpa.Poc
+	if len(r.AllPocResult) > 0 {
+		for _, v := range r.AllPocResult {
+			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul})
+		}
+	}
+	c.Options.ApiCallBack(c.Result)
+
+	return nil
 }
 
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {

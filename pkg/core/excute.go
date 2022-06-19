@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
@@ -34,6 +35,19 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 			continue
 		}
 		pocSlice = append(pocSlice, p)
+	}
+
+	// added gopoc @date: 2022.6.19
+	gopocNameSlice := gopoc.MapGoPocName()
+	if len(gopocNameSlice) > 0 {
+		for _, v := range gopocNameSlice {
+			poc := poc.Poc{}
+			poc.Gopoc = v
+			poc.Id = v
+			poc.Info.Name = v
+			poc.Info.Severity = "unkown"
+			pocSlice = append(pocSlice, poc)
+		}
 	}
 
 	// added search poc by keywords
@@ -103,6 +117,16 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
+
+	// gopoc check
+	if len(poc.Gopoc) > 0 {
+		if err := c.CheckGopoc(target, poc.Gopoc); err != nil {
+			log.Log().Error(err.Error())
+		}
+		return
+	}
+
+	// yaml poc check
 	if err := c.Check(target, poc); err != nil {
 		log.Log().Error(err.Error())
 	}
