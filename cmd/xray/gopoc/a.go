@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/valyala/fasthttp"
 	"io/ioutil"
 	"net"
 	"time"
+
+	"github.com/valyala/fasthttp"
 )
 
 var client *fasthttp.Client

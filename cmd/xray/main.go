@@ -3,10 +3,27 @@ package main
 import (
 	"fmt"
 
+	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 )
 
 func main() {
+	fmt.Println(gopoc.Size())
+
+	args := gopoc.GoPocArgs{}
+	args.SetTarget("127.0.0.1")
+	f := gopoc.GetGoPocFunc("phpinfo")
+	r, err := f(&args)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println("======================================req")
+	fmt.Println(string(r.AllPocResult[0].ResultRequest.Raw))
+	// fmt.Println("======================================resp")
+	// fmt.Println(string(r.AllPocResult[0].ResultResponse.Raw))
+
+	return
 	color := log.NewColor()
 
 	color.Critical("helllo")
