@@ -9,7 +9,7 @@ import (
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
-var redisAuthName = "redis-auth"
+var redisAuthName = "redis-unauth"
 
 func redisAuth(args *GoPocArgs) (Result, error) {
 	// init pocinfo & result
