@@ -86,6 +86,7 @@ func (ht *HtmlTemplate) Html() string {
 		}
 		schema := ""
 		host := ""
+		port := ""
 		path := ""
 		query := ""
 		frament := ""
@@ -94,6 +95,7 @@ func (ht *HtmlTemplate) Html() string {
 		if v.ResultRequest.Url != nil {
 			schema = v.ResultRequest.Url.Scheme
 			host = v.ResultRequest.Url.Host
+			port = v.ResultRequest.Url.Port
 			path = v.ResultRequest.Url.Path
 			if len(v.ResultRequest.Url.Query) > 0 {
 				query = "?" + v.ResultRequest.Url.Query
@@ -104,7 +106,14 @@ func (ht *HtmlTemplate) Html() string {
 			reqraw = v.ResultRequest.GetRaw()
 			respraw = v.ResultResponse.GetRaw()
 		}
-		fullurl := fmt.Sprintf("%s://%s%s%s%s", schema, host, path, query, frament)
+		if len(port) > 0 {
+			port = ":" + port
+		}
+		if len(schema) > 0 {
+			schema = schema + "://"
+		}
+		fullurl := fmt.Sprintf("%s%s%s%s%s%s", schema, host, port, path, query, frament)
+
 		body += fmt.Sprintf(`<tr>
 		<td colspan="3" style="background:#f8f8f8"><a href="%s" target="_blank">%s</a></td>
 	</tr><tr>
