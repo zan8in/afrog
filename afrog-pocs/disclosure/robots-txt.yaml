@@ -1,0 +1,14 @@
+id: robots-txt
+
+info:
+  name: Robots.txt Detected
+  author: zan8in
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /robots.txt
+    expression: response.status == 200 && response.content_type.contains('text/plain') && (response.body.bcontains(b'Disallow:') || response.body.bcontains(b'Allow:'))
+expression: r0()
