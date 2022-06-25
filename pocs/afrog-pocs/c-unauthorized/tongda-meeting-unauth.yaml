@@ -3,7 +3,7 @@ id: tongda-meeting-unauth
 info:
     name: Tongda Meeting Unauthorized Access
     author: 清风明月(www.secbook.info)
-    severity: high
+    severity: low
 
 rules:
     r0:

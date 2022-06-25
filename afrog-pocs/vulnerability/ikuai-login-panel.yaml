@@ -1,0 +1,17 @@
+id: ikuai-login-panel
+
+info:
+  name: iKuai 登录爱快流控路由登录页面
+  author: zan8in
+  severity: info
+  description: |
+    title="登录爱快流控路由"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expression: response.status == 200 && response.body.bcontains(b'<title>登录爱快流控路由')
+expression: r0()

