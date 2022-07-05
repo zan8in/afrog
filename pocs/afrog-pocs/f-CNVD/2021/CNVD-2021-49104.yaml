@@ -4,7 +4,7 @@ info:
   name: 泛微OA E-Office UploadFile.php 任意文件上传漏洞
   author: zan8in
   severity: critical
-  information: |
+  description: |
     在/general/index/UploadFile.php中上传文件过滤不严格导致允许无限制地上传文件，攻击者可以通过该漏洞直接获取网站权限
     app="泛微-EOffice"
   reference:

@@ -4,7 +4,7 @@ info:
   name: 用友 GRP-U8 Proxy SQL注入
   author: zan8in
   severity: high
-  information: |
+  description: |
     用友GRP-u8存在XXE漏洞，该漏洞源于应用程序解析XML输入时没有进制外部实体的加载，导致可加载外部SQL语句，以及命令执行
     title="用友GRP-U8行政事业内控管理软件"
   reference:
