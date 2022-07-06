@@ -110,12 +110,7 @@ func (s *Scan) portscan(port int) {
 }
 
 func (s *Scan) ipscan(ip string, port int, https bool) error {
-	url := ""
-	if !https {
-		url = "http://" + ip + ":" + strconv.Itoa(port)
-	} else {
-		url = "https://" + ip + ":" + strconv.Itoa(port)
-	}
+	url := getHttpSURL(ip, port, https)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -160,4 +155,20 @@ func (s *Scan) ipscan(ip string, port int, https bool) error {
 	// }
 
 	return nil
+}
+
+func getHttpSURL(ip string, port int, tls bool) string {
+	url := ""
+	if port == 443 {
+		url = "https://" + ip + ":" + strconv.Itoa(port)
+	} else if port == 80 || port == 0 {
+		url = "http://" + ip + ":" + strconv.Itoa(port)
+	} else {
+		if !tls {
+			url = "http://" + ip + ":" + strconv.Itoa(port)
+		} else {
+			url = "https://" + ip + ":" + strconv.Itoa(port)
+		}
+	}
+	return url
 }

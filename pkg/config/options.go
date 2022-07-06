@@ -48,8 +48,8 @@ type Options struct {
 	// ports to scan eg: 80,443,8000-9000
 	Port string
 
-	// disable port scan
-	NoPortScan bool
+	// web port scan
+	WebPort bool
 
 	// disable show tips
 	NoTips bool

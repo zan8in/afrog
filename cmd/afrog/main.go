@@ -40,6 +40,8 @@ func main() {
 		&cli.BoolFlag{Name: "nofinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
 		&cli.BoolFlag{Name: "notips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},
 		&cli.BoolFlag{Name: "updatepocs", Aliases: []string{"up"}, Destination: &options.UpdatePocs, Value: false, Usage: "update afrog-pocs"},
+		&cli.BoolFlag{Name: "webport", Aliases: []string{"wp"}, Destination: &options.WebPort, Value: false, Usage: "enable web port scan, default top 1000 port"},
+		&cli.StringFlag{Name: "port", Destination: &options.Port, Value: "", Usage: "web port scan, default top 1000, eg: --port 80,443,8000-9000"},
 	}
 
 	app.Action = func(c *cli.Context) error {
