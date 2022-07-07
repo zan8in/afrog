@@ -13,7 +13,6 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
-	"github.com/zan8in/afrog/pkg/scan"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 )
@@ -98,18 +97,16 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		fmt.Println(ShowTips())
 	}
 
-	fmt.Println("port scan before : ", len(options.Targets))
-
-	if options.WebPort {
-		if scan, err := scan.New(options); err == nil {
-			scan.Execute()
-		}
-	}
-
-	fmt.Println("port scan after : ", len(options.Targets))
-	for k, v := range options.Targets {
-		fmt.Println(k, v)
-	}
+	// fmt.Println("port scan before : ", len(options.Targets))
+	// if options.WebPort {
+	// 	if scan, err := scan.New(options); err == nil {
+	// 		scan.Execute()
+	// 	}
+	// }
+	// fmt.Println("port scan after : ", len(options.Targets))
+	// for k, v := range options.Targets {
+	// 	fmt.Println(k, v)
+	// }
 
 	// fingerprint
 	if !options.NoFinger {
