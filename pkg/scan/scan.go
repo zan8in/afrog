@@ -2,6 +2,7 @@ package scan
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -63,9 +64,10 @@ func New(options *config.Options) (*Scan, error) {
 		return nil, errors.New("parse port error, no found port")
 	}
 
-	// for _, v := range ipSlice {
-	// 	fmt.Println(v)
-	// }
+	for _, v := range ipSlice {
+		fmt.Println(v)
+	}
+	fmt.Println("port len", len(portSlice))
 
 	return &Scan{
 		Options:   options,
@@ -111,6 +113,7 @@ func (s *Scan) portscan(port int) {
 
 func (s *Scan) ipscan(ip string, port int, https bool) error {
 	url := getHttpSURL(ip, port, https)
+	fmt.Println(url)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
