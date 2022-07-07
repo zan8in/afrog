@@ -25,5 +25,3 @@ cmd/afrog/afrog.ico
 cmd/afrog/build.cmd
 cmd/afrog/main.rc
 cmd/afrog/main.syso
-afrog-pocs/
-pocs/
