@@ -1,3 +1,77 @@
+
+### 新增 PoC
+```
+[CNVD-2020-62853] 360 天擎终端安全管理系统越权访问漏洞
+[CNVD-2020-73282] 佑友防火墙弱口令
+[CNVD-2021-32799] 天擎终端安全管理系统前台 SQL 注入漏洞
+[CNVD-2021-39067] H3C IMC dynamiccontent.properties.xhtm 远程命令执行
+[CVE-2007-4556] OpenSymphony XWork/Apache Struts2 - Remote Code Execution S2-001
+[CVE-2012-0392] Apache Struts2 S2-008 RCE
+[CVE-2013-1965] Apache Struts2 S2-012 RCE
+[CVE-2017-12611] Apache Struts2 S2-053 - Remote Code Execution
+[CVE-2017-16894] Laravel .env 配置文件泄露
+[CVE-2017-5638] Apache Struts 2 - Remote Command Execution S2-045 S2-046
+[CVE-2017-8229] Amcrest IP Camera Web Sha1Account1 账号密码泄漏漏洞
+[CVE-2018-11776] Apache Struts2 S2-057 - Remote Code Execution
+[CVE-2018-1273] Spring Data Commons - Remote Code Execution
+[CVE-2018-8715] AppWeb Authentication Bypass vulnerability
+[CVE-2019-0230] Apache Struts <=2.5.20 - Remote Code Execution S2-059
+[CVE-2019-5418] Rails File Content Disclosure
+[CVE-2020-11738] WordPress Duplicator plugin Directory Traversal
+[CVE-2020-11991] Apache Cocoon 2.1.12 XML Injection
+[CVE-2020-17530] Apache Struts 2.0.0-2.5.25 - Remote Code Execution S2-061
+[CVE-2021-1497] Cisco HyperFlex HX Data Platform - Remote Command Execution
+[CVE-2021-1499] Cisco HyperFlex HX Data Platform - File Upload Vulnerability
+[CVE-2021-30461] VoipMonitor <24.61 - Remote Code Execution
+[CVE-2021-3297] Zyxel NBG2105 V1.00(AAGU.2)C0 - Authentication Bypass
+[CVE-2021-41381] Payara Micro Community 5.2021.6 Directory Traversal
+[CVE-2021-42013] Apache 2.4.49/2.4.50 - Path Traversal and Remote Code Execution
+[CVE-2022-22965] Spring Framework RCE JDK 9+
+[CVE-2022-30525] Zyxel Firewall - OS Command Injection
+[hue-login-panel] Cloudera Hue Login Panel
+[appex-lotwan-login-panel] 华夏创新 LotWan广域网优化系统
+[phpmyadmin-panel] phpMyAdmin Panel
+[acti-video-read-file] ACTI 视频监控 images 任意文件读取漏洞
+[bohuangwanglong-cmd-php-rce] 博华网龙防火墙 cmd.php 远程命令执行漏洞(OEM)
+[bohuawanglong-users-xml-password-leak] 博华网龙防火墙 users.xml 未授权访问
+[byzoro-smart-importhtml-rce.yaml] 百卓 Smart importhtml.php 远程命令执行漏洞
+[clickhouse-api-sql-unauth] ClickHouse API 数据库接口未授权访问漏洞
+[dlink-sharecenter-dns-320-rce] D-Link ShareCenter DNS-320 system_mgr.cgi 远程命令执行漏洞
+[e-office-v10-sql-inject] 泛微 eoffice v10 前台 SQL 注入
+[eyou-mail-moni-detail-rce] 亿邮电子邮件系统 moni_detail.do 远程命令执行漏洞
+[feiyuxing-info-leak] 飞鱼星 企业级智能上网行为管理系统 权限绕过信息泄露漏洞
+[flix-ax8-download-read-file] FLIR-AX8 download.php 任意文件下载
+[mpsec-isg1000-file-read] 迈普 ISG1000安全网关 sys_dia_data_down 任意文件下载漏洞
+[haofeng-firewall-setdomain-unauth] 皓峰防火墙 setdomain.php 越权访问漏洞
+[hikvision-gateway-data-file-read] HIKVISION 视频编码设备接入网关 $DATA 任意文件读取
+[hikvision-showfile-file-read] HIKVISION 视频编码设备接入网关 showFile.php 任意文件下载漏洞
+[huiwen-book-config-properties-info-leak] 汇文 图书馆书目检索系统 config.properties 信息泄漏漏洞
+[ikuai-login-panel] iKuai 登录爱快流控路由登录页面
+[kedacom-gateway-file-read] KEDACOM数字系统接入网关 任意文件读取漏洞
+[kedacom-mts-file-read] 科达 MTS转码服务器 任意文件读取漏洞
+[kingsoft-v8-get-file-content-file-read] 金山 V8 终端安全系统 get_file_content.php 任意文件读取漏洞
+[kyan-network-license-php-rce] Kyan 网络监控设备 license.php 远程命令执行漏洞
+[kyan-network-module-php-rce] Kyan 网络监控设备 module.php 远程命令执行漏洞
+[kyan-network-time-php-rce] Kyan 网络监控设备 time.php 远程命令执行漏洞
+[magicflow-main-xp-file-read] MagicFlow 防火墙网关 main.xp 任意文件读取漏洞
+[maike-ras-cookie-bypass] 科迈 RAS系统 Cookie验证越权漏洞
+[msa-gateway-read-file] MSA 互联网管理网关 msa 任意文件下载漏洞
+[netmizer-log-management-cmd-php-rce] NetMizer 日志管理系统 cmd.php 远程命令执行漏洞
+[netmizer-log-management-data-directory-traversal] NetMizer 日志管理系统 data 目录遍历漏洞
+[netpower-download-php-file-read] 中科网威 下一代防火墙控制系统 download.php 任意文件读取漏洞
+[php-zerodium-backdoor] PHP zerodium后门漏洞
+[phpmyadmin-misconfiguration] Sensitive data exposure
+[phpmyadmin-server-import] PhpMyAdmin Server Import
+[phpmyadmin-setup] Publicly Accessible Phpmyadmin Setup
+[sapido-router-rce] Sapido 多款路由器 远程命令执行漏洞
+[selea-targa-camera-read-file] Selea OCR-ANPR摄像机 get_file.php 任意文件读取漏洞
+[tenda-11n-cookie-unauth-access] Tenda 11N无线路由器 Cookie 越权访问漏洞
+[tenda-w15e-routercfm-cfg-config-leak] Tenda W15E企业级路由器 RouterCfm.cfg 配置文件泄漏漏洞
+[wholeton-vpn-info-leak] 惠尔顿 e地通 config.xml 信息泄漏漏洞
+[wisegiga-nas-down-data-php-file-read] WiseGiga NAS down_data.php 任意文件下载漏洞
+[wisegiga-nas-group-php-rce] WiseGiga NAS group.php 远程命令执行漏洞
+```
+### 已内置 PoC
 ```
 [activemq-panel] Apache ActiveMQ Panel
 [adminer-panel] Adminer Login Panel
