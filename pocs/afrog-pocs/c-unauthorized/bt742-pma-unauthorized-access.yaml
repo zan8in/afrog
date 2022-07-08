@@ -10,5 +10,5 @@ rules:
         request:
             method: GET
             path: /pma/
-        expression: response.status == 200 && response.body.bcontains(b"information_schema") && response.body.bcontains(b"phpMyAdmin") && response.body.bcontains(b"server_sql.php")
+        expression: response.status == 200 && response.body.bcontains(b"information_schema") && response.body.ibcontains(b"phpmyadmin") && response.body.bcontains(b"server_sql.php")
 expression: r0()

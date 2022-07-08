@@ -1,0 +1,70 @@
+id: phpmyadmin-server-import
+
+info:
+  name: PhpMyAdmin Server Import
+  author: Cristi vlad (@cristivlad25)
+  severity: high
+  description: Finds Unauthenticated PhpMyAdmin Server Import Pages.
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /pma/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r1:
+        request:
+            method: GET
+            path: /phpmyadmin/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r2:
+        request:
+            method: GET
+            path: /phpMyAdmin 2/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r3:
+        request:
+            method: GET
+            path: /db/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r4:
+        request:
+            method: GET
+            path: /server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r5:
+        request:
+            method: GET
+            path: /PMA/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r6:
+        request:
+            method: GET
+            path: /admin/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r7:
+        request:
+            method: GET
+            path: /admin/pma/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r8:
+        request:
+            method: GET
+            path: /phpMyAdmin/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+    r9:
+        request:
+            method: GET
+            path: /admin/phpMyAdmin/server_import.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'File to import') && response.body.bcontains(b'Location of the text file')
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9()

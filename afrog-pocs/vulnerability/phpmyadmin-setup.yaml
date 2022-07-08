@@ -1,0 +1,69 @@
+id: phpmyadmin-setup
+
+info:
+  name: Publicly Accessible Phpmyadmin Setup
+  author: sheikhrishad,thevillagehacker
+  severity: medium
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r1:
+        request:
+            method: GET
+            path: /_phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r2:
+        request:
+            method: GET
+            path: /forum/phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r3:
+        request:
+            method: GET
+            path: /php/phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r4:
+        request:
+            method: GET
+            path: /typo3/phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r5:
+        request:
+            method: GET
+            path: /web/phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r6:
+        request:
+            method: GET
+            path: /xampp/phpmyadmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r7:
+        request:
+            method: GET
+            path: /sysadmin/phpMyAdmin/scripts/setup.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r8:
+        request:
+            method: GET
+            path: /phpmyadmin/setup/index.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+    r9:
+        request:
+            method: GET
+            path: /pma/setup/index.php
+        expression: |
+            response.status == 200 && response.body.bcontains(b'You want to configure phpMyAdmin using web interface') && response.body.bcontains(b'<title>phpMyAdmin setup</title>')
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9()

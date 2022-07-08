@@ -1,0 +1,24 @@
+id: phpmyadmin-misconfiguration
+
+info:
+  name: Sensitive data exposure
+  author: pussycat0x
+  severity: high
+  description: Unauthenticated phpmyadmin leads to exposure of sensitive information
+  reference: 
+    - https://www.exploit-db.com/ghdb/6997
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /phpmyadmin/index.php?db=information_schema
+        expression: |
+            response.status == 200 && response.body.bcontains(b"var db    = 'information_schema';") && response.body.bcontains(b"var opendb_url = 'db_structure.php';")
+    r1:
+        request:
+            method: GET
+            path: /phpMyAdmin/index.php?db=information_schema
+        expression: |
+            response.status == 200 && response.body.bcontains(b"var db    = 'information_schema';") && response.body.bcontains(b"var opendb_url = 'db_structure.php';")
+expression: r0() || r1()

