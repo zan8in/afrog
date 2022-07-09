@@ -54,7 +54,7 @@ func (ht *HtmlTemplate) Html() string {
 		return ""
 	}
 	title := fmt.Sprintf(`<table>
-	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
+	<thead onclick="$(this).next('tbody').toggle()" style="background:#DDE2DE">
 		<td class="vuln">%s&nbsp;&nbsp;%s</td>
 		<td class="security %s">%s</td>
 		<td class="url">%s</td>
@@ -76,7 +76,7 @@ func (ht *HtmlTemplate) Html() string {
 	header := "<tbody>"
 
 	bodyinfo := fmt.Sprintf(`<tr>
-			<td colspan="3" style="color: #333">%s</td>
+			<td colspan="3">%s</td>
 		</tr>`, info)
 
 	body := ""
@@ -110,9 +110,9 @@ func (ht *HtmlTemplate) Html() string {
 		fullurl := fmt.Sprintf("%s%s%s%s%s", schema, host, path, query, frament)
 
 		body += fmt.Sprintf(`<tr>
-		<td colspan="3" style="background:#f8f8f8"><a href="%s" target="_blank">%s</a></td>
+		<td colspan="3"  style="border-top:1px solid #60786F"><a href="%s" target="_blank">%s</a></td>
 	</tr><tr>
-			<td colspan="3">
+			<td colspan="3" style="background: #223B46; color: #DDE2DE;">
 				<div class="clr">
 				<div class="request w50">
 				<div class="toggleR" onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">→</div>
@@ -182,7 +182,7 @@ func header() string {
 		<title>Afrog Report</title>
 		<style>
 			html,body,div,span,h1,h2,h3,h4,h5,h6,p,pre,a,code,em,img,small,strong,sub,sup,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent;}
-			a{color:#007bc4/*#424242*/; text-decoration:none;outline: none;}
+			a{color:#233B46/*#424242*/; text-decoration:none;outline: none;}
 			a:hover{text-decoration:underline}
 			a:focus {outline:none; -moz-outline:none;}
 			ol,ul{list-style:none}
@@ -197,8 +197,8 @@ func header() string {
 			}
 			body{
 				font-family: 0.3em/1em -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,"Microsoft Yahei",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
-				color: hsl(212.7, 13.3%, 16.3%);
-				background-color: hsl(0, 0%, 100%);
+				color: #233B46;
+				background-color: #C3CAC4;
 				padding: 5px 5px;
 				min-width: 1220px;
 				overflow: scroll;
@@ -208,8 +208,11 @@ func header() string {
 				width: 100%;
 				font-weight: bold;
 				font-size:16px;
-				text-align: center;
-				padding-bottom: 10px;
+				text-align: left;
+				padding-bottom: 5px;
+				padding-top: 5px;
+				background: #4E5B5D;
+				color: #B4C1C3;
 			}
 			.clr {clear: both;}
 			.request {
@@ -310,6 +313,6 @@ func header() string {
 		</script>
 	</head>
 	<body>
-	<div class="top"><a href="https://github.com/zan8in/afrog#%E5%85%8D%E8%B4%A3%E5%A3%B0%E6%98%8E" target="_blank" style="font-size:12px;color:darkorange">Disclaimer</a>&nbsp;&nbsp;&nbsp;Afrog Report&nbsp;&nbsp;&nbsp;<span style="font-size:12px;font-weight:normal;color:darkgrey">` + utils.GetNowDate() + `</span></div>
+	<div class="top">&nbsp;&nbsp;afrog-Report&nbsp;&nbsp;&nbsp;<a href="https://github.com/zan8in/afrog#%E5%85%8D%E8%B4%A3%E5%A3%B0%E6%98%8E" target="_blank" style="font-size:12px;color:darkorange"><i>Disclaimer</i></a>&nbsp;&nbsp;&nbsp;<span style="font-size:12px;font-weight:normal;color:darkgrey">` + utils.GetNowDate() + `</span></div>
 			`
 }
