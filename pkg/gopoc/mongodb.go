@@ -10,7 +10,7 @@ import (
 	"github.com/zan8in/afrog/pkg/proto"
 )
 
-var mongodbUnAuthName = "mongodb-unauth1"
+var mongodbUnAuthName = "mongodb-unauth"
 
 func mongodbAuth(args *GoPocArgs) (Result, error) {
 	poc := poc.Poc{
