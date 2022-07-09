@@ -1,0 +1,26 @@
+id: docker-remote-api-unauth
+
+info:
+  name: Docker remote api Unauth
+  author: zan8in
+  severity: critical
+  description: |
+    该未授权访问漏洞是因为 Docker remote api 可执行docker命令，获取信息
+    从官方文档可以看出，该接口是目的是取代docker 命令界面，通过url操作docker。
+    而Docker swarm是docker下的分布化应用的本地集群，在开放2375监听集群容器时，就会调用这个api
+    protocol="docker"
+  reference:
+    - http://wiki.peiqi.tech/redteam/vulnerability/unauthorized/Docker%202375%E7%AB%AF%E5%8F%A3.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /version
+    expression: response.status == 200 && response.body.bcontains(b'"MinAPIVersion":') && response.body.bcontains(b'"Version":') && response.body.bcontains(b'"ApiVersion":')
+  r1:
+    request:
+      method: GET
+      path: /containers/json
+    expression: response.status == 200 && response.body.bcontains(b'<title>GPON Home Gateway</title>')
+expression: r1()
