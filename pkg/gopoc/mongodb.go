@@ -44,7 +44,7 @@ func mongodbUnAuth(args *GoPocArgs) (Result, error) {
 		err := mongodbPayload(addr, senddata, getlogdata)
 		if err == nil {
 			result.IsVul = true
-			url := proto.UrlType{Host: args.Host, Port: args.Port}
+			url := proto.UrlType{Host: addr, Port: args.Port}
 			result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
 			return result, nil
 		}
@@ -54,7 +54,7 @@ func mongodbUnAuth(args *GoPocArgs) (Result, error) {
 	err := mongodbPayload(addr, senddata, getlogdata)
 	if err == nil {
 		result.IsVul = true
-		url := proto.UrlType{Host: args.Host, Port: mongodbPort}
+		url := proto.UrlType{Host: addr, Port: mongodbPort}
 		result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
 		return result, nil
 	}
