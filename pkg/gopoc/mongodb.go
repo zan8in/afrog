@@ -10,7 +10,7 @@ import (
 	"github.com/zan8in/afrog/pkg/proto"
 )
 
-var mongodbUnAuthName = "mongodb-unauth"
+var mongodbUnAuthName = "mongodb-unauth1"
 
 func mongodbAuth(args *GoPocArgs) (Result, error) {
 	poc := poc.Poc{
@@ -46,6 +46,7 @@ func mongodbAuth(args *GoPocArgs) (Result, error) {
 			return result, nil
 		}
 	}
+
 	addr := args.Host + ":27017"
 	err := mongodbPayload(addr, senddata, getlogdata)
 	if err == nil {
@@ -55,7 +56,7 @@ func mongodbAuth(args *GoPocArgs) (Result, error) {
 		return result, nil
 	}
 
-	return result, nil
+	return result, errors.New("no vulner")
 }
 
 func mongodbPayload(addr string, senddata, getlogdata []byte) error {
@@ -88,7 +89,7 @@ func mongodbPayload(addr string, senddata, getlogdata []byte) error {
 			return nil
 		}
 	}
-	return err
+	return errors.New("no vulner")
 }
 
 func init() {
