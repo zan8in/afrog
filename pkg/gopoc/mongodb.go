@@ -13,7 +13,6 @@ import (
 var mongodbUnAuthName = "mongodb-unauth"
 
 func mongodbAuth(args *GoPocArgs) (Result, error) {
-	// init pocinfo & result
 	poc := poc.Poc{
 		Id: mongodbUnAuthName,
 		Info: poc.Info{
@@ -33,44 +32,63 @@ func mongodbAuth(args *GoPocArgs) (Result, error) {
 		return result, errors.New("no host")
 	}
 
-	addr := args.Host + ":27017"
 	senddata := []byte{58, 0, 0, 0, 167, 65, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 255, 255, 255, 255, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0}
 	getlogdata := []byte{72, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 33, 0, 0, 0, 2, 103, 101, 116, 76, 111, 103, 0, 16, 0, 0, 0, 115, 116, 97, 114, 116, 117, 112, 87, 97, 114, 110, 105, 110, 103, 115, 0, 0}
 	// payload := append(senddata, getlogdata...)
+
+	if len(args.Port) > 0 && args.Port != "80" && args.Port != "443" {
+		addr := args.Host + ":" + args.Port
+		err := mongodbPayload(addr, senddata, getlogdata)
+		if err == nil {
+			result.IsVul = true
+			url := proto.UrlType{Host: args.Host, Port: args.Port}
+			result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
+			return result, nil
+		}
+	}
+	addr := args.Host + ":27017"
+	err := mongodbPayload(addr, senddata, getlogdata)
+	if err == nil {
+		result.IsVul = true
+		url := proto.UrlType{Host: args.Host, Port: "27017"}
+		result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
+		return result, nil
+	}
+
+	return result, nil
+}
+
+func mongodbPayload(addr string, senddata, getlogdata []byte) error {
 	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 	if err != nil {
-		return result, err
+		return err
 	}
 	defer conn.Close()
 	_, err = conn.Write(senddata)
 	if err != nil {
-		return result, err
+		return err
 	}
 	buf := make([]byte, 1024)
 	count, err := conn.Read(buf)
 	if err != nil {
-		return result, err
+		return err
 	}
 	text := string(buf[0:count])
 	if strings.Contains(text, "ismaster") {
 		_, err = conn.Write(getlogdata)
 		if err != nil {
-			return result, err
+			return err
 		}
 		count, err := conn.Read(buf)
 		if err != nil {
-			return result, err
+			return err
 		}
 		text := string(buf[0:count])
 		if strings.Contains(text, "totalLinesWritten") {
-			result.IsVul = true
-			url := proto.UrlType{Host: args.Host, Port: "27017"}
-			result.SetAllPocResult(true, &url, []byte(args.Host+":27017"), []byte("Mongodb Unauth."))
-			return result, nil
+			return nil
 		}
 	}
-
-	return result, errors.New("check result: no vul")
+	return err
 }
 
 func init() {
