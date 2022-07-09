@@ -10,9 +10,12 @@ import (
 	"github.com/zan8in/afrog/pkg/proto"
 )
 
-var mongodbUnAuthName = "mongodb-unauth"
+var (
+	mongodbPort       = "27017"
+	mongodbUnAuthName = "mongodb-unauth"
+)
 
-func mongodbAuth(args *GoPocArgs) (Result, error) {
+func mongodbUnAuth(args *GoPocArgs) (Result, error) {
 	poc := poc.Poc{
 		Id: mongodbUnAuthName,
 		Info: poc.Info{
@@ -47,11 +50,11 @@ func mongodbAuth(args *GoPocArgs) (Result, error) {
 		}
 	}
 
-	addr := args.Host + ":27017"
+	addr := args.Host + ":" + mongodbPort
 	err := mongodbPayload(addr, senddata, getlogdata)
 	if err == nil {
 		result.IsVul = true
-		url := proto.UrlType{Host: args.Host, Port: "27017"}
+		url := proto.UrlType{Host: args.Host, Port: mongodbPort}
 		result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
 		return result, nil
 	}
@@ -93,5 +96,5 @@ func mongodbPayload(addr string, senddata, getlogdata []byte) error {
 }
 
 func init() {
-	GoPocRegister(mongodbUnAuthName, mongodbAuth)
+	GoPocRegister(mongodbUnAuthName, mongodbUnAuth)
 }

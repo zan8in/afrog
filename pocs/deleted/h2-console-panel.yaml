@@ -1,0 +1,21 @@
+id: h2-console-panel
+
+info:
+  name: H2 Console Panel
+  author: 执着
+  severity: critical
+  description: |
+    H2 Console未授权访问，可执行任意系统命令
+    影响版本3.0.1以前"
+  reference:
+    - https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-23221
+    - https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-42392
+
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login.jsp
+    exppression: response.status == 200
+exppression: r0()

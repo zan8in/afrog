@@ -9,12 +9,14 @@ import (
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
-var redisAuthName = "redis-unauth"
+var (
+	redisPort       = "6379"
+	redisUnAuthName = "redis-unauth"
+)
 
-func redisAuth(args *GoPocArgs) (Result, error) {
-	// init pocinfo & result
+func redisUnAuth(args *GoPocArgs) (Result, error) {
 	poc := poc.Poc{
-		Id: redisAuthName,
+		Id: redisUnAuthName,
 		Info: poc.Info{
 			Name:        "Redis 未授权访问",
 			Author:      "zan8in",
@@ -49,7 +51,7 @@ func redisAuth(args *GoPocArgs) (Result, error) {
 		}
 	}
 
-	addr := args.Host + ":6379"
+	addr := args.Host + ":" + redisPort
 	payload := []byte("*1\r\n$4\r\ninfo\r\n")
 
 	resp, err := utils.Tcp(addr, payload)
@@ -59,7 +61,7 @@ func redisAuth(args *GoPocArgs) (Result, error) {
 
 	if bytes.Contains(resp, []byte("redis_version")) {
 		result.IsVul = true
-		url := proto.UrlType{Host: args.Host, Port: "6379"}
+		url := proto.UrlType{Host: args.Host, Port: redisPort}
 		result.SetAllPocResult(true, &url, payload, resp)
 		return result, nil
 	}
@@ -68,5 +70,5 @@ func redisAuth(args *GoPocArgs) (Result, error) {
 }
 
 func init() {
-	GoPocRegister(redisAuthName, redisAuth)
+	GoPocRegister(redisUnAuthName, redisUnAuth)
 }
