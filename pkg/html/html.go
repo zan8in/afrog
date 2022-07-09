@@ -153,7 +153,7 @@ func (ht *HtmlTemplate) htmlFinger(resultSlice []fingerprint.Result) string {
 		return ""
 	}
 	title := `<table class="tablefinger">
-	<thead onclick="$(this).next('tbody').toggle()" style="background:#f5f5f5">
+	<thead onclick="$(this).next('tbody').toggle()" style="background:#DDE2DE">
 	<td class="vuln">000&nbsp;&nbsp;Fingerprint</td>
 	<td class="security info">INFO</td>
 	<td class="url">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
