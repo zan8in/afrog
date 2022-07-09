@@ -281,6 +281,8 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	protoRequest.Body = []byte(rule.Request.Body)
 	variableMap["request"] = protoRequest
 
+	variableMap["fulltarget"] = fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path)
+
 	return err
 }
 

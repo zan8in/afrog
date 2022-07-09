@@ -131,6 +131,8 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 	tempResultRequest.ContentType = tempResultRequest.Headers["content-type"]
 	variableMap["request"] = tempResultRequest
 
+	variableMap["fulltarget"] = fmt.Sprintf("%s://%s%s", tempResultRequest.Url.Scheme, tempResultRequest.Url.Host, tempResultRequest.Url.Path)
+
 	return err
 }
 

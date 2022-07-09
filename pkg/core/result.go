@@ -14,6 +14,7 @@ import (
 type Result struct {
 	IsVul        bool
 	Target       string
+	FullTarget   string
 	PocInfo      *poc.Poc
 	AllPocResult []*PocResult
 	Output       string
@@ -85,7 +86,7 @@ func (r *Result) PrintColorResultInfoConsole(number string) {
 	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
-			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + r.Target + "\r\n")
+			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + r.FullTarget + "\r\n")
 }
 
 func (r *Result) Reset() {
