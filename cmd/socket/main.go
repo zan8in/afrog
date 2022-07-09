@@ -71,7 +71,15 @@ func multiTestHttp() {
 }
 
 func main() {
-	multiTestHttp()
+	// multiTestHttp()
+	// testDialHost("47.254.87.212:873")
+
+	r, err := utils.Tcp("47.254.87.212:873", []byte("info\r\n"))
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	fmt.Println(string(r))
 
 	// r, err := utils.Tcp("58.152.168.153:3306", []byte("GET /r.html HTTP/1.0\r\n\r\n"))
 	// fmt.Println(string(r), err)
