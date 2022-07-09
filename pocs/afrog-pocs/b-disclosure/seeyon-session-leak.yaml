@@ -12,5 +12,5 @@ rules:
         request:
             method: GET
             path: /yyoa/ext/https/getSessionList.jsp?cmd=getAll
-        expression: response.status == 200 && response.body.bcontains(b"<SessionList>\r\n<Session>\r\n<usrID>")
+        expression: response.status == 200 && response.body.bcontains(b"<usrID>") && response.body.bcontains(b"<sessionID>")
 expression: r0()

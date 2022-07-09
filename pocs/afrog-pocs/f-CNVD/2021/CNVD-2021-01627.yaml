@@ -1,0 +1,21 @@
+id: CNVD-2021-01627
+
+info:
+    name: Seeyon 致远 OA 文件上传
+    author: gy741
+    severity: critical
+    description: fofa app="致远互联-Seeyon-Server"
+    reference:
+        - https://www.programmersought.com/article/92658169875/
+        - https://mp.weixin.qq.com/s/bHKDSF7HWsAgQi9rTagBQA
+        - https://buaq.net/go-53721.html
+        - http://wiki.peiqi.tech/wiki/oa/%E8%87%B4%E8%BF%9COA/%E8%87%B4%E8%BF%9COA%20ajax.do%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%20CNVD-2021-01627.html
+
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /seeyon/thirdpartyController.do.css/..;/ajax.do
+        expression: response.status == 200 && response.body.bcontains(bytes("java.lang.NullPointerException:null")) && response.content_type.contains("text/html")
+expression: r0() 
