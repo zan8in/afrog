@@ -9,7 +9,7 @@ import (
 )
 
 func ShowBanner() string {
-	return log.LogColor.Bold("afrog ") + log.LogColor.Banner("人生如戏.戏如梦")
+	return log.LogColor.Bold("afrog ") + log.LogColor.Banner("真的想你")
 }
 
 func ShowUsage() string {

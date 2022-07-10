@@ -10,5 +10,65 @@ rules:
     request:
       method: GET
       path: /phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && "v=([a-z0-9-._]+)".bmatches(response.body)
-expression: r0()
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /phpMyAdmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r2:
+    request:
+      method: GET
+      path: /xampp/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r3:
+    request:
+      method: GET
+      path: /web/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r4:
+    request:
+      method: GET
+      path: /typo3/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r5:
+    request:
+      method: GET
+      path: /forum/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r6:
+    request:
+      method: GET
+      path: /php/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r7:
+    request:
+      method: GET
+      path: /phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r8:
+    request:
+      method: GET
+      path: /blog/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body
+  r9:
+    request:
+      method: GET
+      path: /apache-default/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r10:
+    request:
+      method: GET
+      path: /administrator/components/com_joommyadmin/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r11:
+    request:
+      method: GET
+      path: /_phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+  r12:
+    request:
+      method: GET
+      path: /admin/phpmyadmin/
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin') && response.body.bcontains(b'pmahomme') && 'v=([a-z0-9-._]+)'.bmatches(response.body)
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() | r10() || r11() || r12()

