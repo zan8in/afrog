@@ -6,6 +6,7 @@
   <a href="https://github.com/zan8in/afrog/blob/main/GUIDE.md">指南</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md">贡献</a> •
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/PORLIST.md">列表</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
 
@@ -63,8 +64,16 @@ afrog -t http://127.0.0.1 --nf
 html 报告
 ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png)
 
-## PoC 列表
-### [查看 PoC 列表](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
+## 交流群
+
+> 微信群请先添加 afrog 个人账号，并备注「afrog」，然后会把大家拉到 afrog 交流群中。
+
+<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
+
+## 404星链计划
+<img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
+
+afrog 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
 
 ## 免责声明
 
@@ -77,14 +86,3 @@ html 报告
 如您在使用本工具的过程中存在任何非法行为，您需自行承担相应后果，我们将不承担任何法律及连带责任。
 
 在安装并使用本工具前，请您**务必审慎阅读、充分理解各条款内容**，限制、免责条款或者其他涉及您重大权益的条款可能会以加粗、加下划线等形式提示您重点注意。 除非您已充分阅读、完全理解并接受本协议所有条款，否则，请您不要安装并使用本工具。您的使用行为或者您以其他任何明示或者默示方式表示接受本协议的，即视为您已阅读并同意本协议的约束。
-
-## 交流群
-
-> 微信群请先添加 afrog 个人账号，并备注「afrog」，然后会把大家拉到 afrog 交流群中。
-
-<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
-
-## 404星链计划
-<img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
-
-afrog 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
