@@ -59,9 +59,9 @@ afrog -t http://127.0.0.1 --nf
 
 ## 截图
 控制台
-![](https://github.com/zan8in/afrog/blob/main/images/2.png)
+![](https://github.com/zan8in/afrog/blob/main/images/scan-new.png)
 html 报告
-![](https://github.com/zan8in/afrog/blob/main/images/2.png)
+![](https://github.com/zan8in/afrog/blob/main/images/report-new.png)
 
 ## PoC 列表
 ### [查看 PoC 列表](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
