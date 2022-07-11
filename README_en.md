@@ -2,8 +2,11 @@
 <p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[626]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC directory</a> •
-  <a href="https://github.com/zan8in/afrog">中文文档</a>
+  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/GUIDE.md">Guide</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md">Contribution</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">中文文档</a>
 </p>
 
 
@@ -13,13 +16,13 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 
 ## Features
 
-* [x] Based on xray kernel, not like xray ([afrog template syntax](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md))
-* [x] Great performance, least requests, best results
-* [x] Real-time display, scanning progress 
-* [x] View `request` and `response` packets of scan results 
+* [x] open source
+* [x] Fast, stable, low false positives
+* [x] Detailed html bug report
+* [x] PoC can be customized and updated stably 
 * [x] Start the program to automatically update the local PoC library  
-* [x] Long-term maintenance, update PoC （[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs) ）
-* [x] For secondary development, refer to `cmd/afrog/main.go` or join **[communication group](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7% BE%A4)** Consulting
+* [x] Active community exchange group
+* [x] long-term maintenance
 
 ## Download afrog
 
@@ -31,48 +34,37 @@ afrog is an excellent performance, fast and stable, PoC customizable vulnerabili
 
 ## Example
 
-Scan a single target.
+Basic usage
+```
+# scan a target
+afrog -t http://127.0.0.1
+
+# Scan multiple targets
+afrog -T urls.txt
+
+# Specify a scan report file
+afrog -t http://127.0.0.1-o result.html
+```
+
+Advanced usage
 
 ```
-afrog -t http://127.0.0.1 -o result.html
+# Test PoC 
+afrog -t http://127.0.0.1 -P ./test/ 
+afrog -t http://127.0.0.1 -P ./test/demo.yaml 
+
+# Scan by PoC keywords 
+afrog -t http://127.0.0.1 -s tomcat,springboot,shiro 
+
+# Scan by Poc Vulnerability Level 
+afrog -t http://127.0.0.1 -S high,critical 
+
+# Online update afrog-pocs 
+afrog --up 
+
+# Disable fingerprint recognition 
+afrog -t http://127.0.0.1 --nf
 ```
-![](https://github.com/zan8in/afrog/blob/main/images/onescan.png)
-
-Scan multiple targets.
-
-```
-afrog -T urls.txt -o result.html
-```
-For example: `urls.txt `
-```
-http://192.168.139.129:8080
-http://127.0.0.1
-```
-![](https://github.com/zan8in/afrog/blob/main/images/twoscan.png)
-
-Test a single PoC file
-
-```
-afrog -t http://127.0.0.1 -P ./testing/poc-test.yaml -o result.html
-```
-![](https://github.com/zan8in/afrog/blob/main/images/threescan.png)
-
-Test multiple PoC files 
-
-```
-afrog -t http://127.0.0.1 -P ./testing/ -o result.html
-```
-![](https://github.com/zan8in/afrog/blob/main/images/fourscan.png)
-
-Output html report 
-
-![](https://github.com/zan8in/afrog/blob/main/images/2.png)
-
-![](https://github.com/zan8in/afrog/blob/main/images/3.png)
-
-## How to contribute to PoC?
-
-### [View tutorial](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION_en.md)
 
 ## PoC List
 ### [View PoC List](https://github.com/zan8in/afrog/blob/main/POCLIST.md)

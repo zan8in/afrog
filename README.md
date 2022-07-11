@@ -1,8 +1,11 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[626]</b> 个<br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[626]</b> 个 PoC <br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC 仓库</a> •
+  <a href="https://github.com/zan8in/afrog/releases">下载</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/GUIDE.md">指南</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md">贡献</a> •
+  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">English Doc</a>
 </p>
 
@@ -13,65 +16,46 @@ afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描工具�
 
 ## 特点
 
-* [x] 基于 xray 内核，又不像 xray（[**afrog 模板语法**](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/README.md)）
-* [x] 性能卓越，快速稳定
-* [x] 实时显示，扫描进度
-* [x] 输出 html 报告，方便查看 `request` 和 `response`
-* [x] 启动程序，自动更新本地 PoC 库
-* [x] 长期维护、更新 PoC（[**afrog-pocs**](https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs)）
-* [x] 二次开发，参考 `cmd/afrog/main.go` 或加入 **[交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)**
+* [x] 开源
+* [x] 快速、稳定、误报低
+* [x] 详细的 html 漏洞报告
+* [x] PoC 可定制化、稳定更新
+* [x] 活跃的社区 [交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)
+* [x] 长期维护
 
-## 下载
+## 示例
 
-### [下载地址](https://github.com/zan8in/afrog/releases)
-
-## 使用指南
-
-### [查看指南](https://github.com/zan8in/afrog/blob/main/GUIDE.md)
-
-## 例子
-
-扫描单个目标
+基本用法
 ```
-afrog -t http://127.0.0.1 -o result.html
-```
-![](https://github.com/zan8in/afrog/blob/main/images/onescan.png)
+# 扫描一个目标
+afrog -t http://127.0.0.1
 
-扫描多个目标
+# 扫描多个目标
+afrog -T urls.txt
+
+# 指定漏扫报告文件
+afrog -t http://127.0.0.1-o result.html
+```
+
+高级用法
 
 ```
-afrog -T urls.txt -o result.html
+# 测试 PoC 
+afrog -t http://127.0.0.1 -P ./test/ 
+afrog -t http://127.0.0.1 -P ./test/demo.yaml 
+
+# 按 PoC 关键字扫描 
+afrog -t http://127.0.0.1 -s tomcat,springboot,shiro 
+
+# 按 Poc 漏洞等级扫描 
+afrog -t http://127.0.0.1 -S high,critical 
+
+# 在线更新 afrog-pocs 
+afrog --up 
+
+# 禁用指纹识别，直接漏扫 
+afrog -t http://127.0.0.1 --nf
 ```
-例如：`urls.txt`
-```
-http://192.168.139.129:8080
-http://127.0.0.1
-```
-![](https://github.com/zan8in/afrog/blob/main/images/twoscan.png)
-
-测试单个 PoC 文件
-
-```
-afrog -t http://127.0.0.1 -P ./testing/poc-test.yaml -o result.html
-```
-![](https://github.com/zan8in/afrog/blob/main/images/threescan.png)
-
-测试多个 PoC 文件
-
-```
-afrog -t http://127.0.0.1 -P ./testing/ -o result.html
-```
-![](https://github.com/zan8in/afrog/blob/main/images/fourscan.png)
-
-输出 html 报告
-
-![](https://github.com/zan8in/afrog/blob/main/images/2.png)
-
-![](https://github.com/zan8in/afrog/blob/main/images/3.png)
-
-## 如何贡献 PoC？
-
-### [查看教程](https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md)
 
 ## PoC 列表
 ### [查看 PoC 列表](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
