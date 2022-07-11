@@ -3,11 +3,11 @@
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/GUIDE.md">Guide</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/CONTRIBUTION.md">Contribution</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/docs/GUIDE.md">Guide</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/docs/CONTRIBUTION.md">Contribution</a> •
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/PORLIST.md">LIST</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/README_en.md">中文文档</a>
+  <a href="https://github.com/zan8in/afrog/blob/main/docs/PORLIST.md">LIST</a> •
+  <a href="https://github.com/zan8in/afrog">中文文档</a>
 </p>
 
 
