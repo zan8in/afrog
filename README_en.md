@@ -65,6 +65,11 @@ afrog --up
 # Disable fingerprint recognition 
 afrog -t http://127.0.0.1 --nf
 ```
+## Screenshot
+Console
+![](https://github.com/zan8in/afrog/blob/main/images/2.png)
+Html report
+![](https://github.com/zan8in/afrog/blob/main/images/2.png)
 
 ## PoC List
 ### [View PoC List](https://github.com/zan8in/afrog/blob/main/POCLIST.md)

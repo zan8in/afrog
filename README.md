@@ -57,6 +57,12 @@ afrog --up
 afrog -t http://127.0.0.1 --nf
 ```
 
+## 截图
+控制台
+![](https://github.com/zan8in/afrog/blob/main/images/2.png)
+html 报告
+![](https://github.com/zan8in/afrog/blob/main/images/2.png)
+
 ## PoC 列表
 ### [查看 PoC 列表](https://github.com/zan8in/afrog/blob/main/POCLIST.md)
 
