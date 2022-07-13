@@ -80,11 +80,11 @@ func main() {
 					// PoC Scan
 					number++
 
+					r.PrintColorResultInfoConsole(utils.GetNumberText(number))
+
 					htemplate.Result = r
 					htemplate.Number = utils.GetNumberText(number)
 					htemplate.Append()
-
-					r.PrintColorResultInfoConsole(utils.GetNumberText(number))
 				}
 			}
 

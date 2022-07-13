@@ -26,7 +26,7 @@ func (sf *Syncfile) Write(content string) {
 	wbuf.WriteString(content)
 	wbuf.Flush()
 
-	RandSleep(1)
+	RandSleep(500)
 
 	sf.mutex.Unlock()
 }
