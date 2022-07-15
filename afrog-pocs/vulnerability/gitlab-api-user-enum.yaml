@@ -1,0 +1,66 @@
+id: gitlab-api-user-enum
+
+info:
+  name: GitLab - User Information Disclosure Via Open API
+  author: Suman_Kar
+  severity: medium
+  reference:
+    - https://gitlab.com/gitlab-org/gitlab-foss/-/issues/40158
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/v4/users/1
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r1:
+    request:
+      method: GET
+      path: /api/v4/users/2
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r2:
+    request:
+      method: GET
+      path: /api/v4/users/3
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r3:
+    request:
+      method: GET
+      path: /api/v4/users/4
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r4:
+    request:
+      method: GET
+      path: /api/v4/users/5
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r5:
+    request:
+      method: GET
+      path: /api/v4/users/6
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r6:
+    request:
+      method: GET
+      path: /api/v4/users/7
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r7:
+    request:
+      method: GET
+      path: /api/v4/users/8
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r8:
+    request:
+      method: GET
+      path: /api/v4/users/9
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r9:
+    request:
+      method: GET
+      path: /api/v4/users/10
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+  r10:
+    request:
+      method: GET
+      path: /api/v4/users/2
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"name":')
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() || r10()
