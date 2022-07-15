@@ -638,7 +638,7 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 	return fastResp.Body(), newheader, fastResp.StatusCode(), err
 }
 
-func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, *proto.UrlType, error) {
+func Gopochttp(httpRequest *http.Request, redirects int) ([]byte, []byte, []byte, int, *proto.UrlType, error) {
 	var err error
 
 	fastReq := fasthttp.AcquireRequest()
@@ -651,7 +651,12 @@ func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, *proto.U
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	err = F.DoRedirects(fastReq, fastResp, 3)
+	if redirects > 0 {
+		err = F.DoRedirects(fastReq, fastResp, 3)
+	} else {
+		err = F.DoTimeout(fastReq, fastResp, time.Duration(6)*time.Second)
+	}
+
 	if err != nil {
 		errName, known := httpConnError(err)
 		if known {
@@ -675,7 +680,7 @@ func Gopochttp(httpRequest *http.Request) ([]byte, []byte, []byte, int, *proto.U
 		Fragment: u.Fragment,
 	}
 
-	return fastResp.Body(), []byte(fastResp.String()), []byte(string(fastReq.Header.String()) + "\n" + string(fastReq.Body())), fastResp.StatusCode(), urlType, err
+	return []byte(fastReq.String()), fastResp.Body(), []byte(fastResp.Header.String()), fastResp.StatusCode(), urlType, err
 }
 
 func httpConnError(err error) (string, bool) {
