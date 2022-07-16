@@ -1,0 +1,41 @@
+id: gitlab-user-enum
+
+info:
+  name: GitLab - User Enumeration
+  author: Suman_Kar
+  severity: info
+  reference:
+    - https://github.com/danielmiessler/SecLists/blob/master/Usernames/Names/malenames-usa-top1000.txt
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /users/root/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /users/alert-bot/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+  r2:
+    request:
+      method: GET
+      path: /users/support-bot/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+  r3:
+    request:
+      method: GET
+      path: /users/devops_user/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+  r4:
+    request:
+      method: GET
+      path: /users/jenkins/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+  r5:
+    request:
+      method: GET
+      path: /users/user/exists
+    expression: response.status == 200 && response.raw_header.bcontains(b'application/json') && "exists.*:true".bmatches(response.body)
+expression: r0() || r1() || r2() || r3() || r4() || r5()
