@@ -49,9 +49,13 @@ func main() {
 		upgrade.IsUpdatePocs = options.UpdatePocs
 		upgrade.UpgradeAfrogPocs()
 
-		runner.ShowBanner2(upgrade.LastestAfrogVersion)
+		if !options.UpdatePocs {
+			runner.ShowBanner2(upgrade.LastestAfrogVersion)
+		}
 
-		printPathLog(upgrade)
+		if !options.UpdatePocs {
+			printPathLog(upgrade)
+		}
 
 		if len(options.Output) == 0 {
 			options.Output = utils.GetNowDateTimeReportName() + ".html"
@@ -103,7 +107,7 @@ func main() {
 	}
 
 	err := app.Run(os.Args)
-	if err != nil {
+	if err != nil && !options.UpdatePocs {
 		fmt.Println(runner.ShowTips())
 		fmt.Println(log.LogColor.High("start afrog failed，", err.Error()))
 	}
