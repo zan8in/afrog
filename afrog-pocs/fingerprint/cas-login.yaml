@@ -1,0 +1,19 @@
+id: cas-login
+
+info:
+  name: CAS Login Panel
+  author: pdteam
+  severity: info
+  description: |
+    shodan-query: http.title:'CAS - Central Authentication Service'
+  reference:
+    - https://github.com/apereo/cas
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cas/login
+      follow_redirects: true
+    expression: response.status == 200 && response.body.bcontains(b'Central Authentication Service')
+expression: r0()
