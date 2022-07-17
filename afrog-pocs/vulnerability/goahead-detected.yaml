@@ -1,0 +1,20 @@
+id: goahead-detected
+
+info:
+  name: Goahead Detected
+  author: zan8in
+  severity: info
+  description: |
+    GoAhead是一个开源(商业许可)、简单、轻巧、功能强大、可以在多个平台运行的Web Server，多用于嵌入式系统、智能设备。其支持运行ASP、Javascript和标准的CGI程序。
+    app="GoAhead"
+  reference:
+    - http://wiki.peiqi.tech/wiki/webserver/Goahead/Goahead%20LD_PRELOAD%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E%20CVE-2021-42342.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expression: response.headers["server"].icontains('goahead')
+expression: r0()
