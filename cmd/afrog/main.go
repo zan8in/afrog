@@ -49,13 +49,9 @@ func main() {
 		upgrade.IsUpdatePocs = options.UpdatePocs
 		upgrade.UpgradeAfrogPocs()
 
-		if !options.UpdatePocs {
-			runner.ShowBanner2(upgrade.LastestAfrogVersion)
-		}
+		runner.ShowBanner2(upgrade.LastestAfrogVersion)
 
-		if !options.UpdatePocs {
-			printPathLog(upgrade)
-		}
+		printPathLog(upgrade)
 
 		if len(options.Output) == 0 {
 			options.Output = utils.GetNowDateTimeReportName() + ".html"
