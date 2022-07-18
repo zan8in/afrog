@@ -20,6 +20,7 @@ release
 reports
 .vscode
 .idea
+sec-pocs
 
 cmd/afrog/afrog.ico
 cmd/afrog/build.cmd
