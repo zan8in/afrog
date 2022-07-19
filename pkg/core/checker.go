@@ -178,6 +178,7 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	}
 
 	c.Result.Target = target
+	c.Result.FullTarget = target
 	c.Result.IsVul = true
 	c.Result.PocInfo = gpa.Poc
 	if len(r.AllPocResult) > 0 {
