@@ -1,0 +1,14 @@
+id: thinkphp-debug-detected
+
+info:
+  name: Thinkphp Debug Detected
+  author: zan8in
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?s=afrogThinkphpDebugTest
+    expression: response.status == 404 && response.body.bcontains(b'HttpException') && response.body.bcontains(b'<td>THINK_PATH</td>') && response.body.bcontains(b'模块不存在:') && response.body.bcontains(b'afrogThinkphpDebugTest')
+expression: r0()
