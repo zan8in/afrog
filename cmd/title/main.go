@@ -21,11 +21,18 @@ var (
 )
 
 func main() {
-	urls, err := utils.ReadFileLineByLine("./urls.txt")
+	urls, err := utils.ReadFileLineByLine("./test2.txt")
 	if err != nil {
 		fmt.Println("urls is empty.")
 		return
 	}
+
+	for _, u := range urls {
+		str := http2.CheckHttpOrHttps(u)
+		fmt.Println(str)
+	}
+
+	return
 
 	for _, u := range urls {
 		ip, err := scan.Target2ip(u)

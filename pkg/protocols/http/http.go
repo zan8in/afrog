@@ -575,6 +575,30 @@ func GetTitleRedirect(httpRequest *http.Request, redirect int) ([]byte, int, err
 	return fastResp.Body(), fastResp.StatusCode(), err
 }
 
+func GetTimeout(httpRequest *http.Request, timeout int) ([]byte, int, error) {
+	var err error
+
+	fastReq := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(fastReq)
+
+	CopyRequest(httpRequest, fastReq, nil)
+
+	fastResp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(fastResp)
+
+	err = F.DoTimeout(fastReq, fastResp, time.Duration(timeout)*time.Second)
+	if err != nil {
+		errName, known := httpConnError(err)
+		if known {
+			log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
+		} else {
+			log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
+		}
+	}
+
+	return fastResp.Body(), fastResp.StatusCode(), err
+}
+
 var (
 	strLocation = []byte("Location")
 )
@@ -681,6 +705,52 @@ func Gopochttp(httpRequest *http.Request, redirects int) ([]byte, []byte, []byte
 	}
 
 	return []byte(fastReq.String()), fastResp.Body(), []byte(fastResp.Header.String()), fastResp.StatusCode(), urlType, err
+}
+
+func CheckHttpOrHttps(target string) string {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return target
+	}
+
+	u, err := url.Parse("http://" + target)
+	if err != nil {
+		return target
+	}
+
+	port := u.Port()
+	// fmt.Println("-------------", port)
+
+	switch {
+	case port == "80" || len(port) == 0:
+		return "http://" + target
+	case port == "443":
+		return "https://" + target
+	}
+
+	req, err := http.NewRequest("GET", "http://"+target, nil)
+	if err != nil {
+		return target
+	}
+
+	resp, _, err := GetTimeout(req, 10)
+	if err == nil {
+		if bytes.Contains(resp, []byte("<title>400 The plain HTTP request was sent to HTTPS port</title>")) {
+			return "https://" + target
+		}
+		return "http://" + target
+	}
+
+	req2, err2 := http.NewRequest("GET", "https://"+target, nil)
+	if err2 != nil {
+		return target
+	}
+
+	_, _, err2 = GetTimeout(req2, 10)
+	if err2 == nil {
+		return "https://" + target
+	}
+
+	return target
 }
 
 func httpConnError(err error) (string, bool) {

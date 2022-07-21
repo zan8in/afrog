@@ -73,9 +73,8 @@ func main() {
 
 			if r.IsVul {
 				if r.FingerResult != nil {
-					// Fingerprint Scan
-					//fr := r.FingerResult.(fingerprint.Result)
-					//printFingerprintInfoConsole(fr)
+					fr := r.FingerResult.(fingerprint.Result)
+					printFingerprintInfoConsole(fr)
 				} else {
 					// PoC Scan
 					number++

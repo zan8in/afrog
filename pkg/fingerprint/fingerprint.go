@@ -76,14 +76,18 @@ func (s *Service) executeFingerPrintDetection() {
 		}
 
 		swg := sizedwaitgroup.New(size)
-		for _, url := range s.Options.Targets {
+		for k, url := range s.Options.Targets {
 			swg.Add()
-			go func(url string) {
+			go func(k int, url string) {
 				defer swg.Done()
+
+				url = http2.CheckHttpOrHttps(url)
+				s.Options.Targets[k] = url
+
 				s.processFingerPrintInputPair(url)
 				// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
 
-			}(url)
+			}(k, url)
 		}
 		swg.Wait()
 	}
