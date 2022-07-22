@@ -59,6 +59,10 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	if len(options.Targets) == 0 {
 		return errors.New("not found targets")
 	}
+	// targets handler
+	for _, v := range options.Targets {
+		options.SetCheckLiveValue(v)
+	}
 
 	// init pocs
 	allPocsEmbedYamlSlice := []string{}
