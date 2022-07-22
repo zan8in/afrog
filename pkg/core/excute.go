@@ -4,6 +4,7 @@ import (
 	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
+	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 )
@@ -74,15 +75,16 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	// init scan sum
 	e.options.Count += len(e.options.Targets) * len(newPocSlice)
 
-	swg := e.workPool.PocSwg
+	// swg := e.workPool.PocSwg
+	swg := e.workPool.NewPool(e.workPool.config.PocConcurrencyType)
 	for _, p := range newPocSlice {
-		swg.Add()
+		swg.WaitGroup.Add()
 		go func(p poc.Poc) {
-			defer swg.Done()
+			defer swg.WaitGroup.Done()
 			e.executeTargets(p)
 		}(p)
 	}
-	e.workPool.Wait()
+	swg.WaitGroup.Wait()
 }
 
 func (e *Engine) executeTargets(poc1 poc.Poc) {
@@ -99,13 +101,25 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 	}
 
 	wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
-	for _, target := range allTargets {
+	for k, target := range allTargets {
 		wg.WaitGroup.Add()
-		go func(target string, poc1 poc.Poc) {
+		go func(k int, target string, poc1 poc.Poc) {
 			defer wg.WaitGroup.Done()
-			//fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
+
+			// add: check target alive
+			if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
+				target = http2.CheckLive(target)
+				if !http2.IsFullHttpFormat(target) {
+					e.options.SetCheckLiveValue(target)
+				} else {
+					e.options.Targets[k] = target
+				}
+			}
+
 			e.executeExpression(target, poc1)
-		}(target, poc1)
+
+			// fmt.Println("poc the number of goroutines: ", runtime.NumGoroutine())
+		}(k, target, poc1)
 	}
 	wg.WaitGroup.Wait()
 }
@@ -116,6 +130,8 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 			log.Log().Error("gorutine recover() error from pkg/core/exccute/executeExpression")
 		}
 	}() // https://github.com/zan8in/afrog/issues/7
+
+	// fmt.Println("target the number of goroutines: ", runtime.NumGoroutine())
 
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
