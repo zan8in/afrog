@@ -38,6 +38,13 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		}
 	}()
 
+	// check target alive.
+	if alive := c.Options.CheckLiveByCount(target); !alive {
+		c.Result.IsVul = false
+		c.Options.ApiCallBack(c.Result)
+		return err
+	}
+
 	c.Result.Target = target
 	c.Result.PocInfo = &pocItem
 
@@ -168,13 +175,20 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	gpa := gopoc.New(target)
 
+	// check target alive.
+	if alive := c.Options.CheckLiveByCount(target); !alive {
+		c.Result.IsVul = false
+		c.Options.ApiCallBack(c.Result)
+		return err
+	}
+
 	fun := gopoc.GetGoPocFunc(gopocName)
 	r, err := fun(gpa)
 	if err != nil {
 		c.Result.IsVul = false
 		c.Result.PocInfo = gpa.Poc
 		c.Options.ApiCallBack(c.Result)
-		return
+		return err
 	}
 
 	c.Result.Target = target
