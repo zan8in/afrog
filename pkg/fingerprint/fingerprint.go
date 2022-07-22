@@ -81,12 +81,21 @@ func (s *Service) executeFingerPrintDetection() {
 			go func(k int, url string) {
 				defer swg.Done()
 
-				url = http2.CheckHttpOrHttps(url)
-				s.Options.Targets[k] = url
+				// add: check target alive
+				if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
+					url = http2.CheckLive(url)
+					if !http2.IsFullHttpFormat(url) {
+						s.Options.SetCheckLiveValue(url)
+						s.PrintColorResultInfoConsole(Result{})
+						return
+					} else {
+						s.Options.Targets[k] = url
+					}
+				}
 
 				s.processFingerPrintInputPair(url)
-				// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
 
+				// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
 			}(k, url)
 		}
 		swg.Wait()
