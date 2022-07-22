@@ -68,6 +68,9 @@ type Options struct {
 
 	// Callback scan result
 	ApiCallBack ApiCallBack
+
+	// CheckLive
+	CheckLiveMap sync.Map
 }
 
 type ApiCallBack func(interface{})
@@ -119,4 +122,34 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 		}
 	}
 	return false
+}
+
+// check live by count, alive if result is true  else not alive.
+func (o *Options) CheckLiveByCount(url string) bool {
+	c, b := o.GetCheckLiveValue(url)
+	if c >= 3 {
+		// fmt.Println(url, "c>3", c, b)
+		return false
+	}
+	if !b {
+		o.SetCheckLiveValue(url)
+
+		// c, b := o.GetCheckLiveValue(url)
+		// fmt.Println(url, "no http(s)", c, b)
+	}
+	return true
+}
+
+func (o *Options) SetCheckLiveValue(key string) {
+	c, b := o.CheckLiveMap.Load(key)
+	if b && c.(int) < 3 {
+		o.CheckLiveMap.Store(key, c.(int)+1)
+	} else {
+		o.CheckLiveMap.Store(key, 0)
+	}
+}
+
+func (o *Options) GetCheckLiveValue(key string) (int, bool) {
+	c, b := o.CheckLiveMap.LoadOrStore(key, 0)
+	return c.(int), b
 }
