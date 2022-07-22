@@ -575,8 +575,13 @@ func GetTitleRedirect(httpRequest *http.Request, redirect int) ([]byte, int, err
 	return fastResp.Body(), fastResp.StatusCode(), err
 }
 
-func GetTimeout(httpRequest *http.Request, timeout int) ([]byte, int, error) {
+func GetTimeout(target string, timeout int) ([]byte, int, error) {
 	var err error
+
+	httpRequest, err := http.NewRequest("GET", target, nil)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	fastReq := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(fastReq)
@@ -707,7 +712,9 @@ func Gopochttp(httpRequest *http.Request, redirects int) ([]byte, []byte, []byte
 	return []byte(fastReq.String()), fastResp.Body(), []byte(fastResp.Header.String()), fastResp.StatusCode(), urlType, err
 }
 
-func CheckHttpOrHttps(target string) string {
+// target is not alive if return value is none http(s)  else is alive.
+// @date 2022.7.22
+func CheckLive(target string) string {
 	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
 		return target
 	}
@@ -718,21 +725,24 @@ func CheckHttpOrHttps(target string) string {
 	}
 
 	port := u.Port()
-	// fmt.Println("-------------", port)
 
 	switch {
 	case port == "80" || len(port) == 0:
-		return "http://" + target
-	case port == "443":
-		return "https://" + target
-	}
+		_, _, err := GetTimeout("http://"+target, 20)
+		if err == nil {
+			return "http://" + target
+		}
+		return target
 
-	req, err := http.NewRequest("GET", "http://"+target, nil)
-	if err != nil {
+	case port == "443":
+		_, _, err := GetTimeout("https://"+target, 20)
+		if err == nil {
+			return "https://" + target
+		}
 		return target
 	}
 
-	resp, _, err := GetTimeout(req, 10)
+	resp, _, err := GetTimeout("http://"+target, 20)
 	if err == nil {
 		if bytes.Contains(resp, []byte("<title>400 The plain HTTP request was sent to HTTPS port</title>")) {
 			return "https://" + target
@@ -740,17 +750,19 @@ func CheckHttpOrHttps(target string) string {
 		return "http://" + target
 	}
 
-	req2, err2 := http.NewRequest("GET", "https://"+target, nil)
-	if err2 != nil {
-		return target
-	}
-
-	_, _, err2 = GetTimeout(req2, 10)
-	if err2 == nil {
+	_, _, err = GetTimeout("https://"+target, 20)
+	if err == nil {
 		return "https://" + target
 	}
 
 	return target
+}
+
+func IsFullHttpFormat(target string) bool {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return true
+	}
+	return false
 }
 
 func httpConnError(err error) (string, bool) {
