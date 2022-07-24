@@ -231,7 +231,8 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	if err != nil {
 		return err
 	}
-	fastResp.SetBody(respBody)
+	// fastResp.SetBody(respBody)
+	fastResp.SetBody([]byte(utils.Str2UTF8(string(respBody)))) // fixed gbk to utf8
 
 	// fc.VariableMap["response"] variable assignment
 	tempResultResponse := &proto.Response{}
@@ -601,7 +602,8 @@ func GetTimeout(target string, timeout int) ([]byte, int, error) {
 		}
 	}
 
-	return fastResp.Body(), fastResp.StatusCode(), err
+	// fixed gbk to utf8
+	return []byte(utils.Str2UTF8(string(fastResp.Body()))), fastResp.StatusCode(), err
 }
 
 var (
@@ -664,7 +666,8 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 		}
 	}
 
-	return fastResp.Body(), newheader, fastResp.StatusCode(), err
+	// fixed gbk to utf8
+	return []byte(utils.Str2UTF8(string(fastResp.Body()))), newheader, fastResp.StatusCode(), err
 }
 
 func Gopochttp(httpRequest *http.Request, redirects int) ([]byte, []byte, []byte, int, *proto.UrlType, error) {
