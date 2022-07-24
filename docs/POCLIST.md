@@ -1,72 +1,12 @@
-
-### 新增 PoC
-```
-CVE-2019-5418
-CVE-2020-11738
-CVE-2020-11991
-CVE-2020-17530
-CVE-2021-1497
-CVE-2021-1499
-CVE-2021-22145
-CVE-2021-30461
-CVE-2021-3297
-CVE-2021-41381
-CVE-2021-42013
-CVE-2022-22965
-CVE-2022-30525
-hue-login-panel
-appex-lotwan-login-panel
-phpmyadmin-panel
-acti-video-read-file
-alibaba-canal-config-leak
-bohuangwanglong-cmd-php-rce
-bohuawanglong-users-xml-password-leak
-byzoro-smart-importhtml-rce
-clickhouse-api-unauth
-dlink-sharecenter-dns-320-rce
-docker-remote-api-unauth
-e-office-v10-sql-inject
-eyou-mail-moni-detail-rce
-feiyuxing-info-leak
-flix-ax8-download-read-file
-h3c-mpsec-isg1000-file-read
-haofeng-firewall-setdomain-unauth
-hikvision-gateway-data-file-read
-hikvision-showfile-file-read
-huiwen-book-config-properties-info-leak
-ikuai-login-panel
-kedacom-gateway-file-read
-kedacom-mts-file-read
-kingsoft-v8-get-file-content-file-read
-kyan-network-license-php-rce
-kyan-network-module-php-rce
-kyan-network-time-php-rce
-magicflow-main-xp-file-read
-maike-ras-cookie-bypass
-msa-gateway-read-file
-netmizer-log-management-cmd-php-rce
-netmizer-log-management-data-directory-traversal
-netpower-download-php-file-read
-php-zerodium-backdoor
-phpmyadmin-misconfiguration
-phpmyadmin-server-import
-phpmyadmin-setup
-sapido-router-rce
-selea-targa-camera-read-file
-tenda-11n-cookie-unauth-access
-tenda-w15e-routercfm-cfg-config-leak
-wholeton-vpn-info-leak
-wisegiga-nas-down-data-php-file-read
-wisegiga-nas-group-php-rce
-```
-### 已内置 PoC
 ```
 [activemq-panel] Apache ActiveMQ Panel
+[acunetix-panel-detect] Acunetix Login Panel
 [adminer-panel] Adminer Login Panel
 [apisix-panel] Apache APISIX Login Panel
 [appex-lotwan-login-panel] 华夏创新 LotWan广域网优化系统
 [avtech-avn801-camera-panel] Avtech AVN801 Network Camera Panel Detect
 [azure-kubernetes-service] Detect Azure Kubernetes Service
+[cas-login] CAS Login Panel
 [directadmin-login-panel] DirectAdmin Login Panel Detect
 [django-admin-panel] Python Django Admin Panel
 [dlink-panel] DLink Panel
@@ -93,6 +33,7 @@ wisegiga-nas-group-php-rce
 [minio-browser] MinIO Browser
 [minio-console] MinIO Console
 [mongodb-ops-manager] MongoDB Ops Manager
+[nacos-detect] Nacos Detect
 [openerp-database] OpenERP database instances
 [phpmyadmin-panel] phpMyAdmin Panel
 [rabbitmq-dashboard] RabbitMQ Dashboard
@@ -103,6 +44,7 @@ wisegiga-nas-group-php-rce
 [sonicwall-sslvpn-panel] SonicWall Virtual Office SSLVPN Panel
 [swagger-disclosure] Public Swagger API Desclosure
 [terramaster-panel] TerraMaster Login Panel
+[thinkphp-debug-detected] Thinkphp Debug Detected
 [thinkphp-detect] ThinkPHP detect
 [tomcat-detect] Apache Tomcat Detect
 [upupw-tz panel] UPUPW-PHP 探针
@@ -118,7 +60,6 @@ wisegiga-nas-group-php-rce
 [avtech-password-disclosure] AVTECH 视频监控设备认证绕过
 [dlink-850l-info-leak] Dlink 850l Information Disclosure
 [e-office-mysql-config-leak] 泛微OA E-Office mysql_config.ini 数据库信息泄漏
-[go-pprof-leak] go-pprof-leak
 [hadoop-disclosure] Apache Hadoop Disclosure
 [hikvision-info-leak] hikvision-info-leak
 [hjtcloud-directory-file-leak] Hjtcloud Directory File Leak
@@ -201,7 +142,6 @@ wisegiga-nas-group-php-rce
 [kingsoft-v8-default-password] Kingsoft V8 Default Password
 [minio-default-password] Minio Default Password
 [mofi4500-default-password] MOFI4500-4GXeLTE-V2 Default Login
-[netentsec-icg-default-password] Netentsec Icg Default Password
 [nexus-default-password] Nexus Default Password
 [nps-default-password] Nps Default Password
 [nsicg-default-password] Nsicg Default Password
@@ -287,7 +227,14 @@ wisegiga-nas-group-php-rce
 [finereport-directory-traversal] Finereport Directory Traversal
 [flink-unauth-rce] Apache Flink Unauth RCE
 [flix-ax8-download-read-file] FLIR-AX8 download.php 任意文件下载
+[generic-windows-lfi] Generic Windows based LFI Test
 [git-leak] Git 代码托管泄漏
+[gitlab-api-user-enum] GitLab - User Information Disclosure Via Open API
+[gitlab-public-repos] GitLab public repositories
+[gitlab-public-snippets] GitLab public snippets
+[gitlab-uninitialized-password] Uninitialized GitLab instances
+[gitlab-user-enum] GitLab - User Enumeration
+[goahead-detected] Goahead Detected
 [grafana-file-read] Grafana v8.x Arbitrary File Read
 [h3c-imc-rce] H3C imc RCE
 [mpsec-isg1000-file-read] 迈普 ISG1000安全网关 sys_dia_data_down 任意文件下载漏洞
@@ -306,6 +253,8 @@ wisegiga-nas-group-php-rce
 [ioffice-oa-iofileexport-read-file] 红帆OA ioFileExport.aspx 任意文件读取漏洞
 [jeewms-showordownbyurl-fileread] Jeewms Showordownbyurl fileread
 [jinher-oa-c6-download-file-read] 金和OA C6 download.jsp 任意文件读取漏洞
+[jinher-oa-default-login] Jinher oa C6 Default Password
+[jixian-oa-video-file-file-read] 极限OA video_file.php 任意文件读取漏洞
 [joomla-component-vreview-sql] Joomla Component Vreview sql
 [jumpserver-unauth-rce] Jumpserver Unauth RCE
 [kedacom-gateway-file-read] KEDACOM数字系统接入网关 任意文件读取漏洞
@@ -320,6 +269,7 @@ wisegiga-nas-group-php-rce
 [landray-oa-admin-do-jndi-rce] 蓝凌OA admin.do JNDI远程命令执行
 [landray-oa-custom-jsp-fileread] landray-oa-custom-jsp-fileread
 [landray-oa-syssearchmain-rce] 蓝凌OA sysSearchMain.do 远程命令执行
+[landray-oa-treexml-rce] Landray OA treexml.tmpl script 远程代码执行漏洞
 [laravel-improper-webdir] Laravel Improper Webdir
 [maccms-rce] Maccms RCE
 [maccmsv10-backdoor] Maccmsv10 Backdoor
@@ -329,15 +279,18 @@ wisegiga-nas-group-php-rce
 [msa-gateway-read-file] MSA 互联网管理网关 msa 任意文件下载漏洞
 [msvod-sqli] msvod sqli
 [myucms-lfr] myucms lfr
+[nacos-default-password] Nacos Default Password
 [natshell-arbitrary-file-read] Natshell Arbitrary File Read
 [netentsec-ngfw-rce] Netentsec Ngfw RCE
 [netmizer-log-management-cmd-php-rce] NetMizer 日志管理系统 cmd.php 远程命令执行漏洞
 [netmizer-log-management-data-directory-traversal] NetMizer 日志管理系统 data 目录遍历漏洞
 [netpower-download-php-file-read] 中科网威 下一代防火墙控制系统 download.php 任意文件读取漏洞
-[ns-asg-file-read] Ns Asg file read
+[nginx-merge-slashes-path-traversal] Nginx Merge Slashes Path Traversal
+[ns-asg-file-read] NS ASG Arbitrary File Read
 [nuuo-file-inclusion] Nuuo file inclusion
 [oa8000-workflowservice-sql-inject] 华天动力OA 8000版 workFlowService SQL注入漏洞
 [odoo-file-read] Odoo file read
+[oracle-fatwire-lfi] Oracle Fatwire 6.3 - Path Traversal
 [pbootcms-database-file-download] Pbootcms Database File Download
 [php-zerodium-backdoor] PHP zerodium后门漏洞
 [phpmyadmin-misconfiguration] Sensitive data exposure
@@ -349,7 +302,10 @@ wisegiga-nas-group-php-rce
 [phpstudy-backdoor-rce] Phpstudy backdoor rce
 [phpstudy-nginx-wrong-resolve] Phpstudy Nginx Wrong Resolve
 [powercreator-arbitrary-file-upload] Powercreator Arbitrary file upload
+[qi-anxin-netkang-next-generation-firewall-rce] Qi'anxin Netkang Next Generation Firewall - Remote Code Execution
 [qibocms-sqli] qibocms sqli
+[qihang-media-disclosure] QiHang Media Web Digital Signage 3.0.9 - Cleartext Credentials Disclosure
+[qihang-media-lfi] QiHang Media Web (QH.aspx) Digital Signage 3.0.9 - Arbitrary File Disclosure
 [qilin-bastion-host-rce] qilin bastion host rce
 [resin-inputfile-fileread-or-ssrf] resin inputfile fileread
 [resin-viewfile-fileread] resin viewfile fileread
@@ -396,11 +352,14 @@ wisegiga-nas-group-php-rce
 [thinkcmf-lfi] Thinkcmf lfi
 [thinkcmf-write-shell] Thinkcmf write shell
 [thinkphp-2-rce] ThinkPHP 2 3 's' Parameter RCE
-[thinkphp-501-rce] ThinkPHP 5.0.1 RCE
-[thinkphp-5022-rce] ThinkPHP 5.0.22 RCE
+[thinkphp-30-rce] Thinkphp 3.0 RCE
+[thinkphp-50-rce] Thinkphp 5.0 RCE
+[thinkphp-5010-rce] ThinkPHP 5.0.10 RCE
+[thinkphp-5022-5129-rce] ThinkPHP 5.0.22 RCE
 [thinkphp-5023-rce] ThinkPHP 5.0.23 RCE
+[thinkphp-5024-5130-rce] ThinkPHP 5.0.22 TO 5.1.29  RCE
+[thinkphp-50x-arbitrary-file-read] Thinkphp 5.x Arbitrary file read
 [thinkphp-v6-file-write] thinkphp-v6-file-write
-[tongda-insert-sql-inject] 通达OA v11.6 insert SQL注入漏洞
 [tongda-logincheck-code-getcookie] 通达OA v11.5 logincheck_code.php 登陆绕过漏洞
 [tongda-path-traversal] Office Anywhere TongDa - Path Traversal
 [tongda-report_bi-func-sql-inject] 通达OA v11.6 report_bi.func.php SQL注入漏洞
@@ -408,6 +367,7 @@ wisegiga-nas-group-php-rce
 [tongda-user-session-disclosure] 通达OA User Session Disclosure
 [tongda-v2014-disclosure] 通达OA v2014 get_contactlist.php 敏感信息泄漏漏洞
 [tongda-v2017-uploadfile] 通达OA v2017 action_upload.php 任意文件上传漏洞
+[tongda-v2017-video-file-file-read] 通达OA v2017 video_file.php 任意文件下载漏洞
 [tpshop-directory-traversal] Tpshop Directory Traversal
 [tpshop-sqli] Tpshop sqli
 [typecho-rce] Typecho rce
@@ -420,6 +380,8 @@ wisegiga-nas-group-php-rce
 [wanhu-oa-downloadhttp-file-read] 万户OA downloadhttp.jsp 任意文件下载漏洞
 [wanhu-oa-fileupload-controller-upload] 万户 OA Upload RCE
 [wanhu-oa-smartupload-upload-file] 万户OA smartUpload.jsp 任意文件上传漏洞(需自行上传验证)
+[watchguard-credentials-disclosure] WatchGuard Fireware AD Helper Component - Credentials Disclosure
+[web-config] Web Config file
 [weblogic-ssrf] weblogic ssrf
 [weiphp-path-traversal] Weiphp Path Traversal
 [weiphp-sql] weiphp sql
@@ -540,6 +502,7 @@ wisegiga-nas-group-php-rce
 [CVE-2019-0193] Apache Solr Remote Code Execution
 [CVE-2019-0230] Apache Struts <=2.5.20 - Remote Code Execution S2-059
 [CVE-2019-10758(unreviewed)] Mongo-Express Remote Code Execution - CVE-2019-10758
+[CVE-2019-11248] Debug Endpoint pprof - Exposure Detection
 [CVE-2019-11510] Pulse Connect Secure SSL VPN Arbitrary File Read
 [CVE-2019-11581] Jira 未授权服务端模板注入
 [CVE-2019-12725] Zeroshell 3.9.0 Remote Command Execution
@@ -555,6 +518,7 @@ wisegiga-nas-group-php-rce
 [CVE-2019-17418] Metinfo sql inject
 [CVE-2019-17506] D-Link authentication
 [CVE-2019-17558] Apache Solr Velocity Template RCE
+[CVE-2019-18371] 小米 路由器 extdisks 任意文件读取漏洞
 [CVE-2019-18394] Openfire Full Read SSRF
 [CVE-2019-19781] Citrix Application Delivery Controller (ADC) and Gateway Directory Traversal.
 [CVE-2019-19985] WordPress Plugin Email Subscribers & Newsletters 4.2.2 - Unauthenticated File Download
@@ -604,7 +568,7 @@ wisegiga-nas-group-php-rce
 [CVE-2020-5405] Spring Cloud Directory Traversal
 [CVE-2020-5410] Spring Cloud Config Server Directory Traversal
 [CVE-2020-5515] Gila CMS 1.11.8 SQL Injection.
-[CVE-2020-5902] F5 BIG-IP TMUI RCE
+[CVE-2020-5902] F5 BIG-IP TMUI - Remote Code Execution
 [CVE-2020-7980] Satellian 1.12 Remote Code Execution
 [CVE-2020-8191] citrix-cve-2020-8191-xss
 [CVE-2020-8193] Citrix unauthenticated LFI
@@ -629,6 +593,7 @@ wisegiga-nas-group-php-rce
 [CVE-2021-26084] Confluence Server OGNL injection - RCE
 [CVE-2021-26085] Confluence Pre-Authorization Arbitrary File Read
 [CVE-2021-26855] Microsoft Exchange Server SSRF Vulnerability
+[CVE-2021-27250] D-LINK DAP-2020 webproc 任意文件读取漏洞
 [CVE-2021-27905] Apache Solr <= 8.8.1 SSRF
 [CVE-2021-28164] Jetty Authorization Before Parsing and Canonicalization
 [CVE-2021-29622] Prometheus v2.23.0 to v2.26.0, and v2.27.0 Open Redirect
@@ -652,6 +617,7 @@ wisegiga-nas-group-php-rce
 [CVE-2021-43287] Pre-Auth Takeover of Build Pipelines in GoCD
 [CVE-2021-43734] kkFileView getCorsFile 任意文件读取漏洞
 [CVE-2021-44451] Apache Superset Default Password
+[CVE-2021-46417] Franklin Fueling Systems tsaupload.cgi 任意文件读取漏洞
 [CVE-2021-46422] Telesquare SDT-CW3B1 admin.cgi 远程命令执行漏洞
 [CVE-2022-0540] Atlassian Jira - Authentication bypass in Seraph
 [CVE-2022-1388] F5 BIG-IP iControl REST Auth Bypass RCE
@@ -677,6 +643,7 @@ wisegiga-nas-group-php-rce
 [CVE-2022-29303] SolarView Compact conf_mail.php 远程命令执行漏洞
 [CVE-2022-29464] WSO2 Management - Arbitrary File Upload & Remote Code Execution
 [CVE-2022-30525] Zyxel Firewall - OS Command Injection
+[CVE-2022-33891] Apache Spark shell command injection vulnerability via Spark UI
 [apache-ofbiz-log4j-rce] Apache OFBiz Log4j JNDI RCE
 [mobileiron-log4j-jndi-rce] Ivanti MobileIron Log4J JNDI RCE
 [springboot-log4j-rce] Spring Boot Log4j Remote Code Injection
