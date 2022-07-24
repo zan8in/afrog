@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/axgle/mahonia"
 	"github.com/zan8in/afrog/pkg/proto"
 )
 
@@ -191,4 +193,15 @@ func HexEncode(s string) []byte {
 	dst := make([]byte, hex.EncodedLen(len(s))) //申请一个切片, 指明大小. 必须使用hex.EncodedLen
 	n := hex.Encode(dst, []byte(s))             //字节流转化成16进制
 	return dst[:n]
+}
+
+// 字符串转 utf 8
+func Str2UTF8(str string) string {
+	if len(str) == 0 {
+		return ""
+	}
+	if !utf8.ValidString(str) {
+		return mahonia.NewDecoder("gb18030").ConvertString(str)
+	}
+	return str
 }
