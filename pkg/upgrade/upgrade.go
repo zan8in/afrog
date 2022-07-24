@@ -24,7 +24,7 @@ type Upgrade struct {
 }
 
 const (
-	// upHost          = "http://binbin.run/afrog-release"
+	// upHost = "http://binbin.run/afrog-release"
 	upHost          = "https://gitee.com/zanbin/afrog/raw/main/pocs/v"
 	upPathName      = "/afrog-pocs"
 	upPath          = "/afrog-pocs.zip"
