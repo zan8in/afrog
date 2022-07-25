@@ -6,14 +6,16 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	_ "embed"
 
 	"github.com/axgle/mahonia"
-	"github.com/remeh/sizedwaitgroup"
+	"github.com/panjf2000/ants"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
@@ -75,30 +77,56 @@ func (s *Service) executeFingerPrintDetection() {
 			size = int(s.Options.Config.FingerprintSizeWaitGroup)
 		}
 
-		swg := sizedwaitgroup.New(size)
-		for k, url := range s.Options.Targets {
-			swg.Add()
-			go func(k int, url string) {
-				defer swg.Done()
+		// swg := sizedwaitgroup.New(size)
+		// for k, url := range s.Options.Targets {
+		// 	swg.Add()
+		// 	go func(k int, url string) {
+		// 		defer swg.Done()
 
-				// add: check target alive
-				if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
-					url = http2.CheckLive(url)
-					if !http2.IsFullHttpFormat(url) {
-						s.Options.SetCheckLiveValue(url)
-						s.PrintColorResultInfoConsole(Result{})
-						return
-					} else {
-						s.Options.Targets[k] = url
-					}
+		// 		// add: check target alive
+		// if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
+		// 	url = http2.CheckLive(url)
+		// 	if !http2.IsFullHttpFormat(url) {
+		// 		s.Options.SetCheckLiveValue(url)
+		// 		s.PrintColorResultInfoConsole(Result{})
+		// 		return
+		// 	} else {
+		// 		s.Options.Targets[k] = url
+		// 	}
+		// }
+
+		// 		s.processFingerPrintInputPair(url)
+
+		// 		// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
+		// 	}(k, url)
+		// }
+		// swg.Wait()
+
+		var wg sync.WaitGroup
+		p, _ := ants.NewPoolWithFunc(size, func(wgTask interface{}) {
+			url := wgTask.(poc.WaitGroupTask).Value.(string)
+			key := wgTask.(poc.WaitGroupTask).Key
+			//add: check target alive
+			if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
+				url = http2.CheckLive(url)
+				if !http2.IsFullHttpFormat(url) {
+					s.Options.SetCheckLiveValue(url)
+					s.PrintColorResultInfoConsole(Result{})
+					return
+				} else {
+					s.Options.Targets[key] = url
 				}
+			}
 
-				s.processFingerPrintInputPair(url)
-
-				// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
-			}(k, url)
+			s.processFingerPrintInputPair(url)
+			wg.Done()
+		})
+		defer p.Release()
+		for k, target := range s.Options.Targets {
+			wg.Add(1)
+			_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
 		}
-		swg.Wait()
+		wg.Wait()
 	}
 }
 

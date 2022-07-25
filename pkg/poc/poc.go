@@ -17,6 +17,11 @@ const (
 	STOP_IF_FIRST_MISMATCH = "STOP_IF_FIRST_MISMATCH"
 )
 
+type WaitGroupTask struct {
+	Key   int
+	Value interface{}
+}
+
 type Poc struct {
 	Id         string        `yaml:"id"`        //  脚本名称
 	Transport  string        `yaml:"transport"` // 传输方式，该字段用于指定发送数据包的协议，该字段用于指定发送数据包的协议:①tcp ②udp ③http

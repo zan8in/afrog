@@ -1,6 +1,9 @@
 package core
 
 import (
+	"sync"
+
+	"github.com/panjf2000/ants"
 	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
@@ -75,16 +78,29 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	// init scan sum
 	e.options.Count += len(e.options.Targets) * len(newPocSlice)
 
+	// outdated: 2022.7.25
 	// swg := e.workPool.PocSwg
-	swg := e.workPool.NewPool(e.workPool.config.PocConcurrencyType)
-	for _, p := range newPocSlice {
-		swg.WaitGroup.Add()
-		go func(p poc.Poc) {
-			defer swg.WaitGroup.Done()
-			e.executeTargets(p)
-		}(p)
+	// swg := e.workPool.NewPool(e.workPool.config.PocConcurrencyType)
+	// for _, p := range newPocSlice {
+	// 	swg.WaitGroup.Add()
+	// 	go func(p poc.Poc) {
+	// 		defer swg.WaitGroup.Done()
+	// 		e.executeTargets(p)
+	// 	}(p)
+	// }
+	// swg.WaitGroup.Wait()
+
+	var wg sync.WaitGroup
+	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p interface{}) {
+		e.executeTargets(p.(poc.Poc))
+		wg.Done()
+	})
+	defer p.Release()
+	for _, poc := range newPocSlice {
+		wg.Add(1)
+		_ = p.Invoke(poc)
 	}
-	swg.WaitGroup.Wait()
+	wg.Wait()
 }
 
 func (e *Engine) executeTargets(poc1 poc.Poc) {
@@ -100,28 +116,53 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		return
 	}
 
-	wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
-	for k, target := range allTargets {
-		wg.WaitGroup.Add()
-		go func(k int, target string, poc1 poc.Poc) {
-			defer wg.WaitGroup.Done()
+	// outdated: 2022.7.25
+	// wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
+	// for k, target := range allTargets {
+	// 	wg.WaitGroup.Add()
+	// 	go func(k int, target string, poc1 poc.Poc) {
+	// 		defer wg.WaitGroup.Done()
 
-			// add: check target alive
-			if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
-				target = http2.CheckLive(target)
-				if !http2.IsFullHttpFormat(target) {
-					e.options.SetCheckLiveValue(target)
-				} else {
-					e.options.Targets[k] = target
-				}
+	// 		// add: check target alive
+	// 		if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
+	// 			target = http2.CheckLive(target)
+	// 			if !http2.IsFullHttpFormat(target) {
+	// 				e.options.SetCheckLiveValue(target)
+	// 			} else {
+	// 				e.options.Targets[k] = target
+	// 			}
+	// 		}
+
+	// 		e.executeExpression(target, poc1)
+
+	// 		// fmt.Println("poc the number of goroutines: ", runtime.NumGoroutine())
+	// 	}(k, target, poc1)
+	// }
+	// wg.WaitGroup.Wait()
+
+	var wg sync.WaitGroup
+	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask interface{}) {
+		target := wgTask.(poc.WaitGroupTask).Value.(string)
+		key := wgTask.(poc.WaitGroupTask).Key
+		//add: check target alive
+		if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
+			target = http2.CheckLive(target)
+			if !http2.IsFullHttpFormat(target) {
+				e.options.SetCheckLiveValue(target)
+			} else {
+				e.options.Targets[key] = target
 			}
+		}
 
-			e.executeExpression(target, poc1)
-
-			// fmt.Println("poc the number of goroutines: ", runtime.NumGoroutine())
-		}(k, target, poc1)
+		e.executeExpression(target, poc1)
+		wg.Done()
+	})
+	defer p.Release()
+	for k, target := range allTargets {
+		wg.Add(1)
+		_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
 	}
-	wg.WaitGroup.Wait()
+	wg.Wait()
 }
 
 func (e *Engine) executeExpression(target string, poc poc.Poc) {
