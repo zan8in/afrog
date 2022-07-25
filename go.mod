@@ -10,6 +10,8 @@ require (
 	github.com/gookit/color v1.5.0
 	github.com/karrick/godirwalk v1.16.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/panjf2000/ants v1.3.0
+	github.com/panjf2000/ants/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/rawhttp v0.0.8
 	github.com/remeh/sizedwaitgroup v1.0.0
