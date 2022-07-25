@@ -34,22 +34,22 @@ func redisUnAuth(args *GoPocArgs) (Result, error) {
 		return result, errors.New("no host")
 	}
 
-	if len(args.Port) > 0 && args.Port != "80" && args.Port != "443" {
-		addr := args.Host + ":" + args.Port
-		payload := []byte("*1\r\n$4\r\ninfo\r\n")
+	// if len(args.Port) > 0 && args.Port != "80" && args.Port != "443" {
+	// 	addr := args.Host + ":" + args.Port
+	// 	payload := []byte("*1\r\n$4\r\ninfo\r\n")
 
-		resp, err := utils.Tcp(addr, payload)
-		if err != nil {
-			return result, err
-		}
+	// 	resp, err := utils.Tcp(addr, payload)
+	// 	if err != nil {
+	// 		return result, err
+	// 	}
 
-		if bytes.Contains(resp, []byte("redis_version")) {
-			result.IsVul = true
-			url := proto.UrlType{Host: addr, Port: args.Port}
-			result.SetAllPocResult(true, &url, payload, resp)
-			return result, nil
-		}
-	}
+	// 	if bytes.Contains(resp, []byte("redis_version")) {
+	// 		result.IsVul = true
+	// 		url := proto.UrlType{Host: addr, Port: args.Port}
+	// 		result.SetAllPocResult(true, &url, payload, resp)
+	// 		return result, nil
+	// 	}
+	// }
 
 	addr := args.Host + ":" + redisPort
 	payload := []byte("*1\r\n$4\r\ninfo\r\n")

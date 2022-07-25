@@ -39,16 +39,16 @@ func mongodbUnAuth(args *GoPocArgs) (Result, error) {
 	getlogdata := []byte{72, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 212, 7, 0, 0, 0, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 33, 0, 0, 0, 2, 103, 101, 116, 76, 111, 103, 0, 16, 0, 0, 0, 115, 116, 97, 114, 116, 117, 112, 87, 97, 114, 110, 105, 110, 103, 115, 0, 0}
 	// payload := append(senddata, getlogdata...)
 
-	if len(args.Port) > 0 && args.Port != "80" && args.Port != "443" {
-		addr := args.Host + ":" + args.Port
-		err := mongodbPayload(addr, senddata, getlogdata)
-		if err == nil {
-			result.IsVul = true
-			url := proto.UrlType{Host: addr, Port: args.Port}
-			result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
-			return result, nil
-		}
-	}
+	// if len(args.Port) > 0 && args.Port != "80" && args.Port != "443" {
+	// 	addr := args.Host + ":" + args.Port
+	// 	err := mongodbPayload(addr, senddata, getlogdata)
+	// 	if err == nil {
+	// 		result.IsVul = true
+	// 		url := proto.UrlType{Host: addr, Port: args.Port}
+	// 		result.SetAllPocResult(true, &url, []byte(addr), []byte("MongoDB 未授权访问"))
+	// 		return result, nil
+	// 	}
+	// }
 
 	addr := args.Host + ":" + mongodbPort
 	err := mongodbPayload(addr, senddata, getlogdata)
