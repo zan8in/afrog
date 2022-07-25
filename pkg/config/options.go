@@ -127,7 +127,7 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 // check live by count, alive if result is true  else not alive.
 func (o *Options) CheckLiveByCount(url string) bool {
 	c, b := o.GetCheckLiveValue(url)
-	if c >= 3 {
+	if c >= 6 {
 		// fmt.Println(url, "c>3", c, b)
 		return false
 	}
@@ -142,7 +142,7 @@ func (o *Options) CheckLiveByCount(url string) bool {
 
 func (o *Options) SetCheckLiveValue(key string) {
 	c, b := o.CheckLiveMap.Load(key)
-	if b && c.(int) < 3 {
+	if b && c.(int) < 6 {
 		o.CheckLiveMap.Store(key, c.(int)+1)
 	} else {
 		o.CheckLiveMap.Store(key, 0)
