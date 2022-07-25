@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/urfave/cli/v2"
@@ -110,9 +111,13 @@ func main() {
 
 func printFingerprintInfoConsole(fr fingerprint.Result) {
 	if len(fr.StatusCode) > 0 {
+		statusCode := log.LogColor.Vulner("" + fr.StatusCode + "")
+		if !strings.HasPrefix(fr.StatusCode, "2") {
+			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
+		}
 		fmt.Printf("\r" + fr.Url + " " +
-			log.LogColor.Low(""+fr.StatusCode+"") + " " +
-			log.LogColor.Title(fr.Title) + " " +
+			statusCode + " " +
+			fr.Title + " " +
 			log.LogColor.Critical(fr.Name) + "\r\n")
 	}
 }
