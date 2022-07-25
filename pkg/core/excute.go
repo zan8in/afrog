@@ -142,6 +142,7 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 
 	var wg sync.WaitGroup
 	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask interface{}) {
+		defer wg.Done()
 		target := wgTask.(poc.WaitGroupTask).Value.(string)
 		key := wgTask.(poc.WaitGroupTask).Key
 		//add: check target alive
@@ -155,7 +156,6 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		}
 
 		e.executeExpression(target, poc1)
-		wg.Done()
 	})
 	defer p.Release()
 	for k, target := range allTargets {

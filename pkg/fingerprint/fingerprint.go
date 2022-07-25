@@ -104,6 +104,7 @@ func (s *Service) executeFingerPrintDetection() {
 
 		var wg sync.WaitGroup
 		p, _ := ants.NewPoolWithFunc(size, func(wgTask interface{}) {
+			defer wg.Done()
 			url := wgTask.(poc.WaitGroupTask).Value.(string)
 			key := wgTask.(poc.WaitGroupTask).Key
 			//add: check target alive
@@ -111,15 +112,12 @@ func (s *Service) executeFingerPrintDetection() {
 				url = http2.CheckLive(url)
 				if !http2.IsFullHttpFormat(url) {
 					s.Options.SetCheckLiveValue(url)
-					s.PrintColorResultInfoConsole(Result{})
-					return
 				} else {
 					s.Options.Targets[key] = url
 				}
 			}
 
 			s.processFingerPrintInputPair(url)
-			wg.Done()
 		})
 		defer p.Release()
 		for k, target := range s.Options.Targets {
@@ -132,6 +130,12 @@ func (s *Service) executeFingerPrintDetection() {
 
 func (s *Service) processFingerPrintInputPair(url string) error {
 	if len(s.fpSlice) == 0 {
+		s.PrintColorResultInfoConsole(Result{})
+		return nil
+	}
+
+	// check target alive.
+	if alive := s.Options.CheckLiveByCount(url); !alive {
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
 	}
