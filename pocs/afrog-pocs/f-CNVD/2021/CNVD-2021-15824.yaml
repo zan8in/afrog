@@ -3,7 +3,7 @@ id: CNVD-2021-15824
 info:
   name: EmpireCMS DOM Cross Site-Scripting
   author: daffainfo
-  severity: high
+  severity: medium
   description: EmpireCMS is vulnerable to a DOM based cross-site scripting attack.
   reference:
     - https://sourceforge.net/projects/empirecms/
