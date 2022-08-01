@@ -240,7 +240,7 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 }
 
 func (c *Checker) newRerverse() *proto.Reverse {
-	sub := utils.CreateRandomString(8)
+	sub := utils.CreateRandomString(12)
 	urlStr := fmt.Sprintf("http://%s.%s", sub, ReverseCeyeDomain)
 	u, _ := url.Parse(urlStr)
 	return &proto.Reverse{
