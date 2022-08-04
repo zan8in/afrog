@@ -21,6 +21,7 @@ reports
 .vscode
 .idea
 sec-pocs
+pocs/afrog-pocs/e-privbox
 
 cmd/afrog/afrog.ico
 cmd/afrog/build.cmd
