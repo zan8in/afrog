@@ -21,6 +21,7 @@ reports
 .vscode
 .idea
 
+docs/POCLIST.md
 pocs/afrog-pocs/e-privbox/
 afrog-pocs/
 pocs/deleted/

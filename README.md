@@ -6,7 +6,7 @@
   <a href="https://github.com/zan8in/afrog/blob/main/docs/GUIDE.md">指南</a> •
   <a href="https://github.com/zan8in/afrog/blob/main/docs/CONTRIBUTION.md">贡献</a> •
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/docs/POCLIST.md">列表</a> •
+  <!-- <a href="https://github.com/zan8in/afrog/blob/main/docs/POCLIST.md">列表</a> • -->
   <a href="https://github.com/zan8in/afrog/blob/main/docs/README_en.md">English Doc</a>
 </p>
 
