@@ -21,8 +21,12 @@ reports
 .vscode
 .idea
 
-pocs/afrog-pocs/e-privbox
-afrog-pocs2
+pocs/afrog-pocs/e-privbox/
+afrog-pocs/
+pocs/deleted/
+pocs/peiqi/
+pocs/test/
+
 
 cmd/afrog/afrog.ico
 cmd/afrog/build.cmd
