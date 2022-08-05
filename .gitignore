@@ -20,8 +20,9 @@ release
 reports
 .vscode
 .idea
-sec-pocs
+
 pocs/afrog-pocs/e-privbox
+afrog-pocs2
 
 cmd/afrog/afrog.ico
 cmd/afrog/build.cmd
