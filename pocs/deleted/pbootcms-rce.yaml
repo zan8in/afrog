@@ -24,7 +24,7 @@ rules:
         Reverse: '{{reverseURL}}'
         Content-Length: 100
         Host: 127.0.0.1
-    exppression: response.status == 200 && response.body.bcontains(b'flags=')
+    expression: response.status == 200 && response.body.bcontains(b'flags=')
   r1:
     request:
       method: GET

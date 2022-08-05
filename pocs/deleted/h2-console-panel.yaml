@@ -17,5 +17,5 @@ rules:
     request:
       method: GET
       path: /login.jsp
-    exppression: response.status == 200
-exppression: r0()
+    expression: response.status == 200
+expression: r0()

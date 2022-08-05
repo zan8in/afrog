@@ -56,7 +56,7 @@ rules:
     request:
       method: GET
       path: /phpinfo.php
-    exppression: response.status == 200 && response.body.bcontains(b'PHP Version')
+    expression: response.status == 200 && response.body.bcontains(b'PHP Version')
     stop_if_match: true
   r1:
     before_sleep: 6
