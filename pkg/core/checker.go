@@ -96,7 +96,7 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		if rule.BeforeSleep != 0 {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
-		utils.RandSleep(500)
+		utils.RandSleep(1000)
 
 		isMatch := false
 		if len(rule.Request.Raw) > 0 {
