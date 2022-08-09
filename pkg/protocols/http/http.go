@@ -203,7 +203,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			}
 			if errName == "timeout" {
 				repeatCount++
-				if repeatCount > 1 {
+				if repeatCount > 3 {
 					break
 				}
 			} else {
