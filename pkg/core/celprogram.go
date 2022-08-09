@@ -471,10 +471,10 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
 			redirectsCount++
 			// fmt.Println("redirectsCount++", redirectsCount)
-			if redirectsCount > 1 {
+			if redirectsCount > 3 {
 				return false
 			}
-			utils.RandSleep(500)
+			utils.RandSleep(2000)
 			continue
 		}
 		// fmt.Println(string(resp), "---")
