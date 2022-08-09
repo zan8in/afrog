@@ -107,6 +107,8 @@ func main() {
 		fmt.Println(runner.ShowTips())
 		fmt.Println(log.LogColor.High("start afrog failed，", err.Error()))
 	}
+
+	utils.RandSleep(1000)
 }
 
 func printFingerprintInfoConsole(fr fingerprint.Result) {
