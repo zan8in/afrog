@@ -35,7 +35,7 @@ afrog -t http://127.0.0.1
 afrog -T urls.txt
 
 # 指定漏扫报告文件
-afrog -t http://127.0.0.1-o result.html
+afrog -t http://127.0.0.1 -o result.html
 ```
 
 高级用法

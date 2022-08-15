@@ -44,7 +44,7 @@ afrog -t http://127.0.0.1
 afrog -T urls.txt
 
 # Specify a scan report file
-afrog -t http://127.0.0.1-o result.html
+afrog -t http://127.0.0.1 -o result.html
 ```
 
 Advanced usage
