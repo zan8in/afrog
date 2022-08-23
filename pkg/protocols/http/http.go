@@ -55,8 +55,12 @@ func Init(options *config.Options) {
 		}).Dial,
 	}
 	if len(strings.TrimSpace(options.Config.ConfigHttp.Proxy)) > 0 {
-		// client.Dial = fasthttpproxy.FasthttpHTTPDialerTimeout("localhost:10808", time.Second*5) // http proxy 有问题，不支持https访问
-		F.Dial = fasthttpproxy.FasthttpSocksDialer("socks5://" + options.Config.ConfigHttp.Proxy)
+		if strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks4://") || strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks5://") {
+			F.Dial = fasthttpproxy.FasthttpSocksDialer(options.Config.ConfigHttp.Proxy)
+		} else {
+			// username:password@localhost:1082
+			F.Dial = fasthttpproxy.FasthttpHTTPDialer(options.Config.ConfigHttp.Proxy)
+		}
 	}
 }
 
@@ -648,6 +652,7 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 	// 		break
 	// 	}
 	// }
+	// fasthttp bug, https://github.com/valyala/fasthttp/issues/1361
 	err = F.DoRedirects(fastReq, fastResp, 3)
 
 	newheader := make(map[string][]string)
