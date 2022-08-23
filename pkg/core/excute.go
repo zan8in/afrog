@@ -3,7 +3,7 @@ package core
 import (
 	"sync"
 
-	"github.com/panjf2000/ants"
+	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"

@@ -10,8 +10,6 @@ require (
 	github.com/gookit/color v1.5.0
 	github.com/karrick/godirwalk v1.16.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/panjf2000/ants v1.3.0
-	github.com/panjf2000/ants/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/rawhttp v0.0.8
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -29,6 +27,7 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/klauspost/compress v1.14.1 // indirect
+	github.com/panjf2000/ants/v2 v2.5.0 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.2 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect

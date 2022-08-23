@@ -12,7 +12,7 @@ import (
 	_ "embed"
 
 	"github.com/axgle/mahonia"
-	"github.com/panjf2000/ants"
+	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/poc"
