@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	rsyncPort       = "873"
-	rsyncUnAuthName = "rsync-unauth"
+	rsyncPort = "873"
+	// rsyncUnAuthName = "rsync-unauth"
+	rsyncUnAuthName = ""
 )
 
 func rsyncUnAuth(args *GoPocArgs) (Result, error) {
