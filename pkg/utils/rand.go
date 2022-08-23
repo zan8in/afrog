@@ -90,16 +90,9 @@ func CreateRandomString(len int) string {
 // RandomUA will return a random user agent.
 func RandomUA() string {
 	userAgent := [...]string{
-		"Mozilla/4.0 (compatible, MSIE 7.0, Windows NT 5.1, 360SE)",
-		"Mozilla/4.0 (compatible, MSIE 8.0, Windows NT 6.0, Trident/4.0)",
-		"Mozilla/5.0 (compatible, MSIE 9.0, Windows NT 6.1, Trident/5.0)",
-		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv,2.0.1) Gecko/20100101 Firefox/4.0.1",
-		"Mozilla/5.0 (Windows NT 6.1; rv,2.0.1) Gecko/20100101 Firefox/4.0.1",
-		"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Maxthon 2.0)",
-		"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; TencentTraveler 4.0)",
-		"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; The World)",
-		"Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; 360SE)",
-		"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36 Edg/104.0.1293.63",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36",
 	}
 
 	return userAgent[rand.New(rand.NewSource(time.Now().Unix())).Intn(len(userAgent))]
