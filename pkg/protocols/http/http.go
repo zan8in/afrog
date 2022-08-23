@@ -125,10 +125,10 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		rawHeader.WriteString("\n")
 	}
 
-	if len(fc.UserAgent) > 0 {
-		fastReq.Header.Set("User-Agent", fc.UserAgent)
+	if len(rule.Request.Headers["User-Agent"]) > 0 {
+		fastReq.Header.Set("User-Agent", rule.Request.Headers["User-Agent"])
 	} else {
-		fastReq.Header.Set("User-Agent", utils.RandomUA())
+		fastReq.Header.Set("User-Agent", fc.UserAgent)
 	}
 
 	fastReq.Header.SetMethod(rule.Request.Method)

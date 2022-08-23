@@ -50,6 +50,7 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 
 	c.FastClient.MaxRedirect = c.Options.Config.ConfigHttp.MaxRedirect
 	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
+	c.FastClient.UserAgent = utils.RandomUA()
 
 	matchCondition := ""
 	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
@@ -96,8 +97,6 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
 		utils.RandSleep(1000)
-
-		c.FastClient.UserAgent = rule.Request.Headers["User-Agent"]
 
 		isMatch := false
 		if len(rule.Request.Raw) > 0 {
