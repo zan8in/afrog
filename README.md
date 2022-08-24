@@ -68,7 +68,7 @@ html 报告
 
 > 微信群请先添加 afrog 个人账号，并备注「afrog」，然后会把大家拉到 afrog 交流群中。
 
-<img src="https://github.com/zan8in/afrog/blob/main/images/afrog2.png" width="33%" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
 
 ## 404星链计划
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
