@@ -31,4 +31,18 @@ rules:
     #         headers:
     #             User-Agent: Nacos-Server
     #     expression: response.status == 200 && response.body.bcontains(bytes("delete user ok!"))
-expression: r0() && r1() 
+    r01:
+        request:
+            method: POST
+            path: /v1/auth/users?username={{r1}}&password={{r2}}
+            headers:
+                User-Agent: Nacos-Server
+        expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
+    r11:
+        request:
+            method: GET
+            path: /v1/auth/users?pageNo=1&pageSize=999
+            headers:
+                User-Agent: Nacos-Server
+        expression: response.status == 200 && response.body.bcontains(bytes(r1))
+expression: (r0() && r1()) || (r01() && r11())
