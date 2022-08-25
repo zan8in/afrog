@@ -64,7 +64,7 @@ func Init(options *config.Options) {
 	}
 }
 
-func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
+func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]any) error {
 	var err error
 
 	protoRequest, err := ParseRequest(httpRequest)
@@ -291,7 +291,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	return err
 }
 
-func (fc *FastClient) HTTPRequest2(httpRequest *http.Request, rule poc.Rule, variableMap map[string]interface{}) error {
+func (fc *FastClient) HTTPRequest2(httpRequest *http.Request, rule poc.Rule, variableMap map[string]any) error {
 	var err error
 
 	variableMap["request"] = nil
@@ -827,7 +827,7 @@ func DealMultipart(contentType string, ruleBody string) (result string, err erro
 	return multiPartContent, nil
 }
 
-func (fc *FastClient) AssignVariableMap(find string, variableMap map[string]interface{}) string {
+func (fc *FastClient) AssignVariableMap(find string, variableMap map[string]any) string {
 	for k, v := range variableMap {
 		_, isMap := v.(map[string]string)
 		if isMap {
@@ -874,13 +874,13 @@ func Url2UrlType(u *url.URL) *proto.UrlType {
 }
 
 var protoRequestPool sync.Pool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return new(proto.Request)
 	},
 }
 
 var protoResponsePool sync.Pool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return new(proto.Response)
 	},
 }
