@@ -622,7 +622,7 @@ func file_http_proto_rawDescGZIP() []byte {
 }
 
 var file_http_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_http_proto_goTypes = []interface{}{
+var file_http_proto_goTypes = []any{
 	(*AddrType)(nil),     // 0: proto.AddrType
 	(*ConnInfoType)(nil), // 1: proto.ConnInfoType
 	(*UrlType)(nil),      // 2: proto.UrlType
@@ -654,7 +654,7 @@ func file_http_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_http_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*AddrType); i {
 			case 0:
 				return &v.state
@@ -666,7 +666,7 @@ func file_http_proto_init() {
 				return nil
 			}
 		}
-		file_http_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*ConnInfoType); i {
 			case 0:
 				return &v.state
@@ -678,7 +678,7 @@ func file_http_proto_init() {
 				return nil
 			}
 		}
-		file_http_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*UrlType); i {
 			case 0:
 				return &v.state
@@ -690,7 +690,7 @@ func file_http_proto_init() {
 				return nil
 			}
 		}
-		file_http_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[3].Exporter = func(v any, i int) any {
 			switch v := v.(*Reverse); i {
 			case 0:
 				return &v.state
@@ -702,7 +702,7 @@ func file_http_proto_init() {
 				return nil
 			}
 		}
-		file_http_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[4].Exporter = func(v any, i int) any {
 			switch v := v.(*Request); i {
 			case 0:
 				return &v.state
@@ -714,7 +714,7 @@ func file_http_proto_init() {
 				return nil
 			}
 		}
-		file_http_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_http_proto_msgTypes[5].Exporter = func(v any, i int) any {
 			switch v := v.(*Response); i {
 			case 0:
 				return &v.state

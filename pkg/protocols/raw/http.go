@@ -32,7 +32,7 @@ func GetRawHTTP(timeout int) *rawhttp.Client {
 	return rawHttpClient
 }
 
-func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string]interface{}) error {
+func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string]any) error {
 	var err error
 	var resp *http.Response
 
@@ -136,7 +136,7 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 	return err
 }
 
-func AssignVariableRaw(find string, variableMap map[string]interface{}) string {
+func AssignVariableRaw(find string, variableMap map[string]any) string {
 	for k, v := range variableMap {
 		newstr := fmt.Sprintf("%v", v)
 		oldstr := "{{" + k + "}}"

@@ -8,16 +8,16 @@ import (
 )
 
 type Color struct {
-	Info     func(a ...interface{}) string
-	Low      func(a ...interface{}) string
-	Midium   func(a ...interface{}) string
-	High     func(a ...interface{}) string
-	Critical func(a ...interface{}) string
-	Vulner   func(a ...interface{}) string
-	Time     func(a ...interface{}) string
-	Title    func(a ...interface{}) string
-	Banner   func(a ...interface{}) string
-	Bold     func(a ...interface{}) string
+	Info     func(a ...any) string
+	Low      func(a ...any) string
+	Midium   func(a ...any) string
+	High     func(a ...any) string
+	Critical func(a ...any) string
+	Vulner   func(a ...any) string
+	Time     func(a ...any) string
+	Title    func(a ...any) string
+	Banner   func(a ...any) string
+	Bold     func(a ...any) string
 }
 
 var LogColor *Color

@@ -63,7 +63,7 @@ func main() {
 			return err
 		}
 
-		err := runner.New(options, htemplate, func(result interface{}) {
+		err := runner.New(options, htemplate, func(result any) {
 			r := result.(*core.Result)
 
 			lock.Lock()

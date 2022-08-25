@@ -103,7 +103,7 @@ func (s *Service) executeFingerPrintDetection() {
 		// swg.Wait()
 
 		var wg sync.WaitGroup
-		p, _ := ants.NewPoolWithFunc(size, func(wgTask interface{}) {
+		p, _ := ants.NewPoolWithFunc(size, func(wgTask any) {
 			defer wg.Done()
 			url := wgTask.(poc.WaitGroupTask).Value.(string)
 			key := wgTask.(poc.WaitGroupTask).Key

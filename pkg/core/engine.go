@@ -9,11 +9,11 @@ import (
 )
 
 var CheckerPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return &Checker{
 			Options:         &config.Options{},
 			OriginalRequest: &http.Request{},
-			VariableMap:     make(map[string]interface{}),
+			VariableMap:     make(map[string]any),
 			Result:          &Result{},
 			CustomLib:       NewCustomLib(),
 			FastClient:      &http2.FastClient{},
@@ -30,7 +30,7 @@ func (e *Engine) AcquireChecker() *Checker {
 
 func (e *Engine) ReleaseChecker(c *Checker) {
 	*c.OriginalRequest = http.Request{}
-	c.VariableMap = make(map[string]interface{})
+	c.VariableMap = make(map[string]any)
 	c.Result = &Result{}
 	c.CustomLib = NewCustomLib()
 	c.FastClient = &http2.FastClient{}

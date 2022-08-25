@@ -28,7 +28,7 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return c.programOptions
 }
 
-func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, call runCallback) {
+func (c *CustomLib) Run(expression string, variablemap map[string]any, call runCallback) {
 	env, err := c.NewCelEnv()
 	if err != nil {
 		call(nil, errors.NewCelEnvError(err))
@@ -47,7 +47,7 @@ func (c *CustomLib) Run(expression string, variablemap map[string]interface{}, c
 	call(isVul, err)
 }
 
-func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{}) (ref.Val, error) {
+func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
 	env, err := c.NewCelEnv()
 	if err != nil {
 		return nil, errors.NewCelEnvError(err)
@@ -59,7 +59,7 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]interface{
 	return val, nil
 }
 
-type runCallback func(interface{}, error)
+type runCallback func(any, error)
 
 func NewCustomLib() *CustomLib {
 	c := &CustomLib{}
@@ -74,7 +74,7 @@ func (c *CustomLib) NewCelEnv() (env *cel.Env, err error) {
 	return env, err
 }
 
-func Eval(env *cel.Env, expression string, params map[string]interface{}) (ref.Val, error) {
+func Eval(env *cel.Env, expression string, params map[string]any) (ref.Val, error) {
 	ast, iss := env.Compile(expression)
 	if iss.Err() != nil {
 		log.Log().Error(fmt.Sprintf("cel env.Compile err, %s", iss.Err().Error()))

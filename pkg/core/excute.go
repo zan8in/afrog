@@ -91,7 +91,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	// swg.WaitGroup.Wait()
 
 	var wg sync.WaitGroup
-	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p interface{}) {
+	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p any) {
 		e.executeTargets(p.(poc.Poc))
 		wg.Done()
 	})
@@ -141,7 +141,7 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 	// wg.WaitGroup.Wait()
 
 	var wg sync.WaitGroup
-	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask interface{}) {
+	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask any) {
 		defer wg.Done()
 		target := wgTask.(poc.WaitGroupTask).Value.(string)
 		key := wgTask.(poc.WaitGroupTask).Key

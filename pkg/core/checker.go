@@ -23,7 +23,7 @@ import (
 type Checker struct {
 	Options         *config.Options
 	OriginalRequest *http.Request
-	VariableMap     map[string]interface{}
+	VariableMap     map[string]any
 	Result          *Result
 	CustomLib       *CustomLib
 	FastClient      *http2.FastClient

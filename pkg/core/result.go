@@ -18,7 +18,7 @@ type Result struct {
 	PocInfo      *poc.Poc
 	AllPocResult []*PocResult
 	Output       string
-	FingerResult interface{}
+	FingerResult any
 }
 
 type PocResult struct {

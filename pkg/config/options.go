@@ -73,7 +73,7 @@ type Options struct {
 	CheckLiveMap sync.Map
 }
 
-type ApiCallBack func(interface{})
+type ApiCallBack func(any)
 
 func (o *Options) SetSearchKeyword() bool {
 	if len(o.Search) > 0 {

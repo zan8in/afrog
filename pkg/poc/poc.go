@@ -19,7 +19,7 @@ const (
 
 type WaitGroupTask struct {
 	Key   int
-	Value interface{}
+	Value any
 }
 
 type Poc struct {
@@ -162,7 +162,7 @@ func ReadPocs(pocYaml string) (Poc, error) {
 	return poc, nil
 }
 
-func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 	var tmp ruleAlias
 	if err := unmarshal(&tmp); err != nil {
 		return err
@@ -180,7 +180,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	return nil
 }
 
-func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(any) error) error {
 	order = 0
 
 	tempMap := make(map[string]Rule, 1)
