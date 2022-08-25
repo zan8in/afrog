@@ -39,15 +39,15 @@ func Init(options *config.Options) {
 	writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
 	F = &fasthttp.Client{
-		TLSConfig:                     &tls.Config{InsecureSkipVerify: true},
-		MaxConnsPerHost:               options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数
-		ReadTimeout:                   readTimeout,
-		WriteTimeout:                  writeTimeout,
-		MaxIdleConnDuration:           maxIdleConnDuration,
-		NoDefaultUserAgentHeader:      true, // Don't send: User-Agent: fasthttp
-		DisableHeaderNamesNormalizing: true, // If you set the case on your headers correctly you can enable this
-		DisablePathNormalizing:        true,
-		MaxResponseBodySize:           options.Config.ConfigHttp.MaxResponseBodySize, // 2m
+		TLSConfig:                &tls.Config{InsecureSkipVerify: true},
+		MaxConnsPerHost:          options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数
+		ReadTimeout:              readTimeout,
+		WriteTimeout:             writeTimeout,
+		MaxIdleConnDuration:      maxIdleConnDuration,
+		NoDefaultUserAgentHeader: true, // Don't send: User-Agent: fasthttp
+		// DisableHeaderNamesNormalizing: true, // If you set the case on your headers correctly you can enable this
+		DisablePathNormalizing: true,
+		MaxResponseBodySize:    options.Config.ConfigHttp.MaxResponseBodySize, // 2m
 		// increase DNS cache time to an hour instead of default minute
 		Dial: (&fasthttp.TCPDialer{
 			Concurrency:      options.Config.ConfigHttp.Concurrency,
