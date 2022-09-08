@@ -1,0 +1,21 @@
+id: springboot-actuator
+
+info:
+  name: Springboot Actuator Detected
+  author: zan8in
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /actuator
+    expression: |
+      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
+  r1: 
+    request: 
+      method: GET
+      path: /api/actuator
+    expression: |
+      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
+expression: r0() || r1()
