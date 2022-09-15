@@ -68,7 +68,7 @@ func main() {
 		go func() {
 			startcount := options.CurrentCount
 			for {
-				time.Sleep(time.Minute)
+				time.Sleep(3 * time.Minute)
 				if options.CurrentCount > 0 && startcount == options.CurrentCount {
 					if !options.Silent {
 						fmt.Printf("\r%d/%d | %d%% ", options.Count, options.Count, options.Count*100/options.Count)
