@@ -1,17 +1,14 @@
 id: CNVD-2022-10270
 
 info:
-  name: Sunflower Simple and Personal - Remote Code Execution
-  author: daffainfo
+  name: 向日葵 check 远程命令执行漏洞
+  author: zan8in
   severity: critical
   description: |
-    Sunflower Simple and Personal is susceptible to a remote code execution vulnerability.
+    向日葵通过发送特定的请求获取CID后，可调用 check接口实现远程命令执行，导致服务器权限被获取
     body="Verification failure"
   reference:
-    - https://www.1024sou.com/article/741374.html
-    - https://copyfuture.com/blogs-details/202202192249158884
-    - https://www.cnvd.org.cn/flaw/show/CNVD-2022-10270
-    - https://www.cnvd.org.cn/flaw/show/CNVD-2022-03672
+    - http://wiki.peiqi.tech/wiki/serverapp/%E5%90%91%E6%97%A5%E8%91%B5/%E5%90%91%E6%97%A5%E8%91%B5%20check%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E%20CNVD-2022-10270.html
 
 rules:
   r0:
