@@ -35,12 +35,15 @@ type FastClient struct {
 }
 
 func Init(options *config.Options) {
-	readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
-	writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
-	maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
+	// readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
+	// writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
+	// maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
+	readTimeout, _ := time.ParseDuration("500ms")
+	writeTimeout, _ := time.ParseDuration("500ms")
+	maxIdleConnDuration, _ := time.ParseDuration("1h")
 	F = &fasthttp.Client{
-		TLSConfig:                &tls.Config{InsecureSkipVerify: true},
-		MaxConnsPerHost:          options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		// MaxConnsPerHost:          options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数 如果未设置，则使用DefaultMaxConnSperHost=512
 		ReadTimeout:              readTimeout,
 		WriteTimeout:             writeTimeout,
 		MaxIdleConnDuration:      maxIdleConnDuration,
