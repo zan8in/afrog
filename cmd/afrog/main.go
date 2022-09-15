@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/zan8in/afrog/internal/runner"
@@ -62,6 +63,21 @@ func main() {
 		if err := htemplate.New(); err != nil {
 			return err
 		}
+
+		// fixed 99% bug
+		go func() {
+			startcount := options.CurrentCount
+			for {
+				time.Sleep(time.Minute)
+				if options.CurrentCount > 0 && startcount == options.CurrentCount {
+					if !options.Silent {
+						fmt.Printf("\r%d/%d | %d%% ", options.Count, options.Count, options.Count*100/options.Count)
+					}
+					os.Exit(1)
+				}
+				startcount = options.CurrentCount
+			}
+		}()
 
 		err := runner.New(options, htemplate, func(result any) {
 			r := result.(*core.Result)
