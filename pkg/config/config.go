@@ -46,7 +46,7 @@ const Version = "1.3.7"
 func New() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
-		c.PocSizeWaitGroup = 10
+		c.PocSizeWaitGroup = 25
 		c.TargetSizeWaitGroup = 25
 		c.FingerprintSizeWaitGroup = 100
 		configHttp := c.ConfigHttp
