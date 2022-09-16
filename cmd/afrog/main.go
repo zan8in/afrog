@@ -47,6 +47,7 @@ func main() {
 	}
 
 	app.Action = func(c *cli.Context) error {
+		starttime := time.Now()
 		upgrade := upgrade.New()
 		upgrade.IsUpdatePocs = options.UpdatePocs
 		upgrade.UpgradeAfrogPocs()
@@ -73,6 +74,9 @@ func main() {
 					if !options.Silent {
 						fmt.Printf("\r%d/%d | %d%% ", options.Count, options.Count, options.Count*100/options.Count)
 					}
+					endtime := time.Now()
+					fmt.Println(" time: ", endtime.Sub(starttime))
+
 					os.Exit(1)
 				}
 				startcount = options.CurrentCount
@@ -114,6 +118,9 @@ func main() {
 		if err != nil {
 			return err
 		}
+
+		endtime := time.Now()
+		fmt.Println(" time: ", endtime.Sub(starttime))
 
 		return err
 	}
