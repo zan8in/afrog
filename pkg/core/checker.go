@@ -49,7 +49,6 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 	c.Result.PocInfo = &pocItem
 
 	c.FastClient.MaxRedirect = c.Options.Config.ConfigHttp.MaxRedirect
-	c.Options.Config.ConfigHttp.DialTimeout = 10 //
 	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
 	c.FastClient.UserAgent = utils.RandomUA()
 

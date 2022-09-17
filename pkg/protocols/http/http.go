@@ -166,31 +166,6 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 				maxrd = int(fc.MaxRedirect)
 			}
 			err = F.DoRedirects(fastReq, fastResp, maxrd)
-			//curmaxrd := 0
-			//for {
-			//	curmaxrd++
-			//	err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(30))
-			//	statusCode := fastResp.Header.StatusCode()
-			//	if statusCode != fasthttp.StatusMovedPermanently &&
-			//		statusCode != fasthttp.StatusFound &&
-			//		statusCode != fasthttp.StatusSeeOther &&
-			//		statusCode != fasthttp.StatusTemporaryRedirect &&
-			//		statusCode != fasthttp.StatusPermanentRedirect {
-			//		break
-			//	}
-			//
-			//	location := fastResp.Header.PeekBytes(strLocation)
-			//	if len(location) == 0 {
-			//		break
-			//	}
-			//
-			//	u := fastReq.URI()
-			//	u.UpdateBytes(location)
-			//
-			//	if curmaxrd > maxrd {
-			//		break
-			//	}
-			//}
 		} else {
 			dialtimeout := 6
 			if fc.DialTimeout > 0 {
@@ -210,7 +185,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			}
 			if errName == "timeout" {
 				repeatCount++
-				if repeatCount > 3 {
+				if repeatCount > 0 {
 					break
 				}
 			} else {
