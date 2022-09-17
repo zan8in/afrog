@@ -183,9 +183,9 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			} else {
 				log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
 			}
-			if errName == "timeout" {
+			if errName == "timeout1" {
 				repeatCount++
-				if repeatCount > 0 {
+				if repeatCount > 1 {
 					break
 				}
 			} else {
@@ -755,7 +755,7 @@ func httpConnError(err error) (string, bool) {
 	errName := ""
 	known := false
 	if err == fasthttp.ErrTimeout {
-		errName = "timeout"
+		errName = "timeout1"
 		known = true
 	} else if err == fasthttp.ErrNoFreeConns {
 		errName = "conn_limit"
