@@ -71,12 +71,11 @@ func main() {
 			for {
 				time.Sleep(3 * time.Minute)
 				if options.CurrentCount > 0 && startcount == options.CurrentCount {
-					if !options.Silent {
-						fmt.Printf("\r%d/%d | %d%% ", options.Count, options.Count, options.Count*100/options.Count)
-					}
+					// if !options.Silent {
+					// 	fmt.Printf("\r%d/%d | %d%% ", options.Count, options.Count, options.Count*100/options.Count)
+					// }
 					endtime := time.Now()
-					fmt.Println(" time: ", endtime.Sub(starttime))
-
+					fmt.Println(log.LogColor.High("Error, Time: ", endtime.Sub(starttime)))
 					os.Exit(1)
 				}
 				startcount = options.CurrentCount
@@ -120,7 +119,7 @@ func main() {
 		}
 
 		endtime := time.Now()
-		fmt.Println(" time: ", endtime.Sub(starttime))
+		fmt.Println(log.LogColor.Vulner(" Time: ", endtime.Sub(starttime)))
 
 		return err
 	}
