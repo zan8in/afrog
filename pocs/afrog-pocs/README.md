@@ -63,7 +63,7 @@ rules:
     request:
       method: GET
       path: /info.php
-    expresssion: response.status == 200 && response.body.bcontains(b'PHP Version')
+    expression: response.status == 200 && response.body.bcontains(b'PHP Version')
     stop_if_mismatch: true
 expression: r0() || r1()
 ```
@@ -78,7 +78,7 @@ method:  表示 http request method 方法
 
 path:  表示 http request URL 请求的 PATH
 
-expresssion：子规则的验证表达式，用于验证 r0 或 r1 是否匹配规则。比如：`response.status == 200 && response.body.bcontains(b'PHP Version')`表示 request 请求返回状态码必须是 200 且 源码必须含有 `PHP Version` 关键字
+expression：子规则的验证表达式，用于验证 r0 或 r1 是否匹配规则。比如：`response.status == 200 && response.body.bcontains(b'PHP Version')`表示 request 请求返回状态码必须是 200 且 源码必须含有 `PHP Version` 关键字
 
 stop_if_match: 如果匹配就停止
 
