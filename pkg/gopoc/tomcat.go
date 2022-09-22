@@ -11,7 +11,7 @@ import (
 
 var (
 	tomcatAjpPort       = "8009"
-	tomcatAjpUnAuthName = "CVE-2020-1928"
+	tomcatAjpUnAuthName = "CVE-2020-1938"
 )
 
 func tomcatAjpUnAuth(args *GoPocArgs) (Result, error) {
@@ -23,7 +23,7 @@ func tomcatAjpUnAuth(args *GoPocArgs) (Result, error) {
 			Severity:    "high",
 			Description: "Tomcat AJP协议由于存在实现缺陷导致相关参数可控，攻击者利用该漏洞可通过构造特定参数，读取服务器webapp下的任意文件。若服务器端同时存在文件上传功能，攻击者可进一步实现远程代码的执行。",
 			Reference: []string{
-				"https://blog.csdn.net/qq_44159028/article/details/112507136",
+				"https://blog.csdn.net/weixin_43416469/article/details/114361921",
 			},
 		},
 	}
