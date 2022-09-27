@@ -20,17 +20,10 @@ rules:
     r1:
         request:
             method: GET
-            path: /nacos/v1/auth/users?pageNo=1&pageSize=999
+            path: /nacos/v1/auth/users?pageNo=1&pageSize=9
             headers:
                 User-Agent: Nacos-Server
         expression: response.status == 200 && response.body.bcontains(bytes(r1))
-    # r2:
-    #     request:
-    #         method: DELETE
-    #         path: /nacos/v1/auth/users?username={{r1}}
-    #         headers:
-    #             User-Agent: Nacos-Server
-    #     expression: response.status == 200 && response.body.bcontains(bytes("delete user ok!"))
     r01:
         request:
             method: POST
@@ -41,7 +34,7 @@ rules:
     r11:
         request:
             method: GET
-            path: /v1/auth/users?pageNo=1&pageSize=999
+            path: /v1/auth/users?pageNo=1&pageSize=9
             headers:
                 User-Agent: Nacos-Server
         expression: response.status == 200 && response.body.bcontains(bytes(r1))
