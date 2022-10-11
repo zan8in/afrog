@@ -38,7 +38,7 @@ func Init(options *config.Options) {
 	// readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	// writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	// maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
-	readTimeout, _ := time.ParseDuration("30000ms")
+	readTimeout, _ := time.ParseDuration("16000ms")
 	writeTimeout, _ := time.ParseDuration("1500ms")
 	maxIdleConnDuration, _ := time.ParseDuration("1h")
 	F = &fasthttp.Client{
@@ -264,7 +264,11 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	protoRequest.Body = []byte(rule.Request.Body)
 	variableMap["request"] = protoRequest
 
-	variableMap["fulltarget"] = fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path)
+	urlquery := ""
+	if len(protoRequest.Url.Query) > 0 {
+		urlquery = "?" + protoRequest.Url.Query
+	}
+	variableMap["fulltarget"] = fmt.Sprintf("%s://%s%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path, urlquery)
 
 	return err
 }
