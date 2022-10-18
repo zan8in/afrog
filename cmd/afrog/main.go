@@ -17,6 +17,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/pocs"
 )
 
 var options = &config.Options{}
@@ -43,11 +44,25 @@ func main() {
 		&cli.BoolFlag{Name: "nofinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
 		&cli.BoolFlag{Name: "notips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},
 		&cli.BoolFlag{Name: "updatepocs", Aliases: []string{"up"}, Destination: &options.UpdatePocs, Value: false, Usage: "update afrog-pocs"},
+		&cli.BoolFlag{Name: "printpocs", Aliases: []string{"pp"}, Destination: &options.PrintPocs, Value: false, Usage: "print afrog-pocs list"},
 		// &cli.BoolFlag{Name: "webport", Aliases: []string{"wp"}, Destination: &options.WebPort, Value: false, Usage: "enable web port scan, default top 1000 port"},
 		// &cli.StringFlag{Name: "port", Destination: &options.Port, Value: "", Usage: "web port scan, default top 1000, eg: --port 80,443,8000-9000"},
 	}
 
 	app.Action = func(c *cli.Context) error {
+		// print pocs list
+		if options.PrintPocs {
+			plist, err := pocs.PrintPocs()
+			if err != nil {
+				return err
+			}
+			for _, v := range plist {
+				fmt.Println(v)
+			}
+			fmt.Println("PoC count: ", len(plist))
+			return nil
+		}
+
 		starttime := time.Now()
 		upgrade := upgrade.New()
 		upgrade.IsUpdatePocs = options.UpdatePocs

@@ -60,6 +60,9 @@ type Options struct {
 	// update afrog-pocs
 	UpdatePocs bool
 
+	// show pocs list
+	PrintPocs bool
+
 	// Scan count num(targets * allpocs)
 	Count int
 
