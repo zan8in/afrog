@@ -38,8 +38,8 @@ func Init(options *config.Options) {
 	// readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	// writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	// maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
-	readTimeout, _ := time.ParseDuration("16000ms")
-	writeTimeout, _ := time.ParseDuration("1500ms")
+	readTimeout, _ := time.ParseDuration(getScanSpeed(options.ScanSpeed))
+	writeTimeout, _ := time.ParseDuration("3000ms")
 	maxIdleConnDuration, _ := time.ParseDuration("1h")
 	F = &fasthttp.Client{
 		TLSConfig:                &tls.Config{InsecureSkipVerify: true},
@@ -913,4 +913,17 @@ func ParseRequest(oReq *http.Request) (*proto.Request, error) {
 
 func (fc *FastClient) Reset() {
 	*fc = FastClient{}
+}
+
+func getScanSpeed(optScanSpeed string) string {
+	if optScanSpeed == "1" || len(optScanSpeed) == 0 {
+		return "10000ms"
+	}
+	if optScanSpeed == "2" {
+		return "20000ms"
+	}
+	if optScanSpeed == "3" {
+		return "30000ms"
+	}
+	return "10000ms"
 }

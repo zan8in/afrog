@@ -42,6 +42,9 @@ type Options struct {
 
 	SeverityKeywords []string
 
+	// Scan Speed  eg: 1(fast)(default) 2(moderate) 3(slow)
+	ScanSpeed string
+
 	// disable output fingerprint in the console
 	NoFinger bool
 
