@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[690]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[695]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
