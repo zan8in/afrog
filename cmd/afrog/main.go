@@ -39,7 +39,7 @@ func main() {
 		&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
 		&cli.StringFlag{Name: "search", Aliases: []string{"s"}, Destination: &options.Search, Value: "", Usage: "search PoC by `keyword` , eg: -s tomcat,phpinfo"},
 		&cli.StringFlag{Name: "severity", Aliases: []string{"S"}, Destination: &options.Severity, Value: "", Usage: "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"},
-		&cli.StringFlag{Name: "scan-speed", Aliases: []string{"ss"}, Destination: &options.ScanSpeed, Value: "", Usage: "scan speed. Possible values: 1(fast)(default), 2(moderate), 3(slow)"},
+		&cli.StringFlag{Name: "scan-stable", Aliases: []string{"ss"}, Destination: &options.ScanStable, Value: "", Usage: "scan stable. Possible values: 1(generally)(default), 2(normal), 3(stablize)"},
 		&cli.BoolFlag{Name: "silent", Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
 		&cli.BoolFlag{Name: "nofinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
 		&cli.BoolFlag{Name: "notips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},

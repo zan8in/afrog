@@ -38,7 +38,7 @@ func Init(options *config.Options) {
 	// readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	// writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	// maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
-	readTimeout, _ := time.ParseDuration(getScanSpeed(options.ScanSpeed))
+	readTimeout, _ := time.ParseDuration(getScanStable(options.ScanStable))
 	writeTimeout, _ := time.ParseDuration("3000ms")
 	maxIdleConnDuration, _ := time.ParseDuration("1h")
 	F = &fasthttp.Client{
@@ -915,14 +915,14 @@ func (fc *FastClient) Reset() {
 	*fc = FastClient{}
 }
 
-func getScanSpeed(optScanSpeed string) string {
-	if optScanSpeed == "1" || len(optScanSpeed) == 0 {
+func getScanStable(optScanStable string) string {
+	if optScanStable == "1" || len(optScanStable) == 0 {
 		return "10000ms"
 	}
-	if optScanSpeed == "2" {
+	if optScanStable == "2" {
 		return "20000ms"
 	}
-	if optScanSpeed == "3" {
+	if optScanStable == "3" {
 		return "30000ms"
 	}
 	return "10000ms"
