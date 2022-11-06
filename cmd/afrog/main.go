@@ -100,9 +100,9 @@ func main() {
 
 			lock.Lock()
 
-			if !options.Silent {
-				options.CurrentCount++
-			}
+			// if !options.Silent {
+			options.CurrentCount++
+			// }
 
 			if r.IsVul {
 				if r.FingerResult != nil {
