@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -23,7 +24,7 @@ import (
 var options = &config.Options{}
 var htemplate = &html.HtmlTemplate{}
 var lock sync.Mutex
-var number = 0
+var number int64 = 0
 
 func main() {
 	app := cli.NewApp()
@@ -63,7 +64,6 @@ func main() {
 			return nil
 		}
 
-		starttime := time.Now()
 		upgrade := upgrade.New()
 		upgrade.IsUpdatePocs = options.UpdatePocs
 		upgrade.UpgradeAfrogPocs()
@@ -81,14 +81,17 @@ func main() {
 			return err
 		}
 
+		starttime := time.Now()
+
 		// fixed 99% bug
 		go func() {
 			startcount := options.CurrentCount
 			for {
-				time.Sleep(3 * time.Minute)
-				if options.CurrentCount > 0 && startcount == options.CurrentCount {
-					endtime := time.Now()
-					fmt.Println(log.LogColor.High("Error, Time: ", endtime.Sub(starttime)))
+				time.Sleep(2 * time.Minute)
+				if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
+					fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
+					fmt.Println(" close wait 3 seconds...")
+					time.Sleep(time.Second * 3)
 					os.Exit(1)
 				}
 				startcount = options.CurrentCount
@@ -98,41 +101,33 @@ func main() {
 		err := runner.New(options, htemplate, func(result any) {
 			r := result.(*core.Result)
 
+			atomic.AddInt64(&options.CurrentCount, 1)
+
 			lock.Lock()
-
-			// if !options.Silent {
-			options.CurrentCount++
-			// }
-
 			if r.IsVul {
 				if r.FingerResult != nil {
 					fr := r.FingerResult.(fingerprint.Result)
 					printFingerprintInfoConsole(fr)
 				} else {
-					// PoC Scan
-					number++
 
-					r.PrintColorResultInfoConsole(utils.GetNumberText(number))
+					atomic.AddInt64(&number, 1)
+					r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
 					htemplate.Result = r
-					htemplate.Number = utils.GetNumberText(number)
+					htemplate.Number = utils.GetNumberText(int(number))
 					htemplate.Append()
 				}
 			}
+			lock.Unlock()
 
 			if !options.Silent {
-				fmt.Printf("\r%d/%d | %d%% ", options.CurrentCount, options.Count, options.CurrentCount*100/options.Count)
+				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount())
 			}
-
-			lock.Unlock()
 
 		})
 		if err != nil {
 			return err
 		}
-
-		endtime := time.Now()
-		fmt.Println(log.LogColor.Vulner(" Time: ", endtime.Sub(starttime)))
 
 		return err
 	}
@@ -143,7 +138,8 @@ func main() {
 		fmt.Println(log.LogColor.High("start afrog failed，", err.Error()))
 	}
 
-	utils.RandSleep(1000)
+	fmt.Println(" close wait 3 seconds...")
+	time.Sleep(time.Second * 3)
 }
 
 func printFingerprintInfoConsole(fr fingerprint.Result) {
@@ -152,10 +148,16 @@ func printFingerprintInfoConsole(fr fingerprint.Result) {
 		if !strings.HasPrefix(fr.StatusCode, "2") {
 			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
 		}
+		space := "                       "
+		if len(fr.Title) == 0 && len(fr.Name) == 0 {
+			space = "                                                               "
+		} else if len(fr.Title) != 0 && len(fr.Name) == 0 {
+			space = "                                          "
+		}
 		fmt.Printf("\r" + fr.Url + " " +
 			statusCode + " " +
 			fr.Title + " " +
-			log.LogColor.Critical(fr.Name) + "\r\n")
+			log.LogColor.Critical(fr.Name) + space + "\r\n")
 	}
 }
 

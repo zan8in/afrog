@@ -32,6 +32,8 @@ type FastClient struct {
 	MaxRedirect int32
 	DialTimeout int32
 	UserAgent   string
+	Options     *config.Options
+	Target      string
 }
 
 func Init(options *config.Options) {
@@ -160,6 +162,11 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	// 新增功能：HTTP请求超时，自动重连机制（3次，每次累加超时时间）
 	repeatCount := 0
 	for {
+		fc.Options.TargetLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 1)
+		if fc.Options.TargetLive.HandleTargetLive(fc.Target, -1) == -1 {
+			return errors.New("target nolive")
+		}
+		// starttime := time.Now().Second()
 		if rule.Request.FollowRedirects {
 			maxrd := 3 // follow redirects default 3
 			if fc.MaxRedirect > 0 {
@@ -176,6 +183,11 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			}
 			err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
 		}
+		fc.Options.TargetLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 2)
+		// endtime := time.Now().Second()
+		// if endtime-starttime > 20 {
+		// 	fmt.Println(log.LogColor.Vulner(httpRequest.URL, fastResp.StatusCode(), endtime-starttime))
+		// }
 		if err != nil {
 			errName, known := httpConnError(err)
 			if known {
@@ -184,7 +196,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 				log.Log().Error(fmt.Sprintf("ERR conn failure: %s %s\n", errName, err))
 			}
 			if errName == "timeout" {
-				repeatCount++
+				repeatCount += 1
 				if repeatCount > 1 {
 					break
 				}
@@ -609,32 +621,6 @@ func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]str
 	fastResp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(fastResp)
 
-	// currd := 0
-	// for {
-	// 	currd++
-	// 	err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(6))
-	// 	statusCode := fastResp.Header.StatusCode()
-	// 	if statusCode != fasthttp.StatusMovedPermanently &&
-	// 		statusCode != fasthttp.StatusFound &&
-	// 		statusCode != fasthttp.StatusSeeOther &&
-	// 		statusCode != fasthttp.StatusTemporaryRedirect &&
-	// 		statusCode != fasthttp.StatusPermanentRedirect {
-	// 		break
-	// 	}
-
-	// 	location := fastResp.Header.PeekBytes(strLocation)
-	// 	if len(location) == 0 {
-	// 		break
-	// 	}
-
-	// 	u := fastReq.URI()
-	// 	u.UpdateBytes(location)
-
-	// 	if currd >= 3 {
-	// 		break
-	// 	}
-	// }
-	// fasthttp bug, https://github.com/valyala/fasthttp/issues/1361
 	err = F.DoRedirects(fastReq, fastResp, 3)
 
 	newheader := make(map[string][]string)
@@ -700,6 +686,104 @@ func Gopochttp(httpRequest *http.Request, redirects int) ([]byte, []byte, []byte
 	}
 
 	return []byte(fastReq.String()), fastResp.Body(), []byte(fastResp.Header.String()), fastResp.StatusCode(), urlType, err
+}
+
+// 返回 -1，表示 request 请求失败（无法访问）
+func CheckTargetHttps(target string) (string, int) {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		statusCode, _, err := fasthttp.Get(nil, target)
+		if err == nil {
+			return target, statusCode
+		}
+		return target, -1
+	}
+
+	u, err := url.Parse("http://" + target)
+	if err != nil {
+		return target, -1
+	}
+
+	port := u.Port()
+
+	switch {
+	case port == "80" || len(port) == 0:
+		statusCode, _, err := fasthttp.Get(nil, "http://"+target)
+		if err == nil {
+			return "http://" + target, statusCode
+		}
+		return target, -1
+
+	case port == "443":
+		statusCode, _, err := fasthttp.Get(nil, "https://"+target)
+		if err == nil {
+			return "https://" + target, statusCode
+		}
+		return target, -1
+	}
+
+	statusCode, resp, err := fasthttp.Get(nil, "http://"+target)
+	if err == nil {
+		if bytes.Contains(resp, []byte("<title>400 The plain HTTP request was sent to HTTPS port</title>")) {
+			return "https://" + target, statusCode
+		}
+		return "http://" + target, statusCode
+	}
+
+	statusCode, _, err = fasthttp.Get(nil, "https://"+target)
+	if err == nil {
+		return "https://" + target, statusCode
+	}
+
+	return target, -1
+}
+
+// 返回 -1，表示 request 请求失败（无法访问）
+func CheckTargetHttps2(target string) (string, int) {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		_, statusCode, err := GetTimeout(target, 6)
+		if err == nil {
+			return target, statusCode
+		}
+		return target, -1
+	}
+
+	u, err := url.Parse("http://" + target)
+	if err != nil {
+		return target, -1
+	}
+
+	port := u.Port()
+
+	switch {
+	case port == "80" || len(port) == 0:
+		_, statusCode, err := GetTimeout("http://"+target, 6)
+		if err == nil {
+			return "http://" + target, statusCode
+		}
+		return target, -1
+
+	case port == "443":
+		_, statusCode, err := GetTimeout("https://"+target, 6)
+		if err == nil {
+			return "https://" + target, statusCode
+		}
+		return target, -1
+	}
+
+	resp, statusCode, err := GetTimeout("http://"+target, 6)
+	if err == nil {
+		if bytes.Contains(resp, []byte("<title>400 The plain HTTP request was sent to HTTPS port</title>")) {
+			return "https://" + target, statusCode
+		}
+		return "http://" + target, statusCode
+	}
+
+	_, statusCode, err = GetTimeout("https://"+target, 6)
+	if err == nil {
+		return "https://" + target, statusCode
+	}
+
+	return target, -1
 }
 
 // target is not alive if return value is none http(s)  else is alive.

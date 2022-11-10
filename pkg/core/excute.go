@@ -7,7 +7,6 @@ import (
 	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 )
@@ -78,18 +77,6 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	// init scan sum
 	e.options.Count += len(e.options.Targets) * len(newPocSlice)
 
-	// outdated: 2022.7.25
-	// swg := e.workPool.PocSwg
-	// swg := e.workPool.NewPool(e.workPool.config.PocConcurrencyType)
-	// for _, p := range newPocSlice {
-	// 	swg.WaitGroup.Add()
-	// 	go func(p poc.Poc) {
-	// 		defer swg.WaitGroup.Done()
-	// 		e.executeTargets(p)
-	// 	}(p)
-	// }
-	// swg.WaitGroup.Wait()
-
 	var wg sync.WaitGroup
 	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p any) {
 		e.executeTargets(p.(poc.Poc))
@@ -97,8 +84,10 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	})
 	defer p.Release()
 	for _, poc := range newPocSlice {
-		wg.Add(1)
-		_ = p.Invoke(poc)
+		err := p.Invoke(poc)
+		if err == nil {
+			wg.Add(1)
+		}
 	}
 	wg.Wait()
 }
@@ -116,51 +105,25 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		return
 	}
 
-	// outdated: 2022.7.25
-	// wg := e.workPool.NewPool(e.workPool.config.TargetConcurrencyType)
-	// for k, target := range allTargets {
-	// 	wg.WaitGroup.Add()
-	// 	go func(k int, target string, poc1 poc.Poc) {
-	// 		defer wg.WaitGroup.Done()
-
-	// 		// add: check target alive
-	// 		if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
-	// 			target = http2.CheckLive(target)
-	// 			if !http2.IsFullHttpFormat(target) {
-	// 				e.options.SetCheckLiveValue(target)
-	// 			} else {
-	// 				e.options.Targets[k] = target
-	// 			}
-	// 		}
-
-	// 		e.executeExpression(target, poc1)
-
-	// 		// fmt.Println("poc the number of goroutines: ", runtime.NumGoroutine())
-	// 	}(k, target, poc1)
-	// }
-	// wg.WaitGroup.Wait()
-
 	var wg sync.WaitGroup
 	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask any) {
 		defer wg.Done()
 		target := wgTask.(poc.WaitGroupTask).Value.(string)
-		key := wgTask.(poc.WaitGroupTask).Key
+		// key := wgTask.(poc.WaitGroupTask).Key
 		//add: check target alive
-		if alive := e.options.CheckLiveByCount(target); alive && !http2.IsFullHttpFormat(target) {
-			target = http2.CheckLive(target)
-			if !http2.IsFullHttpFormat(target) {
-				e.options.SetCheckLiveValue(target)
-			} else {
-				e.options.Targets[key] = target
-			}
+		if e.options.TargetLive.HandleTargetLive(target, -1) == 1 {
+			e.executeExpression(target, poc1)
+		} else {
+			e.executeExpression("", poc1)
 		}
 
-		e.executeExpression(target, poc1)
 	})
 	defer p.Release()
 	for k, target := range allTargets {
-		wg.Add(1)
-		_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
+		err := p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
+		if err == nil {
+			wg.Add(1)
+		}
 	}
 	wg.Wait()
 }

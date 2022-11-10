@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/targets"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 )
@@ -24,6 +25,9 @@ type Runner struct {
 
 func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
+
+	// init TargetLive
+	options.TargetLive = utils.New()
 
 	// init callback
 	options.ApiCallBack = acb
@@ -58,10 +62,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 	if len(options.Targets) == 0 {
 		return errors.New("not found targets")
-	}
-	// targets handler
-	for _, v := range options.Targets {
-		options.SetCheckLiveValue(v)
 	}
 
 	// init pocs
@@ -101,17 +101,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		fmt.Println(ShowTips())
 	}
 
-	// fmt.Println("port scan before : ", len(options.Targets))
-	// if options.WebPort {
-	// 	if scan, err := scan.New(options); err == nil {
-	// 		scan.Execute()
-	// 	}
-	// }
-	// fmt.Println("port scan after : ", len(options.Targets))
-	// for k, v := range options.Targets {
-	// 	fmt.Println(k, v)
-	// }
-
 	// fingerprint
 	if !options.NoFinger {
 		s, _ := fingerprint.New(options)
@@ -122,7 +111,9 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		}
 	}
 
-	//
+	//check target live
+	go targets.RunTargetLivenessCheck(options)
+
 	e := core.New(options)
 	e.Execute(allPocsYamlSlice, allPocsEmbedYamlSlice)
 
@@ -131,6 +122,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 func printFingerResultConsole() {
 	fmt.Printf("\r" + log.LogColor.Time("000 "+utils.GetNowDateTime()) + " " +
-		log.LogColor.Vulner("Fingerprint") + " " + log.LogColor.Info("INFO") + "\r\n")
+		log.LogColor.Vulner("Fingerprint") + " " + log.LogColor.Info("INFO") + "                    \r\n")
 
 }

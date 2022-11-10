@@ -77,71 +77,46 @@ func (s *Service) executeFingerPrintDetection() {
 			size = int(s.Options.Config.FingerprintSizeWaitGroup)
 		}
 
-		// swg := sizedwaitgroup.New(size)
-		// for k, url := range s.Options.Targets {
-		// 	swg.Add()
-		// 	go func(k int, url string) {
-		// 		defer swg.Done()
-
-		// 		// add: check target alive
-		// if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
-		// 	url = http2.CheckLive(url)
-		// 	if !http2.IsFullHttpFormat(url) {
-		// 		s.Options.SetCheckLiveValue(url)
-		// 		s.PrintColorResultInfoConsole(Result{})
-		// 		return
-		// 	} else {
-		// 		s.Options.Targets[k] = url
-		// 	}
-		// }
-
-		// 		s.processFingerPrintInputPair(url)
-
-		// 		// fmt.Println("the number of goroutines: ", runtime.NumGoroutine())
-		// 	}(k, url)
-		// }
-		// swg.Wait()
-
 		var wg sync.WaitGroup
 		p, _ := ants.NewPoolWithFunc(size, func(wgTask any) {
 			defer wg.Done()
 			url := wgTask.(poc.WaitGroupTask).Value.(string)
 			key := wgTask.(poc.WaitGroupTask).Key
-			//add: check target alive
-			if alive := s.Options.CheckLiveByCount(url); alive && !http2.IsFullHttpFormat(url) {
-				url = http2.CheckLive(url)
-				if !http2.IsFullHttpFormat(url) {
-					s.Options.SetCheckLiveValue(url)
-				} else {
-					s.Options.Targets[key] = url
-				}
+			if s.Options.TargetLive.HandleTargetLive(url, -1) == -1 {
+				// 该 url 在 targetlive 黑名单里面
+				s.PrintColorResultInfoConsole(Result{})
+			} else {
+				// 该 url 未在 targetlive 黑名单里面
+				s.processFingerPrintInputPair(url, key)
 			}
-
-			s.processFingerPrintInputPair(url)
 		})
 		defer p.Release()
 		for k, target := range s.Options.Targets {
-			wg.Add(1)
-			_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
+			err := p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
+			if err == nil {
+				wg.Add(1)
+			}
 		}
 		wg.Wait()
 	}
 }
 
-func (s *Service) processFingerPrintInputPair(url string) error {
+func (s *Service) processFingerPrintInputPair(url string, key int) error {
 	if len(s.fpSlice) == 0 {
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
 	}
 
-	// check target alive.
-	if alive := s.Options.CheckLiveByCount(url); !alive {
+	// 检测 http or https 并更新 targets 列表
+	url, statusCode := http2.CheckTargetHttps2(url)
+	if statusCode == -1 {
+		// url 加入 targetlive 黑名单 +1
+		s.Options.TargetLive.HandleTargetLive(url, 0)
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
-	}
-
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		url = "http://" + url
+	} else {
+		s.Options.TargetLive.HandleTargetLive(url, 1)
+		s.Options.Targets[key] = url
 	}
 
 	req, err := http.NewRequest("GET", url, nil)

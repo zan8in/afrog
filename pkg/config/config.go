@@ -40,7 +40,7 @@ type Ceye struct {
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
-const Version = "1.3.9"
+const Version = "2.0.0"
 
 // Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
@@ -52,8 +52,8 @@ func New() (*Config, error) {
 		configHttp := c.ConfigHttp
 		configHttp.Proxy = ""
 		configHttp.DialTimeout = 10
-		configHttp.ReadTimeout = "500ms"
-		configHttp.WriteTimeout = "500ms"
+		configHttp.ReadTimeout = "10000ms"
+		configHttp.WriteTimeout = "3000ms"
 		configHttp.MaxIdle = "1h"
 		configHttp.MaxRedirect = 3
 		configHttp.Concurrency = 4096

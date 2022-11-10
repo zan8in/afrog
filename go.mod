@@ -10,7 +10,7 @@ require (
 	github.com/gookit/color v1.5.0
 	github.com/karrick/godirwalk v1.16.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/panjf2000/ants/v2 v2.5.0
+	github.com/panjf2000/ants/v2 v2.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/rawhttp v0.1.1
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -32,6 +32,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/miekg/dns v1.1.43 // indirect
+	github.com/panjf2000/ants v1.3.0
 	github.com/projectdiscovery/blackrock v0.0.0-20210415162320-b38689ae3a2e // indirect
 	github.com/projectdiscovery/cryptoutil v0.0.0-20210805184155-b5d2512f9345 // indirect
 	github.com/projectdiscovery/fastdialer v0.0.15 // indirect

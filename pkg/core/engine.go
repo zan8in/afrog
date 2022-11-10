@@ -25,6 +25,7 @@ func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
 	c.Result.Output = e.options.Output
+	c.FastClient.Options = e.options
 	return c
 }
 

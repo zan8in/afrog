@@ -39,7 +39,7 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 	}()
 
 	// check target alive.
-	if alive := c.Options.CheckLiveByCount(target); !alive {
+	if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
 		c.Options.ApiCallBack(c.Result)
 		return err
@@ -89,9 +89,18 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		c.UpdateVariableMap(pocItem.Payloads.Payloads)
 	}
 
+	c.FastClient.Target = target
+
 	for _, ruleMap := range pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
+
+		if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
+			fmt.Println("来到这里，你可不简单哦", target)
+			c.Result.IsVul = false
+			c.Options.ApiCallBack(c.Result)
+			return err
+		}
 
 		if rule.BeforeSleep != 0 {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
@@ -176,20 +185,23 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	gpa := gopoc.New(target)
 
 	// check target alive.
-	if alive := c.Options.CheckLiveByCount(target); !alive {
+	if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
 		c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
+	c.Options.TargetLive.AddRequestTarget(target+gopocName, 1)
 	fun := gopoc.GetGoPocFunc(gopocName)
 	r, err := fun(gpa)
 	if err != nil {
+		c.Options.TargetLive.AddRequestTarget(target+gopocName, 2)
 		c.Result.IsVul = false
 		c.Result.PocInfo = gpa.Poc
 		c.Options.ApiCallBack(c.Result)
 		return err
 	}
+	c.Options.TargetLive.AddRequestTarget(target+gopocName, 2)
 
 	c.Result.Target = target
 	c.Result.FullTarget = target
