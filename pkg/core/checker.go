@@ -96,7 +96,6 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		rule := ruleMap.Value
 
 		if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
-			fmt.Println("来到这里，你可不简单哦", target)
 			c.Result.IsVul = false
 			c.Options.ApiCallBack(c.Result)
 			return err
