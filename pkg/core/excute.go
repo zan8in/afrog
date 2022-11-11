@@ -111,7 +111,7 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 		target := wgTask.(poc.WaitGroupTask).Value.(string)
 		// key := wgTask.(poc.WaitGroupTask).Key
 		//add: check target alive
-		if e.options.TargetLive.HandleTargetLive(target, -1) == 1 {
+		if e.options.TargetLive.HandleTargetLive(target, -1) != -1 {
 			e.executeExpression(target, poc1)
 		} else {
 			e.executeExpression("", poc1)
