@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[702]</b> 个 PoC <br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[707]</b> 个 PoC <br/>🐸喜欢请点赞🌟⭐，不迷路</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">下载</a> •
