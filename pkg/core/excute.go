@@ -84,10 +84,8 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	})
 	defer p.Release()
 	for _, poc := range newPocSlice {
-		err := p.Invoke(poc)
-		if err == nil {
-			wg.Add(1)
-		}
+		wg.Add(1)
+		_ = p.Invoke(poc)
 	}
 	wg.Wait()
 }
@@ -120,10 +118,8 @@ func (e *Engine) executeTargets(poc1 poc.Poc) {
 	})
 	defer p.Release()
 	for k, target := range allTargets {
-		err := p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
-		if err == nil {
-			wg.Add(1)
-		}
+		wg.Add(1)
+		_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
 	}
 	wg.Wait()
 }

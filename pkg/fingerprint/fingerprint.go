@@ -92,10 +92,8 @@ func (s *Service) executeFingerPrintDetection() {
 		})
 		defer p.Release()
 		for k, target := range s.Options.Targets {
-			err := p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
-			if err == nil {
-				wg.Add(1)
-			}
+			wg.Add(1)
+			_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
 		}
 		wg.Wait()
 	}
