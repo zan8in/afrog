@@ -74,6 +74,20 @@
             <br>
             <a href="https://github.com/purple-WL">purple-WL</a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/9.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0);">throat</a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/10.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="http://secx.store:4000/archives/">Secx</a>
+        </td>
 	</tr>	
 </table></div>
 
