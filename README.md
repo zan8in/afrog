@@ -30,6 +30,20 @@
             <br>
             <a href="https://www.linuxlz.com/">雪山</a>
         </td> 
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/3.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/White-hua">White-hua</a>
+        </td> 
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/4.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/purple-WL">purple-WL</a>
+        </td> 
 	</tr>	
 </table></div>
 
