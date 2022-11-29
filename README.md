@@ -118,6 +118,20 @@
             <br>
             <a href="javascript:void(0);">A1</a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/15.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/rainbow2972">rainbow2972</a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/16.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/wuha0926">wuha0926</a>
+        </td>
 	</tr>	
 </table></div>
 
