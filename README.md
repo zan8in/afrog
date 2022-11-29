@@ -21,8 +21,15 @@
                   alt="Typora-Logo"
                   height="120"/>
             <br>
-            <a href="https://blog.csdn.net/U_U520" target="_blank"><sub>不动明王</sub></a>
+            <a href="https://blog.csdn.net/U_U520"><sub>不动明王</sub></a>
         </td>    
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/2.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://www.linuxlz.com/">雪山</a>
+        </td> 
 	</tr>	
 </table></div>
 
