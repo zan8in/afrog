@@ -9,6 +9,7 @@
   <!-- <a href="https://github.com/zan8in/afrog/blob/main/docs/POCLIST.md">列表</a> • -->
   <a href="https://github.com/zan8in/afrog/blob/main/docs/README_en.md">English Doc</a>
 </p>
+
 ## PoC 贡献者
 
 
@@ -16,13 +17,11 @@
 <div><table frame=void>
 	<tr>
         <td align="center">
-          <a href="https://blog.csdn.net/U_U520" target="_blank">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.jpeg"
                   alt="Typora-Logo"
                   height="120"/>
             <br>
-            <sub>不动明王</sub>
-          </a>
+            <a href="https://blog.csdn.net/U_U520" target="_blank"><sub>不动明王</sub></a>
         </td>    
 	</tr>	
 </table></div>
