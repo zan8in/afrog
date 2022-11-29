@@ -153,6 +153,13 @@
             <br>
             <a href="https://github.com/G-H-Z"><sub>G-H-Z</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/20.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/LDDP"><sub>wh1te</sub></a>
+        </td>
     </tr>	
 </table></div>
 
