@@ -21,7 +21,7 @@
                   alt="Typora-Logo"
                   height="120"/>
             <br>
-            <a href="https://blog.csdn.net/U_U520"><sub>不动明王</sub></a>
+            <a href="https://blog.csdn.net/U_U520">不动明王</a>
         </td>    
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/2.png"
@@ -43,6 +43,20 @@
                   height="120"/>
             <br>
             <a href="https://github.com/purple-WL">purple-WL</a>
+        </td> 
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/5.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0)">123456</a>
+        </td> 
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/6.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/ifofor">ifofor</a>
         </td> 
 	</tr>	
 </table></div>
