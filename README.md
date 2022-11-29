@@ -86,6 +86,8 @@
             <br>
             <a href="http://secx.store:4000/archives/"><sub>Secx</sub></a>
         </td>
+	</tr>
+    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/11.png"
                   alt="Typora-Logo"
@@ -100,8 +102,6 @@
             <br>
             <a href="javascript:void(0);"><sub>Sheen</sub></a>
         </td>
-	</tr>
-    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/13.png"
                   alt="Typora-Logo"
