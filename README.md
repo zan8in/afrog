@@ -132,6 +132,20 @@
             <br>
             <a href="https://github.com/wuha0926">wuha0926</a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/17.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0);">茄子</a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/18.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0);">lei_sec</a>
+        </td>
 	</tr>	
 </table></div>
 
