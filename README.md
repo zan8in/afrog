@@ -17,7 +17,7 @@
 <div><table frame=void>
 	<tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.jpeg"
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.png"
                   alt="Typora-Logo"
                   height="120"/>
             <br>
