@@ -130,6 +130,8 @@
             <br>
             <a href="https://github.com/wuha0926"><sub>wuha0926</sub></a>
         </td>
+	</tr>	
+    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/17.png"
                   alt="Typora-Logo"
@@ -151,7 +153,7 @@
             <br>
             <a href="https://github.com/G-H-Z"><sub>G-H-Z</sub></a>
         </td>
-	</tr>		
+    </tr>	
 </table></div>
 
 
