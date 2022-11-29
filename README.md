@@ -88,6 +88,20 @@
             <br>
             <a href="http://secx.store:4000/archives/">Secx</a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/11.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/yueyu0740">冰河</a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/12.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0);">Sheen</a>
+        </td>
 	</tr>	
 </table></div>
 
