@@ -19,86 +19,84 @@
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://blog.csdn.net/U_U520">不动明王</a>
         </td>    
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/2.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://www.linuxlz.com/">雪山</a>
         </td> 
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/3.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/White-hua">White-hua</a>
         </td> 
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/5.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0)">123456</a>
         </td> 
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/6.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/ifofor">ifofor</a>
         </td> 
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/7.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/SkinAir">Air</a>
         </td>
-	</tr>
-    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/8.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/zhizhuoshuma">执着</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/4.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/purple-WL">purple-WL</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/9.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">throat</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/10.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="http://secx.store:4000/archives/">Secx</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/11.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/yueyu0740">冰河</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/12.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">Sheen</a>
         </td>
@@ -107,51 +105,49 @@
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/13.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">a16</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/14.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">A1</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/15.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/rainbow2972">rainbow2972</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/16.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/wuha0926">wuha0926</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/17.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">茄子</a>
         </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/18.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="javascript:void(0);">lei_sec</a>
         </td>
-	</tr>
-    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/19.png"
                   alt="Typora-Logo"
-                  height="120"/>
+                  height="60"/>
             <br>
             <a href="https://github.com/G-H-Z">G-H-Z</a>
         </td>
