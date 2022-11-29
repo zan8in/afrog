@@ -146,7 +146,16 @@
             <br>
             <a href="javascript:void(0);">lei_sec</a>
         </td>
-	</tr>	
+	</tr>
+    <tr>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/19.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/G-H-Z">G-H-Z</a>
+        </td>
+	</tr>		
 </table></div>
 
 
