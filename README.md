@@ -15,15 +15,15 @@
 
 <div><table frame=void>
 	<tr>
-        <td><div>
-        <center>
-        	<img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.jpeg"
-                 alt="Typora-Logo"
-                 height="120"/>
-        	<br>
-        	<a href="https://blog.csdn.net/U_U520" target="_blank">不动明王</a>
-        </center>
-        </div></td>    
+        <td align="center">
+          <a href="https://blog.csdn.net/U_U520" target="_blank">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.jpeg"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <sub>不动明王</sub>
+          </a>
+        </td>    
 	</tr>	
 </table></div>
 
