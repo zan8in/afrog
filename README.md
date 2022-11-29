@@ -111,6 +111,13 @@
             <br>
             <a href="javascript:void(0);">a16</a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/14.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="javascript:void(0);">A1</a>
+        </td>
 	</tr>	
 </table></div>
 
