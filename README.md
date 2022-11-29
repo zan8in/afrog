@@ -37,13 +37,6 @@
             <br>
             <a href="https://github.com/White-hua">White-hua</a>
         </td> 
-          <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/7.png"
-                  alt="Typora-Logo"
-                  height="120"/>
-            <br>
-            <a href="https://github.com/SkinAir">Air</a>
-        </td>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/5.png"
                   alt="Typora-Logo"
@@ -58,6 +51,13 @@
             <br>
             <a href="https://github.com/ifofor">ifofor</a>
         </td> 
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/7.png"
+                  alt="Typora-Logo"
+                  height="120"/>
+            <br>
+            <a href="https://github.com/SkinAir">Air</a>
+        </td>
 	</tr>
     <tr>
         <td align="center">
