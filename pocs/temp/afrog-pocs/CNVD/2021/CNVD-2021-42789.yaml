@@ -18,5 +18,5 @@ rules:
     request:
       method: GET
       path: /admin/admin/admin_list.html
-    expression: response.status == 200 && response.body.bcontains(b'添加')
+    expression: response.status == 200 && response.body.bcontains(b'添加') && response.body.bcontains(b'首页') && response.body.bcontains(b'管理员列表') && response.body.bcontains(b'导航元素')
 expression: r0()
