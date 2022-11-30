@@ -160,6 +160,13 @@
             <br>
             <a href="https://github.com/LDDP"><sub>wh1te</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/21.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="javascript:void(0);"><sub>清月</sub></a>
+        </td>
     </tr>	
 </table></div>
 
