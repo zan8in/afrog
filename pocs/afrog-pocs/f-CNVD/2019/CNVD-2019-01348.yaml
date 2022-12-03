@@ -4,6 +4,9 @@ info:
     name: Xiuno BBS CNVD-2019-01348
     author: 清风明月(www.secbook.info)
     severity: high
+    description: Xiuno BBS系统存在系统重装漏洞。该漏洞源于系统安装完毕后未对安装目录进行任何防护或过滤，攻击者可直接通过安装页面重装系统。Xiuno BBS 4.0.4
+    reference:
+        - https://www.cnvd.org.cn/flaw/show/CNVD-2019-01348
 
 rules:
     r0:
