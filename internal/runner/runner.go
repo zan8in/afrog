@@ -41,8 +41,8 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 	// update afrog-pocs
 	upgrade := upgrade.New(options.UpdatePocs)
+	upgrade.UpgradeAfrogPocs()
 	if options.UpdatePocs {
-		upgrade.UpgradeAfrogPocs()
 		return nil
 	}
 
@@ -55,9 +55,8 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		gologger.Fatal().Msgf("Output failed, %s", err.Error())
 	}
 
-	ShowBanner3(upgrade)
-
-	// printPathLog(upgrade)
+	// show banner
+	ShowBanner2(upgrade)
 
 	// init TargetLive
 	options.TargetLive = utils.New()
@@ -97,6 +96,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		return errors.New("not found targets")
 	}
 
+	// show banner
 	gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
 
 	// init pocs
@@ -122,18 +122,13 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		return errors.New("no found pocs")
 	}
 
+	// show banner
 	gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
 	gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
 	gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
 
-	// whitespace
+	// whitespace show banner
 	fmt.Println()
-
-	// fmt.Println(ShowUsage())
-
-	// if !options.NoTips {
-	// 	fmt.Println(ShowTips())
-	// }
 
 	// fingerprint
 	if !options.NoFinger {
@@ -155,21 +150,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 }
 
 func printFingerResultConsole() {
-	fmt.Printf("\r" + log.LogColor.Time("000 "+utils.GetNowDateTime()) + " " +
+	gologger.Print().Msgf("\r" + log.LogColor.Time("000 "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner("Fingerprint") + " " + log.LogColor.Info("INFO") + "                    \r\n")
 
-}
-
-func printPathLog(upgrade *upgrade.Upgrade) {
-	fmt.Println("PATH:")
-	// fmt.Println("   " + options.Config.GetConfigPath())
-	// if options.UpdatePocs {
-	// 	fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
-	// } else {
-	// 	if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
-	// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
-	// 	} else {
-	// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
-	// 	}
-	// }
 }

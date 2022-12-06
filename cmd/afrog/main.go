@@ -27,6 +27,7 @@ var lock sync.Mutex
 var number int64 = 0
 
 func main() {
+	runner.ShowBanner()
 
 	readConfig()
 
