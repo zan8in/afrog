@@ -1,6 +1,7 @@
 package html
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/fingerprint"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -27,8 +27,7 @@ func (ht *HtmlTemplate) New() error {
 
 		filesuffix := path.Ext(ht.Filename)
 		if filesuffix != ".html" && filesuffix != ".htm" {
-			fmt.Println(log.LogColor.High("Failed to start afrog，Output file suffix must be .html or .htm"))
-			return nil
+			return errors.New("file suffix must be .html or .htm")
 		}
 
 		ouputFile := filepath.Join(outputDirectory, ht.Filename)

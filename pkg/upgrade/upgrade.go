@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/gologger"
 )
 
 type Upgrade struct {
@@ -32,9 +33,9 @@ const (
 	afrogVersion    = "/afrog.version"
 )
 
-func New() *Upgrade {
+func New(updatePoc bool) *Upgrade {
 	homeDir, _ := os.UserHomeDir()
-	return &Upgrade{HomeDir: homeDir}
+	return &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}
 }
 
 func (u *Upgrade) CheckUpgrade() (bool, error) {
@@ -80,20 +81,19 @@ func (u *Upgrade) UpgradeAfrogPocs() {
 	isUp, err := u.CheckUpgrade()
 	if err != nil {
 		if u.IsUpdatePocs {
-			fmt.Println(log.LogColor.High("PoC Update failed, " + err.Error()))
+			gologger.Fatal().Msgf("The afrog-pocs update failed, %s\n", err.Error())
 		}
-		return
 	}
 	if !isUp {
 		if u.IsUpdatePocs {
-			fmt.Println(log.LogColor.Vulner("Congratulations, the PoC is updated to the latest version"))
+			gologger.Info().Msgf("No new updates found for afrog-pocs!")
 		}
 		return
 	}
 	if isUp {
 		u.LastestVersion = u.RemoteVersion
 		if u.IsUpdatePocs {
-			fmt.Println(log.LogColor.Vulner("Downloading latest release..."))
+			gologger.Info().Msgf("Downloading latest afrog-pocs release...")
 			u.Download()
 		}
 	}
@@ -120,8 +120,8 @@ func (u *Upgrade) Unzip(src string) {
 
 	_, err := uz.Extract(src, u.HomeDir)
 	if err != nil {
-		fmt.Println(log.LogColor.High("Failed updated afrog-pocs ", err))
+		gologger.Fatal().Msgf("The afrog-pocs upzip failed, %s\n", err.Error())
 	}
 
-	fmt.Println(log.LogColor.Vulner("Successfully updated afrog-pocs to ", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/")))
+	gologger.Info().Msgf("Successfully updated to afrog-pocs %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
 }

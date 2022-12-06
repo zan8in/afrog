@@ -5,7 +5,9 @@ import (
 
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/gologger"
 )
 
 func ShowBanner() string {
@@ -18,6 +20,24 @@ func ShowUsage() string {
 
 func ShowTips() string {
 	return "\nTIPS:\n   " + utils.GetRandomTips() + "\n"
+}
+
+func ShowBanner3(upgrade *upgrade.Upgrade) {
+	messageStr := ""
+	if utils.Compare(upgrade.LastestAfrogVersion, ">", config.Version) {
+		messageStr = " (" + log.LogColor.Red(upgrade.LastestAfrogVersion) + ")"
+	} else {
+		messageStr = " (" + log.LogColor.Green("latest") + ")"
+	}
+	gologger.Info().Msgf("Using afrog Engine %s%s", config.Version, messageStr)
+
+	messageStr2 := ""
+	if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
+		messageStr2 = " (" + log.LogColor.Red(upgrade.LastestAfrogVersion) + ")"
+	} else {
+		messageStr2 = " (" + log.LogColor.Green("latest") + ")"
+	}
+	gologger.Info().Msgf("Using afrog-pocs %s%s", upgrade.CurrVersion, messageStr2)
 }
 
 func ShowBanner2(afrogLatestversion string) {

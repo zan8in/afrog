@@ -10,6 +10,7 @@ import (
 	"github.com/tj/go-update/progress"
 	githubUpdateStore "github.com/tj/go-update/stores/github"
 	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/gologger"
 )
 
 func UpdateAfrogVersionToLatest(verbose bool) error {
@@ -33,7 +34,7 @@ func UpdateAfrogVersionToLatest(verbose bool) error {
 		return errors.Wrap(err, "could not fetch latest release")
 	}
 	if len(releases) == 0 {
-		fmt.Println("No new updates found for afrog engine!")
+		gologger.Info().Msgf("No new updates found for afrog engine!")
 		return nil
 	}
 
@@ -58,7 +59,6 @@ func UpdateAfrogVersionToLatest(verbose bool) error {
 	if err := m.Install(tarball); err != nil {
 		return errors.Wrap(err, "could not install latest release")
 	}
-	fmt.Printf("Successfully updated to afrog %s\n", latest.Version)
-
+	gologger.Info().Msgf("Successfully updated to afrog %s\n", latest.Version)
 	return nil
 }

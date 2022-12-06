@@ -25,16 +25,27 @@ require (
 
 require (
 	github.com/apex/log v1.9.0 // indirect
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/c4milo/unpackit v0.1.0 // indirect
+	github.com/cnf/structhash v0.0.0-20201127153200-e1b16c1ebc08 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gosuri/uilive v0.0.4 // indirect
 	github.com/gosuri/uiprogress v0.0.1 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
+	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/tj/go-update v2.2.5-0.20200519121640-62b4b798fd68+incompatible // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 // indirect
+	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf // indirect
+	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 // indirect
+	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (

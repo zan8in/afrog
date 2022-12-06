@@ -14,8 +14,10 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/targets"
+	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/gologger"
 )
 
 type Runner struct {
@@ -25,6 +27,37 @@ type Runner struct {
 
 func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
+
+	// afrog engine update
+	if options.UpdateAfrogVersion {
+		return UpdateAfrogVersionToLatest(true)
+	}
+
+	// print pocs list
+	if options.PrintPocs {
+		options.PrintPocList()
+		return nil
+	}
+
+	// update afrog-pocs
+	upgrade := upgrade.New(options.UpdatePocs)
+	if options.UpdatePocs {
+		upgrade.UpgradeAfrogPocs()
+		return nil
+	}
+
+	// output to afrog report
+	if len(options.Output) == 0 {
+		options.Output = utils.GetNowDateTimeReportName() + ".html"
+	}
+	htemplate.Filename = options.Output
+	if err := htemplate.New(); err != nil {
+		gologger.Fatal().Msgf("Output failed, %s", err.Error())
+	}
+
+	ShowBanner3(upgrade)
+
+	// printPathLog(upgrade)
 
 	// init TargetLive
 	options.TargetLive = utils.New()
@@ -64,6 +97,8 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		return errors.New("not found targets")
 	}
 
+	gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
+
 	// init pocs
 	allPocsEmbedYamlSlice := []string{}
 	if len(options.PocsFilePath) > 0 {
@@ -87,19 +122,18 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		return errors.New("no found pocs")
 	}
 
-	// console print
-	if len(options.Output) > 0 {
-		fmt.Println("   ./reports/" + options.Output)
-	}
+	gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
+	gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
+	gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
 
-	// // init scan sum
-	// options.Count = len(options.Targets) * (len(allPocsYamlSlice) + len(allPocsEmbedYamlSlice))
+	// whitespace
+	fmt.Println()
 
 	// fmt.Println(ShowUsage())
 
-	if !options.NoTips {
-		fmt.Println(ShowTips())
-	}
+	// if !options.NoTips {
+	// 	fmt.Println(ShowTips())
+	// }
 
 	// fingerprint
 	if !options.NoFinger {
@@ -124,4 +158,18 @@ func printFingerResultConsole() {
 	fmt.Printf("\r" + log.LogColor.Time("000 "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner("Fingerprint") + " " + log.LogColor.Info("INFO") + "                    \r\n")
 
+}
+
+func printPathLog(upgrade *upgrade.Upgrade) {
+	fmt.Println("PATH:")
+	// fmt.Println("   " + options.Config.GetConfigPath())
+	// if options.UpdatePocs {
+	// 	fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
+	// } else {
+	// 	if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
+	// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
+	// 	} else {
+	// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
+	// 	}
+	// }
 }

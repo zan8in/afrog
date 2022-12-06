@@ -18,6 +18,8 @@ type Color struct {
 	Title    func(a ...any) string
 	Banner   func(a ...any) string
 	Bold     func(a ...any) string
+	Red      func(a ...any) string
+	Green    func(a ...any) string
 }
 
 var LogColor *Color
@@ -40,6 +42,8 @@ func NewColor() *Color {
 		Title:    color.FgLightBlue.Render,
 		Banner:   color.FgLightGreen.Render,
 		Bold:     color.Bold.Render,
+		Red:      color.FgLightRed.Render,
+		Green:    color.FgLightGreen.Render,
 	}
 }
 
@@ -59,6 +63,8 @@ func (c *Color) GetColor(level string, log string) string {
 	default:
 		if level == "time" {
 			return c.Low(log)
+		} else if level == "RED" {
+			return c.Red(log)
 		} else {
 			return c.Vulner(log)
 		}

@@ -1,10 +1,12 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/pocs"
 )
 
 type Options struct {
@@ -59,6 +61,9 @@ type Options struct {
 
 	// update afrog-pocs
 	UpdatePocs bool
+
+	// update afrog version
+	UpdateAfrogVersion bool
 
 	// show pocs list
 	PrintPocs bool
@@ -128,4 +133,15 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 		}
 	}
 	return false
+}
+
+func (o *Options) PrintPocList() {
+	plist, err := pocs.PrintPocs()
+	if err != nil {
+		return
+	}
+	for _, v := range plist {
+		fmt.Println(v)
+	}
+	fmt.Println("----------------\r\nPoC count: ", len(plist))
 }
