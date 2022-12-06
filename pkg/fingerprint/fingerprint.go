@@ -15,8 +15,10 @@ import (
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/gologger"
 )
 
 // reference https://github.com/0x727/FingerprintHub
@@ -201,4 +203,24 @@ func (s *Service) PrintColorResultInfoConsole(result Result) {
 		r.IsVul = true
 	}
 	s.Options.ApiCallBack(r)
+}
+
+func PrintFingerprintInfoConsole(fr Result) {
+	if len(fr.StatusCode) > 0 {
+		statusCode := log.LogColor.Vulner("" + fr.StatusCode + "")
+		if !strings.HasPrefix(fr.StatusCode, "2") {
+			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
+		}
+		space := "                       "
+		if len(fr.Title) == 0 && len(fr.Name) == 0 {
+			space = "                                                               "
+		} else if len(fr.Title) != 0 && len(fr.Name) == 0 {
+			space = "                                          "
+		}
+
+		gologger.Print().Msgf("\r" + fr.Url + " " +
+			statusCode + " " +
+			fr.Title + " " +
+			log.LogColor.Critical(fr.Name) + space + "\r\n")
+	}
 }

@@ -13,9 +13,6 @@ import (
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
-	"github.com/zan8in/afrog/pkg/log"
-	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
@@ -39,8 +36,8 @@ func main() {
 		for {
 			time.Sleep(2 * time.Minute)
 			if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
-				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
-				fmt.Println(" close wait 3 seconds...")
+				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
+				gologger.Print().Msg(" | close wait 3 seconds...")
 				time.Sleep(time.Second * 3)
 				os.Exit(1)
 			}
@@ -53,11 +50,11 @@ func main() {
 
 		atomic.AddInt64(&options.CurrentCount, 1)
 
-		lock.Lock()
 		if r.IsVul {
+			lock.Lock()
 			if r.FingerResult != nil {
 				fr := r.FingerResult.(fingerprint.Result)
-				printFingerprintInfoConsole(fr)
+				fingerprint.PrintFingerprintInfoConsole(fr)
 			} else {
 
 				atomic.AddInt64(&number, 1)
@@ -67,11 +64,11 @@ func main() {
 				htemplate.Number = utils.GetNumberText(int(number))
 				htemplate.Append()
 			}
+			lock.Unlock()
 		}
-		lock.Unlock()
 
 		if !options.Silent {
-			fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount())
+			fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount())
 		}
 
 	})
@@ -79,6 +76,48 @@ func main() {
 	if err != nil {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
+
+	gologger.Print().Msg(" | close wait 3 seconds...")
+	time.Sleep(time.Second * 3)
+}
+
+func readConfig() {
+	flagSet := goflags.NewFlagSet()
+	flagSet.SetDescription(`afrog`)
+
+	flagSet.CreateGroup("input", "Target",
+		flagSet.StringVarP(&options.Target, "target", "t", "", "target URLs/hosts to scan"),
+		flagSet.StringVarP(&options.TargetsFilePath, "Targets", "T", "", "path to file containing a list of target URLs/hosts to scan (one per line)"),
+	)
+
+	flagSet.CreateGroup("pocs", "PoCs",
+		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"),
+	)
+
+	flagSet.CreateGroup("output", "Output",
+		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
+		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
+	)
+
+	flagSet.CreateGroup("filters", "Filtering",
+		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by `keyword` , eg: -s tomcat,phpinfo"),
+		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"),
+	)
+
+	flagSet.CreateGroup("optimization", "Optimizations",
+		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
+		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
+		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
+		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "", "scan stable. Possible values: 1(generally)(default), 2(normal), 3(stablize)"),
+	)
+
+	flagSet.CreateGroup("update", "Update",
+		flagSet.BoolVar(&options.UpdateAfrogVersion, "update", false, "update afrog engine to the latest released version"),
+		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
+	)
+
+	_ = flagSet.Parse()
+
 }
 
 // func main22() {
@@ -196,74 +235,35 @@ func main() {
 // 	time.Sleep(time.Second * 3)
 // }
 
-func printFingerprintInfoConsole(fr fingerprint.Result) {
-	if len(fr.StatusCode) > 0 {
-		statusCode := log.LogColor.Vulner("" + fr.StatusCode + "")
-		if !strings.HasPrefix(fr.StatusCode, "2") {
-			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
-		}
-		space := "                       "
-		if len(fr.Title) == 0 && len(fr.Name) == 0 {
-			space = "                                                               "
-		} else if len(fr.Title) != 0 && len(fr.Name) == 0 {
-			space = "                                          "
-		}
-		fmt.Printf("\r" + fr.Url + " " +
-			statusCode + " " +
-			fr.Title + " " +
-			log.LogColor.Critical(fr.Name) + space + "\r\n")
-	}
-}
+// func printFingerprintInfoConsole(fr fingerprint.Result) {
+// 	if len(fr.StatusCode) > 0 {
+// 		statusCode := log.LogColor.Vulner("" + fr.StatusCode + "")
+// 		if !strings.HasPrefix(fr.StatusCode, "2") {
+// 			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
+// 		}
+// 		space := "                       "
+// 		if len(fr.Title) == 0 && len(fr.Name) == 0 {
+// 			space = "                                                               "
+// 		} else if len(fr.Title) != 0 && len(fr.Name) == 0 {
+// 			space = "                                          "
+// 		}
+// 		fmt.Printf("\r" + fr.Url + " " +
+// 			statusCode + " " +
+// 			fr.Title + " " +
+// 			log.LogColor.Critical(fr.Name) + space + "\r\n")
+// 	}
+// }
 
-func printPathLog(upgrade *upgrade.Upgrade) {
-	fmt.Println("PATH:")
-	fmt.Println("   " + options.Config.GetConfigPath())
-	if options.UpdatePocs {
-		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
-	} else {
-		if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
-			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
-		} else {
-			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
-		}
-	}
-}
-
-func readConfig() {
-	flagSet := goflags.NewFlagSet()
-	flagSet.SetDescription(`afrog`)
-
-	flagSet.CreateGroup("input", "Target",
-		flagSet.StringVarP(&options.Target, "target", "t", "", "target URLs/hosts to scan"),
-		flagSet.StringVarP(&options.TargetsFilePath, "Targets", "T", "", "path to file containing a list of target URLs/hosts to scan (one per line)"),
-	)
-
-	flagSet.CreateGroup("pocs", "PoCs",
-		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"),
-	)
-
-	flagSet.CreateGroup("output", "Output",
-		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
-		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
-	)
-
-	flagSet.CreateGroup("filters", "Filtering",
-		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by `keyword` , eg: -s tomcat,phpinfo"),
-		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"),
-	)
-
-	flagSet.CreateGroup("optimization", "Optimizations",
-		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
-		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
-		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
-		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "", "scan stable. Possible values: 1(generally)(default), 2(normal), 3(stablize)"),
-	)
-
-	flagSet.CreateGroup("update", "Update",
-		flagSet.BoolVar(&options.UpdateAfrogVersion, "update", false, "update afrog engine to the latest released version"),
-		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
-	)
-
-	_ = flagSet.Parse()
-
-}
+// func printPathLog(upgrade *upgrade.Upgrade) {
+// 	fmt.Println("PATH:")
+// 	fmt.Println("   " + options.Config.GetConfigPath())
+// 	if options.UpdatePocs {
+// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
+// 	} else {
+// 		if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
+// 			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
+// 		} else {
+// 			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
+// 		}
+// 	}
+// }
