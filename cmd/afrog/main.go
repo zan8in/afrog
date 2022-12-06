@@ -18,10 +18,12 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-var options = &config.Options{}
-var htemplate = &html.HtmlTemplate{}
-var lock sync.Mutex
-var number int64 = 0
+var (
+	options   = &config.Options{}
+	htemplate = &html.HtmlTemplate{}
+	lock      sync.Mutex
+	number    int64 = 0
+)
 
 func main() {
 	runner.ShowBanner()

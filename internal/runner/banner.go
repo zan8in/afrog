@@ -23,14 +23,6 @@ func ShowBanner() {
 	gologger.Print().Msgf("\t\t\tlife is fantastic. enjoy life.\n\n")
 }
 
-// func ShowUsage() string {
-// 	return "\nUSAGE:\n   afrog -t example.com -o result.html\n   afrog -T urls.txt -o result.html\n   afrog -T urls.txt -s -o result.html\n   afrog -t example.com -P ./pocs/poc-test.yaml -o result.html\n   afrog -t example.com -P ./pocs/ -o result.html\n"
-// }
-
-// func ShowTips() string {
-// 	return "\nTIPS:\n   " + utils.GetRandomTips() + "\n"
-// }
-
 func ShowBanner2(upgrade *upgrade.Upgrade) {
 	messageStr := ""
 	if utils.Compare(upgrade.LastestAfrogVersion, ">", config.Version) {
@@ -48,3 +40,11 @@ func ShowBanner2(upgrade *upgrade.Upgrade) {
 	}
 	gologger.Info().Msgf("Using afrog-pocs %s%s", upgrade.CurrVersion, messageStr2)
 }
+
+// func ShowUsage() string {
+// 	return "\nUSAGE:\n   afrog -t example.com -o result.html\n   afrog -T urls.txt -o result.html\n   afrog -T urls.txt -s -o result.html\n   afrog -t example.com -P ./pocs/poc-test.yaml -o result.html\n   afrog -t example.com -P ./pocs/ -o result.html\n"
+// }
+
+// func ShowTips() string {
+// 	return "\nTIPS:\n   " + utils.GetRandomTips() + "\n"
+// }

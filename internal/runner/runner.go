@@ -93,7 +93,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		}
 	}
 	if len(options.Targets) == 0 {
-		return errors.New("not found targets")
+		return errors.New("target not found")
 	}
 
 	// show banner
@@ -119,7 +119,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
 
 	if len(allPocsYamlSlice) == 0 && len(allPocsEmbedYamlSlice) == 0 {
-		return errors.New("no found pocs")
+		return errors.New("afrog-pocs not found")
 	}
 
 	// show banner

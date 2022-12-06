@@ -9,12 +9,18 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/gologger"
 )
 
 var (
 	ReverseCeyeApiKey string
 	ReverseCeyeDomain string
 )
+
+type TargetAndPocs struct {
+	Target string
+	PocKey string
+}
 
 func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSlice) {
 	ReverseCeyeApiKey = e.options.Config.Reverse.Ceye.ApiKey
@@ -76,6 +82,19 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 
 	// init scan sum
 	e.options.Count += len(e.options.Targets) * len(newPocSlice)
+
+	// health check
+	doHealthCheck(newPocSlice)
+
+	// handle all afrog-pocs
+	allTargetAndPocs := []TargetAndPocs{}
+	pocsMap := make(map[string]poc.Poc)
+	for _, np := range newPocSlice {
+		pocsMap[np.Id] = np
+		for _, target := range e.options.Targets {
+			allTargetAndPocs = append(allTargetAndPocs, TargetAndPocs{Target: target, PocKey: np.Id})
+		}
+	}
 
 	var wg sync.WaitGroup
 	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p any) {
@@ -148,4 +167,36 @@ func (e *Engine) executeExpression(target string, poc poc.Poc) {
 	if err := c.Check(target, poc); err != nil {
 		log.Log().Error(err.Error())
 	}
+}
+
+func doHealthCheck(pocs []poc.Poc) {
+	pocIds := []string{}
+	repeatPocIds := []string{}
+	for _, np := range pocs {
+		if len(pocIds) == 0 {
+			pocIds = append(pocIds, np.Id)
+			continue
+		}
+		repeat := false
+		for _, id := range pocIds {
+			if id == np.Id {
+				repeatPocIds = append(repeatPocIds, id)
+				repeat = true
+				break
+			}
+		}
+		if !repeat {
+			pocIds = append(pocIds, np.Id)
+		}
+		repeat = false
+	}
+
+	if len(repeatPocIds) > 0 {
+		gologger.Error().Msgf("Health check:")
+		for _, h := range repeatPocIds {
+			gologger.Error().Msgf("%s ", h)
+		}
+		gologger.Fatal().Msgf("Already exists\n")
+	}
+
 }
