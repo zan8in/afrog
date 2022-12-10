@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptrace"
 	"net/url"
 	"regexp"
 	"runtime"
@@ -161,13 +162,20 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 
 	// target
 	target = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	targetfull := fulltarget(fmt.Sprintf("%s://%s", u.Scheme, u.Host), u.Path)
-	if targetfull != target {
-		target = targetfull
+	if !strings.HasPrefix(rule.Request.Path, "^") {
+		targetfull := fulltarget(fmt.Sprintf("%s://%s", u.Scheme, u.Host), u.Path)
+		if targetfull != target {
+			target = targetfull
+		}
 	}
 
 	// path
 	rule.Request.Path = setVariableMap(strings.TrimSpace(rule.Request.Path), variableMap)
+	if !strings.HasPrefix(rule.Request.Path, "^") {
+		target = strings.TrimRight(target, "/") + rule.Request.Path
+	} else {
+		target = strings.TrimRight(target, "/") + "/" + rule.Request.Path[1:]
+	}
 	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, " ", "%20")
 	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, "+", "%20")
 
@@ -183,9 +191,9 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	}
 
 	// newhttprequest
-	req, err := retryablehttp.NewRequest(rule.Request.Method, strings.TrimRight(target, "/")+rule.Request.Path, nil)
+	req, err := retryablehttp.NewRequest(rule.Request.Method, target, nil)
 	if len(rule.Request.Body) > 0 {
-		req, err = retryablehttp.NewRequest(rule.Request.Method, strings.TrimRight(target, "/")+rule.Request.Path, strings.NewReader(rule.Request.Body))
+		req, err = retryablehttp.NewRequest(rule.Request.Method, target, strings.NewReader(rule.Request.Body))
 	}
 	if err != nil {
 		return err
@@ -206,6 +214,15 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	if len(req.Header.Get("User-Agent")) == 0 {
 		req.Header.Add("User-Agent", utils.RandomUA())
 	}
+
+	// latency
+	var milliseconds int64
+	start := time.Now()
+	trace := httptrace.ClientTrace{}
+	trace.GotFirstResponseByte = func() {
+		milliseconds = time.Since(start).Nanoseconds() / 1e6
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
 
 	// http client do request
 	resp := &http.Response{}
@@ -252,6 +269,7 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	protoResp.Body = []byte(utf8RespBody)
 	protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + utf8RespBody)
 	protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
+	protoResp.Latency = milliseconds
 	variableMap["response"] = protoResp
 
 	// store the request
@@ -274,13 +292,13 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	protoReq.ContentType = req.Header.Get("Content-Type")
 	protoReq.Body = []byte(rule.Request.Body)
 
-	reqPath := strings.Replace(utils.UrlTypeToString(protoResp.Url), strings.TrimRight(target, "/"), "", 1)
+	reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
 	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + req.URL.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + string(rule.Request.Body))
 	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
 	variableMap["request"] = protoReq
 
 	// store the full target url
-	variableMap["fulltarget"] = utils.UrlTypeToString(protoResp.Url)
+	variableMap["fulltarget"] = target
 
 	return nil
 }

@@ -22,6 +22,7 @@ type Result struct {
 }
 
 type PocResult struct {
+	FullTarget     string
 	ResultRequest  *proto.Request
 	ResultResponse *proto.Response
 	IsVul          bool

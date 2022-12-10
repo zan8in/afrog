@@ -135,6 +135,7 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 			pocRstTemp.ResultRequest = c.VariableMap["request"].(*proto.Request)
 		}
 		if c.VariableMap["fulltarget"] != nil {
+			pocRstTemp.FullTarget = c.VariableMap["fulltarget"].(string)
 			c.Result.FullTarget = c.VariableMap["fulltarget"].(string)
 		}
 		c.Result.AllPocResult = append(c.Result.AllPocResult, &pocRstTemp)
@@ -229,7 +230,7 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	c.Result.PocInfo = gpa.Poc
 	if len(r.AllPocResult) > 0 {
 		for _, v := range r.AllPocResult {
-			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul})
+			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul, FullTarget: target})
 		}
 	}
 
