@@ -1,25 +1,27 @@
 package core
 
 import (
+	"context"
 	"sync"
+	"time"
 
-	"github.com/panjf2000/ants/v2"
-	"github.com/zan8in/afrog/pkg/gopoc"
+	"github.com/panjf2000/ants"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
-	"github.com/zan8in/gologger"
 )
 
 var (
 	ReverseCeyeApiKey string
 	ReverseCeyeDomain string
+
+	Ticker *time.Ticker
 )
 
 type TargetAndPocs struct {
 	Target string
-	PocKey string
+	Poc    poc.Poc
 }
 
 func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSlice) {
@@ -46,20 +48,21 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		pocSlice = append(pocSlice, p)
 	}
 
-	if len(e.options.PocsFilePath) == 0 {
-		// added gopoc @date: 2022.6.19
-		gopocNameSlice := gopoc.MapGoPocName()
-		if len(gopocNameSlice) > 0 {
-			for _, v := range gopocNameSlice {
-				poc := poc.Poc{}
-				poc.Gopoc = v
-				poc.Id = v
-				poc.Info.Name = v
-				poc.Info.Severity = "unkown"
-				pocSlice = append(pocSlice, poc)
-			}
-		}
-	}
+	// DEPRECATED from date: 2022.12.10
+	// if len(e.options.PocsFilePath) == 0 {
+	// 	// added gopoc @date: 2022.6.19
+	// 	gopocNameSlice := gopoc.MapGoPocName()
+	// 	if len(gopocNameSlice) > 0 {
+	// 		for _, v := range gopocNameSlice {
+	// 			poc := poc.Poc{}
+	// 			poc.Gopoc = v
+	// 			poc.Id = v
+	// 			poc.Info.Name = v
+	// 			poc.Info.Severity = "unkown"
+	// 			pocSlice = append(pocSlice, poc)
+	// 		}
+	// 	}
+	// }
 
 	// added search poc by keywords
 	newPocSlice := []poc.Poc{}
@@ -83,120 +86,88 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	// init scan sum
 	e.options.Count += len(e.options.Targets) * len(newPocSlice)
 
-	// health check
-	doHealthCheck(newPocSlice)
-
-	// handle all afrog-pocs
-	allTargetAndPocs := []TargetAndPocs{}
-	pocsMap := make(map[string]poc.Poc)
-	for _, np := range newPocSlice {
-		pocsMap[np.Id] = np
-		for _, target := range e.options.Targets {
-			allTargetAndPocs = append(allTargetAndPocs, TargetAndPocs{Target: target, PocKey: np.Id})
-		}
-	}
-
+	// poc scan
+	Ticker = time.NewTicker(time.Second / time.Duration(e.options.RateLimit))
 	var wg sync.WaitGroup
-	p, _ := ants.NewPoolWithFunc(e.workPool.config.PocConcurrency, func(p any) {
-		e.executeTargets(p.(poc.Poc))
-		wg.Done()
-	})
-	defer p.Release()
-	for _, poc := range newPocSlice {
-		wg.Add(1)
-		_ = p.Invoke(poc)
-	}
-	wg.Wait()
-}
 
-func (e *Engine) executeTargets(poc1 poc.Poc) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Log().Error("gorutine recover() error from pkg/core/exccute/excutTargets")
-		}
-	}()
-
-	allTargets := e.options.Targets
-	if len(allTargets) == 0 {
-		log.Log().Error("executeTargets failed, no targets")
-		return
-	}
-
-	var wg sync.WaitGroup
-	p, _ := ants.NewPoolWithFunc(e.workPool.config.TargetConcurrency, func(wgTask any) {
+	p, _ := ants.NewPoolWithFunc(e.options.Concurrency, func(p any) {
 		defer wg.Done()
-		target := wgTask.(poc.WaitGroupTask).Value.(string)
-		// key := wgTask.(poc.WaitGroupTask).Key
-		//add: check target alive
-		if e.options.TargetLive.HandleTargetLive(target, -1) != -1 {
-			e.executeExpression(target, poc1)
-		} else {
-			e.executeExpression("", poc1)
+		<-Ticker.C
+
+		tap := p.(*TargetAndPocs)
+
+		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+			ctx := context.Background()
+			e.executeExpression(ctx, tap.Target, &tap.Poc)
 		}
 
 	})
 	defer p.Release()
-	for k, target := range allTargets {
-		wg.Add(1)
-		_ = p.Invoke(poc.WaitGroupTask{Value: target, Key: k})
+
+	for _, poc := range newPocSlice {
+		for _, t := range e.options.Targets {
+			wg.Add(1)
+			p.Invoke(&TargetAndPocs{Target: t, Poc: poc})
+		}
 	}
+
 	wg.Wait()
 }
 
-func (e *Engine) executeExpression(target string, poc poc.Poc) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Log().Error("gorutine recover() error from pkg/core/exccute/executeExpression")
-		}
-	}() // https://github.com/zan8in/afrog/issues/7
+// DEPRECATED from date: 2022.12.10
+// func (e *Engine) executeTargets(ctx context.Context, poc1 poc.Poc) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			r := &Result{}
+// 			r.IsVul = false
+// 			e.options.ApiCallBack(r)
+// 		}
+// 	}()
 
-	// fmt.Println("target the number of goroutines: ", runtime.NumGoroutine())
+// 	allTargets := e.options.Targets
 
+// 	input := &inputs.SimpleInputProvider{Inputs: allTargets}
+
+// 	wg := sizedwaitgroup.New(e.options.RateLimit)
+// 	input.Scan(func(scannedValue string) {
+// 		wg.Add()
+// 		go func(value string) {
+// 			defer wg.Done()
+// 			if targetlive.TLive.HandleTargetLive(scannedValue, -1) != -1 {
+// 				e.executeExpression(ctx, scannedValue, &poc1)
+// 			} else {
+// 				e.executeExpression(ctx, "", nil)
+// 			}
+// 		}(scannedValue)
+// 	})
+// 	wg.Wait()
+
+// }
+
+func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
 
-	// gopoc check
-	if len(poc.Gopoc) > 0 {
-		if err := c.CheckGopoc(target, poc.Gopoc); err != nil {
-			log.Log().Error(err.Error())
+	defer func() {
+		// https://github.com/zan8in/afrog/issues/7
+		if r := recover(); r != nil {
+			c.Result.IsVul = false
+			c.Options.ApiCallBack(c.Result)
 		}
-		return
-	}
+	}()
+
+	// fmt.Println("target the number of goroutines: ", runtime.NumGoroutine())
+
+	// DEPRECATED from date: 2022.12.10
+	// gopoc check
+	// if len(poc.Gopoc) > 0 {
+	// 	c.CheckGopoc(target, poc.Gopoc)
+	// 	c.Options.ApiCallBack(c.Result)
+	// 	return
+	// }
 
 	// yaml poc check
-	if err := c.Check(target, poc); err != nil {
-		log.Log().Error(err.Error())
-	}
-}
-
-func doHealthCheck(pocs []poc.Poc) {
-	pocIds := []string{}
-	repeatPocIds := []string{}
-	for _, np := range pocs {
-		if len(pocIds) == 0 {
-			pocIds = append(pocIds, np.Id)
-			continue
-		}
-		repeat := false
-		for _, id := range pocIds {
-			if id == np.Id {
-				repeatPocIds = append(repeatPocIds, id)
-				repeat = true
-				break
-			}
-		}
-		if !repeat {
-			pocIds = append(pocIds, np.Id)
-		}
-		repeat = false
-	}
-
-	if len(repeatPocIds) > 0 {
-		gologger.Error().Msgf("Health check:")
-		for _, h := range repeatPocIds {
-			gologger.Error().Msgf("%s ", h)
-		}
-		gologger.Fatal().Msgf("Already exists\n")
-	}
+	c.Check(ctx, target, poc)
+	c.Options.ApiCallBack(c.Result)
 
 }

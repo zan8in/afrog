@@ -1,6 +1,8 @@
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 var quotes = []rune{'"', '\'', '`'}
 
@@ -14,6 +16,24 @@ func (stringSlice *StringSlice) Set(value string) {
 
 func (stringSlice StringSlice) String() string {
 	return ToString(stringSlice)
+}
+
+func (stringSlice StringSlice) GetKey(value string) int {
+	for k, v := range stringSlice {
+		if v == value {
+			return k
+		}
+	}
+	return -1
+}
+
+func (stringSlice StringSlice) Modify(value string) {
+	for k, v := range stringSlice {
+		if v == value {
+			stringSlice[k] = value
+			return
+		}
+	}
 }
 
 func ToString(slice []string) string {

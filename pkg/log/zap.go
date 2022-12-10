@@ -2,12 +2,13 @@
 // no SugerLogger, Only Logger
 // @author: 胖胖的ALEX
 // example:
-// 	   Log().Debug("debug log test")
-// 	   Log().Info("info log test")
-// 	   Log().Warn("warn log test")
-// 	   Log().Error("error log test")
-// 	   Log().Panic("panic log test")
-// 	   Log().Fatal("fatal log test")
+//
+//	Log().Debug("debug log test")
+//	Log().Info("info log test")
+//	Log().Warn("warn log test")
+//	Log().Error("error log test")
+//	Log().Panic("panic log test")
+//	Log().Fatal("fatal log test")
 package log
 
 import (

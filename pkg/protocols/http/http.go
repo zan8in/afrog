@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/afrog/pkg/utils"
+	"golang.org/x/net/context"
 
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
@@ -36,28 +38,40 @@ type FastClient struct {
 	Target      string
 }
 
+// https://blog.csdn.net/xingzuo_1840/article/details/124630022
+/*
+https://www.cnblogs.com/paulwhw/p/15972645.html
+MaxIdleConnsPerHost：优先设置这个，决定了对于单个Host需要维持的连接池大小。该值的合理确定，应该根据性能测试的结果调整。
+MaxIdleConns：客户端连接单个Host，不少于MaxIdleConnsPerHost大小，不然影响MaxIdleConnsPerHost控制的连接池；客户端连接 n 个Host，少于 n X MaxIdleConnsPerHost 会影响MaxIdleConnsPerHost控制的连接池（导致连接重建）。嫌麻烦，建议设置为0，不限制。
+MaxConnsPerHost：对于单个Host允许的最大连接数，包含IdleConns，所以一般大于等于MaxIdleConnsPerHost。设置为等于MaxIdleConnsPerHost，也就是尽可能复用连接池中的连接。另外设置过小，可能会导致并发下降，超过这个值会 block 请求，直到有空闲连接。（所以默认值是不限制的）
+*/
+
 func Init(options *config.Options) {
 	// readTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.ReadTimeout)
 	// writeTimeout, _ := time.ParseDuration(options.Config.ConfigHttp.WriteTimeout)
 	// maxIdleConnDuration, _ := time.ParseDuration(options.Config.ConfigHttp.MaxIdle)
-	readTimeout, _ := time.ParseDuration(getScanStable(options.ScanStable))
-	writeTimeout, _ := time.ParseDuration("3000ms")
-	maxIdleConnDuration, _ := time.ParseDuration("1h")
+	// readTimeout, _ := time.ParseDuration("5s")
+	// writeTimeout, _ := time.ParseDuration("5s")
+	timeout := time.Duration(5000) * time.Millisecond
+
+	// maxIdleConnDuration, _ := time.ParseDuration("1h")
 	F = &fasthttp.Client{
-		TLSConfig:                &tls.Config{InsecureSkipVerify: true},
-		MaxConnsPerHost:          1024, //options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数 如果未设置，则使用DefaultMaxConnSperHost=512
-		ReadTimeout:              readTimeout,
-		WriteTimeout:             writeTimeout,
-		MaxIdleConnDuration:      maxIdleConnDuration,
+		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		// MaxConnsPerHost:    runtime.NumCPU(), //options.Config.ConfigHttp.MaxConnsPerHost, // 每个主机的最大空闲连接数 如果未设置，则使用DefaultMaxConnSperHost=512
+		ReadTimeout:        timeout,
+		WriteTimeout:       timeout,
+		MaxConnWaitTimeout: timeout,
+		// MaxConnDuration:    timeout,
+		// MaxIdleConnDuration:      maxIdleConnDuration,
 		NoDefaultUserAgentHeader: true, // Don't send: User-Agent: fasthttp
 		// DisableHeaderNamesNormalizing: true, // If you set the case on your headers correctly you can enable this
 		DisablePathNormalizing: true,
-		MaxResponseBodySize:    options.Config.ConfigHttp.MaxResponseBodySize, // 2m
+		// MaxResponseBodySize:    options.Config.ConfigHttp.MaxResponseBodySize, // 2m
 		// increase DNS cache time to an hour instead of default minute
-		Dial: (&fasthttp.TCPDialer{
-			Concurrency:      options.Config.ConfigHttp.Concurrency,
-			DNSCacheDuration: time.Hour,
-		}).Dial,
+		// Dial: (&fasthttp.TCPDialer{
+		// 	Concurrency:      options.Config.ConfigHttp.Concurrency,
+		// 	DNSCacheDuration: time.Hour,
+		// }).Dial,
 	}
 	if len(strings.TrimSpace(options.Config.ConfigHttp.Proxy)) > 0 {
 		if strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks4://") || strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks5://") {
@@ -69,7 +83,7 @@ func Init(options *config.Options) {
 	}
 }
 
-func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, variableMap map[string]any) error {
+func (fc *FastClient) HTTPRequest(ctx context.Context, httpRequest *http.Request, rule poc.Rule, variableMap map[string]any) error {
 	var err error
 
 	protoRequest, err := ParseRequest(httpRequest)
@@ -162,33 +176,38 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 	// 新增功能：HTTP请求超时，自动重连机制（3次，每次累加超时时间）
 	repeatCount := 0
 	for {
-		fc.Options.TargetLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 1)
-		if fc.Options.TargetLive.HandleTargetLive(fc.Target, -1) == -1 {
+		targetlive.TLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 1)
+		if targetlive.TLive.HandleTargetLive(fc.Target, -1) == -1 {
 			return errors.New("target nolive")
 		}
 		// starttime := time.Now().Second()
 		if rule.Request.FollowRedirects {
-			maxrd := 3 // follow redirects default 3
-			if fc.MaxRedirect > 0 {
-				maxrd = int(fc.MaxRedirect)
-			}
+			maxrd := 0 // follow redirects default 3
+			// if fc.MaxRedirect > 0 {
+			// 	maxrd = int(fc.MaxRedirect)
+			// }
 			err = F.DoRedirects(fastReq, fastResp, maxrd)
 		} else {
-			dialtimeout := 6
-			if fc.DialTimeout > 0 {
-				dialtimeout = int(fc.DialTimeout)
-			}
-			if repeatCount > 0 {
-				dialtimeout = dialtimeout + dialtimeout*repeatCount
-			}
-			err = F.DoTimeout(fastReq, fastResp, time.Second*time.Duration(dialtimeout))
+			dialtimeout := time.Duration(5000) * time.Millisecond
+			// if fc.DialTimeout > 0 {
+			// 	dialtimeout = int(fc.DialTimeout)
+			// }
+			// if repeatCount > 0 {
+			// 	dialtimeout = dialtimeout + dialtimeout*repeatCount
+			// }
+			// err = F.DoRedirects(fastReq, fastResp, 0)
+			err = F.DoTimeout(fastReq, fastResp, dialtimeout)
 		}
-		fc.Options.TargetLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 2)
+
+		// fmt.Println(err, fastResp.StatusCode(), fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path))
+		targetlive.TLive.AddRequestTarget(fmt.Sprintf("%s://%s%s", protoRequest.Url.Scheme, protoRequest.Url.Host, protoRequest.Url.Path), 2)
 		// endtime := time.Now().Second()
 		// if endtime-starttime > 20 {
 		// 	fmt.Println(log.LogColor.Vulner(httpRequest.URL, fastResp.StatusCode(), endtime-starttime))
 		// }
+
 		if err != nil {
+			log.Log().Sugar().Error(err.Error())
 			errName, known := httpConnError(err)
 			if known {
 				log.Log().Error(fmt.Sprintf("WARN conn error: %s\n", errName))
@@ -197,7 +216,7 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 			}
 			if errName == "timeout" {
 				repeatCount += 1
-				if repeatCount > 1 {
+				if repeatCount > 0 {
 					break
 				}
 			} else {
@@ -207,6 +226,9 @@ func (fc *FastClient) HTTPRequest(httpRequest *http.Request, rule poc.Rule, vari
 		if err == nil {
 			break
 		}
+	}
+	if err != nil {
+		return err
 	}
 
 	// set fastResp body
@@ -603,10 +625,6 @@ func GetTimeout(target string, timeout int) ([]byte, int, error) {
 	// fixed gbk to utf8
 	return []byte(utils.Str2UTF8(string(fastResp.Body()))), fastResp.StatusCode(), err
 }
-
-var (
-	strLocation = []byte("Location")
-)
 
 func GetFingerprintRedirect(httpRequest *http.Request) ([]byte, map[string][]string, int, error) {
 	var err error

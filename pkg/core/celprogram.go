@@ -6,21 +6,19 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 
 	"github.com/dlclark/regexp2"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
 )
@@ -446,38 +444,23 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		return false
 	}
 
+	time.Sleep(time.Second * time.Duration(timeout))
+
 	sub := strings.Split(r.Domain, ".")[0]
 	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", ReverseCeyeApiKey, sub)
-	req, _ := http.NewRequest("GET", urlStr, nil)
 
-	time.Sleep(time.Second * time.Duration(timeout))
-	// fmt.Println(urlStr)
-
-	redirectsCount := 0
-	for {
-		//fc := http2.FastClient{}
-		resp, err := http2.ReverseHttpRequest(req)
-		if err != nil {
-			// fmt.Println("rediSampleHTTPRequest", err.Error())
-			log.Log().Error(err.Error())
-			return false
-		}
-
-		if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) { // api返回结果不为空
-			// fmt.Println(string(resp), "===")
-			return true
-		}
-
-		if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
-			redirectsCount++
-			// fmt.Println("redirectsCount++", redirectsCount)
-			if redirectsCount > 3 {
-				return false
-			}
-			utils.RandSleep(2000)
-			continue
-		}
-		// fmt.Println(string(resp), "---")
+	resp, err := retryhttpclient.ReverseGet(urlStr)
+	if err != nil {
 		return false
 	}
+
+	if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) { // api返回结果不为空
+		return true
+	}
+
+	if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
+		return false
+	}
+
+	return false
 }

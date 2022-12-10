@@ -2,7 +2,6 @@ package fingerprint
 
 import (
 	"encoding/json"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,11 +16,13 @@ import (
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/gologger"
 )
 
 // reference https://github.com/0x727/FingerprintHub
+// http2 "github.com/zan8in/afrog/pkg/protocols/http"
 
 type Service struct {
 	Options     *config.Options
@@ -84,7 +85,7 @@ func (s *Service) executeFingerPrintDetection() {
 			defer wg.Done()
 			url := wgTask.(poc.WaitGroupTask).Value.(string)
 			key := wgTask.(poc.WaitGroupTask).Key
-			if s.Options.TargetLive.HandleTargetLive(url, -1) == -1 {
+			if targetlive.TLive.HandleTargetLive(url, -1) == -1 {
 				// 该 url 在 targetlive 黑名单里面
 				s.PrintColorResultInfoConsole(Result{})
 			} else {
@@ -108,30 +109,38 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 	}
 
 	// 检测 http or https 并更新 targets 列表
-	url, statusCode := http2.CheckTargetHttps2(url)
+	url, statusCode := retryhttpclient.CheckHttpsAndLives(url)
 	if statusCode == -1 {
 		// url 加入 targetlive 黑名单 +1
-		s.Options.TargetLive.HandleTargetLive(url, 0)
+		targetlive.TLive.HandleTargetLive(url, 0)
 		s.PrintColorResultInfoConsole(Result{})
+
 		return nil
 	} else {
-		s.Options.TargetLive.HandleTargetLive(url, 1)
+		targetlive.TLive.HandleTargetLive(url, 1)
 		s.Options.Targets[key] = url
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	// req, err := http.NewRequest("GET", url, nil)
+	// if err != nil {
+	// 	s.PrintColorResultInfoConsole(Result{})
+	// 	return nil
+	// }
+
+	// data, headers, statuscode, err := http2.GetFingerprintRedirect(req)
+	data, headers, statuscode, err := retryhttpclient.FingerPrintGet(url)
+	// fmt.Println(headers)
+	// for k, h := range headers {
+	// 	fmt.Println(k, h)
+	// }
+
 	if err != nil {
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
 	}
 
-	data, headers, statuscode, err := http2.GetFingerprintRedirect(req)
-	if err != nil {
-		s.PrintColorResultInfoConsole(Result{})
-		return nil
-	}
-
-	fpName := ""
+	fingerSlice := []string{}
+	// fpName := ""
 	for _, v := range s.fpSlice {
 		flag := false
 
@@ -139,16 +148,18 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		if len(v.Headers) > 0 {
 			hflag = false
 			for k, h := range v.Headers {
-				if len(headers[strings.ToLower(k)]) == 0 {
+				if len(headers[k]) == 0 {
 					hflag = false
-					break
+					continue
 				}
-				if len(headers[strings.ToLower(k)]) > 0 {
-					if !strings.Contains(headers[strings.ToLower(k)][0], h) {
+				if len(headers[k]) > 0 {
+					// fmt.Println("header key ", headers[k][0], " => h :", h)
+					if !strings.Contains(headers[k][0], h) {
 						hflag = false
-						break
+						continue
 					}
 					hflag = true
+					fingerSlice = append(fingerSlice, v.Name)
 				}
 			}
 		}
@@ -162,9 +173,10 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 			for _, k := range v.Keyword {
 				if !strings.Contains(string(data), k) {
 					kflag = false
-					break
+					continue
 				}
 				kflag = true
+				fingerSlice = append(fingerSlice, v.Name)
 			}
 		}
 		if len(v.Keyword) > 0 && kflag {
@@ -172,7 +184,7 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		}
 
 		if flag {
-			fpName = v.Name
+			// fpName = v.Name
 			break
 		}
 	}
@@ -188,10 +200,23 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		}
 	}
 
-	s.PrintColorResultInfoConsole(Result{Url: url, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fpName})
+	fingerString := toString(fingerSlice)
+
+	s.PrintColorResultInfoConsole(Result{Url: url, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fingerString})
 
 	return nil
 
+}
+
+func toString(slice []string) string {
+	defaultBuilder := &strings.Builder{}
+	for i, k := range slice {
+		defaultBuilder.WriteString(k)
+		if i != len(slice)-1 {
+			defaultBuilder.WriteString("  ")
+		}
+	}
+	return defaultBuilder.String()
 }
 
 func (s *Service) PrintColorResultInfoConsole(result Result) {

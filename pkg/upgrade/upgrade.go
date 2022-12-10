@@ -2,14 +2,12 @@ package upgrade
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/gologger"
@@ -102,7 +100,7 @@ func (u *Upgrade) UpgradeAfrogPocs() {
 func (u *Upgrade) Download() {
 	resp, err := grab.Get(u.HomeDir, upHost+upPath)
 	if err != nil {
-		fmt.Println(log.LogColor.Low(err.Error()))
+		gologger.Fatal().Msg(err.Error())
 		return
 	}
 	os.RemoveAll(u.HomeDir + upPathName)

@@ -1,4 +1,4 @@
-package utils
+package targetlive
 
 import (
 	"strings"
@@ -6,11 +6,13 @@ import (
 	"sync/atomic"
 )
 
+var TLive *TargetLive
+
 type TargetLive struct {
 	live        sync.Map
 	nolive      sync.Map
 	max         int
-	noliveCount int64
+	noliveCount uint32
 	noliveSlice []string
 	mutex       *sync.Mutex
 	rtMutex     *sync.Mutex
@@ -23,8 +25,8 @@ type RequestTarget struct {
 	v int
 }
 
-func New() *TargetLive {
-	return &TargetLive{live: sync.Map{}, nolive: sync.Map{}, max: 3, noliveSlice: []string{}, mutex: &sync.Mutex{}, white: []string{}, black: []string{}, rtMutex: &sync.Mutex{}}
+func New(maxSize int) {
+	TLive = &TargetLive{live: sync.Map{}, nolive: sync.Map{}, max: maxSize, noliveSlice: []string{}, mutex: &sync.Mutex{}, white: []string{}, black: []string{}, rtMutex: &sync.Mutex{}}
 }
 
 func (tl *TargetLive) AddRequestTarget(t string, v int) {
@@ -77,14 +79,14 @@ func (tl *TargetLive) HandleTargetLive(target string, live int) int {
 		// TODO: handle nolive
 		c, b := tl.nolive.Load(target)
 		if b && c.(int) >= tl.max {
-			atomic.AddInt64(&tl.noliveCount, 1)
+			atomic.AddUint32(&tl.noliveCount, 1)
 			tl.appendNoliveSlices(target)
 			return 0
 		}
 		if b {
 			tl.nolive.Store(target, c.(int)+1)
 			if c.(int)+1 >= tl.max {
-				atomic.AddInt64(&tl.noliveCount, 1)
+				atomic.AddUint32(&tl.noliveCount, 1)
 				tl.appendNoliveSlices(target)
 			}
 			// fmt.Println("tl.nolive.Store(target, c.(int)+1)", target, c.(int)+1)
@@ -109,6 +111,9 @@ func (tl *TargetLive) HandleTargetLive(target string, live int) int {
 	}
 
 	return 2
+}
+
+func (tl *TargetLive) Reset(target string) {
 }
 
 func (tl *TargetLive) appendNoliveSlices(t string) {
@@ -138,6 +143,13 @@ func (tl *TargetLive) GetNoLiveSlice() []string {
 	return tl.noliveSlice
 }
 
-func (tl *TargetLive) GetNoLiveAtomicCount() int64 {
+func (tl *TargetLive) GetNoLiveAtomicCount() uint32 {
 	return tl.noliveCount
+}
+
+func (tl *TargetLive) IsNoLiveAtomic(target string) bool {
+	if tl.HandleTargetLive(target, -1) == -1 {
+		return true
+	}
+	return false
 }

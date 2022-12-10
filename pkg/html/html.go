@@ -83,30 +83,14 @@ func (ht *HtmlTemplate) Html() string {
 		if !v.IsVul {
 			continue
 		}
-		schema := ""
-		host := ""
-		path := ""
-		query := ""
-		frament := ""
 		reqraw := []byte{}
 		respraw := []byte{}
-		if v.ResultRequest.Url != nil {
-			schema = v.ResultRequest.Url.Scheme
-			host = v.ResultRequest.Url.Host
-			path = v.ResultRequest.Url.Path
-			if len(v.ResultRequest.Url.Query) > 0 {
-				query = "?" + v.ResultRequest.Url.Query
-			}
-			if len(v.ResultRequest.Url.Fragment) > 0 {
-				frament = "#" + v.ResultRequest.Url.Fragment
-			}
+		if v.ResultResponse.Url != nil {
 			reqraw = v.ResultRequest.GetRaw()
 			respraw = v.ResultResponse.GetRaw()
 		}
-		if len(schema) > 0 {
-			schema = schema + "://"
-		}
-		fullurl := fmt.Sprintf("%s%s%s%s%s", schema, host, path, query, frament)
+
+		fullurl := htResult.FullTarget
 
 		body += fmt.Sprintf(`<tr>
 		<td colspan="3"  style="border-top:1px solid #60786F"><a href="%s" target="_blank">%s</a></td>

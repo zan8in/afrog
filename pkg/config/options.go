@@ -1,12 +1,12 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/gologger"
 )
 
 type Options struct {
@@ -72,7 +72,7 @@ type Options struct {
 	Count int
 
 	// Current Scan count num
-	CurrentCount int64
+	CurrentCount uint32
 
 	// Thread lock
 	OptLock sync.Mutex
@@ -80,8 +80,29 @@ type Options struct {
 	// Callback scan result
 	ApiCallBack ApiCallBack
 
-	// check target live status
-	TargetLive *utils.TargetLive
+	// maximum number of requests to send per second (default 150)
+	RateLimit int
+
+	// maximum number of afrog-pocs to be executed in parallel (default 25)
+	Concurrency int
+
+	// maximum number of fingerprint to be executed in parallel (default 25)
+	FingerprintConcurrency int
+
+	// max errors for a host before skipping from scan (default 30)
+	MaxHostError int
+
+	// number of times to retry a failed request (default 1)
+	Retries int
+
+	// time to wait in seconds before timeout (default 10)
+	Timeout int
+
+	// http/socks5 proxy to use
+	Proxy string
+
+	// afrog process count (target total × pocs total)
+	ProcessTotal uint32
 }
 
 type ApiCallBack func(any)
@@ -141,7 +162,7 @@ func (o *Options) PrintPocList() {
 		return
 	}
 	for _, v := range plist {
-		fmt.Println(v)
+		gologger.Print().Msg(v)
 	}
-	fmt.Println("----------------\r\nPoC count: ", len(plist))
+	gologger.Print().Msgf("----------------\r\nPoC Total: ", len(plist))
 }

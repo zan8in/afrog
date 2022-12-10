@@ -41,7 +41,7 @@ func (c *CustomLib) Run(expression string, variablemap map[string]any, call runC
 	}
 	isVul, ok := val.Value().(bool)
 	if !ok {
-		fmt.Println("successVal Value error: ", err.Error())
+		// fmt.Println("successVal Value error: ", err.Error())
 		return
 	}
 	call(isVul, err)

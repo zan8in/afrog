@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
+	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
@@ -22,7 +22,7 @@ var (
 	options   = &config.Options{}
 	htemplate = &html.HtmlTemplate{}
 	lock      sync.Mutex
-	number    int64 = 0
+	number    uint32 = 0
 )
 
 func main() {
@@ -33,24 +33,28 @@ func main() {
 	starttime := time.Now()
 
 	// fixed 99% bug
-	go func() {
-		startcount := options.CurrentCount
-		for {
-			time.Sleep(2 * time.Minute)
-			if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
-				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
-				gologger.Print().Msg(" | close wait 3 seconds...")
-				time.Sleep(time.Second * 3)
-				os.Exit(1)
-			}
-			startcount = options.CurrentCount
-		}
-	}()
+	// go func() {
+	// 	startcount := options.CurrentCount
+	// 	for {
+	// 		time.Sleep(2 * time.Minute)
+	// 		if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
+	// 			fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
+	// 			sleepEnd()
+	// 			os.Exit(1)
+	// 		}
+	// 		startcount = options.CurrentCount
+	// 	}
+	// }()
 
 	err := runner.New(options, htemplate, func(result any) {
 		r := result.(*core.Result)
 
-		atomic.AddInt64(&options.CurrentCount, 1)
+		defer func() {
+			atomic.AddUint32(&options.CurrentCount, 1)
+			if !options.Silent {
+				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), targetlive.TLive.GetNoLiveAtomicCount())
+			}
+		}()
 
 		if r.IsVul {
 			lock.Lock()
@@ -59,7 +63,7 @@ func main() {
 				fingerprint.PrintFingerprintInfoConsole(fr)
 			} else {
 
-				atomic.AddInt64(&number, 1)
+				atomic.AddUint32(&number, 1)
 				r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
 				htemplate.Result = r
@@ -69,17 +73,16 @@ func main() {
 			lock.Unlock()
 		}
 
-		if !options.Silent {
-			fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount())
-		}
-
 	})
 
 	if err != nil {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
 
-	gologger.Print().Msg(" | close wait 3 seconds...")
+	sleepEnd()
+}
+
+func sleepEnd() {
 	time.Sleep(time.Second * 3)
 }
 
@@ -106,11 +109,20 @@ func readConfig() {
 		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"),
 	)
 
+	flagSet.CreateGroup("rate-limit", "Rate-Limit",
+		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.IntVarP(&options.FingerprintConcurrency, "fingerprint-concurrency", "fc", 100, "maximum number of fingerprint to be executed in parallel"),
+	)
+
 	flagSet.CreateGroup("optimization", "Optimizations",
 		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
 		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
 		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
-		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "", "scan stable. Possible values: 1(generally)(default), 2(normal), 3(stablize)"),
+		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
+		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),
+		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
+		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
 	)
 
 	flagSet.CreateGroup("update", "Update",
@@ -118,154 +130,10 @@ func readConfig() {
 		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
 	)
 
+	flagSet.CreateGroup("debug", "Debug",
+		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
+	)
+
 	_ = flagSet.Parse()
 
 }
-
-// func main22() {
-// 	app := cli.NewApp()
-// 	app.Name = runner.ShowBanner()
-// 	app.Usage = "v" + config.Version
-// 	app.UsageText = runner.ShowTips()
-// 	app.Version = config.Version
-
-// 	app.Flags = []cli.Flag{
-// 		&cli.StringFlag{Name: "target", Aliases: []string{"t"}, Destination: &options.Target, Value: "", Usage: "target URLs/hosts to scan"},
-// 		&cli.StringFlag{Name: "targets", Aliases: []string{"T"}, Destination: &options.TargetsFilePath, Value: "", Usage: "path to file containing a list of target URLs/hosts to scan (one per line)"},
-// 		&cli.StringFlag{Name: "pocs", Aliases: []string{"P"}, Destination: &options.PocsFilePath, Value: "", Usage: "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"},
-// 		&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Destination: &options.Output, Value: "", Usage: "output html report, eg: -o result.html "},
-// 		&cli.StringFlag{Name: "search", Aliases: []string{"s"}, Destination: &options.Search, Value: "", Usage: "search PoC by `keyword` , eg: -s tomcat,phpinfo"},
-// 		&cli.StringFlag{Name: "severity", Aliases: []string{"S"}, Destination: &options.Severity, Value: "", Usage: "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"},
-// 		&cli.StringFlag{Name: "scan-stable", Aliases: []string{"ss"}, Destination: &options.ScanStable, Value: "", Usage: "scan stable. Possible values: 1(generally)(default), 2(normal), 3(stablize)"},
-// 		&cli.BoolFlag{Name: "silent", Destination: &options.Silent, Value: false, Usage: "no progress, only results"},
-// 		&cli.BoolFlag{Name: "nofinger", Aliases: []string{"nf"}, Destination: &options.NoFinger, Value: false, Usage: "disable fingerprint"},
-// 		&cli.BoolFlag{Name: "notips", Aliases: []string{"nt"}, Destination: &options.NoTips, Value: false, Usage: "disable show tips"},
-// 		&cli.BoolFlag{Name: "updatepocs", Aliases: []string{"up"}, Destination: &options.UpdatePocs, Value: false, Usage: "update afrog-pocs"},
-// 		&cli.BoolFlag{Name: "printpocs", Aliases: []string{"pp"}, Destination: &options.PrintPocs, Value: false, Usage: "print afrog-pocs list"},
-// 		// &cli.BoolFlag{Name: "webport", Aliases: []string{"wp"}, Destination: &options.WebPort, Value: false, Usage: "enable web port scan, default top 1000 port"},
-// 		// &cli.StringFlag{Name: "port", Destination: &options.Port, Value: "", Usage: "web port scan, default top 1000, eg: --port 80,443,8000-9000"},
-// 	}
-
-// 	app.Action = func(c *cli.Context) error {
-// 		// print pocs list
-// 		if options.PrintPocs {
-// 			plist, err := pocs.PrintPocs()
-// 			if err != nil {
-// 				return err
-// 			}
-// 			for _, v := range plist {
-// 				fmt.Println(v)
-// 			}
-// 			fmt.Println("PoC count: ", len(plist))
-// 			return nil
-// 		}
-
-// 		upgrade := upgrade.New(options.UpdatePocs)
-// 		upgrade.UpgradeAfrogPocs()
-
-// 		runner.ShowBanner2(upgrade.LastestAfrogVersion)
-
-// 		printPathLog(upgrade)
-
-// 		if len(options.Output) == 0 {
-// 			options.Output = utils.GetNowDateTimeReportName() + ".html"
-// 		}
-
-// 		htemplate.Filename = options.Output
-// 		if err := htemplate.New(); err != nil {
-// 			return err
-// 		}
-
-// 		starttime := time.Now()
-
-// 		// fixed 99% bug
-// 		go func() {
-// 			startcount := options.CurrentCount
-// 			for {
-// 				time.Sleep(2 * time.Minute)
-// 				if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
-// 					fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
-// 					fmt.Println(" close wait 3 seconds...")
-// 					time.Sleep(time.Second * 3)
-// 					os.Exit(1)
-// 				}
-// 				startcount = options.CurrentCount
-// 			}
-// 		}()
-
-// 		err := runner.New(options, htemplate, func(result any) {
-// 			r := result.(*core.Result)
-
-// 			atomic.AddInt64(&options.CurrentCount, 1)
-
-// 			lock.Lock()
-// 			if r.IsVul {
-// 				if r.FingerResult != nil {
-// 					fr := r.FingerResult.(fingerprint.Result)
-// 					printFingerprintInfoConsole(fr)
-// 				} else {
-
-// 					atomic.AddInt64(&number, 1)
-// 					r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
-
-// 					htemplate.Result = r
-// 					htemplate.Number = utils.GetNumberText(int(number))
-// 					htemplate.Append()
-// 				}
-// 			}
-// 			lock.Unlock()
-
-// 			if !options.Silent {
-// 				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Now().Sub(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount())
-// 			}
-
-// 		})
-// 		if err != nil {
-// 			return err
-// 		}
-
-// 		return err
-// 	}
-
-// 	err := app.Run(os.Args)
-// 	if err != nil && !options.UpdatePocs {
-// 		fmt.Println(runner.ShowTips())
-// 		fmt.Println(log.LogColor.High("start afrog failed，", err.Error()))
-// 	}
-
-// 	fmt.Println(" close wait 3 seconds...")
-// 	time.Sleep(time.Second * 3)
-// }
-
-// func printFingerprintInfoConsole(fr fingerprint.Result) {
-// 	if len(fr.StatusCode) > 0 {
-// 		statusCode := log.LogColor.Vulner("" + fr.StatusCode + "")
-// 		if !strings.HasPrefix(fr.StatusCode, "2") {
-// 			statusCode = log.LogColor.Midium("" + fr.StatusCode + "")
-// 		}
-// 		space := "                       "
-// 		if len(fr.Title) == 0 && len(fr.Name) == 0 {
-// 			space = "                                                               "
-// 		} else if len(fr.Title) != 0 && len(fr.Name) == 0 {
-// 			space = "                                          "
-// 		}
-// 		fmt.Printf("\r" + fr.Url + " " +
-// 			statusCode + " " +
-// 			fr.Title + " " +
-// 			log.LogColor.Critical(fr.Name) + space + "\r\n")
-// 	}
-// }
-
-// func printPathLog(upgrade *upgrade.Upgrade) {
-// 	fmt.Println("PATH:")
-// 	fmt.Println("   " + options.Config.GetConfigPath())
-// 	if options.UpdatePocs {
-// 		fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.LastestVersion)
-// 	} else {
-// 		if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
-// 			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion + " (" + log.LogColor.Vulner(upgrade.LastestVersion) + ")")
-// 		} else {
-// 			fmt.Println("   " + poc.GetPocPath() + " v" + upgrade.CurrVersion)
-// 		}
-// 	}
-// }

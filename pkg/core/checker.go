@@ -1,14 +1,19 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zan8in/afrog/pkg/gopoc"
+	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
+	"github.com/zan8in/afrog/pkg/targetlive"
+	"golang.org/x/net/context"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -20,6 +25,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+var MMutex = &sync.Mutex{}
+
 type Checker struct {
 	Options         *config.Options
 	OriginalRequest *http.Request
@@ -29,24 +36,23 @@ type Checker struct {
 	FastClient      *http2.FastClient
 }
 
-func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
+func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
-			c.Options.ApiCallBack(c.Result)
-			log.Log().Error(fmt.Sprintf("goroutine recover() error from pkg/core/Check, %v\n", r))
+			// c.Options.ApiCallBack(c.Result)
 		}
 	}()
 
 	// check target alive.
-	if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
+	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	c.Result.Target = target
-	c.Result.PocInfo = &pocItem
+	c.Result.PocInfo = pocItem
 
 	c.FastClient.MaxRedirect = c.Options.Config.ConfigHttp.MaxRedirect
 	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
@@ -60,23 +66,23 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		matchCondition = poc.STOP_IF_FIRST_MATCH
 	}
 
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		target = "http://" + target
+	target, err = c.checkIsURL(target)
+	if err != nil {
+		c.Result.IsVul = false
+		return err
 	}
 
 	c.OriginalRequest, err = http.NewRequest("GET", target, nil)
 	if err != nil {
-		log.Log().Error(fmt.Sprintf("rule map originalRequest err, %s", err.Error()))
 		c.Result.IsVul = false
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	tempRequest, err := http2.ParseRequest(c.OriginalRequest)
 	if err != nil {
-		log.Log().Error(fmt.Sprintf("ParseRequest err, %s", err.Error()))
 		c.Result.IsVul = false
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 	c.VariableMap["request"] = tempRequest
@@ -95,32 +101,29 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 		k := ruleMap.Key
 		rule := ruleMap.Value
 
-		if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
+		if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 			c.Result.IsVul = false
-			c.Options.ApiCallBack(c.Result)
+			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if rule.BeforeSleep != 0 {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
-		utils.RandSleep(1000)
 
 		isMatch := false
 		if len(rule.Request.Raw) > 0 {
 			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Config.ConfigHttp.DialTimeout))}
 			err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
 		} else {
-			err = c.FastClient.HTTPRequest(c.OriginalRequest, rule, c.VariableMap)
+			// err = c.FastClient.HTTPRequest(ctx, c.OriginalRequest, rule, c.VariableMap)
+			err = retryhttpclient.Request(ctx, target, rule, c.VariableMap)
 		}
 		if err == nil {
 			evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
 			if err == nil {
 				isMatch = evalResult.Value().(bool)
 			}
-		}
-		if err != nil {
-			log.Log().Error(fmt.Sprintf("RunEval %s", err.Error()))
 		}
 
 		c.CustomLib.WriteRuleFunctionsROptions(k, isMatch)
@@ -143,64 +146,95 @@ func (c *Checker) Check(target string, pocItem poc.Poc) (err error) {
 
 		if rule.StopIfMismatch && !isMatch {
 			c.Result.IsVul = false
-			c.Options.ApiCallBack(c.Result)
+			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if rule.StopIfMatch && isMatch {
 			c.Result.IsVul = true
-			c.Options.ApiCallBack(c.Result)
+			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if matchCondition == poc.STOP_IF_FIRST_MISMATCH && !isMatch {
 			c.Result.IsVul = false
-			c.Options.ApiCallBack(c.Result)
+			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if matchCondition == poc.STOP_IF_FIRST_MATCH && isMatch {
 			c.Result.IsVul = true
-			c.Options.ApiCallBack(c.Result)
+			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
+
 	}
 
 	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
 	if err != nil {
-		log.Log().Error(fmt.Sprintf("Final RunEval Error: %s", err.Error()))
 		c.Result.IsVul = false
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	c.Result.IsVul = isVul.Value().(bool)
-	c.Options.ApiCallBack(c.Result)
+	// c.Options.ApiCallBack(c.Result)
 
 	return err
+}
+
+func (c *Checker) checkIsURL(target string) (string, error) {
+	if !utils.IsURL(target) {
+
+		newtarget, status := retryhttpclient.CheckHttpsAndLives(target)
+
+		if status == -1 {
+
+			MMutex.Lock()
+			if k := c.Options.Targets.GetKey(target); k != -1 && !utils.IsURL(target) {
+				c.Options.Targets[k] = "http://" + target
+				target = "http://" + target
+			}
+			MMutex.Unlock()
+
+			targetlive.TLive.HandleTargetLive(target, 0)
+
+			return target, errors.New("target response failed")
+		}
+
+		MMutex.Lock()
+		if k := c.Options.Targets.GetKey(target); k != -1 && !utils.IsURL(target) {
+			c.Options.Targets[k] = newtarget
+			target = newtarget
+		}
+		MMutex.Unlock()
+
+	}
+	return target, nil
+
 }
 
 func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	gpa := gopoc.New(target)
 
 	// check target alive.
-	if c.Options.TargetLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
+	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
-	c.Options.TargetLive.AddRequestTarget(target+gopocName, 1)
+	targetlive.TLive.AddRequestTarget(target+gopocName, 1)
 	fun := gopoc.GetGoPocFunc(gopocName)
 	r, err := fun(gpa)
 	if err != nil {
-		c.Options.TargetLive.AddRequestTarget(target+gopocName, 2)
+		targetlive.TLive.AddRequestTarget(target+gopocName, 2)
 		c.Result.IsVul = false
 		c.Result.PocInfo = gpa.Poc
-		c.Options.ApiCallBack(c.Result)
+		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
-	c.Options.TargetLive.AddRequestTarget(target+gopocName, 2)
+	targetlive.TLive.AddRequestTarget(target+gopocName, 2)
 
 	c.Result.Target = target
 	c.Result.FullTarget = target
@@ -211,7 +245,7 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul})
 		}
 	}
-	c.Options.ApiCallBack(c.Result)
+	// c.Options.ApiCallBack(c.Result)
 
 	return nil
 }
