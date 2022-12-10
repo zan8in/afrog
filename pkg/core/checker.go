@@ -40,14 +40,12 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	defer func() {
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
-			// c.Options.ApiCallBack(c.Result)
 		}
 	}()
 
 	// check target alive.
 	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
@@ -75,14 +73,12 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	c.OriginalRequest, err = http.NewRequest("GET", target, nil)
 	if err != nil {
 		c.Result.IsVul = false
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	tempRequest, err := http2.ParseRequest(c.OriginalRequest)
 	if err != nil {
 		c.Result.IsVul = false
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 	c.VariableMap["request"] = tempRequest
@@ -103,7 +99,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 
 		if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 			c.Result.IsVul = false
-			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
@@ -146,25 +141,21 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 
 		if rule.StopIfMismatch && !isMatch {
 			c.Result.IsVul = false
-			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if rule.StopIfMatch && isMatch {
 			c.Result.IsVul = true
-			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if matchCondition == poc.STOP_IF_FIRST_MISMATCH && !isMatch {
 			c.Result.IsVul = false
-			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
 		if matchCondition == poc.STOP_IF_FIRST_MATCH && isMatch {
 			c.Result.IsVul = true
-			// c.Options.ApiCallBack(c.Result)
 			return err
 		}
 
@@ -173,12 +164,10 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
 	if err != nil {
 		c.Result.IsVul = false
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
 	c.Result.IsVul = isVul.Value().(bool)
-	// c.Options.ApiCallBack(c.Result)
 
 	return err
 }
@@ -220,7 +209,6 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 	// check target alive.
 	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
 		c.Result.IsVul = false
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 
@@ -231,7 +219,6 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 		targetlive.TLive.AddRequestTarget(target+gopocName, 2)
 		c.Result.IsVul = false
 		c.Result.PocInfo = gpa.Poc
-		// c.Options.ApiCallBack(c.Result)
 		return err
 	}
 	targetlive.TLive.AddRequestTarget(target+gopocName, 2)
@@ -245,7 +232,6 @@ func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
 			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul})
 		}
 	}
-	// c.Options.ApiCallBack(c.Result)
 
 	return nil
 }
