@@ -174,6 +174,20 @@
             <br>
             <a href="javascript:void(0);"><sub>york</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/23.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="javascript:void(0);"><sub>7eleven.eth</sub></a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/24.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/Double-q1015"><sub>Double-q1015</sub></a>
+        </td>
     </tr>	
 </table></div>
 

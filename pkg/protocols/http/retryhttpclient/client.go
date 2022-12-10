@@ -168,8 +168,8 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 
 	// path
 	rule.Request.Path = setVariableMap(strings.TrimSpace(rule.Request.Path), variableMap)
-	rule.Request.Path = strings.ReplaceAll(rule.Request.Path, " ", "%20")
-	rule.Request.Path = strings.ReplaceAll(rule.Request.Path, "+", "%20")
+	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, " ", "%20")
+	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, "+", "%20")
 
 	// body
 	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
@@ -183,9 +183,9 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	}
 
 	// newhttprequest
-	req, err := retryablehttp.NewRequest(rule.Request.Method, target+rule.Request.Path, nil)
+	req, err := retryablehttp.NewRequest(rule.Request.Method, strings.TrimRight(target, "/")+rule.Request.Path, nil)
 	if len(rule.Request.Body) > 0 {
-		req, err = retryablehttp.NewRequest(rule.Request.Method, target+rule.Request.Path, strings.NewReader(rule.Request.Body))
+		req, err = retryablehttp.NewRequest(rule.Request.Method, strings.TrimRight(target, "/")+rule.Request.Path, strings.NewReader(rule.Request.Body))
 	}
 	if err != nil {
 		return err
@@ -274,10 +274,7 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	protoReq.ContentType = req.Header.Get("Content-Type")
 	protoReq.Body = []byte(rule.Request.Body)
 
-	reqPath := resp.Request.URL.Path
-	if len(resp.Request.URL.Path) == 0 {
-		reqPath = "/"
-	}
+	reqPath := strings.Replace(utils.UrlTypeToString(protoResp.Url), strings.TrimRight(target, "/"), "", 1)
 	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + req.URL.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + string(rule.Request.Body))
 	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
 	variableMap["request"] = protoReq
