@@ -1,0 +1,37 @@
+id: tenda-panel
+
+info:
+  name: Tenda Panel
+  author: doinb1517
+  severity: info
+  description: |
+    app="tenda-路由器"
+    A Tenda panel was detected.
+  reference:
+    - https://www.tenda.com.cn/default.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login.html
+      follow_redirects: true
+    expression: |
+      response.status == 200
+      && 
+      (response.body.bcontains(b"<title>Tenda 11N Wireless Router Login Screen</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda | LOGIN</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda | Login</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda Wireless Router</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda Wi-Fi</title>")
+      ||
+      response.body.bcontains(b"<title>腾达无线路由器</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda|登录</title>")
+      ||
+      response.body.bcontains(b"<title>Tenda Web Master</title>"))
+expression: r0()
