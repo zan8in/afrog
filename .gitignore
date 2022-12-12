@@ -51,3 +51,5 @@ cmd/socket*
 cmd/title*
 cmd/workgroup*
 cmd/xray*
+
+dist/

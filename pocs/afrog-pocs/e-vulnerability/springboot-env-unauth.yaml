@@ -1,0 +1,22 @@
+id: springboot-env-unauth
+
+info:
+  name: springboot env 未经授权访问
+  author: daffainfo
+  severity: critical
+  description: springboot env 未经授权访问
+  reference:
+    - https://github.com/LandGrey/SpringBootVulExploit
+
+rules:
+    spring10:
+        request:
+            method: GET
+            path: /env
+        expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+    spring20:
+        request:
+            method: GET
+            path: /actuator/env
+        expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+expression: spring10() || spring20()

