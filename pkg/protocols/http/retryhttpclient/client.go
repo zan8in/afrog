@@ -257,7 +257,7 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	newRespHeader := make(map[string]string)
 	rawHeaderBuilder := strings.Builder{}
 	for k := range resp.Header {
-		newRespHeader[k] = resp.Header.Get(k)
+		newRespHeader[strings.ToLower(k)] = resp.Header.Get(k)
 
 		rawHeaderBuilder.WriteString(k)
 		rawHeaderBuilder.WriteString(": ")
