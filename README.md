@@ -191,11 +191,11 @@
     </tr>	
     <tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/17.png"
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/25.png"
                   alt="Typora-Logo"
                   height="80"/>
             <br>
-            <a href="javascript:void(0);"><sub>茄子</sub></a>
+            <a href="https://github.com/iceyjchen"><sub>ICEY_</sub></a>
         </td>
     </tr>
 </table></div>
