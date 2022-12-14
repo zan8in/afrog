@@ -197,6 +197,13 @@
             <br>
             <a href="https://github.com/iceyjchen"><sub>ICEY_</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/26.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="javascript:void(0);"><sub>lazy</sub></a>
+        </td>
     </tr>
 </table></div>
 
