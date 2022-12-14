@@ -202,7 +202,7 @@
                   alt="Typora-Logo"
                   height="80"/>
             <br>
-            <a href="javascript:void(0);"><sub>lazy</sub></a>
+            <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
         </td>
     </tr>
 </table></div>
