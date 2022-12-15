@@ -189,6 +189,22 @@
             <a href="https://github.com/Double-q1015"><sub>Double-q1015</sub></a>
         </td>
     </tr>	
+    <tr>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/25.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/iceyjchen"><sub>ICEY_</sub></a>
+        </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/26.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
+        </td>
+    </tr>
 </table></div>
 
 

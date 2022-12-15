@@ -110,7 +110,6 @@ func processProxyList(options *Options) error {
 }
 
 func runProxyConnectivity(proxyURL url.URL, options *Options, done chan bool, exitCounter chan bool) {
-	fmt.Println(proxyURL)
 	if err := testProxyConnection(proxyURL, options.Timeout); err == nil {
 		if ProxyURL == "" && ProxySocksURL == "" {
 			assignProxyURL(proxyURL, options)
