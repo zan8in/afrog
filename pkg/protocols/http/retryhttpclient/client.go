@@ -199,6 +199,9 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 		return err
 	}
 
+	// set path
+	req.Request.URL.Path = rule.Request.Path
+
 	// headers
 	if rule.Request.Method == http.MethodPost && len(rule.Request.Headers["Content-Type"]) == 0 {
 		if rule.Request.Headers == nil {
@@ -407,7 +410,14 @@ func simpleRtryHttpGet(target string) ([]byte, int, error) {
 		return []byte(""), 0, errors.New("no target specified")
 	}
 
-	resp, err := RtryNoRedirect.Get(target)
+	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req.Header.Add("User-Agent", utils.RandomUA())
+
+	resp, err := RtryNoRedirect.Do(req)
 	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
@@ -434,7 +444,14 @@ func simpleRtryRedirectGet(target string) ([]byte, map[string][]string, int, err
 		return []byte(""), nil, 0, errors.New("no target specified")
 	}
 
-	resp, err := RtryRedirect.Get(target)
+	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	req.Header.Add("User-Agent", utils.RandomUA())
+
+	resp, err := RtryRedirect.Do(req)
 	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
@@ -514,7 +531,7 @@ func ReverseGet(target string) ([]byte, error) {
 	if len(target) == 0 {
 		return []byte(""), errors.New("target not find")
 	}
-	respBody, _, err := simpleRtryHttpGet("https://" + target)
+	respBody, _, err := simpleRtryHttpGet(target)
 	return respBody, err
 }
 
