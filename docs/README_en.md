@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[707]</b> <br/>🐸Like please tag stars🌟⭐</p>
+<p align="center">A tool for finding vulnerabilities.<br/>❤️PoC <b>[759]</b> <br/>🐸Like please tag stars🌟⭐</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
@@ -61,10 +61,10 @@ afrog -t http://127.0.0.1 -s tomcat,springboot,shiro
 afrog -t http://127.0.0.1 -S high,critical 
 
 # Online update afrog-pocs 
-afrog --up 
+afrog -up 
 
 # Disable fingerprint recognition 
-afrog -t http://127.0.0.1 --nf
+afrog -t http://127.0.0.1 -nf
 ```
 ## Screenshot
 Console
