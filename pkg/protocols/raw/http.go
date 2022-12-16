@@ -1,7 +1,6 @@
 package raw
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -43,24 +42,24 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 
 	rhttp, err := Parse(request, baseurl, true)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Parse Failed, %s\n", err.Error()))
+		return fmt.Errorf("parse Failed, %s", err.Error())
 	}
 
 	resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), ioutil.NopCloser(strings.NewReader(rhttp.Data)))
 	if err != nil {
 		//fmt.Println(err.Error())
-		return errors.New(fmt.Sprintf("DoRaw Failed, %s\n", err.Error()))
+		return fmt.Errorf("doRaw Failed, %s", err.Error())
 	}
 	defer resp.Body.Close()
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return errors.New(fmt.Sprintf("ReadAll Failed, %s\n", err.Error()))
+		return fmt.Errorf("readAll Failed, %s", err.Error())
 	}
 
 	dumpedResponseHeaders, err := httputil.DumpResponse(resp, false)
 	if err != nil {
-		return errors.New(fmt.Sprintf("DumpResponse Failed, %s\n", err.Error()))
+		return fmt.Errorf("dumpResponse Failed, %s", err.Error())
 	}
 
 	tempResultResponse := &proto.Response{}
