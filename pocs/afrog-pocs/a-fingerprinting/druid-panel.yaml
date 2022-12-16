@@ -1,0 +1,14 @@
+id: druid-panel
+
+info:
+  name: Druid Panel
+  author: zan8in
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /druid/login.html
+    expression: response.status == 200 && response.body.bcontains(b'<title>druid monitor</title>')
+expression: r0()

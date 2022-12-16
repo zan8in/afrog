@@ -1,0 +1,15 @@
+id: spring-detect
+
+info:
+  name: Spring detected
+  author: Adam Crosser
+  severity: info
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /error
+      follow_redirects: true
+    expression: response.status == 500 && response.body.bcontains(b'"status":999')
+expression: r0()

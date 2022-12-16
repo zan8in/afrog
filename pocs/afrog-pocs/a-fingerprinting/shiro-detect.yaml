@@ -15,5 +15,5 @@ rules:
             follow_redirects: true
             headers:
               cookie: JSESSIONID={{randstr}};rememberMe=123;
-        expression: response.status == 200 && (response.headers["set-cookie"].contains("rememberMe=deleteMe") || response.headers["cookie"].contains("rememberMe=deleteMe"))
+        expression: response.status == 200 && response.raw_header.bcontains(b'rememberMe=deleteMe')
 expression: r0()
