@@ -168,16 +168,25 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 			target = targetfull
 		}
 	}
+	target = strings.TrimRight(target, "/")
 
 	// path
 	rule.Request.Path = setVariableMap(strings.TrimSpace(rule.Request.Path), variableMap)
-	if !strings.HasPrefix(rule.Request.Path, "^") {
-		target = strings.TrimRight(target, "/") + rule.Request.Path
-	} else {
-		target = strings.TrimRight(target, "/") + "/" + rule.Request.Path[1:]
+
+	newpath := rule.Request.Path
+	if strings.HasPrefix(rule.Request.Path, "^") {
+		newpath = "/" + rule.Request.Path[1:]
 	}
-	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, " ", "%20")
-	// rule.Request.Path = strings.ReplaceAll(rule.Request.Path, "+", "%20")
+
+	if !strings.HasPrefix(newpath, "/") {
+		newpath = "/" + newpath
+	}
+
+	newpath = strings.ReplaceAll(newpath, " ", "%20")
+	newpath = strings.ReplaceAll(newpath, "+", "%20")
+	newpath = strings.ReplaceAll(newpath, "#", "%23")
+
+	target = target + newpath
 
 	// body
 	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
@@ -198,9 +207,6 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	if err != nil {
 		return err
 	}
-
-	// set path
-	req.Request.URL.Path = rule.Request.Path
 
 	// headers
 	if rule.Request.Method == http.MethodPost && len(rule.Request.Headers["Content-Type"]) == 0 {
