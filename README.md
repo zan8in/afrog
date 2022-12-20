@@ -2,15 +2,15 @@
 <p align="center">A Vulnerability Scanning Tools For Penetration Testing</p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/releases">下载</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/docs/GUIDE.md">指南</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/docs/CONTRIBUTION.md">贡献</a> •
+  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
+  <!-- <a href="https://github.com/zan8in/afrog/blob/main/docs/GUIDE.md">指南</a> • -->
+  <a href="https://github.com/zan8in/afrog/blob/main/docs/CONTRIBUTION.md">Contributors</a> •
   <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a> •
   <!-- <a href="https://github.com/zan8in/afrog/blob/main/docs/POCLIST.md">列表</a> • -->
-  <a href="https://github.com/zan8in/afrog/blob/main/docs/README_en.md">English Doc</a>
+  <!-- <a href="https://github.com/zan8in/afrog/blob/main/docs/README_en.md">English Doc</a> -->
 </p>
 
-## PoC 贡献者
+## PoC Contributors
 
 
 
@@ -256,9 +256,9 @@ afrog -t http://127.0.0.1 -nf
 ```
 
 ## Screenshot
-Console screenshot
+
 ![](https://github.com/zan8in/afrog/blob/main/images/scan-new.png)
-Html report screenshot
+
 ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png)
 
 ## Discussion group
