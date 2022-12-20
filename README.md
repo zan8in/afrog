@@ -242,10 +242,10 @@ Advanced usage
 afrog -t http://127.0.0.1 -P ./test/ 
 afrog -t http://127.0.0.1 -P ./test/demo.yaml 
 
-# Scan by PoC keywords 
+# Scan by PoC Keywords 
 afrog -t http://127.0.0.1 -s tomcat,springboot,shiro 
 
-# Scan by Poc Vulnerability Level 
+# Scan by PoC Vulnerability Severity Level 
 afrog -t http://127.0.0.1 -S high,critical 
 
 # Online update afrog-pocs 
