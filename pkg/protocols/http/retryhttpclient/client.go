@@ -508,7 +508,7 @@ func CheckHttpsAndLives(target string) (string, int) {
 		}
 		return target, -1
 
-	case port == "443":
+	case port == "443" || strings.HasSuffix(port, "443"):
 		_, statusCode, err := simpleRtryHttpGet("https://" + target)
 		if err == nil {
 			return "https://" + target, statusCode

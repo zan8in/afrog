@@ -139,8 +139,7 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		return nil
 	}
 
-	fingerSlice := []string{}
-	// fpName := ""
+	fpName := ""
 	for _, v := range s.fpSlice {
 		flag := false
 
@@ -150,16 +149,15 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 			for k, h := range v.Headers {
 				if len(headers[k]) == 0 {
 					hflag = false
-					continue
+					break
 				}
 				if len(headers[k]) > 0 {
 					// fmt.Println("header key ", headers[k][0], " => h :", h)
 					if !strings.Contains(headers[k][0], h) {
 						hflag = false
-						continue
+						break
 					}
 					hflag = true
-					fingerSlice = append(fingerSlice, v.Name)
 				}
 			}
 		}
@@ -173,10 +171,9 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 			for _, k := range v.Keyword {
 				if !strings.Contains(string(data), k) {
 					kflag = false
-					continue
+					break
 				}
 				kflag = true
-				fingerSlice = append(fingerSlice, v.Name)
 			}
 		}
 		if len(v.Keyword) > 0 && kflag {
@@ -184,7 +181,7 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		}
 
 		if flag {
-			// fpName = v.Name
+			fpName = v.Name
 			break
 		}
 	}
@@ -200,9 +197,7 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		}
 	}
 
-	fingerString := toString(fingerSlice)
-
-	s.PrintColorResultInfoConsole(Result{Url: url, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fingerString})
+	s.PrintColorResultInfoConsole(Result{Url: url, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fpName})
 
 	return nil
 

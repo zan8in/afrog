@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">一款性能卓越、快速稳定、PoC 可定制化的漏洞扫描工具<br/>❤️不以物喜，不以己悲<br/>共 <b>[759]</b> 个 PoC <br/>🐸喜欢请点赞🌟⭐，不迷路</p>
+<p align="center">A Vulnerability Scanning Tools For Penetration Testing</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">下载</a> •
@@ -209,78 +209,77 @@
 
 
 
-## 什么是 afrog
+## What is afrog
 
-afrog 是一款性能卓越、快速稳定、PoC 可定制的漏洞扫描工具，PoC 包含 CVE、CNVD、默认口令、信息泄露、指纹识别、未授权访问、任意文件读取、命令执行等多种漏洞类型，帮助网络安全从业者快速验证并及时修复漏洞。
+afrog is an excellent performance, fast and stable, PoC customizable vulnerability scanning (hole digging) tool. PoC involves CVE, CNVD, default password, information leakage, fingerprint identification, unauthorized access, arbitrary file reading, command execution, etc. It helps network security practitioners quickly verify and fix vulnerabilities in a timely manner.
 
-## 特点
+## Features
 
-* [x] 开源
-* [x] 快速、稳定、误报低
-* [x] 详细的 html 漏洞报告
-* [x] PoC 可定制化、稳定更新
-* [x] 活跃的社区 [交流群](https://github.com/zan8in/afrog#%E4%BA%A4%E6%B5%81%E7%BE%A4)
-* [x] 长期维护
+* [x] Open Source
+* [x] Fast, stable, low false positives
+* [x] Detailed html vulnerability report
+* [x] PoC can be customized and updated stably
+* [x] Active community exchange group
 
-## 示例
+## Example
 
-基本用法
+Basic usage
 ```
-# 扫描一个目标
+# Scan a target
 afrog -t http://127.0.0.1
 
-# 扫描多个目标
+# Scan multiple targets
 afrog -T urls.txt
 
-# 指定漏扫报告文件
+# Specify a scan report file
 afrog -t http://127.0.0.1 -o result.html
 ```
 
-高级用法
+Advanced usage
 
 ```
-# 测试 PoC 
+# Test PoC 
 afrog -t http://127.0.0.1 -P ./test/ 
 afrog -t http://127.0.0.1 -P ./test/demo.yaml 
 
-# 按 PoC 关键字扫描 
+# Scan by PoC keywords 
 afrog -t http://127.0.0.1 -s tomcat,springboot,shiro 
 
-# 按 Poc 漏洞等级扫描 
+# Scan by Poc Vulnerability Level 
 afrog -t http://127.0.0.1 -S high,critical 
 
-# 在线更新 afrog-pocs 
+# Online update afrog-pocs 
 afrog -up 
 
-# 禁用指纹识别，直接漏扫 
+# Disable fingerprint recognition 
 afrog -t http://127.0.0.1 -nf
 ```
 
-## 截图
-控制台
+## Screenshot
+Console screenshot
 ![](https://github.com/zan8in/afrog/blob/main/images/scan-new.png)
-html 报告
+Html report screenshot
 ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png)
 
-## 交流群
+## Discussion group
 
-> 微信群请先添加 afrog 个人账号，并备注「afrog」，然后会把大家拉到 afrog 交流群中。
+> For WeChat group, please add afrog personal account first, and remark "afrog", and then everyone will be pulled into the afrog communication group.
 
 <img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
 
-## 404星链计划
+## 404Starlink
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
 
-afrog 现已加入 [404星链计划](https://github.com/knownsec/404StarLink)
+afrog has joined [404Starlink](https://github.com/knownsec/404StarLink)
 
-## 免责声明
+## Disclaimer
 
-本工具仅面向**合法授权**的企业安全建设行为，如您需要测试本工具的可用性，请自行搭建靶机环境。
+This tool is only for **legally authorized** enterprise security construction behavior. If you need to test the usability of this tool, please build a target environment by yourself.
 
-为避免被恶意使用，本项目所有收录的poc均为漏洞的理论判断，不存在漏洞利用过程，不会对目标发起真实攻击和漏洞利用。
+In order to avoid malicious use, all PoCs included in this project are theoretical judgments of vulnerabilities, there is no vulnerability exploitation process, and no real attacks or exploits will be launched on the target.
 
-在使用本工具进行检测时，您应确保该行为符合当地的法律法规，并且已经取得了足够的授权。**请勿对非授权目标进行扫描。**
+When using this tool for detection, you should ensure that the behavior complies with local laws and regulations and has obtained sufficient authorization. **Do not scan unauthorized targets. **
 
-如您在使用本工具的过程中存在任何非法行为，您需自行承担相应后果，我们将不承担任何法律及连带责任。
+If you have any illegal behavior in the process of using this tool, you shall bear the corresponding consequences by yourself, and we will not bear any legal and joint responsibility.
 
-在安装并使用本工具前，请您**务必审慎阅读、充分理解各条款内容**，限制、免责条款或者其他涉及您重大权益的条款可能会以加粗、加下划线等形式提示您重点注意。 除非您已充分阅读、完全理解并接受本协议所有条款，否则，请您不要安装并使用本工具。您的使用行为或者您以其他任何明示或者默示方式表示接受本协议的，即视为您已阅读并同意本协议的约束。
+Before installing and using this tool, please **must read carefully and fully understand the contents of each clause**. Restrictions, disclaimers or other clauses involving your significant rights and interests may be bolded or underlined to remind you to pay attention . Unless you have fully read, fully understood and accepted all the terms of this agreement, please do not install and use this tool. Your use behavior or your acceptance of this agreement in any other express or implied manner shall be deemed that you have read and agreed to be bound by this agreement.
