@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/pkg/output"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/gologger"
@@ -103,6 +104,11 @@ type Options struct {
 
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
+
+	// write output in JSONL(ines) format
+	OutputJson string
+
+	OJ *output.OutputJson
 }
 
 type ApiCallBack func(any)

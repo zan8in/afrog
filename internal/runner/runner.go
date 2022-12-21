@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/pkg/output"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/targetlive"
@@ -56,6 +58,11 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	htemplate.Filename = options.Output
 	if err := htemplate.New(); err != nil {
 		gologger.Fatal().Msgf("Output failed, %s", err.Error())
+	}
+
+	// output to json file
+	if len(options.OutputJson) > 0 {
+		options.OJ = output.NewOutputJson(options.OutputJson)
 	}
 
 	// show banner
@@ -188,7 +195,7 @@ func runTargetLivenessCheck(options *config.Options) {
 					// url, statusCode := http2.CheckTargetHttps(url)
 					url, statusCode = retryhttpclient.CheckHttpsAndLives(url)
 
-					if statusCode == -1 || statusCode >= 500 {
+					if statusCode == -1 || statusCode >= http.StatusInternalServerError {
 						if statusCode == -1 && !utils.IsURL(url) {
 							url = "http://" + url
 						}
@@ -205,7 +212,7 @@ func runTargetLivenessCheck(options *config.Options) {
 					// url, statusCode := http2.CheckTargetHttps(url)
 					url, statusCode = retryhttpclient.CheckHttpsAndLives(url)
 
-					if statusCode == -1 || statusCode >= 500 {
+					if statusCode == -1 || statusCode >= http.StatusInternalServerError {
 						if statusCode == -1 && !utils.IsURL(url) {
 							url = "http://" + url
 						}

@@ -69,6 +69,10 @@ func main() {
 				htemplate.Result = r
 				htemplate.Number = utils.GetNumberText(int(number))
 				htemplate.Append()
+
+				if len(options.OutputJson) > 0 {
+					options.OJ.AddJson(r.PocInfo.Id, r.PocInfo.Info.Severity, r.FullTarget)
+				}
 			}
 			lock.Unlock()
 		}
@@ -102,6 +106,7 @@ func readConfig() {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
 		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
+		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format"),
 	)
 
 	flagSet.CreateGroup("filters", "Filtering",

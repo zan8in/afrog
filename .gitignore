@@ -37,6 +37,9 @@ cmd/afrog/build.cmd
 cmd/afrog/main.rc
 cmd/afrog/main.syso
 
+cmd/pool*
+cmd/server*
+cmd/update*
 cmd/ants*
 cmd/api*
 cmd/celgo*
