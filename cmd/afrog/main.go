@@ -106,7 +106,7 @@ func readConfig() {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
 		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
-		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format"),
+		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format, eg: -json result.json"),
 	)
 
 	flagSet.CreateGroup("filters", "Filtering",
