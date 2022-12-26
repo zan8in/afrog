@@ -204,6 +204,13 @@
             <br>
             <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/27.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/Lay0us1"><sub>Lay0us</sub></a>
+        </td>
     </tr>
 </table></div>
 
