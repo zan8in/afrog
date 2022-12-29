@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptrace"
 	"net/url"
 	"regexp"
@@ -120,12 +119,12 @@ func Init(options *config.Options) (err error) {
 	}
 
 	// follow redirects client
-	clientCookieJar, _ := cookiejar.New(nil)
+	// clientCookieJar, _ := cookiejar.New(nil)
 
 	httpRedirectClient := http.Client{
 		Transport: transport,
 		Timeout:   time.Duration(options.Timeout) * time.Second,
-		Jar:       clientCookieJar,
+		// Jar:       clientCookieJar,
 	}
 
 	RtryRedirect = retryablehttp.NewWithHTTPClient(&httpRedirectClient, retryableHttpOptions)
@@ -135,12 +134,12 @@ func Init(options *config.Options) (err error) {
 	// whitespace
 
 	// disabled follow redirects client
-	clientNoRedirectCookieJar, _ := cookiejar.New(nil)
+	// clientNoRedirectCookieJar, _ := cookiejar.New(nil)
 
 	httpNoRedirectClient := http.Client{
-		Transport:     transport,
-		Timeout:       time.Duration(options.Timeout) * time.Second,
-		Jar:           clientNoRedirectCookieJar,
+		Transport: transport,
+		Timeout:   time.Duration(options.Timeout) * time.Second,
+		// Jar:           clientNoRedirectCookieJar,
 		CheckRedirect: makeCheckRedirectFunc(false, defaultMaxRedirects),
 	}
 
