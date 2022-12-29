@@ -133,6 +133,19 @@ var (
 			decls.NewFunction("sleep",
 				decls.NewOverload("sleep_int", []*exprpb.Type{decls.Int},
 					decls.Null)),
+			// year
+			decls.NewFunction("year",
+				decls.NewOverload("year_string", []*exprpb.Type{decls.String},
+					decls.String)),
+			decls.NewFunction("shortyear",
+				decls.NewOverload("shortyear_string", []*exprpb.Type{decls.String},
+					decls.String)),
+			decls.NewFunction("month",
+				decls.NewOverload("month_string", []*exprpb.Type{decls.String},
+					decls.String)),
+			decls.NewFunction("day",
+				decls.NewOverload("day_string", []*exprpb.Type{decls.String},
+					decls.String)),
 		),
 	}
 )
@@ -146,7 +159,7 @@ func ReadComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
 	return allEnvOptions
 }
 
-//	追加rule变量到 cel options
+// 追加rule变量到 cel options
 func WriteRuleIsVulOptions(c CustomLib, key string, isVul bool) {
 	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(key+"()", decls.Bool)))
 }

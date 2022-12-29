@@ -367,6 +367,35 @@ var (
 					return nil
 				},
 			},
+			// year
+			&functions.Overload{
+				Operator: "year_string",
+				Unary: func(value ref.Val) ref.Val {
+					year := time.Now().Format("2006")
+					return types.String(year)
+				},
+			},
+			&functions.Overload{
+				Operator: "shortyear_string",
+				Unary: func(value ref.Val) ref.Val {
+					year := time.Now().Format("06")
+					return types.String(year)
+				},
+			},
+			&functions.Overload{
+				Operator: "month_string",
+				Unary: func(value ref.Val) ref.Val {
+					month := time.Now().Format("01")
+					return types.String(month)
+				},
+			},
+			&functions.Overload{
+				Operator: "day_string",
+				Unary: func(value ref.Val) ref.Val {
+					day := time.Now().Format("02")
+					return types.String(day)
+				},
+			},
 		),
 	}
 )
