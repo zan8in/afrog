@@ -396,6 +396,13 @@ var (
 					return types.String(day)
 				},
 			},
+			&functions.Overload{
+				Operator: "timestamp_second_string",
+				Unary: func(value ref.Val) ref.Val {
+					timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+					return types.String(timestamp)
+				},
+			},
 		),
 	}
 )
