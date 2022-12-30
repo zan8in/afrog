@@ -90,6 +90,7 @@ type Info struct {
 	Name           string         `yaml:"name"`
 	Author         string         `yaml:"author"`
 	Severity       string         `yaml:"severity"`
+	Verified       bool           `yaml:"verified"`
 	Description    string         `yaml:"description"`
 	Reference      []string       `yaml:"reference"`
 	Tags           string         `yaml:"tags"`

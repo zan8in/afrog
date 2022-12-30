@@ -1,0 +1,20 @@
+id: piwigo-detect
+
+info:
+  name: Piwigo Detect
+  author: zan8in
+  severity: info
+  verified: true
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /identification.php
+    expression: response.status == 200 && response.body.bcontains(b'<body id=theIdentificationPage>') && response.body.bcontains(b'piwigo.org">Piwigo</a>')
+  r1:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200 && (response.body.bcontains(b'piwigo.org">Piwigo</a>') || response.body.bcontains(b'piwigo.org">Piwigo</a>'))
+expression: r0() || r1()
