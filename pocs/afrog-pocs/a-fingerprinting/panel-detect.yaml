@@ -1,0 +1,60 @@
+id: panel-detect
+
+info:
+    name: Panel Detect
+    author: zan8in
+    severity: info
+    verified: true
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /
+        expressions:
+           - '"apache-activemq" != "" && response.status == 200 && response.body.bcontains(b"<title>Apache ActiveMQ</title>")'
+           - '"thinkphp" != "" && response.status == 200 && response.raw_header.ibcontains(b"thinkphp")'
+           - '"appex-lotwan-login" != "" && response.status == 200 && response.body.bcontains(b"<title>LotWan 广域网优化系统</title>")'
+           - '"avtech-avn801-camera" != "" && response.status == 200 && response.body.bcontains(b"IP Surveillance for Your Life") && response.body.bcontains(b"avtech") && response.body.bcontains(b"/cgi-bin/guest/Login.cgi?rnd=")'
+           - '"directadmin-login" != "" && response.status == 200 && response.body.bcontains(b"<title>DirectAdmin Login</title>")'
+           - '"dubbo-detect" != "" && response.status == 200 && response.headers["www-authenticate"].icontains("Basic realm=\"dubbo\"")'
+           - '"huawei-hg532e-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>HG532e</title>")'
+           - '"jira-panel" != "" && response.body.bcontains(b"Project Management Software") && response.body.bcontains(b"atlassian.com/software/jira")'
+           - '"kubernetes-dashboard" != "" && response.status == 200 && response.body.bcontains(b"Kubernetes Dashboard</title>")'
+           - '"kubernetes-mirantis" != "" && response.status == 200 && response.body.bcontains(b"Mirantis Kubernetes Engine")'
+           - '"kubernetes-resource-report" != "" && response.status == 200 && response.body.bcontains(b"Overview - Kubernetes Resource Report")'
+           - '"openerp-database" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenERP</title>")' 
+           - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"RabbitMQ Management")'
+           - '"rocketmq-console" != "" && response.status == 200 && response.body.bcontains(b"<title>RocketMq-console-ng</title>")'
+           - '"teleport-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>登录::TELEPORT</title>")'
+           - '"terramaster-panel" != "" && response.status == 200 && (response.body.bcontains(b"<title>TOS Loading</title>") || response.headers["server"] == "TOS" || response.headers["x-powered-by"] == "TerraMaster")'
+           - '"tomcat-detect" != "" && response.raw_header.bcontains(b"tomcat") || response.body.ibcontains(b"/manager/html") ||  response.body.ibcontains(b"/manager/status")  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)'
+           - '"upupw-tz-panel" != "" && response.status == 200 && "<title>UPUPW(.*)</title>".bmatches(response.body)'
+           - '"zabbix-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>zabbix-server: Zabbix</title>")'
+    r1:
+        request:
+            method: GET
+            path: /
+            follow_redirects: true
+        expressions:
+           - '"apache-activemq" != "" && response.status == 200 && response.body.bcontains(b"<title>Apache ActiveMQ</title>")'
+           - '"thinkphp" != "" && response.status == 200 && response.raw_header.ibcontains(b"thinkphp")'
+           - '"appex-lotwan-login" != "" && response.status == 200 && response.body.bcontains(b"<title>LotWan 广域网优化系统</title>")'
+           - '"avtech-avn801-camera" != "" && response.status == 200 && response.body.bcontains(b"IP Surveillance for Your Life") && response.body.bcontains(b"avtech") && response.body.bcontains(b"/cgi-bin/guest/Login.cgi?rnd=")'
+           - '"directadmin-login" != "" && response.status == 200 && response.body.bcontains(b"<title>DirectAdmin Login</title>")'
+           - '"dubbo-detect" != "" && response.status == 200 && response.headers["www-authenticate"].icontains("Basic realm=\"dubbo\"")'
+           - '"huawei-hg532e-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>HG532e</title>")'
+           - '"jira-panel" != "" && response.body.bcontains(b"Project Management Software") && response.body.bcontains(b"atlassian.com/software/jira")'
+           - '"kubernetes-dashboard" != "" && response.status == 200 && response.body.bcontains(b"Kubernetes Dashboard</title>")'
+           - '"kubernetes-mirantis" != "" && response.status == 200 && response.body.bcontains(b"Mirantis Kubernetes Engine")'
+           - '"kubernetes-resource-report" != "" && response.status == 200 && response.body.bcontains(b"Overview - Kubernetes Resource Report")'
+           - '"openerp-database" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenERP</title>")' 
+           - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"RabbitMQ Management")'
+           - '"rocketmq-console" != "" && response.status == 200 && response.body.bcontains(b"<title>RocketMq-console-ng</title>")'
+           - '"teleport-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>登录::TELEPORT</title>")'
+           - '"terramaster-panel" != "" && response.status == 200 && (response.body.bcontains(b"<title>TOS Loading</title>") || response.headers["server"] == "TOS" || response.headers["x-powered-by"] == "TerraMaster")'
+           - '"tomcat-detect" != "" && response.raw_header.bcontains(b"tomcat") || response.body.ibcontains(b"/manager/html") ||  response.body.ibcontains(b"/manager/status")  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)'
+           - '"upupw-tz-panel" != "" && response.status == 200 && "<title>UPUPW(.*)</title>".bmatches(response.body)'
+           - '"zabbix-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>zabbix-server: Zabbix</title>")'
+           
+expression: r0() || r1()

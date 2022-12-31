@@ -4,6 +4,7 @@ info:
   name: Apache Tomcat Detect
   author: philippedelteil,dhiyaneshDk
   severity: info
+  verified: true
   description: |
     An Apache Tomcat Manager panel was discovered.
     app="APACHE-Tomcat"
@@ -13,12 +14,7 @@ set:
 rules:
     r0:
       request:
-          method: GET
-          path: /
-      expression: response.raw_header.bcontains(b'tomcat') || response.body.ibcontains(b'apache tomcat') ||  response.body.ibcontains(b'/manager/html') ||  response.body.ibcontains(b'/manager/status')  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)
-    r1:
-      request:
         method: GET
         path: /{{randstr}}
       expression: response.raw_header.bcontains(b'tomcat') || response.body.ibcontains(b'apache tomcat') ||  response.body.ibcontains(b'/manager/html') ||  response.body.ibcontains(b'/manager/status')  ||   "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)
-expression: r0() || r1()
+expression: r0()
