@@ -123,6 +123,7 @@ func readConfig() {
 	flagSet.CreateGroup("optimization", "Optimizations",
 		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
 		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
+		flagSet.BoolVarP(&options.OnlyFinger, "onlyfinger", "of", false, "fingerprint scan only"),
 		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
 		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
 		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),

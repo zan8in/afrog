@@ -156,11 +156,14 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		}
 	}
 
-	//check target live
-	go runTargetLivenessCheck(options)
+	if !options.OnlyFinger {
+		//check target live
+		go runTargetLivenessCheck(options)
 
-	e := core.New(options)
-	e.Execute(allPocsYamlSlice, allPocsEmbedYamlSlice)
+		// check poc
+		e := core.New(options)
+		e.Execute(allPocsYamlSlice, allPocsEmbedYamlSlice)
+	}
 
 	return nil
 }
