@@ -4,6 +4,7 @@ info:
   name: Spring detected
   author: Adam Crosser
   severity: info
+  verified: true
 
 rules:
   r0:

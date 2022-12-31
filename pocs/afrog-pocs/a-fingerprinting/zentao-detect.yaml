@@ -4,6 +4,7 @@ info:
   name: Zentao detect
   author: pikpikcu
   severity: info
+  verified: true
 
 rules:
   r0:

@@ -4,6 +4,8 @@ info:
   name: Thinkphp Debug Detected
   author: zan8in
   severity: info
+  verified: true
+  description: app="ThinkPHP"
 
 rules:
   r0:

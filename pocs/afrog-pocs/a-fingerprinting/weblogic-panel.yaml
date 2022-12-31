@@ -4,6 +4,7 @@ info:
   name: Weblogic Login Panel
   author: bing0o,meme-lord
   severity: info
+  verified: true
   description: |
     shodan-query: product:"Oracle Weblogic"
 

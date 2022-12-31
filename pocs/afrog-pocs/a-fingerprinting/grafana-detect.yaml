@@ -4,8 +4,7 @@ info:
   name: Grafana Panel
   author: organiccrap
   severity: info
-  description: |
-    fofa: title="Jeecg-Boot"
+  verified: true
 
 rules:
   r0:

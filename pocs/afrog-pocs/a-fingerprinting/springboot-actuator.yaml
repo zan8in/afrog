@@ -4,6 +4,7 @@ info:
   name: Springboot Actuator Detected
   author: zan8in
   severity: info
+  verified: true
 
 rules:
   r0:

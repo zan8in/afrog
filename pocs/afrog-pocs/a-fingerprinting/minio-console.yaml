@@ -4,6 +4,7 @@ info:
   name: MinIO Console
   author: pussycat0x
   severity: info
+  verified: true
   description: |
     fofa-query: app="MinIO-Console"
     shodan-query: title:"MinIO Console"

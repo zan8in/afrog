@@ -4,6 +4,7 @@ info:
     name: Alibaba Nacos V1 Auth Bypass
     author: kmahyyg(https://github.com/kmahyyg)
     severity: high
+    verified: true
     description: fofa app="NACOS"
 
 set:

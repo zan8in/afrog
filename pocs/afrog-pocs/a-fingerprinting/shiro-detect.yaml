@@ -4,7 +4,9 @@ info:
     name: Shiro detect
     author: zan8in
     severity: info
+    verified: true
     description: fofa app="APACHE-Shiro"
+
 set:
     randstr: randomLowercase(6)
 rules:

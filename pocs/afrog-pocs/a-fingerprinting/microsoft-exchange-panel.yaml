@@ -4,6 +4,7 @@ info:
   name: Microsoft Exchange Control Panel
   author: r3dg33k
   severity: info
+  verified: true
   description: |
     Publicly accessible Microsoft Exchange Server Control Panel
     Fofa: app="Microsoft-Exchange"

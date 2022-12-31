@@ -4,9 +4,10 @@ info:
   name: Tenda Panel
   author: doinb1517
   severity: info
+  verified: true
   description: |
-    app="tenda-路由器"
     A Tenda panel was detected.
+    app="tenda-路由器"
   reference:
     - https://www.tenda.com.cn/default.html
 

@@ -4,6 +4,7 @@ info:
   name: DLink Panel
   author: zan8in
   severity: info
+  verified: true
 
 rules:
   r0:
@@ -14,23 +15,15 @@ rules:
     expression: |
       response.status == 200 
       && 
-      (response.body.bcontains(b'languagechange(share.ti_username)')  && 
-      response.body.bcontains(b'DILanguage')) 
+      (response.body.bcontains(b'languagechange(share.ti_username)')  && response.body.bcontains(b'DILanguage')
       || 
-      (response.body.bcontains(b"AC集中管理平台") && 
-      response.body.bcontains(b"D-Link路由器"))
+      (response.body.bcontains(b"AC集中管理平台") && response.body.bcontains(b"D-Link路由器"))
       ||
-      (response.body.bcontains(b"<title>ADSL Router</title>") &&
-      response.body.bcontains(b"D-Link"))
+      (response.body.bcontains(b"<title>ADSL Router</title>") && response.body.bcontains(b"D-Link")))
   r1:
     request:
       method: GET
       path: /info/Login.html
       follow_redirects: true
-    expression: |
-      response.status == 200 
-      && 
-      response.body.bcontains(b'<title>D-LINK</title>')  && 
-      response.body.bcontains(b'dlink-favicon.ico')
-  
+    expression: response.status == 200  && response.body.bcontains(b'<title>D-LINK</title>')
 expression: r0() || r1()

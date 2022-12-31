@@ -4,6 +4,7 @@ info:
   name: CAS Login Panel
   author: pdteam
   severity: info
+  verified: true
   description: |
     shodan-query: http.title:'CAS - Central Authentication Service'
   reference:

@@ -4,6 +4,7 @@ info:
   name: Druid Panel
   author: zan8in
   severity: info
+  verified: true
 
 rules:
   r0:

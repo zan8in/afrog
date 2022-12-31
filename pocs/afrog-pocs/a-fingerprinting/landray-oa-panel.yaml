@@ -1,0 +1,16 @@
+id: landray-oa-panel
+
+info:
+  name: Landray OA Panel Login
+  author: YanYun
+  severity: info
+  verified: true
+  description: app="Landray-OA系统"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login.jsp
+    expression: response.status == 200 && response.body.bcontains(b'lui_login_input_username') && response.body.bcontains(b'lui_login_input_password')
+expression: r0()

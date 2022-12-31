@@ -5,6 +5,7 @@ info:
     author: zan8in
     severity: info
     description: fofa app="GitLab"
+    verified: true
 
 rules:
     r0:

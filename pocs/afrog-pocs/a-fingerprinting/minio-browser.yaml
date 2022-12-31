@@ -4,6 +4,7 @@ info:
   name: MinIO Browser
   author: pikpikcu
   severity: info
+  verified: true
   description: |
     shodan-query: title:"MinIO Browser"
 

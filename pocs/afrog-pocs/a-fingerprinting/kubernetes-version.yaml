@@ -3,8 +3,10 @@ id: kubernetes-version
 info:
   name: Kubernetes Version Exposure
   author: raesene
-  description: Searches for exposed Kubernetes API servers which return version information unauthenticated
   severity: info
+  verified: true
+  description: Searches for exposed Kubernetes API servers which return version information unauthenticated
+
 
 rules:
     r0:

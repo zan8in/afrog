@@ -4,6 +4,7 @@ info:
   name: Jenkins API Instance Detection Template
   author: righettod
   severity: info
+  verified: true
   description: Try to detect the presence of a Jenkins API instance via the API default XML endpoint
 
 rules:

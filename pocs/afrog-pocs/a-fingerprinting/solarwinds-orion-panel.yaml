@@ -4,6 +4,7 @@ info:
   name: SolarWinds Orion Panel
   author: puzzlepeaches
   severity: info
+  verified: true
 
 rules:
   r0:

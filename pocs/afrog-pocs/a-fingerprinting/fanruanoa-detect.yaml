@@ -1,9 +1,10 @@
 id: fanruanoa-detect
 
 info:
-  name: FanRuanOA-detect
+  name: FanRuan OA detect
   author: zan8in
   severity: info
+  verified: true
   
 rules:
   r0:

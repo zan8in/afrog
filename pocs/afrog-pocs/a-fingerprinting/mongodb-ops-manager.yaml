@@ -4,6 +4,7 @@ info:
   name: MongoDB Ops Manager
   author: dhiyaneshDK
   severity: info
+  verified: true
   reference:
     - https://www.shodan.io/search?query=http.title%3A%22MongoDB+Ops+Manager%22
 

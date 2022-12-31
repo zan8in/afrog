@@ -4,6 +4,7 @@ info:
   name: Fckeditor Detect
   author: princechaddha,bernardofsr
   severity: info
+  verified: true
 
 rules:
   r0:

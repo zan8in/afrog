@@ -3,8 +3,11 @@ id: adminer-panel
 info:
   name: Adminer Login Panel
   author: random_robbie,meme-lord
-  description: An Adminer login panel was detected.
   severity: info
+  verified: true
+  description: |
+    An Adminer login panel was detected.
+    app="Adminer"
   reference:
     - https://blog.sorcery.ie/posts/adminer/
 

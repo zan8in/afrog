@@ -4,6 +4,7 @@ info:
   name: Python Django Admin Panel
   author: pdteam
   severity: info
+  verified: true
 
 rules:
   r0:

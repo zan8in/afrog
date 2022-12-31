@@ -4,6 +4,7 @@ info:
   name: Detect Azure Kubernetes Service
   author: dhiyaneshDk
   severity: info
+  verified: true
 
 rules:
     r0:

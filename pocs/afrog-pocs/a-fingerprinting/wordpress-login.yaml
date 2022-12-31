@@ -4,6 +4,7 @@ info:
   name: WordPress login
   author: its0x08
   severity: info
+  verfied: true
 
 rules:
   r0:

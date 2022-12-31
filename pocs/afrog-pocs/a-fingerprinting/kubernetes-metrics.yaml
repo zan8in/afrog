@@ -4,6 +4,7 @@ info:
   name: Detect Kubernetes Exposed Metrics
   author: pussycat0x
   severity: low
+  verified: false
   description: Information Disclosure of Garbage Collection
   reference:
     - https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#metrics-in-kubernetes

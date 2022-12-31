@@ -4,6 +4,7 @@ info:
   name: Emessage Panel
   author: ffffffff0x
   severity: info
+  verified: true
   description: |
     fofa-query: title="emessage"
 
