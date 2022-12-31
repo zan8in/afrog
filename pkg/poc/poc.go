@@ -53,6 +53,7 @@ type RuleMapSlice []RuleMap
 type Rule struct {
 	Request        RuleRequest   `yaml:"request"`
 	Expression     string        `yaml:"expression"`
+	Expressions    []string      `yaml:"expressions"`
 	Output         yaml.MapSlice `yaml:"output"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
@@ -63,6 +64,7 @@ type Rule struct {
 type ruleAlias struct {
 	Request        RuleRequest   `yaml:"request"`
 	Expression     string        `yaml:"expression"`
+	Expressions    []string      `yaml:"expressions"`
 	Output         yaml.MapSlice `yaml:"output"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
@@ -171,6 +173,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 
 	r.Request = tmp.Request
 	r.Expression = tmp.Expression
+	r.Expressions = append(r.Expressions, tmp.Expressions...)
 	r.Output = tmp.Output
 	r.StopIfMatch = tmp.StopIfMatch
 	r.StopIfMismatch = tmp.StopIfMismatch

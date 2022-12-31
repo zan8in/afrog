@@ -115,9 +115,27 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 			err = retryhttpclient.Request(ctx, target, rule, c.VariableMap)
 		}
 		if err == nil {
-			evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
-			if err == nil {
-				isMatch = evalResult.Value().(bool)
+			if len(rule.Expressions) > 0 {
+				// multiple expressions
+				for _, expression := range rule.Expressions {
+					evalResult, err := c.CustomLib.RunEval(expression, c.VariableMap)
+					if err == nil {
+						isMatch = evalResult.Value().(bool)
+						if isMatch {
+							if name := checkExpression(expression); len(name) > 0 {
+								pocItem.Id = name
+								pocItem.Info.Name = name
+							}
+							break
+						}
+					}
+				}
+			} else {
+				// single expression
+				evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
+				if err == nil {
+					isMatch = evalResult.Value().(bool)
+				}
 			}
 		}
 
@@ -281,4 +299,14 @@ func (c *Checker) newRerverse() *proto.Reverse {
 		Ip:                 "",
 		IsDomainNameServer: false,
 	}
+}
+
+func checkExpression(expression string) string {
+	if strings.Contains(expression, "!= \"\"") {
+		pos := strings.Index(expression, "!= \"\"")
+		name := strings.Trim(strings.TrimSpace(expression[:pos]), "\"")
+		return name
+	}
+	return ""
+
 }
