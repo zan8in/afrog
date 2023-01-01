@@ -1,11 +1,11 @@
 id: seeyon-session-leak
 
 info:
-    name: seeyon-session-leak
+    name: Seeyon session leakage
     author: sakura404x
     severity: high
-    reference:
-        - https://github.com/apachecn/sec-wiki/blob/c73367f88026f165b02a1116fe1f1cd2b8e8ac37/doc/unclassified/zhfly3345.md
+    verified: true
+    description: "fofa: yyoa"
 
 rules:
     r0:

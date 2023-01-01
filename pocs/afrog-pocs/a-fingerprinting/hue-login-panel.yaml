@@ -3,7 +3,8 @@ id: hue-login-panel
 info:
   name: Cloudera Hue Login Panel
   author: For3stCo1d
-  severity: high
+  severity: info
+  verified: true
   description: |
     Cloudera Hue default admin credentials were discovered. 
     Fofa： title="Hue - 欢迎使用 Hue"

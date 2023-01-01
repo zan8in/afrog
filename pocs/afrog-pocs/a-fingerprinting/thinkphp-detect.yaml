@@ -12,5 +12,5 @@ rules:
         request:
             method: GET
             path: /index.php?m=1
-        expression: response.status == 404 && response.body.bcontains(b'ThinkPHP</a><sup>')
+        expression: '"ThinkPHP</a><sup>([0-9]+.[0-9]+.[0-9]+)</sup>".bmatches(response.body)'
 expression: r0()

@@ -1,14 +1,15 @@
 id: tianqing-info-leak
 
 info:
-    name: 天擎 Info Leak
+    name: TianQing Info Leak
     author: jingling(https://github.com/shmilylty)
-    severity: high
+    severity: medium
+    verified: false
 
 rules:
     r0:
         request:
             method: GET
             path: /api/dbstat/gettablessize
-        expression: response.status == 200 && response.content_type.icontains("application/json") && response.body.bcontains(b"schema_name") && response.body.bcontains(b"table_name")
+        expression: response.status == 200 && response.content_type.icontains("application/json") && response.body.bcontains(b'"schema_name":') && response.body.bcontains(b'"table_name":')
 expression: r0()

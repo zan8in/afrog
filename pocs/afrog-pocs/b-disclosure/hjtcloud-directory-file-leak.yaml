@@ -4,6 +4,7 @@ info:
     name: Hjtcloud Directory File Leak
     author: YekkoY
     severity: high
+    verified: false
 
 rules:
     r0:

@@ -4,6 +4,7 @@ info:
   name: Avtech AVC798HA DVR Information Exposure
   author: geeknik
   severity: low
+  verified: true
   description: |
     Under the /cgi-bin/nobody folder every CGI script can be accessed without authentication.
     app="AVTECH-视频监控"

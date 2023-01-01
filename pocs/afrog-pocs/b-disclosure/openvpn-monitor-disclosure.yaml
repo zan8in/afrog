@@ -3,7 +3,8 @@ id: openvpn-monitor-disclosure
 info:
   name: OpenVPN Monitor Disclosure
   author: geeknik
-  severity: high
+  severity: medium
+  verified: true
   description: openvpn-monitor is a simple python program to generate html that displays the status of an OpenVPN server, including all current connections.
   reference:
     - https://openvpn-monitor.openbytes.ie/

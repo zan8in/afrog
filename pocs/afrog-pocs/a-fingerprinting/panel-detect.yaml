@@ -35,6 +35,9 @@ rules:
            - '"druid-console-exposure" != "" && response.status == 200 && response.body.bcontains(b"src=\"/druid.js\"") && response.body.bcontains(b"href=\"/druid.css\"")'
            - '"nacos-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>nacos</title>")'
            - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"Technology, Inc.")'
+           - '"directory-list" != "" && response.status == 200  && response.body.bcontains(b"<title>Index of /</title>") && response.body.bcontains(b"<h1>Index of /</h1>")'
+           - '"kyan-network-monitoring" != "" && response.status == 200 && response.body.bcontains(b"<title>platform - Login</title>")'
+           - '"openvpn-admin" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")'
     r1:
         request:
             method: GET
@@ -64,6 +67,8 @@ rules:
            - '"druid-console-exposure" != "" && response.status == 200 && response.body.bcontains(b"src=\"/druid.js\"") && response.body.bcontains(b"href=\"/druid.css\"")'
            - '"nacos-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>nacos</title>")'
            - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"Technology, Inc.")'
-
+           - '"directory-list" != "" && response.status == 200  && response.body.bcontains(b"<title>Index of /</title>") && response.body.bcontains(b"<h1>Index of /</h1>")'
+           - '"kyan-network-monitoring" != "" && response.status == 200 && response.body.bcontains(b"<title>platform - Login</title>")'
+           - '"openvpn-admin" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")'
            
 expression: r0() || r1()

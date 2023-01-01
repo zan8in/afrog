@@ -4,6 +4,7 @@ info:
     name: 目录浏览 列目录
     author: zan8in
     severity: info
+    verified: true
 
 rules:
   r0:

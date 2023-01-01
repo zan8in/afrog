@@ -4,6 +4,8 @@ info:
     name: ASPCMS Backend Leak
     author: Hzllaga
     severity: high
+    verified: true
+    description: app="ASPCMS"
 
 rules:
     r0:

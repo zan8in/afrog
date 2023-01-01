@@ -1,0 +1,24 @@
+id: openvpn-admin
+
+info:
+  name: OpenVPN Admin Login Panel - Detect
+  author: ritikchaddha
+  severity: info
+  verified: true
+  description: |
+    OpenVPN Admin login panel was detected.
+    shodan-query: http.title:"OpenVPN-Admin"
+    fofa: title="OpenVPN-Admin"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login
+    expression: response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")
+  r1:
+    request:
+      method: GET
+      path: /index.php
+    expression: response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")
+expression: r0() || r1()

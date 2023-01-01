@@ -1,9 +1,10 @@
-id: e-office-mysql-config-leak
+id: e-cology-e-office-mysql-config-leak
 
 info:
     name: 泛微OA E-Office mysql_config.ini 数据库信息泄漏
     author: zan8in
     severity: high
+    verified: true
     description: |
       泛微 E-Office mysql_config.ini文件可直接访问，泄漏数据库账号密码等信息
       app="泛微-EOffice"

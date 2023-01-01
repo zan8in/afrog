@@ -4,6 +4,7 @@ info:
   name: Apache Hadoop Disclosure
   author: zan8in
   severity: low
+  verified: true
 
 rules:
   r0:
