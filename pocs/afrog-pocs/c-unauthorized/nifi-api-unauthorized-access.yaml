@@ -4,6 +4,7 @@ info:
     name: Apache Nifi Api Unauthorized Access
     author: wulalalaaa(https://github.com/wulalalaaa)
     severity: high
+    verified: false
 
 rules:
     r0:

@@ -4,6 +4,7 @@ info:
     name: BT742 PMA Unauthorized Access
     author: Facker007(https://github.com/Facker007)
     severity: high
+    verified: false
 
 rules:
     r0:

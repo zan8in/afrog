@@ -4,18 +4,13 @@ info:
     name: Tensorboard Unauth
     author: p0wd3r
     severity: high
+    verified: true
 
 rules:
     r0:
         request:
             method: GET
-            path: /
-            follow_redirects: true
-        expression: response.status == 200 && response.body.bcontains(b"The TensorFlow Authors. All Rights Reserved.")
-    r1:
-        request:
-            method: GET
             path: /data/plugins_listing
             follow_redirects: true
         expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"profile") && response.body.bcontains(b"distributions")
-expression: r0() && r1()
+expression: r0()

@@ -4,6 +4,8 @@ info:
     name: H2 Database Web Console Unauthorized Access
     author: jujumanman (https://github.com/jujumanman)
     severity: high
+    verified: true
+    description: 'fofa: H2-Console'
 
 rules:
     r0:

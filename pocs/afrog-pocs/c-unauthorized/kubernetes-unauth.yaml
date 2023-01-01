@@ -4,6 +4,7 @@ info:
     name: kubernetes Unauth
     author: mumu0215(https://github.com/mumu0215)
     severity: high
+    verified: false
 
 rules:
     r0:

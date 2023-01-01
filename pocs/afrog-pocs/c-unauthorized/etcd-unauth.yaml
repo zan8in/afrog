@@ -4,6 +4,7 @@ info:
     name: ETCD Unauth
     author: j4ckzh0u(https://github.com/j4ckzh0u)
     severity: high
+    verfied: true
 
 set:
     r1: randomLowercase(32)

@@ -3,7 +3,8 @@ id: jeecg-boot-unauth
 info:
   name: Jeecg Boot Unauth
   author: zan8in
-  severity: info
+  severity: high
+  verified: true
   description: |
     fofa: title="Jeecg-Boot"
 

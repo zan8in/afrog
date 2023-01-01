@@ -4,6 +4,7 @@ info:
   name: Springboot Actuator Unauth
   author: ffffffff0x
   severity: high
+  verified: true
   reference:
     - https://github.com/LandGrey/SpringBootVulExploit
 

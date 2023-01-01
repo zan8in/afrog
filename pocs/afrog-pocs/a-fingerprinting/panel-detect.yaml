@@ -34,10 +34,14 @@ rules:
            - '"acunetix-panel-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>Acunetix</title>")'
            - '"druid-console-exposure" != "" && response.status == 200 && response.body.bcontains(b"src=\"/druid.js\"") && response.body.bcontains(b"href=\"/druid.css\"")'
            - '"nacos-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>nacos</title>")'
-           - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"Technology, Inc.")'
+           - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>Technology, Inc.</title>")'
            - '"directory-list" != "" && response.status == 200  && response.body.bcontains(b"<title>Index of /</title>") && response.body.bcontains(b"<h1>Index of /</h1>")'
            - '"kyan-network-monitoring" != "" && response.status == 200 && response.body.bcontains(b"<title>platform - Login</title>")'
            - '"openvpn-admin" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")'
+           - '"elasticsearch" != "" && response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"You Know, for Search")'
+           - '"hp-officepro-printer" != "" && response.status == 200 && response.body.bcontains(b"frameWorkObj") && response.body.bcontains(b"class=\"pgm-container") && response.body.bcontains(b".pgm-container")'
+           - '"kafka-manager-panel" != "" && response.status == 200 && (response.body.bcontains(b"Kafka Manager") || response.raw_header.bcontains(b"Kafka-Manager"))'
+           - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
     r1:
         request:
             method: GET
@@ -66,9 +70,13 @@ rules:
            - '"acunetix-panel-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>Acunetix</title>")'
            - '"druid-console-exposure" != "" && response.status == 200 && response.body.bcontains(b"src=\"/druid.js\"") && response.body.bcontains(b"href=\"/druid.css\"")'
            - '"nacos-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>nacos</title>")'
-           - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"Technology, Inc.")'
+           - '"utt-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>Technology, Inc.</title>")'
            - '"directory-list" != "" && response.status == 200  && response.body.bcontains(b"<title>Index of /</title>") && response.body.bcontains(b"<h1>Index of /</h1>")'
            - '"kyan-network-monitoring" != "" && response.status == 200 && response.body.bcontains(b"<title>platform - Login</title>")'
            - '"openvpn-admin" != "" && response.status == 200 && response.body.bcontains(b"<title>OpenVPN-Admin")'
+           - '"elasticsearch" != "" && response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"You Know, for Search")'
+           - '"hp-officepro-printer" != "" && response.status == 200 && response.body.bcontains(b"frameWorkObj") && response.body.bcontains(b"class=\"pgm-container") && response.body.bcontains(b".pgm-container")'
+           - '"kafka-manager-panel" != "" && response.status == 200 && (response.body.bcontains(b"Kafka Manager") || response.raw_header.bcontains(b"Kafka-Manager"))'
+           - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
            
 expression: r0() || r1()

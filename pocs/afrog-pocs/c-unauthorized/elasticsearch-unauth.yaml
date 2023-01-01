@@ -1,9 +1,10 @@
 id: elasticsearch-unauth
 
 info:
-    name: Elasticsearch Unauth
+    name: ElasticSearch Information Disclosure
     author: p0wd3r
     severity: high
+    verified: true
     description: |
         /_nodes #查看节点数据
         /_cat/indices #索引
@@ -17,12 +18,7 @@ rules:
     r0:
         request:
             method: GET
-            path: /
-        expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"You Know, for Search")
-    r1:
-        request:
-            method: GET
             path: /_cat
         expression: response.status == 200 && response.body.bcontains(b"/_cat/master")
-expression: r0() && r1()
+expression: r0()
 

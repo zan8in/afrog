@@ -4,6 +4,7 @@ info:
     name: Druid Monitor Unauth
     author: met7or
     severity: high
+    verified: true
 
 rules:
     r0:

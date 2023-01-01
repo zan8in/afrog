@@ -4,6 +4,7 @@ info:
     name: Influxdb Unauth
     author: p0wd3r
     severity: high
+    verified: true
 
 rules:
     r0:

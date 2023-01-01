@@ -3,6 +3,7 @@ info:
   name: Spark WebUI Unauthenticated
   author: princechaddha
   severity: medium
+  verified: false
   reference: 
     - https://github.com/vulhub/vulhub/tree/master/spark/unacc
 

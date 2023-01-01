@@ -4,6 +4,7 @@ info:
     name: Jupyter Notebook Unauthorized Access
     author: bufsnake(https://github.com/bufsnake)
     severity: high
+    verified: false
 
 rules:
     r0:

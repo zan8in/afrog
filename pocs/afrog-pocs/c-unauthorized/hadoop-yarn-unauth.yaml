@@ -3,7 +3,8 @@ id: hadoop-yarn-unauth
 info:
     name: Hadoop Yarn Unauth
     author: p0wd3r,sharecast
-    severity: high
+    severity: medium
+    verified: true
     description: |
         app="APACHE-hadoop-YARN"
 

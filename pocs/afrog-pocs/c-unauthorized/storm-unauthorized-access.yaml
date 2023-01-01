@@ -4,6 +4,7 @@ info:
   name: Apache Storm Unauthorized Access
   author: pikpikcu
   severity: medium
+  verified: false
   reference: 
     - https://storm.apache.org/releases/current/STORM-UI-REST-API.html
 

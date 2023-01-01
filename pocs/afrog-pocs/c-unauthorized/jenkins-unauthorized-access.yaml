@@ -1,9 +1,10 @@
-id: jenkins-unauthorized-access
+id: jenkins-unauthorized-rce
 
 info:
-    name: jenkins-unauthorized-access
+    name: Jenkins unauthorized rce
     author: MrP01ntSun(https://github.com/MrPointSun)
-    severity: high
+    severity: critical
+    verified: true
     reference:
         - https://www.cnblogs.com/yuzly/p/11255609.html
         - https://blog.51cto.com/13770310/2156663

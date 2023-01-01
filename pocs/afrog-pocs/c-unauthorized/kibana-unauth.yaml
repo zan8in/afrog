@@ -4,6 +4,7 @@ info:
     name: Kibana Unauth
     author: Isaac(https://github.com/IsaacQiang)
     severity: high
+    verified: true
 
 rules:
     r0:

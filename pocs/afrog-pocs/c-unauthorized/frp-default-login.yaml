@@ -1,0 +1,20 @@
+id: frp-default-login
+
+info:
+  name: FRP Default Login
+  author: pikpikcu
+  severity: high
+  verified: false
+  description: FRP default login credentials were discovered.
+  reference:
+    - https://github.com/fatedier/frp/issues/1840
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/proxy/tcp
+      headers:
+        Authorization: "Basic YWRtaW46YWRtaW4="
+    expression: response.status == 200 && response.body.bcontains(b'proxies')
+expression: r0()

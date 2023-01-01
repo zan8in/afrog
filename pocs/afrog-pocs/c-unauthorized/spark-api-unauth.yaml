@@ -4,6 +4,7 @@ info:
     name: spark Api Unauth
     author: betta(https://github.com/betta-cyber)
     severity: high
+    verified: false
 
 rules:
     r0:
