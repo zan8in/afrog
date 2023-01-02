@@ -4,6 +4,7 @@ info:
   name: Zabbix Dashboards Access
   author: pussycat0x,vsh00t
   severity: medium
+  verfied: true
   description: View dashboard with guest login.
   reference:
     - https://www.exploit-db.com/ghdb/5595

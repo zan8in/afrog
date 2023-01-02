@@ -4,6 +4,7 @@ info:
     name: Zabbix authentication Bypass
     author: FiveAourThe(https://github.com/FiveAourThe)
     severity: high
+    verified: true
 
 rules:
     r0:
