@@ -43,6 +43,7 @@ rules:
            - '"kafka-manager-panel" != "" && response.status == 200 && (response.body.bcontains(b"Kafka Manager") || response.raw_header.bcontains(b"Kafka-Manager"))'
            - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
+           - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
     r1:
         request:
             method: GET
@@ -80,5 +81,6 @@ rules:
            - '"kafka-manager-panel" != "" && response.status == 200 && (response.body.bcontains(b"Kafka Manager") || response.raw_header.bcontains(b"Kafka-Manager"))'
            - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
+           - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
            
 expression: r0() || r1()

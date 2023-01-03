@@ -4,6 +4,7 @@ info:
   name: Gitlab Default Login
   author: Suman_Kar,dwisiswant0
   severity: high
+  verified: true
   description: Gitlab default login credentials were discovered.
   reference:
     - https://twitter.com/0xmahmoudJo0/status/1467394090685943809
@@ -18,9 +19,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"root","password":"5iveL!fe"}
@@ -30,9 +28,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"root","password":"123456789"}
@@ -42,9 +37,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"admin","password":"5iveL!fe"}
@@ -54,9 +46,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"admin","password":"123456789"}
@@ -66,9 +55,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"admin@local.host","password":"5iveL!fe"}
@@ -78,9 +64,6 @@ rules:
             method: POST
             path: /oauth/token
             headers:
-                Host: "{{hostname}}"
-                Accept: application/json, text/plain, */*
-                Referer: "{{hosturl}}"
                 content-type: application/json
             body: |
                 {"grant_type":"password","username":"admin@local.host","password":"123456789"}

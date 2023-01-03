@@ -4,6 +4,8 @@ info:
   name: Jenkins Default Password
   author: zan8in
   severity: high
+  verified: true
+  description: app="Jenkins"
 
 rules:
     r0:
@@ -29,7 +31,6 @@ rules:
             body: |
               j_username=jenkins&j_password=password&from=&Submit=Sign+in
         expression: |
-          response.status == 302 && !response.headers["location"].contains("loginError")
+          response.status == 302 && response.body.bcontains(b'<title>工作台 [Jenkins]</title>')
         stop_if_match: true
-expression: |
-    r0() && (r1() || r2())
+expression: r0() && (r1() || r2())
