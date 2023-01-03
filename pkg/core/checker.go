@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
@@ -268,7 +267,9 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 
 		out, err := c.CustomLib.RunEval(value, c.VariableMap)
 		if err != nil {
-			log.Log().Error(fmt.Sprintf("UpdateVariableMap[%s][%s] Eval err, %s", key, value, err.Error()))
+			// fixed set string failed bug
+			c.VariableMap[key] = fmt.Sprintf("%v", value)
+			c.CustomLib.UpdateCompileOption(key, decls.String)
 			continue
 		}
 
