@@ -5,7 +5,11 @@ info:
     author: sakura404x
     severity: high
     verified: true
-    description: "fofa: yyoa"
+    description: |
+        确定漏洞，使用session登录主页即可 (http://x.x.x.x/yyoa/portal/portalIndex.jsp), Cookie(JSESSIONID=XXXXXXXXXXXXXXXXXXXXXXXXXX)
+        "fofa: yyoa"
+    reference:
+        - https://mp.weixin.qq.com/s/V1bp8NedoNULf4G4cq8X1g
 
 rules:
     r0:

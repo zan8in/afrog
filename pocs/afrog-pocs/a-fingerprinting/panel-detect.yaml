@@ -28,7 +28,6 @@ rules:
            - '"rocketmq-console" != "" && response.status == 200 && response.body.bcontains(b"<title>RocketMq-console-ng</title>")'
            - '"teleport-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>登录::TELEPORT</title>")'
            - '"terramaster-panel" != "" && response.status == 200 && (response.body.bcontains(b"<title>TOS Loading</title>") || response.headers["server"] == "TOS" || response.headers["x-powered-by"] == "TerraMaster")'
-           - '"tomcat-detect" != "" && response.raw_header.bcontains(b"tomcat") || response.body.ibcontains(b"/manager/html") ||  response.body.ibcontains(b"/manager/status")  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)'
            - '"upupw-tz-panel" != "" && response.status == 200 && "<title>UPUPW(.*)</title>".bmatches(response.body)'
            - '"zabbix-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>zabbix-server: Zabbix</title>")'
            - '"acunetix-panel-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>Acunetix</title>")'
@@ -44,6 +43,7 @@ rules:
            - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
            - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
+           - '"kingsoft-v8" != "" && response.status == 200 && response.body.bcontains(b"<title>在线安装-V8+终端安全系统Web控制台</title>")'
     r1:
         request:
             method: GET
@@ -66,7 +66,6 @@ rules:
            - '"rocketmq-console" != "" && response.status == 200 && response.body.bcontains(b"<title>RocketMq-console-ng</title>")'
            - '"teleport-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>登录::TELEPORT</title>")'
            - '"terramaster-panel" != "" && response.status == 200 && (response.body.bcontains(b"<title>TOS Loading</title>") || response.headers["server"] == "TOS" || response.headers["x-powered-by"] == "TerraMaster")'
-           - '"tomcat-detect" != "" && response.raw_header.bcontains(b"tomcat") || response.body.ibcontains(b"/manager/html") ||  response.body.ibcontains(b"/manager/status")  ||  "Apache Tomcat.*([0-9].[0-9]+.[0-9]+)".bmatches(response.body)'
            - '"upupw-tz-panel" != "" && response.status == 200 && "<title>UPUPW(.*)</title>".bmatches(response.body)'
            - '"zabbix-panel" != "" && response.status == 200 && response.body.bcontains(b"<title>zabbix-server: Zabbix</title>")'
            - '"acunetix-panel-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>Acunetix</title>")'
@@ -82,5 +81,6 @@ rules:
            - '"tensorboard-detect" != "" && response.status == 200 && response.body.bcontains(b"<title>TensorBoard</title>")'
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
            - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
+           - '"kingsoft-v8" != "" && response.status == 200 && response.body.bcontains(b"<title>在线安装-V8+终端安全系统Web控制台</title>")'
            
 expression: r0() || r1()

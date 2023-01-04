@@ -1,0 +1,15 @@
+id: ds-store-leak
+
+info:
+  name: Directory Listing via DS_Store
+  author: 0w4ys
+  severity: info
+  verified: true
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /.DS_Store
+    expression: response.status == 200 && response.body.bcontains(b'Bud1')
+expression: r0()
