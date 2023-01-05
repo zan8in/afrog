@@ -4,23 +4,33 @@ info:
   name: Apahce Tomcat Manager Default Login
   author: pdteam
   severity: high
+  verified: true
+
 
 set:
   adminb64: base64('admin:admin')
   tomcatb64: base64('tomcat:tomcat')
+  admin123: base64('admin:123456')
 rules:
   r0:
     request:
       method: GET
       path: /manager/html
       headers:
-        Authorization: Basic {{adminb64}}
-    expression: response.status == 200 && response.body.bcontains(b"tomcat") && response.body.bcontains(b"manager")
+        Authorization: "Basic {{adminb64}}"
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
   r1:
     request:
       method: GET
       path: /manager/html
       headers:
-        Authorization: Basic {{tomcatb64}}
-    expression: response.status == 200 && response.body.bcontains(b"tomcat") && response.body.bcontains(b"manager")
-expression: r0() || r1()
+        Authorization: "Basic {{tomcatb64}}"
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
+  r2:
+    request:
+      method: GET
+      path: /manager/html
+      headers:
+        Authorization: "Basic {{admin123}}"
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
+expression: r0() || r1() || r2()

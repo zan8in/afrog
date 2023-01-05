@@ -44,6 +44,10 @@ rules:
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
            - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
            - '"kingsoft-v8" != "" && response.status == 200 && response.body.bcontains(b"<title>在线安装-V8+终端安全系统Web控制台</title>")'
+           - '"panabit-ixcache" != "" && response.status == 200 && response.body.bcontains(b"<title>iXCache</title>")'
+           - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
+           - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
+           
     r1:
         request:
             method: GET
@@ -82,5 +86,8 @@ rules:
            - '"axis-detect" != "" && response.status == 200 && response.body.bcontains(b"Validate") && response.body.bcontains(b"Welcome") && response.body.bcontains(b"Axis") && response.body.bcontains(b"deployed") && response.body.bcontains(b"installation") && response.body.bcontains(b"Admin")'
            - '"hikvision-intercom" != "" && response.status == 200 && response.body.bcontains(b"document.title = LOGIN_BTN_LOGIN") && response.body.bcontains(b"document.write(TITLE_SYSTEM);")'
            - '"kingsoft-v8" != "" && response.status == 200 && response.body.bcontains(b"<title>在线安装-V8+终端安全系统Web控制台</title>")'
+           - '"panabit-ixcache" != "" && response.status == 200 && response.body.bcontains(b"<title>iXCache</title>")'
+           - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
+           - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
            
 expression: r0() || r1()

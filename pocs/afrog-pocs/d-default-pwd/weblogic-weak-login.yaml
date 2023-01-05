@@ -5,6 +5,7 @@ info:
   author: pdteam
   description: WebLogic default login credentials were discovered.
   severity: high
+  verified: false
   reference:
     - https://github.com/vulhub/vulhub/tree/master/weblogic/weak_password
     - https://www.s-squaresystems.com/weblogic-default-admin-users-password-change/

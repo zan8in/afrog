@@ -6,7 +6,7 @@ info:
   severity: info
   verified: true
   description: |
-    fofa-query: app="UTT-安全网络管理系统"
+    fofa-query: "app="UTT-安全网络管理系统""
 
 rules:
   r0:
