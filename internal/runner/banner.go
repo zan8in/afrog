@@ -20,7 +20,7 @@ _/    _/  _/        _/    _/    _/_/      _/_/_/  %s
 
 func ShowBanner() {
 	gologger.Print().Msgf("%s\n", banner)
-	gologger.Print().Msgf("\t\t\tLost in your uniqueness even though we are all ordinary.\n\n")
+	gologger.Print().Msgf("\t\t\tBright Future.\n\n")
 }
 
 func ShowBanner2(upgrade *upgrade.Upgrade) {
