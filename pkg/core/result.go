@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -84,10 +85,11 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole(number string) {
+	fulltarget, _ := url.QueryUnescape(r.FullTarget) // fixed %!/(MISSING) BUG
 	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
-			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + r.FullTarget + "\r\n")
+			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + "\r\n")
 }
 
 func (r *Result) Reset() {
