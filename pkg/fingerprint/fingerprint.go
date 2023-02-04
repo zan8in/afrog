@@ -75,10 +75,7 @@ func (s *Service) Execute() {
 
 func (s *Service) executeFingerPrintDetection() {
 	if len(s.Options.Targets) > 0 {
-		size := 100
-		if s.Options.Config.FingerprintSizeWaitGroup > 0 {
-			size = int(s.Options.Config.FingerprintSizeWaitGroup)
-		}
+		size := s.Options.FingerprintConcurrency
 
 		var wg sync.WaitGroup
 		p, _ := ants.NewPoolWithFunc(size, func(wgTask any) {
