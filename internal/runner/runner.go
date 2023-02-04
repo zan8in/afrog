@@ -86,11 +86,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 	options.Config = config
 
-	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {
-		homeDir, _ := os.UserHomeDir()
-		return errors.New("please edit `api-key` and `domain` in `" + homeDir + "/.config/afrog/afrog-config.yaml`")
-	}
-
 	// init fasthttp
 	// http2.Init(options)
 
@@ -142,6 +137,13 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
 	gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
 	gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
+
+	// reverse set
+	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {
+		homeDir, _ := os.UserHomeDir()
+		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
+		gologger.Error().Msgf("`ceye` reverse service not set: %s", configDir)
+	}
 
 	// whitespace show banner
 	fmt.Println()
