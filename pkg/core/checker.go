@@ -32,7 +32,7 @@ type Checker struct {
 	VariableMap     map[string]any
 	Result          *Result
 	CustomLib       *CustomLib
-	FastClient      *http2.FastClient
+	// FastClient      *http2.FastClient
 }
 
 func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (err error) {
@@ -50,10 +50,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 
 	c.Result.Target = target
 	c.Result.PocInfo = pocItem
-
-	c.FastClient.MaxRedirect = c.Options.Config.ConfigHttp.MaxRedirect
-	c.FastClient.DialTimeout = c.Options.Config.ConfigHttp.DialTimeout
-	c.FastClient.UserAgent = utils.RandomUA()
 
 	matchCondition := ""
 	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
@@ -90,8 +86,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 		c.UpdateVariableMap(pocItem.Payloads.Payloads)
 	}
 
-	c.FastClient.Target = target
-
 	for _, ruleMap := range pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
@@ -107,10 +101,9 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 
 		isMatch := false
 		if len(rule.Request.Raw) > 0 {
-			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Config.ConfigHttp.DialTimeout))}
+			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Timeout))}
 			err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
 		} else {
-			// err = c.FastClient.HTTPRequest(ctx, c.OriginalRequest, rule, c.VariableMap)
 			err = retryhttpclient.Request(ctx, target, rule, c.VariableMap)
 		}
 		if err == nil {

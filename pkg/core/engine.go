@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/zan8in/afrog/pkg/config"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 )
 
 var CheckerPool = sync.Pool{
@@ -16,7 +15,6 @@ var CheckerPool = sync.Pool{
 			VariableMap:     make(map[string]any),
 			Result:          &Result{},
 			CustomLib:       NewCustomLib(),
-			FastClient:      &http2.FastClient{},
 		}
 	},
 }
@@ -25,7 +23,6 @@ func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
 	c.Result.Output = e.options.Output
-	c.FastClient.Options = e.options
 	return c
 }
 
@@ -34,7 +31,6 @@ func (e *Engine) ReleaseChecker(c *Checker) {
 	c.VariableMap = make(map[string]any)
 	c.Result = &Result{}
 	c.CustomLib = NewCustomLib()
-	c.FastClient = &http2.FastClient{}
 	CheckerPool.Put(c)
 }
 
@@ -45,8 +41,8 @@ type Engine struct {
 
 func New(options *config.Options) *Engine {
 	workPool := NewWorkPool(WorkPoolConfig{
-		PocConcurrency:        int(options.Config.PocSizeWaitGroup),
-		TargetConcurrency:     int(options.Config.TargetSizeWaitGroup),
+		PocConcurrency:        int(options.Concurrency),
+		TargetConcurrency:     int(options.Concurrency),
 		PocConcurrencyType:    PocConcurrencyType,
 		TargetConcurrencyType: TargetConcurrencyType,
 	})
