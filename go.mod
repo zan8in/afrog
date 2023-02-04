@@ -18,7 +18,7 @@ require (
 	github.com/tj/go-update v2.2.5-0.20200519121640-62b4b798fd68+incompatible
 	github.com/valyala/fasthttp v1.43.0
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
-	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
+	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
