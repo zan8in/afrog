@@ -16,7 +16,6 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/tj/go-update v2.2.5-0.20200519121640-62b4b798fd68+incompatible
-	github.com/urfave/cli/v2 v2.3.0
 	github.com/valyala/fasthttp v1.43.0
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
 	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
@@ -62,7 +61,6 @@ require (
 	github.com/akrylysov/pogreb v0.10.1 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
@@ -75,8 +73,6 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.17 // indirect
 	github.com/projectdiscovery/retryablehttp-go v1.0.5
 	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
-	github.com/russross/blackfriday/v2 v2.0.1 // indirect
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6 // indirect

