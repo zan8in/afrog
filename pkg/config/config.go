@@ -11,11 +11,11 @@ import (
 
 // Config is a afrog-config.yaml catalog helper implementation
 type Config struct {
-	PocSizeWaitGroup         int32      `yaml:"poc_sizewaitgroup"`
-	TargetSizeWaitGroup      int32      `yaml:"target_sizewaitgroup"`
-	FingerprintSizeWaitGroup int32      `yaml:"fingerprint_sizewaitgroup"`
-	ConfigHttp               ConfigHttp `yaml:"http"`
-	Reverse                  Reverse    `yaml:"reverse"`
+	// PocSizeWaitGroup         int32      `yaml:"poc_sizewaitgroup"`
+	// TargetSizeWaitGroup      int32      `yaml:"target_sizewaitgroup"`
+	// FingerprintSizeWaitGroup int32      `yaml:"fingerprint_sizewaitgroup"`
+	// ConfigHttp               ConfigHttp `yaml:"http"`
+	Reverse Reverse `yaml:"reverse"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -40,30 +40,30 @@ type Ceye struct {
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
-const Version = "2.2.0"
+const Version = "2.2.1"
 
 // Create and initialize afrog-config.yaml configuration info
 func New() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
-		c.PocSizeWaitGroup = 25
-		c.TargetSizeWaitGroup = 25
-		c.FingerprintSizeWaitGroup = 100
-		configHttp := c.ConfigHttp
-		configHttp.Proxy = ""
-		configHttp.DialTimeout = 10
-		configHttp.ReadTimeout = "10000ms"
-		configHttp.WriteTimeout = "3000ms"
-		configHttp.MaxIdle = "1h"
-		configHttp.MaxRedirect = 3
-		configHttp.Concurrency = 4096
-		configHttp.MaxConnsPerHost = 512 // MaxConnsPerHost是一个限流的参数，保证对一个Host最大的打开连接数，如果超过这个数字，则会直接拒绝，这里默认值是512，但如果你打算用来做压测之类的事情，需要增加这个值，比如这里我就增加到了16384
-		configHttp.MaxResponseBodySize = 1024 * 1024 * 2
-		configHttp.UserAgent = ""
-		c.ConfigHttp = configHttp
+		// c.PocSizeWaitGroup = 25
+		// c.TargetSizeWaitGroup = 25
+		// c.FingerprintSizeWaitGroup = 100
+		// configHttp := c.ConfigHttp
+		// configHttp.Proxy = ""
+		// configHttp.DialTimeout = 10
+		// configHttp.ReadTimeout = "10000ms"
+		// configHttp.WriteTimeout = "3000ms"
+		// configHttp.MaxIdle = "1h"
+		// configHttp.MaxRedirect = 3
+		// configHttp.Concurrency = 4096
+		// configHttp.MaxConnsPerHost = 512 // MaxConnsPerHost是一个限流的参数，保证对一个Host最大的打开连接数，如果超过这个数字，则会直接拒绝，这里默认值是512，但如果你打算用来做压测之类的事情，需要增加这个值，比如这里我就增加到了16384
+		// configHttp.MaxResponseBodySize = 1024 * 1024 * 2
+		// configHttp.UserAgent = ""
+		// c.ConfigHttp = configHttp
 		reverse := c.Reverse
-		reverse.Ceye.ApiKey = "fb1837116d366dd91f2aa9ab837efe66"
-		reverse.Ceye.Domain = "dflqxk.ceye.io"
+		reverse.Ceye.ApiKey = ""
+		reverse.Ceye.Domain = ""
 		c.Reverse = reverse
 		WriteConfiguration(&c)
 	}
