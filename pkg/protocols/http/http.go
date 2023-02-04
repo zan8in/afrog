@@ -20,7 +20,6 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/valyala/fasthttp"
-	"github.com/valyala/fasthttp/fasthttpproxy"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
@@ -73,14 +72,14 @@ func Init(options *config.Options) {
 		// 	DNSCacheDuration: time.Hour,
 		// }).Dial,
 	}
-	if len(strings.TrimSpace(options.Config.ConfigHttp.Proxy)) > 0 {
-		if strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks4://") || strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks5://") {
-			F.Dial = fasthttpproxy.FasthttpSocksDialer(options.Config.ConfigHttp.Proxy)
-		} else {
-			// username:password@localhost:1082
-			F.Dial = fasthttpproxy.FasthttpHTTPDialer(options.Config.ConfigHttp.Proxy)
-		}
-	}
+	// if len(strings.TrimSpace(options.Config.ConfigHttp.Proxy)) > 0 {
+	// 	if strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks4://") || strings.HasPrefix(options.Config.ConfigHttp.Proxy, "socks5://") {
+	// 		F.Dial = fasthttpproxy.FasthttpSocksDialer(options.Config.ConfigHttp.Proxy)
+	// 	} else {
+	// 		// username:password@localhost:1082
+	// 		F.Dial = fasthttpproxy.FasthttpHTTPDialer(options.Config.ConfigHttp.Proxy)
+	// 	}
+	// }
 }
 
 func (fc *FastClient) HTTPRequest(ctx context.Context, httpRequest *http.Request, rule poc.Rule, variableMap map[string]any) error {
