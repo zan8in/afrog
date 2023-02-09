@@ -4,6 +4,11 @@ info:
     name: Wifisky Default Password
     author: Print1n(http://print1n.top)
     severity: high
+    verified: false
+    description: | 
+        app="WIFISKY-7层流控路由器"
+    reference:
+    - https://securityforeveryone.com/tools/wifisky-default-password-scanner
 
 rules:
     r0:
@@ -11,5 +16,5 @@ rules:
             method: POST
             path: /login.php?action=login&type=admin
             body: username=admin&password=admin
-        expression: response.status == 200 && response.headers["content-type"].contains("text/html") && response.body.bcontains(b'"success":"true"') && response.body.bcontains(b'"data":{"id":1}') && response.body.bcontains(b'"alert":')
+        expression: response.status == 200 && response.headers["content-type"].contains("text/html") && response.body.bcontains(b'"success":"true"') && response.body.bcontains(b'"data":')
 expression: r0()
