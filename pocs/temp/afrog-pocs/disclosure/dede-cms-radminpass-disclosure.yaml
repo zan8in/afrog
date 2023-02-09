@@ -1,0 +1,19 @@
+id: dede-cms-radminpass-disclosure
+
+info:
+  name: 织梦CMS radminpass.php文件暴露
+  author: jijue
+  severity: high
+  verified: true
+  description: |
+    radminpass.php文件是一个用于修改管理员密码的PHP脚本工具
+    多出现在新手站长用过这个工具以后忘记删了
+    app="DedeCMS"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /radminpass.php
+    expression: response.body.bcontains(b'http://yousite/radminpass.php')
+expression: r0()

