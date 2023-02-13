@@ -4,6 +4,7 @@ info:
     name: ecshop-CNVD-2020-58823-sqli
     author: 凉风(http://webkiller.cn/)
     severity: high
+    verified: true
 
 set:
     r1: randomInt(40000, 44800)
