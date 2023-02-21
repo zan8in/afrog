@@ -1,0 +1,41 @@
+id: phpinfo  # 身份标识  和文件名一样  冒号后都有空格
+ 
+info:   # poc 信息描述   注意缩进 父子关系  yaml语言和python相似  重视格式
+  name: info 信息泄露 
+  author: 不动明王   #作者
+  severity: info    # 漏洞等级 info(信息)、low(低危)、medium(中危)、high(高危)、critical(紧急)
+  verified: false  # true 漏洞已通过验证，false未验证
+  description: |    # # 漏洞描述、测绘等    |是yaml语言 多行换行用法
+   介绍:phpinfo是一个服务器的运行指令,可以显示php服务器的配置信息。
+   phpinfo() 同时是个很有价值的、包含所有 EGPCS(Environment, GET, POST, Cookie, Server) 数据的调试工具
+   一般不同容器都会默认开启这个功能
+   这里可以随意写你想写的介绍
+  reference: # 参考 引用的文章
+  - http://wiki.peiqi.tech/wiki/
+  - http://wiki.peiqi.tech/wiki/2  #  - 插入列表
+ 
+set:
+  randomfilename: randomLowercase(16)  #随机生成16位小写字符串  一般上传使用
+ 
+rules:  #poc 本体 规则集合
+  mingzi1:   # 规则名随便起
+    request:  # request 请求
+      method: GET  # POST  PUT GET
+      path: /phpinfo.php  #路径  要写已知的默认的(改了就不行了)  #下来有时间了写个红队特别版  加入字典跑（高并发）
+    expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
+    # bcontains(b'xxxxxxxxx')  contains原本是字符数组  加b转成二进制字符流
+ 
+  mingzi2:  # 规则2
+    request: # request 请求
+      method: GET
+      path: /phpinfo.php
+    expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
+ 
+  mingzi3:  # 规则3
+    request: # request 请求
+      method: POST      # randomfilename 自定义变量  调用
+      path: /{{randomfilename}}.php 
+      body: username=admin&password=123456  #post 必写  #自定义的可以写  比如UA Content-Type  甚至host  否则使用默认的就行
+    expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
+ 
+expression: mingzi1() ||mingzi2() || mingzi3()    # 判断响应结果表达式   或的关系  有1则1
