@@ -10,17 +10,59 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-var banner = fmt.Sprintf(`
-      _/_/    _/_/_/_/  _/_/_/      _/_/      _/_/_/   
-   _/    _/  _/        _/    _/  _/    _/  _/          
-  _/_/_/_/  _/_/_/    _/_/_/    _/    _/  _/  _/_/     
- _/    _/  _/        _/    _/  _/    _/  _/    _/      
-_/    _/  _/        _/    _/    _/_/      _/_/_/  %s
+var banner1 = fmt.Sprintf(`
+┌─┐┌─┐┬─┐┌─┐┌─┐
+├─┤├┤ ├┬┘│ ││ ┬
+┴ ┴└  ┴└─└─┘└─┘ %s
+`, config.Version)
+var banner2 = fmt.Sprintf(`
+╔═╗╔═╗╦═╗╔═╗╔═╗
+╠═╣╠╣ ╠╦╝║ ║║ ╦
+╩ ╩╚  ╩╚═╚═╝╚═╝ %s
+`, config.Version)
+var banner3 = fmt.Sprintf(`
+╔═╗┌─┐┬─┐┌─┐┌─┐
+╠═╣├┤ ├┬┘│ ││ ┬
+╩ ╩└  ┴└─└─┘└─┘ %s
+`, config.Version)
+var banner4 = fmt.Sprintf(`
+┌─┐╔═╗╦═╗╔═╗╔═╗
+├─┤╠╣ ╠╦╝║ ║║ ╦
+┴ ┴╚  ╩╚═╚═╝╚═╝ %s
+`, config.Version)
+
+var banner5 = fmt.Sprintf(`
+╔═╗┌─┐╦═╗┌─┐╔═╗
+╠═╣├┤ ╠╦╝│ │║ ╦
+╩ ╩└  ╩╚═└─┘╚═╝ %s
+`, config.Version)
+var banner6 = fmt.Sprintf(`
+┌─┐╔═╗┬─┐╔═╗┌─┐
+├─┤╠╣ ├┬┘║ ║│ ┬
+┴ ┴╚  ┴└─╚═╝└─┘ %s
 `, config.Version)
 
 func ShowBanner() {
-	gologger.Print().Msgf("%s\n", banner)
-	gologger.Print().Msgf("\t\t\tThe Wandering Earth 2\n\n")
+	gologger.Print().Msgf("%s\n", randomBanner())
+	gologger.Print().Msgf("\tThe Wandering Earth 2\n\n")
+}
+
+func randomBanner() string {
+	switch utils.GetRandomIntWithAll(1, 6) {
+	case 1:
+		return banner1
+	case 2:
+		return banner2
+	case 3:
+		return banner3
+	case 4:
+		return banner4
+	case 5:
+		return banner5
+	case 6:
+		return banner6
+	}
+	return banner1
 }
 
 func ShowBanner2(upgrade *upgrade.Upgrade) {
