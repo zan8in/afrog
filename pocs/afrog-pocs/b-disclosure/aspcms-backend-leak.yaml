@@ -3,7 +3,7 @@ id: aspcms-backend-leak
 info:
     name: ASPCMS Backend Leak
     author: Hzllaga
-    severity: high
+    severity: low
     verified: true
     description: app="ASPCMS"
 
