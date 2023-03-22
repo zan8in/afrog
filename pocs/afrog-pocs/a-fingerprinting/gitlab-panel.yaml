@@ -12,10 +12,10 @@ rules:
         request:
             method: GET
             path: /explore
-        expression: response.status == 200 && response.body.bcontains(b"<title>Projects · Explore · GitLab</title>")
+        expression: response.status == 200 && response.body.ibcontains(b"<title>Projects · Explore · GitLab</title>")
     r1:
         request:
             method: GET
             path: /users/sign_in
-        expression: response.status == 200 && response.body.bcontains(b"GitLab") && response.body.bcontains(b"https://about.gitlab.com")
+        expression: response.status == 200 && (resp.raw_header.ibcontains(b"_gitlab_session") || resp.body.bcontains(b"gon.default_issues_tracker") || resp.body.bcontains(b"GitLab Community Edition"))
 expression: r0() || r1()
