@@ -218,6 +218,13 @@
             <br>
             <a href="javascript:void(0);"><sub>m4sk</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/29.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://www.yuque.com/chenmoshuren/qyxg2k"><sub>沉默树人</sub></a>
+        </td>
     </tr>
 </table></div>
 
