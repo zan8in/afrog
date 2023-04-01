@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	_ "embed"
@@ -75,13 +76,16 @@ func (s *Service) Execute() {
 
 func (s *Service) executeFingerPrintDetection() {
 	if len(s.Options.Targets) > 0 {
-		size := s.Options.FingerprintConcurrency
-
+		ticker := time.NewTicker(time.Second / time.Duration(s.Options.RateLimit))
 		var wg sync.WaitGroup
-		p, _ := ants.NewPoolWithFunc(size, func(wgTask any) {
+
+		p, _ := ants.NewPoolWithFunc(s.Options.Concurrency, func(wgTask any) {
 			defer wg.Done()
+			<-ticker.C
+
 			url := wgTask.(poc.WaitGroupTask).Value.(string)
 			key := wgTask.(poc.WaitGroupTask).Key
+
 			if targetlive.TLive.HandleTargetLive(url, -1) == -1 {
 				// 该 url 在 targetlive 黑名单里面
 				s.PrintColorResultInfoConsole(Result{})
