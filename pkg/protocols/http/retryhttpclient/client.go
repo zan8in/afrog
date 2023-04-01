@@ -548,3 +548,38 @@ func ReverseGet(target string) ([]byte, error) {
 func FingerPrintGet(target string) ([]byte, map[string][]string, int, error) {
 	return simpleRtryRedirectGet(target)
 }
+
+func CheckTarget(target string) (string, error) {
+
+	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("User-Agent", utils.RandomUA())
+
+	resp, err := RtryRedirect.Do(req)
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	reader := io.LimitReader(resp.Body, maxDefaultBody)
+	respBody, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
+	}
+
+	if !isTargetLive(resp.StatusCode) {
+		return "", fmt.Errorf("status code is not live %d", resp.StatusCode)
+	}
+
+	return string(respBody), nil
+}
+
+func isTargetLive(code int) bool {
+	return true
+}

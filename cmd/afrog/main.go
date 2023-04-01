@@ -12,7 +12,6 @@ import (
 	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/runner"
-	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/gologger"
 )
@@ -40,7 +39,7 @@ func main() {
 			options.Count = int(options.TargetsTotal) * int(options.PocsTotal)
 			atomic.AddUint32(&options.CurrentCount, 1)
 			if !options.Silent {
-				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", options.TargetsTotal, targetlive.TLive.GetNoLiveAtomicCount())
+				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", options.TargetsTotal, options.BadTargetsTotal)
 			}
 		}()
 

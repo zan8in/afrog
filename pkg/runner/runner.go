@@ -28,8 +28,9 @@ type Runner struct {
 	options *config.Options
 	catalog *catalog.Catalog
 
-	ChanTargets chan string
-	ChanPocs    chan poc.Poc
+	ChanTargets    chan string
+	ChanBadTargets chan string
+	ChanPocs       chan poc.Poc
 
 	targetsTemp string
 
@@ -38,9 +39,10 @@ type Runner struct {
 
 func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
 	runner := &Runner{
-		options:     options,
-		ChanTargets: make(chan string),
-		ChanPocs:    make(chan poc.Poc),
+		options:        options,
+		ChanTargets:    make(chan string),
+		ChanBadTargets: make(chan string),
+		ChanPocs:       make(chan poc.Poc),
 	}
 
 	// afrog engine update
@@ -96,31 +98,8 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 	options.Config = config
 
-	// init fasthttp
-	// http2.Init(options)
-
 	// init rtryhttp
 	retryhttpclient.Init(options)
-
-	// // init targets
-	// if len(options.Target) > 0 {
-	// 	options.Targets.Set(options.Target)
-	// }
-	// if len(options.TargetsFilePath) > 0 {
-	// 	allTargets, err := utils.ReadFileLineByLine(options.TargetsFilePath)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	for _, t := range allTargets {
-	// 		options.Targets.Set(t)
-	// 	}
-	// }
-	// if len(options.Targets) == 0 {
-	// 	return errors.New("target not found")
-	// }
-
-	// show banner
-	// gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
 
 	// init targets
 	go func() {
@@ -149,13 +128,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
 		gologger.Error().Msgf("`ceye` reverse service not set: %s", configDir)
 	}
-
-	// whitespace show banner
-	// i := 1
-	// for p := range runner.ChanPocs {
-	// 	fmt.Printf("[%d]%s\n", i, p.Id)
-	// 	i++
-	// }
 
 	// fingerprint
 	if !options.NoFinger {

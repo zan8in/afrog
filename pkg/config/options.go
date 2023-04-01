@@ -111,8 +111,9 @@ type Options struct {
 	ProcessTotal uint32
 
 	//
-	PocsTotal    uint32
-	TargetsTotal uint32
+	PocsTotal       uint32
+	TargetsTotal    uint32
+	BadTargetsTotal uint32
 
 	// write output in JSONL(ines) format
 	OutputJson string
