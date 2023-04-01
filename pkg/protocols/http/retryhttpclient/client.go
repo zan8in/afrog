@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
-	"github.com/zan8in/retryablehttp"
 	"golang.org/x/net/context"
 	"golang.org/x/net/proxy"
 )
@@ -288,7 +288,7 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	// store the request
 	protoReq := &proto.Request{}
 	protoReq.Method = rule.Request.Method
-	protoReq.Url = url2ProtoUrl(req.URL.URL)
+	protoReq.Url = url2ProtoUrl(req.URL)
 
 	newReqHeader := make(map[string]string)
 	rawReqHeaderBuilder := strings.Builder{}
@@ -547,39 +547,4 @@ func ReverseGet(target string) ([]byte, error) {
 
 func FingerPrintGet(target string) ([]byte, map[string][]string, int, error) {
 	return simpleRtryRedirectGet(target)
-}
-
-func CheckTarget(target string) (string, error) {
-
-	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Add("User-Agent", utils.RandomUA())
-
-	resp, err := RtryRedirect.Do(req)
-	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	reader := io.LimitReader(resp.Body, maxDefaultBody)
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		return "", err
-	}
-
-	if !isTargetLive(resp.StatusCode) {
-		return "", fmt.Errorf("status code is not live %d", resp.StatusCode)
-	}
-
-	return string(respBody), nil
-}
-
-func isTargetLive(code int) bool {
-	return true
 }

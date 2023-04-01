@@ -11,7 +11,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/zan8in/rawhttp/client"
+	"github.com/projectdiscovery/rawhttp/client"
 )
 
 // Request defines a basic HTTP raw request

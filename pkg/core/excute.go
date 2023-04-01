@@ -98,7 +98,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
 			ctx := context.Background()
-			e.ExecuteExpression(ctx, tap.Target, &tap.Poc)
+			e.executeExpression(ctx, tap.Target, &tap.Poc)
 		}
 
 	})
@@ -144,7 +144,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 
 // }
 
-func (e *Engine) ExecuteExpression(ctx context.Context, target string, poc *poc.Poc) {
+func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
 
