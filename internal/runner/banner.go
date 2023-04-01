@@ -1,8 +1,6 @@
 package runner
 
 import (
-	"fmt"
-
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/upgrade"
@@ -10,17 +8,8 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-var banner = fmt.Sprintf(`
-      _/_/    _/_/_/_/  _/_/_/      _/_/      _/_/_/   
-   _/    _/  _/        _/    _/  _/    _/  _/          
-  _/_/_/_/  _/_/_/    _/_/_/    _/    _/  _/  _/_/     
- _/    _/  _/        _/    _/  _/    _/  _/    _/      
-_/    _/  _/        _/    _/    _/_/      _/_/_/  %s
-`, config.Version)
-
 func ShowBanner() {
-	gologger.Print().Msgf("%s\n", banner)
-	gologger.Print().Msgf("\t\t\tThe Wandering Earth 2\n\n")
+	gologger.Print().Msgf("\n|||\tA F R O G\t|||\t%s\n\n", config.Version)
 }
 
 func ShowBanner2(upgrade *upgrade.Upgrade) {
@@ -30,7 +19,7 @@ func ShowBanner2(upgrade *upgrade.Upgrade) {
 	} else {
 		messageStr = " (" + log.LogColor.Green("latest") + ")"
 	}
-	gologger.Info().Msgf("Using afrog Engine %s%s", config.Version, messageStr)
+	gologger.Print().Msgf("Using afrog Engine %s%s", config.Version, messageStr)
 
 	messageStr2 := ""
 	if utils.Compare(upgrade.LastestVersion, ">", upgrade.CurrVersion) {
@@ -38,7 +27,7 @@ func ShowBanner2(upgrade *upgrade.Upgrade) {
 	} else {
 		messageStr2 = " (" + log.LogColor.Green("latest") + ")"
 	}
-	gologger.Info().Msgf("Using afrog-pocs %s%s", upgrade.CurrVersion, messageStr2)
+	gologger.Print().Msgf("Using afrog-pocs %s%s", upgrade.CurrVersion, messageStr2)
 }
 
 // func ShowUsage() string {

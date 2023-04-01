@@ -110,7 +110,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// show banner
-	gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
+	gologger.Print().Msgf("Targets loaded for scan: %d", len(options.Targets))
 
 	// init pocs
 	allPocsEmbedYamlSlice := []string{}
@@ -134,9 +134,9 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// show banner
-	gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
-	gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
-	gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
+	gologger.Print().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
+	gologger.Print().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
+	gologger.Print().Msgf("Creating output html file: %s", htemplate.Filename)
 
 	// reverse set
 	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/projectdiscovery/rawhttp"
 	"github.com/zan8in/afrog/pkg/proto"
 	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/rawhttp"
 )
 
 var (
