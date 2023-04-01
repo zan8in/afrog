@@ -15,11 +15,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/retryablehttp"
 	"golang.org/x/net/context"
 	"golang.org/x/net/proxy"
 )
@@ -288,7 +288,7 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	// store the request
 	protoReq := &proto.Request{}
 	protoReq.Method = rule.Request.Method
-	protoReq.Url = url2ProtoUrl(req.URL)
+	protoReq.Url = url2ProtoUrl(req.URL.URL)
 
 	newReqHeader := make(map[string]string)
 	rawReqHeaderBuilder := strings.Builder{}

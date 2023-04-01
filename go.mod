@@ -20,6 +20,7 @@ require (
 	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
+	github.com/zan8in/retryablehttp v0.0.0-20230317090519-47a043af521d
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	google.golang.org/protobuf v1.28.1
@@ -62,7 +63,6 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo v1.15.0 // indirect
 	github.com/onsi/gomega v1.10.5 // indirect
-	github.com/projectdiscovery/utils v0.0.4-0.20221201124851-f8524345b6d3 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
@@ -80,7 +80,6 @@ require (
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb // indirect
 	github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 // indirect
-	github.com/zan8in/retryablehttp v0.0.0-20230317090519-47a043af521d // indirect
 	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect
 	golang.org/x/mod v0.8.0 // indirect
@@ -97,7 +96,6 @@ require (
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
 	github.com/panjf2000/ants v1.3.0
-	github.com/projectdiscovery/retryablehttp-go v1.0.5
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6 // indirect
