@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants"
-	"github.com/pkg/errors"
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
@@ -21,17 +21,27 @@ import (
 	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
-	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/gologger"
 )
 
 type Runner struct {
 	options *config.Options
 	catalog *catalog.Catalog
+
+	ChanTargets chan string
+	ChanPocs    chan poc.Poc
+
+	targetsTemp string
+
+	ticker *time.Ticker
 }
 
 func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
-	runner := &Runner{options: options}
+	runner := &Runner{
+		options:     options,
+		ChanTargets: make(chan string),
+		ChanPocs:    make(chan poc.Poc),
+	}
 
 	// afrog engine update
 	if options.UpdateAfrogVersion {
@@ -92,51 +102,46 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	// init rtryhttp
 	retryhttpclient.Init(options)
 
-	// init targets
-	if len(options.Target) > 0 {
-		options.Targets.Set(options.Target)
-	}
-	if len(options.TargetsFilePath) > 0 {
-		allTargets, err := utils.ReadFileLineByLine(options.TargetsFilePath)
-		if err != nil {
-			return err
-		}
-		for _, t := range allTargets {
-			options.Targets.Set(t)
-		}
-	}
-	if len(options.Targets) == 0 {
-		return errors.New("target not found")
-	}
+	// // init targets
+	// if len(options.Target) > 0 {
+	// 	options.Targets.Set(options.Target)
+	// }
+	// if len(options.TargetsFilePath) > 0 {
+	// 	allTargets, err := utils.ReadFileLineByLine(options.TargetsFilePath)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	for _, t := range allTargets {
+	// 		options.Targets.Set(t)
+	// 	}
+	// }
+	// if len(options.Targets) == 0 {
+	// 	return errors.New("target not found")
+	// }
 
 	// show banner
-	gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
+	// gologger.Info().Msgf("Targets loaded for scan: %d", len(options.Targets))
+
+	// init targets
+	go func() {
+		if err := runner.PreprocessTargets(); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+	}()
 
 	// init pocs
-	allPocsEmbedYamlSlice := []string{}
-	if len(options.PocsFilePath) > 0 {
-		options.PocsDirectory.Set(options.PocsFilePath)
-	} else {
-		// init default afrog-pocs
-		if allDefaultPocsYamlSlice, err := pocs.GetPocs(); err == nil {
-			allPocsEmbedYamlSlice = append(allPocsEmbedYamlSlice, allDefaultPocsYamlSlice...)
+	go func() {
+		if err := runner.PreprocessPocs(); err != nil {
+			gologger.Error().Msg(err.Error())
 		}
-		// init ~/afrog-pocs
-		pocsDir, _ := poc.InitPocHomeDirectory()
-		if len(pocsDir) > 0 {
-			options.PocsDirectory.Set(pocsDir)
-		}
-	}
-	allPocsYamlSlice := runner.catalog.GetPocsPath(options.PocsDirectory)
+	}()
 
-	if len(allPocsYamlSlice) == 0 && len(allPocsEmbedYamlSlice) == 0 {
-		return errors.New("afrog-pocs not found")
-	}
+	fmt.Println()
 
 	// show banner
-	gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
-	gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
-	gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
+	// gologger.Info().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
+	// gologger.Info().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
+	// gologger.Info().Msgf("Creating output html file: %s", htemplate.Filename)
 
 	// reverse set
 	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {
@@ -146,7 +151,11 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	}
 
 	// whitespace show banner
-	fmt.Println()
+	// i := 1
+	// for p := range runner.ChanPocs {
+	// 	fmt.Printf("[%d]%s\n", i, p.Id)
+	// 	i++
+	// }
 
 	// fingerprint
 	if !options.NoFinger {
@@ -164,7 +173,32 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 		// check poc
 		e := core.New(options)
-		e.Execute(allPocsYamlSlice, allPocsEmbedYamlSlice)
+		runner.ticker = time.NewTicker(time.Second / time.Duration(options.RateLimit))
+		var wg sync.WaitGroup
+
+		p, _ := ants.NewPoolWithFunc(options.RateLimit, func(p any) {
+			defer wg.Done()
+			<-runner.ticker.C
+
+			tap := p.(*core.TargetAndPocs)
+
+			if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+				ctx := context.Background()
+				e.ExecuteExpression(ctx, tap.Target, &tap.Poc)
+			}
+
+		})
+		defer p.Release()
+
+		for poc := range runner.ChanPocs {
+			for t := range runner.ChanTargets {
+				wg.Add(1)
+				p.Invoke(&core.TargetAndPocs{Target: t, Poc: poc})
+			}
+		}
+
+		wg.Wait()
+
 	}
 
 	return nil

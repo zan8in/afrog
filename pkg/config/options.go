@@ -4,9 +4,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/zan8in/afrog/pkg/output"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 )
 
@@ -21,7 +23,7 @@ type Options struct {
 	Targets utils.StringSlice
 
 	// Target URLs/Domains to scan
-	Target string
+	Target goflags.StringSlice
 
 	// TargetsFilePath specifies the targets from a file to scan.
 	TargetsFilePath string
@@ -108,10 +110,96 @@ type Options struct {
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
 
+	//
+	PocsTotal    uint32
+	TargetsTotal uint32
+
 	// write output in JSONL(ines) format
 	OutputJson string
 
 	OJ *output.OutputJson
+}
+
+func ParseOptions() (*Options, error) {
+
+	options := &Options{}
+
+	flagSet := goflags.NewFlagSet()
+	flagSet.SetDescription(`afrog`)
+
+	flagSet.CreateGroup("input", "Target",
+		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan", goflags.NormalizedStringSliceOptions),
+		flagSet.StringVarP(&options.TargetsFilePath, "Targets", "T", "", "path to file containing a list of target URLs/hosts to scan (one per line)"),
+	)
+
+	flagSet.CreateGroup("pocs", "PoCs",
+		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"),
+	)
+
+	flagSet.CreateGroup("output", "Output",
+		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
+		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
+		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format, eg: -json result.json"),
+	)
+
+	flagSet.CreateGroup("filters", "Filtering",
+		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by `keyword` , eg: -s tomcat,phpinfo"),
+		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"),
+	)
+
+	flagSet.CreateGroup("rate-limit", "Rate-Limit",
+		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", DefaultRateLimit, "maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", DefaultConcurrency, "maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.IntVarP(&options.FingerprintConcurrency, "fingerprint-concurrency", "fc", 100, "maximum number of fingerprint to be executed in parallel"),
+	)
+
+	flagSet.CreateGroup("optimization", "Optimizations",
+		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
+		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
+		flagSet.BoolVarP(&options.OnlyFinger, "onlyfinger", "of", false, "fingerprint scan only"),
+		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
+		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
+		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),
+		flagSet.IntVar(&options.Retries, "retries", DefaultRetries, "number of times to retry a failed request"),
+		flagSet.IntVar(&options.Timeout, "timeout", DefaultTimeout, "time to wait in seconds before timeout"),
+	)
+
+	flagSet.CreateGroup("update", "Update",
+		flagSet.BoolVar(&options.UpdateAfrogVersion, "update", false, "update afrog engine to the latest released version"),
+		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
+	)
+
+	flagSet.CreateGroup("debug", "Debug",
+		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
+	)
+
+	if err := flagSet.Parse(); err != nil {
+		return nil, err
+	}
+
+	if err := options.validateOptions(); err != nil {
+		return nil, err
+	}
+
+	return options, nil
+}
+
+var (
+	errNoInputList = errors.New("no input list provided")
+	errZeroValue   = errors.New("cannot be zero")
+)
+
+func (options *Options) validateOptions() error {
+
+	if options.Target == nil && options.TargetsFilePath == "" {
+		return errNoInputList
+	}
+
+	if options.Timeout == 0 {
+		return errors.Wrap(errZeroValue, "timeout")
+	}
+
+	return nil
 }
 
 type ApiCallBack func(any)
