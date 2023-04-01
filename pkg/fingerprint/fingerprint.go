@@ -106,31 +106,19 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 	}
 
 	// 检测 http or https 并更新 targets 列表
-	url, statusCode := retryhttpclient.CheckHttpsAndLives(url)
-	if statusCode == -1 {
+	fullurl, err := retryhttpclient.CheckProtocol(url)
+	if err != nil {
 		// url 加入 targetlive 黑名单 +1
 		targetlive.TLive.HandleTargetLive(url, 0)
 		s.PrintColorResultInfoConsole(Result{})
 
 		return nil
-	} else {
-		targetlive.TLive.HandleTargetLive(url, 1)
-		s.Options.Targets[key] = url
 	}
 
-	// req, err := http.NewRequest("GET", url, nil)
-	// if err != nil {
-	// 	s.PrintColorResultInfoConsole(Result{})
-	// 	return nil
-	// }
+	targetlive.TLive.HandleTargetLive(fullurl, 1)
+	s.Options.Targets[key] = fullurl
 
-	// data, headers, statuscode, err := http2.GetFingerprintRedirect(req)
-	data, headers, statuscode, err := retryhttpclient.FingerPrintGet(url)
-	// fmt.Println(headers)
-	// for k, h := range headers {
-	// 	fmt.Println(k, h)
-	// }
-
+	data, headers, statuscode, err := retryhttpclient.FingerPrintGet(fullurl)
 	if err != nil {
 		s.PrintColorResultInfoConsole(Result{})
 		return nil
@@ -194,7 +182,7 @@ func (s *Service) processFingerPrintInputPair(url string, key int) error {
 		}
 	}
 
-	s.PrintColorResultInfoConsole(Result{Url: url, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fpName})
+	s.PrintColorResultInfoConsole(Result{Url: fullurl, StatusCode: strconv.Itoa(statuscode), Title: sTitle, Name: fpName})
 
 	return nil
 

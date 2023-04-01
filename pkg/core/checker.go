@@ -186,16 +186,15 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 func (c *Checker) checkIsURL(target string) (string, error) {
 	if !utils.IsURL(target) {
 
-		newtarget, status := retryhttpclient.CheckHttpsAndLives(target)
+		newtarget, err := retryhttpclient.CheckProtocol(target)
+		if err != nil {
 
-		if status == -1 {
-
-			MMutex.Lock()
-			if k := c.Options.Targets.GetKey(target); k != -1 && !utils.IsURL(target) {
-				c.Options.Targets[k] = "http://" + target
-				target = "http://" + target
-			}
-			MMutex.Unlock()
+			// MMutex.Lock()
+			// if k := c.Options.Targets.GetKey(target); k != -1 {
+			// 	c.Options.Targets[k] = "http://" + target
+			// 	target = "http://" + target
+			// }
+			// MMutex.Unlock()
 
 			targetlive.TLive.HandleTargetLive(target, 0)
 

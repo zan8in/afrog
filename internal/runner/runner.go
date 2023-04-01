@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -192,21 +191,20 @@ func runTargetLivenessCheck(options *config.Options) {
 
 				url := wgTask.(poc.WaitGroupTask).Value.(string)
 				key := wgTask.(poc.WaitGroupTask).Key
-				statusCode := 0
 
 				// 首次检测 target list
 				if first && targetlive.TLive.HandleTargetLive(url, -1) != -1 {
 
 					// url, statusCode := http2.CheckTargetHttps(url)
-					url, statusCode = retryhttpclient.CheckHttpsAndLives(url)
+					fullurl, err := retryhttpclient.CheckProtocol(url)
 
-					if statusCode == -1 || statusCode >= http.StatusInternalServerError {
-						if statusCode == -1 && !utils.IsURL(url) {
-							url = "http://" + url
-						}
+					if err != nil {
+						// if statusCode == -1 && !utils.IsURL(url) {
+						// 	url = "http://" + url
+						// }
 						targetlive.TLive.HandleTargetLive(url, 0)
 					} else {
-						targetlive.TLive.HandleTargetLive(url, 1)
+						targetlive.TLive.HandleTargetLive(fullurl, 1)
 					}
 					// reqCount += 1
 				}
@@ -215,15 +213,14 @@ func runTargetLivenessCheck(options *config.Options) {
 				if !first && targetlive.TLive.HandleTargetLive(url, -1) == 2 {
 
 					// url, statusCode := http2.CheckTargetHttps(url)
-					url, statusCode = retryhttpclient.CheckHttpsAndLives(url)
-
-					if statusCode == -1 || statusCode >= http.StatusInternalServerError {
-						if statusCode == -1 && !utils.IsURL(url) {
-							url = "http://" + url
-						}
+					fullurl, err := retryhttpclient.CheckProtocol(url)
+					if err != nil {
+						// if statusCode == -1 && !utils.IsURL(url) {
+						// 	url = "http://" + url
+						// }
 						targetlive.TLive.HandleTargetLive(url, 0)
 					} else {
-						targetlive.TLive.HandleTargetLive(url, 1)
+						targetlive.TLive.HandleTargetLive(fullurl, 1)
 					}
 					// reqCount += 1
 				}

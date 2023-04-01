@@ -1,7 +1,6 @@
 package retryhttpclient
 
 import (
-	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -485,55 +484,117 @@ func simpleRtryRedirectGet(target string) ([]byte, map[string][]string, int, err
 	return respBody, newheader, resp.StatusCode, nil
 }
 
-// Check http or https And Check host live status
-// returns response body and status code
-// status code = -1 means server responded failed
-func CheckHttpsAndLives(target string) (string, int) {
-	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
-		_, statusCode, err := simpleRtryHttpGet(target)
-		if err == nil {
-			return target, statusCode
+var (
+	HTTP_PREFIX  = "http://"
+	HTTPS_PREFIX = "https://"
+)
+
+// return error if host is not living
+// or if host is live return http(s) url
+func CheckProtocol(host string) (string, error) {
+	var (
+		err       error
+		result    string
+		parsePort string
+	)
+
+	if len(strings.TrimSpace(host)) == 0 {
+		return result, fmt.Errorf("host %q is empty", host)
+	}
+
+	if strings.HasPrefix(host, HTTPS_PREFIX) {
+		_, err := checkTarget(host)
+		if err != nil {
+			return result, err
 		}
-		return target, -1
+
+		return host, nil
 	}
 
-	u, err := url.Parse("http://" + target)
+	if strings.HasPrefix(host, HTTP_PREFIX) {
+		_, err := checkTarget(host)
+		if err != nil {
+			return result, err
+		}
+
+		return host, nil
+	}
+
+	u, err := url.Parse(HTTP_PREFIX + host)
 	if err != nil {
-		return target, -1
+		return result, err
 	}
-
-	port := u.Port()
+	parsePort = u.Port()
 
 	switch {
-	case port == "80" || len(port) == 0:
-		_, statusCode, err := simpleRtryHttpGet("http://" + target)
+	case parsePort == "80":
+		_, err := checkTarget(HTTP_PREFIX + host)
+		if err != nil {
+			return result, err
+		}
+
+		return HTTP_PREFIX + host, nil
+
+	case parsePort == "443":
+		_, err := checkTarget(HTTPS_PREFIX + host)
+		if err != nil {
+			return result, err
+		}
+
+		return HTTPS_PREFIX + host, nil
+
+	default:
+		_, err := checkTarget(HTTPS_PREFIX + host)
 		if err == nil {
-			return "http://" + target, statusCode
+			return HTTPS_PREFIX + host, err
 		}
-		return target, -1
 
-	case port == "443" || strings.HasSuffix(port, "443"):
-		_, statusCode, err := simpleRtryHttpGet("https://" + target)
+		body, err := checkTarget(HTTP_PREFIX + host)
 		if err == nil {
-			return "https://" + target, statusCode
+			if strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
+				return HTTPS_PREFIX + host, nil
+			}
+			return HTTP_PREFIX + host, nil
 		}
-		return target, -1
+
 	}
 
-	resp, statusCode, err := simpleRtryHttpGet("http://" + target)
-	if err == nil {
-		if bytes.Contains(resp, []byte("<title>400 The plain HTTP request was sent to HTTPS port</title>")) {
-			return "https://" + target, statusCode
+	return "", fmt.Errorf("host %q is empty", host)
+}
+
+func checkTarget(target string) (string, error) {
+
+	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("User-Agent", utils.RandomUA())
+
+	resp, err := RtryRedirect.Do(req)
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
 		}
-		return "http://" + target, statusCode
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	reader := io.LimitReader(resp.Body, maxDefaultBody)
+	respBody, err := io.ReadAll(reader)
+	if err != nil {
+		return "", err
 	}
 
-	_, statusCode, err = simpleRtryHttpGet("https://" + target)
-	if err == nil {
-		return "https://" + target, statusCode
+	if !isTargetLive(resp.StatusCode) {
+		return "", fmt.Errorf("status code is not live %d", resp.StatusCode)
 	}
 
-	return target, -1
+	return string(respBody), nil
+}
+
+func isTargetLive(code int) bool {
+	return true
 }
 
 // Reverse URL Get request
