@@ -7,7 +7,7 @@ import (
 )
 
 type Syncfile struct {
-	mutex     *sync.Mutex
+	sync.RWMutex
 	iohandler *os.File
 }
 
@@ -16,17 +16,14 @@ func NewSyncfile(filename string) (*Syncfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Syncfile{mutex: &sync.Mutex{}, iohandler: f}, nil
+	return &Syncfile{iohandler: f}, nil
 }
 
 func (sf *Syncfile) Write(content string) {
-	sf.mutex.Lock()
+	sf.Lock()
+	defer sf.Unlock()
 
 	wbuf := bufio.NewWriterSize(sf.iohandler, len(content))
 	wbuf.WriteString(content)
 	wbuf.Flush()
-
-	RandSleep(1000)
-
-	sf.mutex.Unlock()
 }
