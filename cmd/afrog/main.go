@@ -126,9 +126,9 @@ func readConfig() {
 		flagSet.BoolVarP(&options.OnlyFinger, "onlyfinger", "of", false, "fingerprint scan only"),
 		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
 		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
-		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
-		flagSet.IntVar(&options.Timeout, "timeout", 6, "time to wait in seconds before timeout"),
+		flagSet.IntVar(&options.Timeout, "timeout", 16, "time to wait in seconds before timeout"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

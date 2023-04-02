@@ -198,9 +198,9 @@ func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[
 	}
 
 	// newhttprequest
-	req, err := retryablehttp.NewRequest(rule.Request.Method, target, nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, rule.Request.Method, target, nil)
 	if len(rule.Request.Body) > 0 {
-		req, err = retryablehttp.NewRequest(rule.Request.Method, target, strings.NewReader(rule.Request.Body))
+		req, err = retryablehttp.NewRequestWithContext(ctx, rule.Request.Method, target, strings.NewReader(rule.Request.Body))
 	}
 	if err != nil {
 		return err

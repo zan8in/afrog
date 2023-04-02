@@ -81,7 +81,8 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		tap := p.(*TargetAndPocs)
 
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(e.options.Timeout)*time.Second)
+			defer cancel()
 			e.executeExpression(ctx, tap.Target, &tap.Poc)
 		}
 

