@@ -246,6 +246,8 @@
             <br>
             <a href="javascript:void(0);"><sub>江湖人称魏神</sub></a>
         </td>
+    </tr>
+    <tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/33.jpg"
                   alt="Typora-Logo"
