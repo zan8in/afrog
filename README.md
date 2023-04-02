@@ -262,6 +262,13 @@
             <br>
             <a href="javascript:void(0);"><sub>-sudo</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/35.jpg"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/Cuerz"><sub>Cuerz</sub></a>
+        </td>
     </tr>
 </table></div>
 

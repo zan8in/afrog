@@ -48,22 +48,6 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		pocSlice = append(pocSlice, p)
 	}
 
-	// DEPRECATED from date: 2022.12.10
-	// if len(e.options.PocsFilePath) == 0 {
-	// 	// added gopoc @date: 2022.6.19
-	// 	gopocNameSlice := gopoc.MapGoPocName()
-	// 	if len(gopocNameSlice) > 0 {
-	// 		for _, v := range gopocNameSlice {
-	// 			poc := poc.Poc{}
-	// 			poc.Gopoc = v
-	// 			poc.Id = v
-	// 			poc.Info.Name = v
-	// 			poc.Info.Severity = "unkown"
-	// 			pocSlice = append(pocSlice, poc)
-	// 		}
-	// 	}
-	// }
-
 	// added search poc by keywords
 	newPocSlice := []poc.Poc{}
 	if len(e.options.Search) > 0 && e.options.SetSearchKeyword() {
@@ -114,36 +98,6 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	wg.Wait()
 }
 
-// DEPRECATED from date: 2022.12.10
-// func (e *Engine) executeTargets(ctx context.Context, poc1 poc.Poc) {
-// 	defer func() {
-// 		if r := recover(); r != nil {
-// 			r := &Result{}
-// 			r.IsVul = false
-// 			e.options.ApiCallBack(r)
-// 		}
-// 	}()
-
-// 	allTargets := e.options.Targets
-
-// 	input := &inputs.SimpleInputProvider{Inputs: allTargets}
-
-// 	wg := sizedwaitgroup.New(e.options.RateLimit)
-// 	input.Scan(func(scannedValue string) {
-// 		wg.Add()
-// 		go func(value string) {
-// 			defer wg.Done()
-// 			if targetlive.TLive.HandleTargetLive(scannedValue, -1) != -1 {
-// 				e.executeExpression(ctx, scannedValue, &poc1)
-// 			} else {
-// 				e.executeExpression(ctx, "", nil)
-// 			}
-// 		}(scannedValue)
-// 	})
-// 	wg.Wait()
-
-// }
-
 func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
@@ -155,16 +109,6 @@ func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.
 			c.Options.ApiCallBack(c.Result)
 		}
 	}()
-
-	// fmt.Println("target the number of goroutines: ", runtime.NumGoroutine())
-
-	// DEPRECATED from date: 2022.12.10
-	// gopoc check
-	// if len(poc.Gopoc) > 0 {
-	// 	c.CheckGopoc(target, poc.Gopoc)
-	// 	c.Options.ApiCallBack(c.Result)
-	// 	return
-	// }
 
 	// yaml poc check
 	c.Check(ctx, target, poc)

