@@ -529,7 +529,7 @@ func CheckProtocol(host string) (string, error) {
 	parsePort = u.Port()
 
 	switch {
-	case parsePort == "80" || parsePort == "":
+	case parsePort == "80":
 		_, err := checkTarget(HTTP_PREFIX + host)
 		if err != nil {
 			return result, err
@@ -537,7 +537,7 @@ func CheckProtocol(host string) (string, error) {
 
 		return HTTP_PREFIX + host, nil
 
-	case parsePort == "443" || strings.HasSuffix(parsePort, "443"):
+	case parsePort == "443":
 		_, err := checkTarget(HTTPS_PREFIX + host)
 		if err != nil {
 			return result, err

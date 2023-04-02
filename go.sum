@@ -453,8 +453,8 @@ github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf h1:mMkVfpCOvTeQVQ72
 github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauupyJqrwMdFSKkLbVeOylYA1ViNrg0=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
-github.com/zan8in/pins v0.0.0-20230402092756-19ea7990d5b4 h1:15TGRQwUnz1WTNzZv8GHjE+sXigBdXgJ8X3dydhjoow=
-github.com/zan8in/pins v0.0.0-20230402092756-19ea7990d5b4/go.mod h1:IS68BWpdxy0vi8QFQ5tyRrP7WV2LPHVbLT99DHa6o2s=
+github.com/zan8in/pins v0.0.0-20230402134734-21cf9f936dd9 h1:LSHa2EP6zK+C68AZ4z9e1buTtWU4jB0guVZI0Hp8vso=
+github.com/zan8in/pins v0.0.0-20230402134734-21cf9f936dd9/go.mod h1:BERt9Srwv317qrwFeoxYkFFpKWgadNU1M+CAlamtuvs=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af/go.mod h1:7AvjxFJyo5xS0vdGrwa5iwiTYtSMj8V5HGMVTxRstoE=
 github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 h1:NChaJHUwxfGY7OvSLDBiTnHn7FXcecsY00/xoTonlbw=

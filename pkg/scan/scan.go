@@ -2,7 +2,6 @@ package scan
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -20,19 +19,14 @@ type Scan struct {
 func New(options *config.Options) (*Scan, error) {
 	ipSlice := []string{}
 	targets := options.Targets
-	port := options.Port
 
 	if targets.Len() == 0 {
 		return nil, errors.New("targets is empty")
 	}
 
-	if len(port) == 0 {
-		port = NmapTop1000
-	}
-
 	// url to ip
 	for _, v := range targets.List() {
-		ip, err := Target2ip(strings.TrimSpace(v.(string)))
+		ip, err := Target2ip(strings.TrimSpace(v))
 		if err != nil {
 			continue
 		}
@@ -54,20 +48,8 @@ func New(options *config.Options) (*Scan, error) {
 		return nil, errors.New("target to ip error, no found ip")
 	}
 
-	// port
-	portSlice, err := ParsePorts(port)
-	if err != nil {
-		return nil, errors.New("parse port error, no found port")
-	}
-
-	for _, v := range ipSlice {
-		fmt.Println(v)
-	}
-	fmt.Println("port len", len(portSlice))
-
 	return &Scan{
-		Options:   options,
-		IpSlice:   ipSlice,
-		PortSlice: portSlice,
+		Options: options,
+		IpSlice: ipSlice,
 	}, nil
 }

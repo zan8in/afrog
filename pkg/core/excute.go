@@ -92,7 +92,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	for _, poc := range newPocSlice {
 		for _, t := range e.options.Targets.List() {
 			wg.Add(1)
-			p.Invoke(&TargetAndPocs{Target: t.(string), Poc: poc})
+			p.Invoke(&TargetAndPocs{Target: t, Poc: poc})
 		}
 	}
 
@@ -111,8 +111,6 @@ func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.
 		}
 	}()
 
-	// yaml poc check
 	c.Check(ctx, target, poc)
 	c.Options.ApiCallBack(c.Result)
-
 }

@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
@@ -24,6 +28,11 @@ var (
 )
 
 func main() {
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	runner.ShowBanner()
 
 	readConfig()
@@ -36,7 +45,7 @@ func main() {
 		defer func() {
 			atomic.AddUint32(&options.CurrentCount, 1)
 			if !options.Silent {
-				fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+				fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/int(options.Count), strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 			}
 		}()
 
@@ -64,6 +73,7 @@ func main() {
 	}
 
 	sleepEnd()
+
 }
 
 func sleepEnd() {
@@ -97,16 +107,11 @@ func readConfig() {
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
-		flagSet.IntVarP(&options.FingerprintConcurrency, "fingerprint-concurrency", "fc", 100, "maximum number of fingerprint to be executed in parallel"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimizations",
 		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
 		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
-		flagSet.BoolVarP(&options.OnlyFinger, "onlyfinger", "of", false, "fingerprint scan only"),
-		flagSet.BoolVarP(&options.NoTips, "notips", "nt", false, "disable show tips"),
-		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
-		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
 	)

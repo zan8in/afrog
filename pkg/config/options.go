@@ -46,23 +46,8 @@ type Options struct {
 
 	SeverityKeywords []string
 
-	// Scan Stable  eg: 1(generally)(default), 2(normal), 3(stablize)
-	ScanStable string
-
 	// disable output fingerprint in the console
 	NoFinger bool
-
-	// fingerprint scan only
-	OnlyFinger bool
-
-	// ports to scan eg: 80,443,8000-9000
-	Port string
-
-	// web port scan
-	WebPort bool
-
-	// disable show tips
-	NoTips bool
 
 	// update afrog-pocs
 	UpdatePocs bool
@@ -90,12 +75,6 @@ type Options struct {
 
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
-
-	// maximum number of fingerprint to be executed in parallel (default 25)
-	FingerprintConcurrency int
-
-	// max errors for a host before skipping from scan (default 30)
-	MaxHostError int
 
 	// number of times to retry a failed request (default 1)
 	Retries int
