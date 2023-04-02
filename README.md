@@ -239,6 +239,13 @@
             <br>
             <a href="https://github.com/leonardo-o1"><sub>leonardo-o1</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/32.jpg"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="javascript:void(0);"><sub>江湖人称魏神</sub></a>
+        </td>
     </tr>
 </table></div>
 

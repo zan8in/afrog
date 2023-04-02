@@ -11,7 +11,6 @@ import (
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/output"
@@ -149,12 +148,13 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 	// fingerprint
 	if !options.NoFinger {
-		s, _ := fingerprint.New(options)
-		s.Execute()
-		if len(s.ResultSlice) > 0 {
-			htemplate.AppendFinger(s.ResultSlice)
-			printFingerResultConsole()
-		}
+		gologger.Warning().Msg("`fingerprint`已禁用，代替工具是 Pyxis，下载地址 (https://github.com/zan8in/pyxis)")
+		// s, _ := fingerprint.New(options)
+		// s.Execute()
+		// if len(s.ResultSlice) > 0 {
+		// 	htemplate.AppendFinger(s.ResultSlice)
+		// 	printFingerResultConsole()
+		// }
 	}
 
 	if !options.OnlyFinger {
