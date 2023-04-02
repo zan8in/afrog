@@ -253,6 +253,13 @@
             <br>
             <a href="javascript:void(0);"><sub>若兮风</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/34.png"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="javascript:void(0);"><sub>-sudo</sub></a>
+        </td>
     </tr>
 </table></div>
 

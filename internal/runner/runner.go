@@ -148,7 +148,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 
 	// fingerprint
 	if !options.NoFinger {
-		gologger.Print().Msg("Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
+		gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
 		// s, _ := fingerprint.New(options)
 		// s.Execute()
 		// if len(s.ResultSlice) > 0 {
