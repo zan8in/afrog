@@ -10,9 +10,7 @@ import (
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/html"
-	"github.com/zan8in/afrog/pkg/targetlive"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
@@ -32,48 +30,30 @@ func main() {
 
 	starttime := time.Now()
 
-	// fixed 99% bug
-	// go func() {
-	// 	startcount := options.CurrentCount
-	// 	for {
-	// 		time.Sleep(2 * time.Minute)
-	// 		if options.CurrentCount > 0 && startcount == options.CurrentCount && len(options.TargetLive.ListRequestTargets()) == 0 {
-	// 			fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d | except: The program runs to %d end", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), options.TargetLive.GetNoLiveAtomicCount(), int(options.CurrentCount)*100/options.Count)
-	// 			sleepEnd()
-	// 			os.Exit(1)
-	// 		}
-	// 		startcount = options.CurrentCount
-	// 	}
-	// }()
-
 	err := runner.New(options, htemplate, func(result any) {
 		r := result.(*core.Result)
 
 		defer func() {
 			atomic.AddUint32(&options.CurrentCount, 1)
 			if !options.Silent {
-				fmt.Printf("\r%d/%d/%d%%/%s | hosts: %d, closed: %d", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s", len(options.Targets), targetlive.TLive.GetNoLiveAtomicCount())
+				fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 			}
 		}()
 
 		if r.IsVul {
 			lock.Lock()
-			if r.FingerResult != nil {
-				fr := r.FingerResult.(fingerprint.Result)
-				fingerprint.PrintFingerprintInfoConsole(fr)
-			} else {
 
-				atomic.AddUint32(&number, 1)
-				r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			atomic.AddUint32(&number, 1)
+			r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
-				htemplate.Result = r
-				htemplate.Number = utils.GetNumberText(int(number))
-				htemplate.Append()
+			htemplate.Result = r
+			htemplate.Number = utils.GetNumberText(int(number))
+			htemplate.Append()
 
-				if len(options.OutputJson) > 0 {
-					options.OJ.AddJson(r.PocInfo.Id, r.PocInfo.Info.Severity, r.FullTarget)
-				}
+			if len(options.OutputJson) > 0 {
+				options.OJ.AddJson(r.PocInfo.Id, r.PocInfo.Info.Severity, r.FullTarget)
 			}
+
 			lock.Unlock()
 		}
 
@@ -128,7 +108,7 @@ func readConfig() {
 		flagSet.StringVarP(&options.ScanStable, "scan-stable", "ss", "1", "scan stable. Possible values: generally=1, normal=2, stablize=3"),
 		flagSet.IntVarP(&options.MaxHostError, "max-host-error", "mhe", 30, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
-		flagSet.IntVar(&options.Timeout, "timeout", 16, "time to wait in seconds before timeout"),
+		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

@@ -9,17 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/gopoc"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
-	"github.com/zan8in/afrog/pkg/targetlive"
 	"golang.org/x/net/context"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
 	"github.com/zan8in/afrog/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
@@ -32,7 +29,6 @@ type Checker struct {
 	VariableMap     map[string]any
 	Result          *Result
 	CustomLib       *CustomLib
-	// FastClient      *http2.FastClient
 }
 
 func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (err error) {
@@ -41,12 +37,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 			c.Result.IsVul = false
 		}
 	}()
-
-	// check target alive.
-	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
-		c.Result.IsVul = false
-		return err
-	}
 
 	c.Result.Target = target
 	c.Result.PocInfo = pocItem
@@ -71,7 +61,7 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 		return err
 	}
 
-	tempRequest, err := http2.ParseRequest(c.OriginalRequest)
+	tempRequest, err := retryhttpclient.ParseRequest(c.OriginalRequest)
 	if err != nil {
 		c.Result.IsVul = false
 		return err
@@ -89,11 +79,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	for _, ruleMap := range pocItem.Rules {
 		k := ruleMap.Key
 		rule := ruleMap.Value
-
-		if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
-			c.Result.IsVul = false
-			return err
-		}
 
 		if rule.BeforeSleep != 0 {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
@@ -188,62 +173,16 @@ func (c *Checker) checkIsURL(target string) (string, error) {
 
 		newtarget, err := retryhttpclient.CheckProtocol(target)
 		if err != nil {
-
-			// MMutex.Lock()
-			// if k := c.Options.Targets.GetKey(target); k != -1 {
-			// 	c.Options.Targets[k] = "http://" + target
-			// 	target = "http://" + target
-			// }
-			// MMutex.Unlock()
-
-			targetlive.TLive.HandleTargetLive(target, 0)
-
 			return target, errors.New("target response failed")
 		}
 
-		MMutex.Lock()
-		if k := c.Options.Targets.GetKey(target); k != -1 && !utils.IsURL(target) {
-			c.Options.Targets[k] = newtarget
+		if k := c.Options.Targets.GetKey(target); k >= 0 {
+			c.Options.Targets.Update(k, newtarget)
 			target = newtarget
 		}
-		MMutex.Unlock()
-
 	}
 	return target, nil
 
-}
-
-func (c *Checker) CheckGopoc(target, gopocName string) (err error) {
-	gpa := gopoc.New(target)
-
-	// check target alive.
-	if targetlive.TLive.HandleTargetLive(target, -1) == -1 || len(target) == 0 {
-		c.Result.IsVul = false
-		return err
-	}
-
-	targetlive.TLive.AddRequestTarget(target+gopocName, 1)
-	fun := gopoc.GetGoPocFunc(gopocName)
-	r, err := fun(gpa)
-	if err != nil {
-		targetlive.TLive.AddRequestTarget(target+gopocName, 2)
-		c.Result.IsVul = false
-		c.Result.PocInfo = gpa.Poc
-		return err
-	}
-	targetlive.TLive.AddRequestTarget(target+gopocName, 2)
-
-	c.Result.Target = target
-	c.Result.FullTarget = target
-	c.Result.IsVul = true
-	c.Result.PocInfo = gpa.Poc
-	if len(r.AllPocResult) > 0 {
-		for _, v := range r.AllPocResult {
-			c.Result.AllPocResult = append(c.Result.AllPocResult, &PocResult{ResultRequest: v.ResultRequest, ResultResponse: v.ResultResponse, IsVul: v.IsVul, FullTarget: target})
-		}
-	}
-
-	return nil
 }
 
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {

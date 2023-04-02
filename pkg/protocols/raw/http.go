@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/pkg/proto"
-	http2 "github.com/zan8in/afrog/pkg/protocols/http"
+	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/rawhttp"
 )
 
@@ -65,7 +65,7 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 	tempResultResponse := &proto.Response{}
 	tempResultResponse.Status = int32(resp.StatusCode)
 	if requrl, err := url.Parse(baseurl); err == nil {
-		tempResultResponse.Url = http2.Url2UrlType(requrl)
+		tempResultResponse.Url = retryhttpclient.Url2UrlType(requrl)
 	}
 	newheader2 := make(map[string]string)
 	respHeaderSlice := strings.Split(strings.TrimSpace(string(dumpedResponseHeaders)), "\n")
@@ -93,7 +93,7 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 	tempResultRequest := &proto.Request{}
 	tempResultRequest.Method = rhttp.Method
 	if requrl, err := url.Parse(baseurl); err == nil {
-		tempResultRequest.Url = http2.Url2UrlType(requrl)
+		tempResultRequest.Url = retryhttpclient.Url2UrlType(requrl)
 	}
 	newheader1 := map[string]string{}
 	for _, v := range rhttp.UnsafeHeaders {

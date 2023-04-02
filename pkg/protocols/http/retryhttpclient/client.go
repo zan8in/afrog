@@ -1,10 +1,12 @@
 package retryhttpclient
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -527,7 +529,7 @@ func CheckProtocol(host string) (string, error) {
 	parsePort = u.Port()
 
 	switch {
-	case parsePort == "80":
+	case parsePort == "80" || parsePort == "":
 		_, err := checkTarget(HTTP_PREFIX + host)
 		if err != nil {
 			return result, err
@@ -535,7 +537,7 @@ func CheckProtocol(host string) (string, error) {
 
 		return HTTP_PREFIX + host, nil
 
-	case parsePort == "443":
+	case parsePort == "443" || strings.HasSuffix(parsePort, "443"):
 		_, err := checkTarget(HTTPS_PREFIX + host)
 		if err != nil {
 			return result, err
@@ -608,4 +610,38 @@ func ReverseGet(target string) ([]byte, error) {
 
 func FingerPrintGet(target string) ([]byte, map[string][]string, int, error) {
 	return simpleRtryRedirectGet(target)
+}
+
+func Url2UrlType(u *url.URL) *proto.UrlType {
+	return &proto.UrlType{
+		Scheme:   u.Scheme,
+		Domain:   u.Hostname(),
+		Host:     u.Host,
+		Port:     u.Port(),
+		Path:     u.EscapedPath(),
+		Query:    u.RawQuery,
+		Fragment: u.Fragment,
+	}
+}
+
+func ParseRequest(oReq *http.Request) (*proto.Request, error) {
+	req := &proto.Request{}
+	req.Method = oReq.Method
+	req.Url = Url2UrlType(oReq.URL)
+	header := make(map[string]string)
+	for k := range oReq.Header {
+		header[k] = oReq.Header.Get(k)
+	}
+	req.Headers = header
+	req.ContentType = oReq.Header.Get("Content-Type")
+	if oReq.Body == nil || oReq.Body == http.NoBody {
+	} else {
+		data, err := ioutil.ReadAll(oReq.Body)
+		if err != nil {
+			return nil, err
+		}
+		req.Body = data
+		oReq.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	}
+	return req, nil
 }

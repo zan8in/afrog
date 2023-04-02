@@ -8,6 +8,7 @@ import (
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/gologger"
+	sliceutil "github.com/zan8in/pins/slice"
 )
 
 type Options struct {
@@ -18,7 +19,7 @@ type Options struct {
 	PocsDirectory utils.StringSlice
 
 	// Target URLs/Domains to scan
-	Targets utils.StringSlice
+	Targets sliceutil.SafeSlice
 
 	// Target URLs/Domains to scan
 	Target string

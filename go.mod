@@ -15,10 +15,10 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/tj/go-update v2.2.5-0.20200519121640-62b4b798fd68+incompatible
-	github.com/valyala/fasthttp v1.43.0
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
 	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
+	github.com/zan8in/pins v0.0.0-20230402092756-19ea7990d5b4
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230317090519-47a043af521d
 	go.uber.org/zap v1.21.0
@@ -31,7 +31,7 @@ require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Mzack9999/go-http-digest-auth-client v0.6.1-0.20220414142836-eb8883508809 // indirect
 	github.com/apex/log v1.9.0 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
+	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/c4milo/unpackit v0.1.0 // indirect
@@ -86,17 +86,14 @@ require (
 
 require (
 	github.com/akrylysov/pogreb v0.10.1 // indirect
-	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20210826220005-b48c857c3a0e // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/miekg/dns v1.1.50 // indirect
-	github.com/panjf2000/ants v1.3.0
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/ulule/deepcopier v0.0.0-20200430083143-45decc6639b6 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/weppos/publicsuffix-go v0.30.0 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect

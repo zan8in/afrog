@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panjf2000/ants"
+	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
@@ -68,7 +68,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	}
 
 	// init scan sum
-	e.options.Count += len(e.options.Targets) * len(newPocSlice)
+	e.options.Count += e.options.Targets.Len() * len(newPocSlice)
 
 	// poc scan
 	Ticker = time.NewTicker(time.Second / time.Duration(e.options.RateLimit))
@@ -90,9 +90,9 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	defer p.Release()
 
 	for _, poc := range newPocSlice {
-		for _, t := range e.options.Targets {
+		for _, t := range e.options.Targets.List() {
 			wg.Add(1)
-			p.Invoke(&TargetAndPocs{Target: t, Poc: poc})
+			p.Invoke(&TargetAndPocs{Target: t.(string), Poc: poc})
 		}
 	}
 

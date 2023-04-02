@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/fingerprint"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
@@ -122,36 +121,6 @@ func (ht *HtmlTemplate) Append() {
 		// utils.AppendString(ht.Filename, r)
 		ht.Syncfile.Write(content)
 	}
-}
-
-func (ht *HtmlTemplate) AppendFinger(resultSlice []fingerprint.Result) {
-	content := ht.htmlFinger(resultSlice)
-	if len(content) > 0 {
-		ht.Syncfile.Write(content)
-	}
-}
-
-func (ht *HtmlTemplate) htmlFinger(resultSlice []fingerprint.Result) string {
-	if len(resultSlice) == 0 {
-		return ""
-	}
-	title := `<table class="tablefinger">
-	<thead onclick="$(this).next('tbody').toggle()" style="background:#DDE2DE">
-	<td class="vuln">000&nbsp;&nbsp;Fingerprint</td>
-	<td class="security info">INFO</td>
-	<td class="url">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-	</thead>`
-
-	header := "<tbody>"
-
-	body := ""
-	for _, v := range resultSlice {
-		body += fmt.Sprintf(`<tr class="fingerprint"><td ><a href="%s" class='fingerhref' target="_blank">%s</a>&nbsp;&nbsp;<span class='info'>[%s]</span></td><td colspan=2><span class='low' style="font-weight:normal">%s</span>&nbsp;&nbsp;<span class='critical'>%s</span></td></tr>`, v.Url, v.Url, v.StatusCode, v.Title, v.Name)
-	}
-
-	footer := "</tbody></table>"
-
-	return title + header + body + footer
 }
 
 func header() string {
