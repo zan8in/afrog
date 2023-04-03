@@ -1,7 +1,6 @@
 package core
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -38,6 +37,11 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 		}
 	}()
 
+	if target, err = c.checkURL(target); err != nil {
+		c.Result.IsVul = false
+		return err
+	}
+
 	c.Result.Target = target
 	c.Result.PocInfo = pocItem
 
@@ -47,12 +51,6 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	}
 	if strings.Contains(pocItem.Expression, "||") && !strings.Contains(pocItem.Expression, "&&") {
 		matchCondition = poc.STOP_IF_FIRST_MATCH
-	}
-
-	target, err = c.checkIsURL(target)
-	if err != nil {
-		c.Result.IsVul = false
-		return err
 	}
 
 	c.OriginalRequest, err = http.NewRequest("GET", target, nil)
@@ -168,21 +166,42 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	return err
 }
 
-func (c *Checker) checkIsURL(target string) (string, error) {
-	if !utils.IsURL(target) {
+var MaxCheckNum = 1
 
-		newtarget, err := retryhttpclient.CheckProtocol(target)
-		if err != nil {
-			return target, errors.New("target response failed")
-		}
+func (c *Checker) checkURL(target string) (string, error) {
+	var err error
 
-		if k := c.Options.Targets.GetKey(target); k >= 0 {
-			c.Options.Targets.Update(k, newtarget)
-			target = newtarget
-		}
+	// if target check num more than MaxCheckNum
+	if c.Options.Targets.Num(target) > MaxCheckNum {
+		fmt.Printf("%s is blacklisted\n", target)
+		return "", fmt.Errorf("%s is blacklisted", target)
 	}
-	return target, nil
 
+	// if target is not url, then check again
+	if !utils.IsURL(target) {
+		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
+			if k := c.Options.Targets.Key(target); k >= 0 {
+				c.Options.Targets.Update(k, newtarget)
+				c.Options.Targets.ResetNum(newtarget)
+			}
+			return newtarget, nil
+		}
+
+		c.Options.Targets.UpdateNum(target, 1)
+		return target, fmt.Errorf("check protocol falied, %s", err.Error())
+	}
+
+	// if target is url more than zero, then check protocol against
+	if c.Options.Targets.Num(target) > 0 {
+		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
+			c.Options.Targets.ResetNum(newtarget)
+			return newtarget, nil
+		}
+
+		c.Options.Targets.UpdateNum(target, 1)
+	}
+
+	return target, nil
 }
 
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {

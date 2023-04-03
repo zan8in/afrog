@@ -92,7 +92,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	for _, poc := range newPocSlice {
 		for _, t := range e.options.Targets.List() {
 			wg.Add(1)
-			p.Invoke(&TargetAndPocs{Target: t, Poc: poc})
+			p.Invoke(&TargetAndPocs{Target: t.(string), Poc: poc})
 		}
 	}
 

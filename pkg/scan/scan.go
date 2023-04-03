@@ -26,7 +26,7 @@ func New(options *config.Options) (*Scan, error) {
 
 	// url to ip
 	for _, v := range targets.List() {
-		ip, err := Target2ip(strings.TrimSpace(v))
+		ip, err := Target2ip(strings.TrimSpace(v.(string)))
 		if err != nil {
 			continue
 		}
