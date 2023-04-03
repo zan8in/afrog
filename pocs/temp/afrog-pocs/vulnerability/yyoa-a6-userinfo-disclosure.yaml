@@ -1,0 +1,15 @@
+id: yyoa-a6-userinfo-disclosure
+
+info:
+  name: 致远OA A6 initDataAssess.jsp 用户敏感信息泄露
+  author: zan8in
+  severity: low
+  verified: false
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /yyoa/assess/js/initDataAssess.jsp
+    expression: response.status == 200 && response.body.bcontains(b'personList[') && response.body.bcontains(b'new Person(')
+expression: r0()

