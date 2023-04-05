@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
-	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/gologger"
 )
 
 var (
@@ -33,7 +33,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	for _, pocYaml := range allPocsYamlSlice {
 		p, err := poc.ReadPocs(pocYaml)
 		if err != nil {
-			log.Log().Error(err.Error())
+			gologger.Error().Msg(err.Error())
 			continue
 		}
 		pocSlice = append(pocSlice, p)
@@ -42,7 +42,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	for _, pocEmbedYaml := range allPocsEmbedYamlSlice {
 		p, err := pocs.ReadPocs(pocEmbedYaml)
 		if err != nil {
-			log.Log().Error(err.Error())
+			gologger.Error().Msg(err.Error())
 			continue
 		}
 		pocSlice = append(pocSlice, p)
