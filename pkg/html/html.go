@@ -3,6 +3,7 @@ package html
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -89,7 +90,7 @@ func (ht *HtmlTemplate) Html() string {
 			respraw = v.ResultResponse.GetRaw()
 		}
 
-		fullurl := v.FullTarget
+		fullurl := url.QueryEscape(v.FullTarget)
 
 		body += fmt.Sprintf(`<tr>
 		<td colspan="3"  style="border-top:1px solid #60786F"><a href="%s" target="_blank">%s</a></td>
