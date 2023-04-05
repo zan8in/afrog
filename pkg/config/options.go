@@ -79,6 +79,9 @@ type Options struct {
 	// number of times to retry a failed request (default 1)
 	Retries int
 
+	//
+	MaxHostNum int
+
 	// time to wait in seconds before timeout (default 10)
 	Timeout int
 

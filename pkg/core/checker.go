@@ -166,14 +166,11 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	return err
 }
 
-var MaxCheckNum = 1
-
 func (c *Checker) checkURL(target string) (string, error) {
 	var err error
 
 	// if target check num more than MaxCheckNum
-	if c.Options.Targets.Num(target) > MaxCheckNum {
-		fmt.Printf("%s is blacklisted\n", target)
+	if c.Options.Targets.Num(target) > c.Options.MaxHostNum {
 		return "", fmt.Errorf("%s is blacklisted", target)
 	}
 
