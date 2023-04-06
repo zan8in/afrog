@@ -50,7 +50,7 @@ func UpdateAfrogVersionToLatest(verbose bool) error {
 	if final == nil {
 		return fmt.Errorf("no compatible binary found for %s/%s", currentOS, runtime.GOARCH)
 	}
-	//https: //gitee.com/zanbin/afrog/releases/download/v2.0.1/afrog_windows_amd64.zip
+	//https://gitee.com/zanbin/afrog/releases/download/v2.0.1/afrog_windows_amd64.zip
 	final.URL = strings.Replace(final.URL, "github.com/zan8in", "gitee.com/zanbin", -1)
 	tarball, err := final.DownloadProxy(progress.Reader)
 	if err != nil {

@@ -453,8 +453,6 @@ github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf h1:mMkVfpCOvTeQVQ72
 github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauupyJqrwMdFSKkLbVeOylYA1ViNrg0=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
-github.com/zan8in/pins v0.0.0-20230403012248-fc739cc933f0 h1:MUD9qELfe301Vbtt54QYA6Tm78eb4FqVl5rOclmEFO4=
-github.com/zan8in/pins v0.0.0-20230403012248-fc739cc933f0/go.mod h1:IS68BWpdxy0vi8QFQ5tyRrP7WV2LPHVbLT99DHa6o2s=
 github.com/zan8in/pins v0.0.0-20230403022702-3d3e641e57ef h1:ZUDjohJvzXIellZzXwFBm8gnRsRE3xipJEaHblPS+LA=
 github.com/zan8in/pins v0.0.0-20230403022702-3d3e641e57ef/go.mod h1:IS68BWpdxy0vi8QFQ5tyRrP7WV2LPHVbLT99DHa6o2s=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
