@@ -11,5 +11,5 @@ rules:
     request:
       method: GET
       path: /wp-login.php
-    expression: response.status == 200 && (response.body.bcontains(b'WordPress</title>') || response.body.bcontains(b'/wp-login.php?action=lostpassword">Lost your password?</a>') || response.body.bcontains(b'<form name="loginform" id="loginform" action="{{BaseURL}}/wp-login.php" method="post">'))
+    expression: response.status == 200 && (response.body.ibcontains(b'WordPress</title>') || response.body.bcontains(b'/wp-login.php?action=lostpassword">Lost your password?</a>') || response.body.bcontains(b'<form name="loginform" id="loginform" action="{{hosturl}}/wp-login.php" method="post">'))
 expression: r0()
