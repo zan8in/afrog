@@ -48,6 +48,7 @@ rules:
            - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
            - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
+           - '"thinkphp-debug" != "" && response.body.bcontains(b">错误</span>") && response.body.bcontains(b">SQL</span>") &&  response.body.bcontains(b">调试</span>")'
            
     r1:
         request:
@@ -91,5 +92,6 @@ rules:
            - '"panabit-gateway" != "" && response.status == 200 && response.body.bcontains(b"<span>Powered by OFBiz</span>")'
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
            - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
+           - '"thinkphp-debug" != "" && response.body.bcontains(b">错误</span>") && response.body.bcontains(b">SQL</span>") &&  response.body.bcontains(b">调试</span>")'
            
 expression: r0() || r1()
