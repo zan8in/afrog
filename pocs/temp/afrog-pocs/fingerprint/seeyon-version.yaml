@@ -1,0 +1,15 @@
+id: seeyon-version
+
+info:
+  name: Seeyon Version
+  author: zan8in
+  severity: info
+  verified: true
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /seeyon/main.do?method=showAbout
+    expression: response.status == 200 && response.body.bcontains(b'>Build Id:</td>') && response.body.bcontains(b'>注册数:</td>')  
+expression: r0()

