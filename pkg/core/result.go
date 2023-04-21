@@ -1,8 +1,7 @@
 package core
 
 import (
-	"fmt"
-	"net/url"
+	"html"
 	"strconv"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/gologger"
 )
 
 type Result struct {
@@ -85,8 +85,8 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole(number string) {
-	fulltarget, _ := url.QueryUnescape(r.FullTarget) // fixed %!/(MISSING) BUG
-	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
+	fulltarget := html.EscapeString(r.FullTarget) // fixed %!/(MISSING) BUG
+	gologger.Print().Msg("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
 			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + "\r\n")
