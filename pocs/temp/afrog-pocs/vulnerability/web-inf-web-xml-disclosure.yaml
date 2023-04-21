@@ -1,0 +1,14 @@
+id: web-inf-web-xml-disclosure
+
+info:
+  name: WEB-INF Disclosure
+  author: zan8in
+  severity: high
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /WEB-INF/web.xml
+    expression: response.status == 200 && response.body.bcontains(b'<web-app') && response.body.bcontains(b'</web-app>')
+expression: r0()
