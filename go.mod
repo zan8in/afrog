@@ -18,7 +18,7 @@ require (
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
 	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
-	github.com/zan8in/pins v0.0.0-20230403022702-3d3e641e57ef
+	github.com/zan8in/pins v0.0.0-20230422040436-7005b245b39a
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230317090519-47a043af521d
 	go.uber.org/zap v1.21.0
@@ -43,6 +43,7 @@ require (
 	github.com/cockroachdb/redact v1.1.3 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/getsentry/sentry-go v0.16.0 // indirect
+	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
@@ -101,7 +102,7 @@ require (
 	github.com/zmap/zcrypto v0.0.0-20230310154051-c8b263fd8300 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.10.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/net v0.8.0
 	golang.org/x/sys v0.6.0 // indirect

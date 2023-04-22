@@ -8,7 +8,6 @@ import (
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/html"
 	"github.com/zan8in/afrog/pkg/output"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
@@ -23,7 +22,7 @@ type Runner struct {
 	catalog *catalog.Catalog
 }
 
-func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCallBack) error {
+func New(options *config.Options, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
 
 	// afrog engine update
@@ -42,15 +41,6 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	upgrade.UpgradeAfrogPocs()
 	if options.UpdatePocs {
 		return nil
-	}
-
-	// output to afrog report
-	if len(options.Output) == 0 {
-		options.Output = utils.GetNowDateTimeReportName() + ".html"
-	}
-	htemplate.Filename = options.Output
-	if err := htemplate.New(); err != nil {
-		gologger.Fatal().Msgf("Output failed, %s", err.Error())
 	}
 
 	// output to json file
@@ -123,7 +113,7 @@ func New(options *config.Options, htemplate *html.HtmlTemplate, acb config.ApiCa
 	// show banner
 	gologger.Print().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
 	gologger.Print().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
-	gologger.Print().Msgf("Creating output html file: %s", htemplate.Filename)
+	// gologger.Print().Msgf("Creating output html file: %s", htemplate.Filename)
 
 	// reverse set
 	if len(options.Config.Reverse.Ceye.Domain) == 0 || len(options.Config.Reverse.Ceye.ApiKey) == 0 {

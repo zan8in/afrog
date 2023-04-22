@@ -2,44 +2,46 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"net/http"
 	_ "net/http/pprof"
 
 	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
-	"github.com/zan8in/afrog/pkg/html"
+	"github.com/zan8in/afrog/pkg/report"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 )
 
 var (
-	options   = &config.Options{}
-	htemplate = &html.HtmlTemplate{}
-	lock      sync.Mutex
-	number    uint32 = 0
+	lock   sync.Mutex
+	rport  *report.Report
+	err    error
+	number uint32 = 0
 )
 
 func main() {
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
 
 	runner.ShowBanner()
 
-	readConfig()
+	options := parseOptions()
+
+	if rport, err = report.NewReport(options.Output, report.DefaultTemplate); err != nil {
+		gologger.Fatal().Msg(err.Error())
+	}
 
 	starttime := time.Now()
 
-	err := runner.New(options, htemplate, func(result any) {
+	err = runner.New(options, func(result any) {
 		r := result.(*core.Result)
 
 		defer func() {
@@ -55,9 +57,8 @@ func main() {
 			atomic.AddUint32(&number, 1)
 			r.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
-			htemplate.Result = r
-			htemplate.Number = utils.GetNumberText(int(number))
-			htemplate.Append()
+			rport.SetResult(r)
+			rport.Append(utils.GetNumberText(int(number)))
 
 			if len(options.OutputJson) > 0 {
 				options.OJ.AddJson(r.PocInfo.Id, r.PocInfo.Info.Severity, r.FullTarget)
@@ -80,7 +81,8 @@ func sleepEnd() {
 	time.Sleep(time.Second * 3)
 }
 
-func readConfig() {
+func parseOptions() *config.Options {
+	options := &config.Options{}
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`afrog`)
 
@@ -128,4 +130,5 @@ func readConfig() {
 
 	_ = flagSet.Parse()
 
+	return options
 }
