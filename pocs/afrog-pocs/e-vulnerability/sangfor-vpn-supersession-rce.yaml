@@ -3,8 +3,8 @@ id: sangfor-vpn-supersession-rce
 info:
   name: Sangfor VPN SuperSession TO RCE
   author: G-H-Z
-  severity: Critical
-  verified: true
+  severity: critical
+  verified: false
 
 rules:
   r0:
