@@ -276,6 +276,13 @@
             <br>
             <a href="javascript:void(0);"><sub>laohuan12138</sub></a>
         </td>
+        <td align="center">
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/37.jpg"
+                  alt="Typora-Logo"
+                  height="80"/>
+            <br>
+            <a href="https://github.com/exp0l0zzz"><sub>exp0l0zzz</sub></a>
+        </td>
     </tr>
 </table></div>
 
