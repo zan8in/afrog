@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -83,7 +84,10 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(e.options.Timeout)*time.Second)
 			defer cancel()
+			fmt.Println("-", tap.Target)
 			e.executeExpression(ctx, tap.Target, &tap.Poc)
+			fmt.Println("+", tap.Target)
+
 		}
 
 	})
