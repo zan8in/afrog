@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"html"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -85,7 +86,7 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole(number string) {
-	fulltarget := html.EscapeString(r.FullTarget) // fixed %!/(MISSING) BUG
+	fulltarget, _ := url.QueryUnescape(html.EscapeString(r.FullTarget)) // fixed %!/(MISSING) BUG
 	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+

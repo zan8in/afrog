@@ -25,15 +25,18 @@ type Runner struct {
 func New(options *config.Options, acb config.ApiCallBack) error {
 	runner := &Runner{options: options}
 
+	// print pocs list
+	if options.PocList {
+		return options.PrintPocList()
+	}
+
+	if len(options.PocDetail) > 0 {
+		return options.ShowPocDetail(options.PocDetail)
+	}
+
 	// afrog engine update
 	if options.UpdateAfrogVersion {
 		return UpdateAfrogVersionToLatest(true)
-	}
-
-	// print pocs list
-	if options.PrintPocs {
-		options.PrintPocList()
-		return nil
 	}
 
 	// update afrog-pocs
@@ -125,7 +128,11 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	// whitespace show banner
 	fmt.Println()
 
-	gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
+	// gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
+
+	if options.MonitorTargets {
+		go runner.monitorTargets()
+	}
 
 	// check poc
 	e := core.New(options)

@@ -31,12 +31,36 @@ var (
 
 	RtryNoRedirectHttpClient *http.Client
 	RtryRedirectHttpClient   *http.Client
-	defaultMaxRedirects      = 10
+
+	defaultMaxRedirects = 10
+	defaultTimeout      = 20 * time.Second
 )
 
 const maxDefaultBody = 2 * 1024 * 1024
 
 func Init(options *config.Options) (err error) {
+	po := &retryablehttp.DefaultPoolOptions
+	po.Proxy = options.Proxy
+	po.Timeout = options.Timeout
+	po.Retries = options.Retries
+	po.DisableRedirects = true
+
+	retryablehttp.InitClientPool(po)
+	if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
+		return err
+	}
+
+	po.DisableRedirects = false
+	po.EnableRedirect(retryablehttp.FollowAllRedirect)
+	retryablehttp.InitClientPool(po)
+	if RtryRedirect, err = retryablehttp.GetPool(po); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Init2(options *config.Options) (err error) {
 	retryableHttpOptions := retryablehttp.DefaultOptionsSpraying
 	maxIdleConns := 0
 	maxConnsPerHost := 0
@@ -151,7 +175,32 @@ func Init(options *config.Options) (err error) {
 	return err
 }
 
-func Request(ctx context.Context, target string, rule poc.Rule, variableMap map[string]any) error {
+type checkRedirectFunc func(req *http.Request, via []*http.Request) error
+
+func makeCheckRedirectFunc(followRedirects bool, maxRedirects int) checkRedirectFunc {
+	return func(req *http.Request, via []*http.Request) error {
+		if !followRedirects {
+			return http.ErrUseLastResponse
+		}
+
+		if maxRedirects == 0 {
+			if len(via) > defaultMaxRedirects {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		}
+
+		if len(via) > maxRedirects {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	}
+}
+
+func Request(target string, rule poc.Rule, variableMap map[string]any) error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
 	variableMap["request"] = nil
 	variableMap["response"] = nil
 
@@ -394,34 +443,15 @@ func fulltarget(target, path string) string {
 	return target
 }
 
-type checkRedirectFunc func(req *http.Request, via []*http.Request) error
-
-func makeCheckRedirectFunc(followRedirects bool, maxRedirects int) checkRedirectFunc {
-	return func(req *http.Request, via []*http.Request) error {
-		if !followRedirects {
-			return http.ErrUseLastResponse
-		}
-
-		if maxRedirects == 0 {
-			if len(via) > defaultMaxRedirects {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		}
-
-		if len(via) > maxRedirects {
-			return http.ErrUseLastResponse
-		}
-		return nil
-	}
-}
-
 func simpleRtryHttpGet(target string) ([]byte, int, error) {
 	if len(target) == 0 {
 		return []byte(""), 0, errors.New("no target specified")
 	}
 
-	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -444,46 +474,6 @@ func simpleRtryHttpGet(target string) ([]byte, int, error) {
 	}
 
 	return respBody, resp.StatusCode, err
-}
-
-// body is parameters 1
-// headers is parameters 2
-// statusCode is parameters 3
-// err is parameters 4
-func simpleRtryRedirectGet(target string) ([]byte, map[string][]string, int, error) {
-	if len(target) == 0 {
-		return []byte(""), nil, 0, errors.New("no target specified")
-	}
-
-	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-
-	req.Header.Add("User-Agent", utils.RandomUA())
-
-	resp, err := RtryRedirect.Do(req)
-	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		return []byte(""), nil, 0, err
-	}
-
-	reader := io.LimitReader(resp.Body, maxDefaultBody)
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		resp.Body.Close()
-		return []byte(""), nil, 0, err
-	}
-
-	newheader := make(map[string][]string)
-	for k := range resp.Header {
-		newheader[k] = []string{resp.Header.Get(k)}
-
-	}
-
-	return respBody, newheader, resp.StatusCode, nil
 }
 
 var (
@@ -565,8 +555,10 @@ func CheckProtocol(host string) (string, error) {
 }
 
 func checkTarget(target string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
 
-	req, err := retryablehttp.NewRequest(http.MethodGet, target, nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return "", err
 	}
@@ -606,10 +598,6 @@ func ReverseGet(target string) ([]byte, error) {
 	}
 	respBody, _, err := simpleRtryHttpGet(target)
 	return respBody, err
-}
-
-func FingerPrintGet(target string) ([]byte, map[string][]string, int, error) {
-	return simpleRtryRedirectGet(target)
 }
 
 func Url2UrlType(u *url.URL) *proto.UrlType {

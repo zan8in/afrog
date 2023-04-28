@@ -1,8 +1,10 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
@@ -48,15 +50,38 @@ func (c *CustomLib) Run(expression string, variablemap map[string]any, call runC
 }
 
 func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
-	env, err := c.NewCelEnv()
-	if err != nil {
-		return nil, errors.NewCelEnvError(err)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	var (
+		val ref.Val
+		err error
+	)
+	resp := make(chan int)
+	go func() {
+		defer close(resp)
+
+		env, err := c.NewCelEnv()
+		if err != nil {
+			resp <- 9
+		}
+		val, err = Eval(env, expression, variablemap)
+		if err != nil {
+			resp <- 9
+		}
+		resp <- 99
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("Eval timed out")
+	case v := <-resp:
+		if v == 99 {
+			return val, err
+		}
+		return nil, fmt.Errorf("Eval error")
 	}
-	val, err := Eval(env, expression, variablemap)
-	if err != nil {
-		return nil, errors.NewEvalError(err)
-	}
-	return val, nil
+
 }
 
 type runCallback func(any, error)

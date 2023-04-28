@@ -10,7 +10,6 @@ import (
 
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
-	"golang.org/x/net/context"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -30,7 +29,7 @@ type Checker struct {
 	CustomLib       *CustomLib
 }
 
-func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (err error) {
+func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
@@ -87,7 +86,7 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Timeout))}
 			err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
 		} else {
-			err = retryhttpclient.Request(ctx, target, rule, c.VariableMap)
+			err = retryhttpclient.Request(target, rule, c.VariableMap)
 		}
 		if err == nil {
 			if len(rule.Expressions) > 0 {
@@ -166,11 +165,18 @@ func (c *Checker) Check(ctx context.Context, target string, pocItem *poc.Poc) (e
 	return err
 }
 
+const ActiveTarget = -99
+
 func (c *Checker) checkURL(target string) (string, error) {
-	var err error
 
 	// if target check num more than MaxCheckNum
-	if c.Options.Targets.Num(target) > c.Options.MaxHostNum {
+	tcount := c.Options.Targets.Num(target)
+
+	if tcount == ActiveTarget {
+		return target, nil
+	}
+
+	if tcount > c.Options.MaxHostNum {
 		return "", fmt.Errorf("%s is blacklisted", target)
 	}
 
@@ -179,23 +185,24 @@ func (c *Checker) checkURL(target string) (string, error) {
 		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
 			if k := c.Options.Targets.Key(target); k >= 0 {
 				c.Options.Targets.Update(k, newtarget)
-				c.Options.Targets.ResetNum(newtarget)
+				c.Options.Targets.SetNum(newtarget, ActiveTarget)
 			}
 			return newtarget, nil
 		}
 
 		c.Options.Targets.UpdateNum(target, 1)
-		return target, fmt.Errorf("check protocol falied, %s", err.Error())
+		return target, fmt.Errorf("%s check protocol falied", target)
 	}
 
 	// if target is url more than zero, then check protocol against
-	if c.Options.Targets.Num(target) > 0 {
+	if c.Options.Targets.Num(target) >= 0 {
 		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
-			c.Options.Targets.ResetNum(newtarget)
+			c.Options.Targets.SetNum(newtarget, ActiveTarget)
 			return newtarget, nil
 		}
 
 		c.Options.Targets.UpdateNum(target, 1)
+		return target, fmt.Errorf("%s no response", target)
 	}
 
 	return target, nil

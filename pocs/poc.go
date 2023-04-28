@@ -2,6 +2,7 @@ package pocs
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"strings"
 
@@ -29,8 +30,8 @@ func GetPocs() ([]string, error) {
 	return allPocs, err
 }
 
-func PrintPocs() ([]string, error) {
-	allPocs := []string{}
+func GetPocDetail(pocname string) (string, error) {
+	var result string
 
 	err := fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -38,12 +39,20 @@ func PrintPocs() ([]string, error) {
 		}
 		// fmt.Printf("path=%q, isDir=%v\n", path, d.IsDir())
 		if !d.IsDir() && strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") {
-			allPocs = append(allPocs, d.Name())
+			name := d.Name()
+			if pocname == name || pocname+".yaml" == name || pocname+".yml" == name {
+				result = path
+				return nil
+			}
 		}
 		return nil
 	})
 
-	return allPocs, err
+	if len(result) == 0 {
+		return result, fmt.Errorf("result is empty")
+	}
+
+	return result, err
 }
 
 func ReadPocs(path string) (poc.Poc, error) {

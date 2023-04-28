@@ -1,8 +1,6 @@
 package core
 
 import (
-	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -82,12 +80,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 		tap := p.(*TargetAndPocs)
 
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(e.options.Timeout)*time.Second)
-			defer cancel()
-			fmt.Println("-", tap.Target)
-			e.executeExpression(ctx, tap.Target, &tap.Poc)
-			fmt.Println("+", tap.Target)
-
+			e.executeExpression(tap.Target, &tap.Poc)
 		}
 
 	})
@@ -103,7 +96,7 @@ func (e *Engine) Execute(allPocsYamlSlice, allPocsEmbedYamlSlice utils.StringSli
 	wg.Wait()
 }
 
-func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
+func (e *Engine) executeExpression(target string, poc *poc.Poc) {
 	c := e.AcquireChecker()
 	defer e.ReleaseChecker(c)
 
@@ -115,6 +108,6 @@ func (e *Engine) executeExpression(ctx context.Context, target string, poc *poc.
 		}
 	}()
 
-	c.Check(ctx, target, poc)
+	c.Check(target, poc)
 	c.Options.ApiCallBack(c.Result)
 }

@@ -44,12 +44,14 @@ func main() {
 	err = runner.New(options, func(result any) {
 		r := result.(*core.Result)
 
-		defer func() {
-			atomic.AddUint32(&options.CurrentCount, 1)
-			if !options.Silent {
-				fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/int(options.Count), strings.Split(time.Since(starttime).String(), ".")[0]+"s")
-			}
-		}()
+		if !options.Silent {
+			defer func() {
+				atomic.AddUint32(&options.CurrentCount, 1)
+				if !options.Silent {
+					fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/int(options.Count), strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+				}
+			}()
+		}
 
 		if r.IsVul {
 			lock.Lock()
@@ -92,12 +94,13 @@ func parseOptions() *config.Options {
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",
-		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan（no default `afrog-pocs` directory）"),
+		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan (no default `afrog-pocs` directory)"),
+		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
+		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
 	)
 
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
-		flagSet.BoolVarP(&options.PrintPocs, "printpocs", "pp", false, "print afrog-pocs list"),
 		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format, eg: -json result.json"),
 	)
 
@@ -114,6 +117,7 @@ func parseOptions() *config.Options {
 	flagSet.CreateGroup("optimization", "Optimizations",
 		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
 		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
+		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", true, "monitor targets live in the scan"),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
 		flagSet.IntVar(&options.MaxHostNum, "mhe", 3, "max errors for a host before skipping from scan"),

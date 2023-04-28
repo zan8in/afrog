@@ -18,9 +18,9 @@ require (
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
 	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
-	github.com/zan8in/pins v0.0.0-20230422040436-7005b245b39a
+	github.com/zan8in/pins v0.0.0-20230424143752-abcce5d9da35
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
-	github.com/zan8in/retryablehttp v0.0.0-20230317090519-47a043af521d
+	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	google.golang.org/protobuf v1.28.1
@@ -104,8 +104,8 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/net v0.8.0
-	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/net v0.9.0
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )
