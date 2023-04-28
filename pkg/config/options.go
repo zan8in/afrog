@@ -20,20 +20,28 @@ type Options struct {
 	// Pocs Directory
 	PocsDirectory utils.StringSlice
 
-	// Target URLs/Domains to scan
 	Targets sliceutil.SafeSlice
 
-	// Target URLs/Domains to scan
+	// target URLs/hosts to scan
 	Target string
 
-	// TargetsFilePath specifies the targets from a file to scan.
-	TargetsFilePath string
+	// list of target URLs/hosts to scan (one per line)
+	TargetsFile string
 
-	// PocsFilePath specifies the directory of pocs to scan.
-	PocsFilePath string
+	// PoC file or directory to scan
+	PocFile string
 
-	// output file to write found issues/vulnerabilities
+	// show afrog-pocs list
+	PocList bool
+
+	// show a afrog-pocs detail
+	PocDetail string
+
+	// file to write output to (optional), support format: html
 	Output string
+
+	// file to write output to (optional), support format: json
+	Json string
 
 	// search PoC by keyword , eg: -s tomcat
 	Search string
@@ -48,20 +56,11 @@ type Options struct {
 
 	SeverityKeywords []string
 
-	// disable output fingerprint in the console
-	NoFinger bool
-
 	// update afrog-pocs
 	UpdatePocs bool
 
 	// update afrog version
 	UpdateAfrogVersion bool
-
-	// show pocs list
-	PocList bool
-
-	// show poc detail
-	PocDetail string
 
 	//
 	MonitorTargets bool
@@ -98,9 +97,6 @@ type Options struct {
 
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
-
-	// write output in JSONL(ines) format
-	OutputJson string
 
 	OJ *output.OutputJson
 }

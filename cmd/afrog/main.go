@@ -62,7 +62,7 @@ func main() {
 			rport.SetResult(r)
 			rport.Append(utils.GetNumberText(int(number)))
 
-			if len(options.OutputJson) > 0 {
+			if len(options.Json) > 0 {
 				options.OJ.AddJson(r.PocInfo.Id, r.PocInfo.Info.Severity, r.FullTarget)
 			}
 
@@ -90,23 +90,23 @@ func parseOptions() *config.Options {
 
 	flagSet.CreateGroup("input", "Target",
 		flagSet.StringVarP(&options.Target, "target", "t", "", "target URLs/hosts to scan"),
-		flagSet.StringVarP(&options.TargetsFilePath, "Targets", "T", "", "path to file containing a list of target URLs/hosts to scan (one per line)"),
+		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",
-		flagSet.StringVarP(&options.PocsFilePath, "pocs", "P", "", "poc.yaml or poc directory paths to include in the scan (no default `afrog-pocs` directory)"),
-		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
+		flagSet.StringVarP(&options.PocFile, "poc-file", "P", "", "PoC file or directory to scan"),
 		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
+		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
 	)
 
 	flagSet.CreateGroup("output", "Output",
-		flagSet.StringVarP(&options.Output, "output", "o", "", "output html report, eg: -o result.html"),
-		flagSet.StringVar(&options.OutputJson, "json", "", "write output in JSON format, eg: -json result.json"),
+		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional), support format: html"),
+		flagSet.StringVarP(&options.Json, "json", "j", "", "file to write output to (optional), support format: json"),
 	)
 
-	flagSet.CreateGroup("filters", "Filtering",
-		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by `keyword` , eg: -s tomcat,phpinfo"),
-		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. Possible values: info, low, medium, high, critical, unknown"),
+	flagSet.CreateGroup("filter", "Filter",
+		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by keyword , eg: -s tomcat,phpinfo"),
+		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. support: info, low, medium, high, critical, unknown"),
 	)
 
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
@@ -114,13 +114,12 @@ func parseOptions() *config.Options {
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 	)
 
-	flagSet.CreateGroup("optimization", "Optimizations",
-		flagSet.BoolVar(&options.Silent, "silent", false, "no progress, only results"),
-		flagSet.BoolVarP(&options.NoFinger, "nofinger", "nf", false, "disable fingerprint"),
-		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", true, "monitor targets live in the scan"),
-		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
-		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
+	flagSet.CreateGroup("optimization", "Optimization",
+		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", true, "monitor targets state in the scan"),
+		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
+		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
 		flagSet.IntVar(&options.MaxHostNum, "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

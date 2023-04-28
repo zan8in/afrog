@@ -47,8 +47,8 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	}
 
 	// output to json file
-	if len(options.OutputJson) > 0 {
-		options.OJ = output.NewOutputJson(options.OutputJson)
+	if len(options.Json) > 0 {
+		options.OJ = output.NewOutputJson(options.Json)
 	}
 
 	// show banner
@@ -76,8 +76,8 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	if len(options.Target) > 0 {
 		options.Targets.Append(options.Target)
 	}
-	if len(options.TargetsFilePath) > 0 {
-		allTargets, err := utils.ReadFileLineByLine(options.TargetsFilePath)
+	if len(options.TargetsFile) > 0 {
+		allTargets, err := utils.ReadFileLineByLine(options.TargetsFile)
 		if err != nil {
 			return err
 		}
@@ -94,8 +94,8 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 
 	// init pocs
 	allPocsEmbedYamlSlice := []string{}
-	if len(options.PocsFilePath) > 0 {
-		options.PocsDirectory.Set(options.PocsFilePath)
+	if len(options.PocFile) > 0 {
+		options.PocsDirectory.Set(options.PocFile)
 	} else {
 		// init default afrog-pocs
 		if allDefaultPocsYamlSlice, err := pocs.GetPocs(); err == nil {
