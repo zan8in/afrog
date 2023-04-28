@@ -9,10 +9,10 @@ import (
 
 	_ "net/http/pprof"
 
-	"github.com/zan8in/afrog/internal/runner"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/core"
 	"github.com/zan8in/afrog/pkg/report"
+	"github.com/zan8in/afrog/pkg/runner"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
