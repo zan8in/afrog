@@ -58,9 +58,9 @@ func New(options *config.Options, acb config.ApiCallBack) error {
 	options.ApiCallBack = acb
 
 	// init proxyURL
-	if err := config.LoadProxyServers(options); err != nil {
-		return err
-	}
+	// if err := config.LoadProxyServers(options); err != nil {
+	// 	return err
+	// }
 
 	// init config file
 	config, err := config.New()
