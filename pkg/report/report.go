@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/result"
 	fileutil "github.com/zan8in/pins/file"
 	timeutil "github.com/zan8in/pins/time"
 )
 
 type Report struct {
 	sync.RWMutex
-	Result     *core.Result
+	Result     *result.Result
 	of         *os.File
 	ReportFile string
 	Template   TemplateStyle
@@ -34,7 +34,7 @@ const OutputDirectory = "./reports"
 // template: the name of the template
 func NewReport(fileName string, template TemplateStyle) (*Report, error) {
 	r := &Report{
-		Result:   &core.Result{},
+		Result:   &result.Result{},
 		Template: template,
 	}
 
@@ -79,7 +79,7 @@ func (report *Report) check(fileName string) error {
 	return nil
 }
 
-func (report *Report) SetResult(result *core.Result) {
+func (report *Report) SetResult(result *result.Result) {
 	report.Lock()
 	defer report.Unlock()
 

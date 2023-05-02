@@ -266,8 +266,8 @@ github.com/mattn/go-isatty v0.0.8/go.mod h1:Iq45c/XA43vh69/j3iqttzPXn0bhXyGjM0Hd
 github.com/mattn/go-isatty v0.0.9/go.mod h1:YNRxwqDuOph6SZLI9vUUz6OYw3QyUt7WiY2yME+cCiQ=
 github.com/mattn/go-isatty v0.0.12/go.mod h1:cbi8OIDigv2wuxKPP5vlRcQ1OAZbq2CE4Kysco4FUpU=
 github.com/mattn/go-isatty v0.0.14/go.mod h1:7GGIvUiUoEMVVmxf/4nioHXj79iQHKdU27kJ6hsGG94=
-github.com/mattn/go-isatty v0.0.16 h1:bq3VjFmv/sOjHtdEhmkEV4x1AJtvUvOJ2PFAZ5+peKQ=
-github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
+github.com/mattn/go-isatty v0.0.17 h1:BTarxUcIeDqL27Mc+vyvdWYSL28zpIhv3RoTdsLMPng=
+github.com/mattn/go-isatty v0.0.17/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
 github.com/mattn/goveralls v0.0.2/go.mod h1:8d1ZMHsd7fW6IRPKQh46F2WRpyib5/X4FOpevwGNQEw=
 github.com/matttproud/golang_protobuf_extensions v1.0.4 h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=
 github.com/matttproud/golang_protobuf_extensions v1.0.4/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
@@ -450,8 +450,8 @@ github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb h1:70NKBDzjvUbs+
 github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb/go.mod h1:2TapaCNt2q/KUV+WoYYlsK0QpoC8ZKFFxt6P0kfdHcs=
 github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 h1:WwIlLuTbEEzJHh0ZXXrBhwALDztG1Mkvz7jfqzwuhtY=
 github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9/go.mod h1:IMXMxKc8XnbwVGoe2cie8JYP2rF4R6DIJh4mMniInUQ=
-github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf h1:mMkVfpCOvTeQVQ7261o28UPwprCbzLEYIjijSnu8D5k=
-github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
+github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a h1:kgpEfiv4FDkAthNB5RQHAZ/fJEVitbcrLOJDeUCRVyY=
+github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauupyJqrwMdFSKkLbVeOylYA1ViNrg0=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/pins v0.0.0-20230424143752-abcce5d9da35 h1:h4jdqICROYihn3EjwsEqtV+RzhmHDmaF6esW2b1IkrU=

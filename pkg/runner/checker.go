@@ -1,4 +1,4 @@
-package core
+package runner
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
+	"github.com/zan8in/afrog/pkg/result"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/pkg/config"
@@ -25,7 +26,7 @@ type Checker struct {
 	Options         *config.Options
 	OriginalRequest *http.Request
 	VariableMap     map[string]any
-	Result          *Result
+	Result          *result.Result
 	CustomLib       *CustomLib
 }
 
@@ -119,7 +120,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.UpdateVariableMap(rule.Output)
 		}
 
-		pocRstTemp := PocResult{IsVul: isMatch}
+		pocRstTemp := result.PocResult{IsVul: isMatch}
 		if c.VariableMap["response"] != nil {
 			pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
 		}
@@ -164,8 +165,6 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 
 	return err
 }
-
-const ActiveTarget = -99
 
 func (c *Checker) checkURL(target string) (string, error) {
 
@@ -246,7 +245,7 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 
 func (c *Checker) newRerverse() *proto.Reverse {
 	sub := utils.CreateRandomString(12)
-	urlStr := fmt.Sprintf("http://%s.%s", sub, ReverseCeyeDomain)
+	urlStr := fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
 	u, _ := url.Parse(urlStr)
 	return &proto.Reverse{
 		Url:                utils.ParseUrl(u),

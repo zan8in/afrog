@@ -1,4 +1,4 @@
-package runner
+package config
 
 import (
 	"fmt"
@@ -9,11 +9,10 @@ import (
 	"github.com/tj/go-update"
 	"github.com/tj/go-update/progress"
 	githubUpdateStore "github.com/tj/go-update/stores/github"
-	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/gologger"
 )
 
-func UpdateAfrogVersionToLatest(verbose bool) error {
+func updateEngine() error {
 	var command string
 	switch runtime.GOOS {
 	case "windows":
@@ -26,7 +25,7 @@ func UpdateAfrogVersionToLatest(verbose bool) error {
 		Store: &githubUpdateStore.Store{
 			Owner:   "zan8in",
 			Repo:    "afrog",
-			Version: config.Version,
+			Version: Version,
 		},
 	}
 	releases, err := m.LatestReleases()

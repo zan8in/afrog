@@ -9,8 +9,6 @@ import (
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
-const ActiveTarget = -99
-
 func (r *Runner) monitorTargets() {
 	if r.options.Targets.Len() == 0 {
 		return

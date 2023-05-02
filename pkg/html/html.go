@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zan8in/afrog/pkg/core"
+	"github.com/zan8in/afrog/pkg/result"
 	"github.com/zan8in/afrog/pkg/utils"
 )
 
 type HtmlTemplate struct {
-	Result   *core.Result
+	Result   *result.Result
 	Filename string
 	Number   string
 	Syncfile *utils.Syncfile

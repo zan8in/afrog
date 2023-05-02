@@ -2,27 +2,22 @@ package retryhttpclient
 
 import (
 	"bytes"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
 	"regexp"
-	"runtime"
 	"strings"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/retryablehttp"
 	"golang.org/x/net/context"
-	"golang.org/x/net/proxy"
 )
 
 var (
@@ -38,11 +33,17 @@ var (
 
 const maxDefaultBody = 2 * 1024 * 1024
 
-func Init(options *config.Options) (err error) {
+type Options struct {
+	Proxy   string
+	Timeout int
+	Retries int
+}
+
+func Init(opt *Options) (err error) {
 	po := &retryablehttp.DefaultPoolOptions
-	po.Proxy = options.Proxy
-	po.Timeout = options.Timeout
-	po.Retries = options.Retries
+	po.Proxy = opt.Proxy
+	po.Timeout = opt.Timeout
+	po.Retries = opt.Retries
 	po.DisableRedirects = true
 
 	retryablehttp.InitClientPool(po)
@@ -58,143 +59,6 @@ func Init(options *config.Options) (err error) {
 	}
 
 	return nil
-}
-
-func Init2(options *config.Options) (err error) {
-	retryableHttpOptions := retryablehttp.DefaultOptionsSpraying
-	maxIdleConns := 0
-	maxConnsPerHost := 0
-	maxIdleConnsPerHost := -1
-	disableKeepAlives := true // 默认 false
-
-	// retryableHttpOptions = retryablehttp.DefaultOptionsSingle
-	// disableKeepAlives = false
-	// maxIdleConnsPerHost = 500
-	// maxConnsPerHost = 500
-
-	maxIdleConns = 1000                        //
-	maxIdleConnsPerHost = runtime.NumCPU() * 2 //
-	idleConnTimeout := 15 * time.Second        //
-	tLSHandshakeTimeout := 5 * time.Second     //
-
-	dialer := &net.Dialer{ //
-		Timeout:   time.Duration(options.Timeout) * time.Second,
-		KeepAlive: 15 * time.Second,
-	}
-
-	retryableHttpOptions.RetryWaitMax = 10 * time.Second
-	retryableHttpOptions.RetryMax = options.Retries
-
-	tlsConfig := &tls.Config{
-		Renegotiation:      tls.RenegotiateOnceAsClient,
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionTLS10,
-	}
-
-	transport := &http.Transport{
-		DialContext:         dialer.DialContext,
-		MaxIdleConns:        maxIdleConns,
-		MaxIdleConnsPerHost: maxIdleConnsPerHost,
-		MaxConnsPerHost:     maxConnsPerHost,
-		TLSClientConfig:     tlsConfig,
-		DisableKeepAlives:   disableKeepAlives,
-		TLSHandshakeTimeout: tLSHandshakeTimeout, //
-		IdleConnTimeout:     idleConnTimeout,     //
-	}
-
-	// transport = &http.Transport{
-	// 	// DialContext:         dialer.Dial,
-	// 	// DialTLSContext:      dialer.DialTLS,
-	// 	MaxIdleConns:        500,
-	// 	MaxIdleConnsPerHost: 500,
-	// 	MaxConnsPerHost:     500,
-	// 	TLSClientConfig:     tlsConfig,
-	// }
-
-	// proxy
-
-	if config.ProxyURL != "" {
-		if proxyURL, err := url.Parse(config.ProxyURL); err == nil {
-			transport.Proxy = http.ProxyURL(proxyURL)
-		}
-	} else if config.ProxySocksURL != "" {
-		socksURL, proxyErr := url.Parse(config.ProxySocksURL)
-		if proxyErr != nil {
-			return proxyErr
-		}
-		dialer, err := proxy.FromURL(socksURL, proxy.Direct)
-		if err != nil {
-			return err
-		}
-
-		dc := dialer.(interface {
-			DialContext(ctx context.Context, network, addr string) (net.Conn, error)
-		})
-		if proxyErr == nil {
-			transport.DialContext = dc.DialContext
-			transport.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				// upgrade proxy connection to tls
-				conn, err := dc.DialContext(ctx, network, addr)
-				if err != nil {
-					return nil, err
-				}
-				return tls.Client(conn, tlsConfig), nil
-			}
-		}
-	}
-
-	// follow redirects client
-	// clientCookieJar, _ := cookiejar.New(nil)
-
-	httpRedirectClient := http.Client{
-		Transport: transport,
-		Timeout:   time.Duration(options.Timeout) * time.Second,
-		// Jar:       clientCookieJar,
-	}
-
-	RtryRedirect = retryablehttp.NewWithHTTPClient(&httpRedirectClient, retryableHttpOptions)
-	RtryRedirect.CheckRetry = retryablehttp.HostSprayRetryPolicy()
-	RtryRedirectHttpClient = RtryRedirect.HTTPClient
-
-	// whitespace
-
-	// disabled follow redirects client
-	// clientNoRedirectCookieJar, _ := cookiejar.New(nil)
-
-	httpNoRedirectClient := http.Client{
-		Transport: transport,
-		Timeout:   time.Duration(options.Timeout) * time.Second,
-		// Jar:           clientNoRedirectCookieJar,
-		CheckRedirect: makeCheckRedirectFunc(false, defaultMaxRedirects),
-	}
-
-	RtryNoRedirect = retryablehttp.NewWithHTTPClient(&httpNoRedirectClient, retryableHttpOptions)
-	RtryNoRedirect.CheckRetry = retryablehttp.HostSprayRetryPolicy()
-	RtryNoRedirectHttpClient = RtryNoRedirect.HTTPClient
-
-	return err
-}
-
-type checkRedirectFunc func(req *http.Request, via []*http.Request) error
-
-func makeCheckRedirectFunc(followRedirects bool, maxRedirects int) checkRedirectFunc {
-	return func(req *http.Request, via []*http.Request) error {
-		if !followRedirects {
-			return http.ErrUseLastResponse
-		}
-
-		if maxRedirects == 0 {
-			if len(via) > defaultMaxRedirects {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		}
-
-		if len(via) > maxRedirects {
-			return http.ErrUseLastResponse
-		}
-		return nil
-	}
 }
 
 func Request(target string, rule poc.Rule, variableMap map[string]any) error {

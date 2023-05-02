@@ -1,4 +1,4 @@
-package core
+package runner
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 
 	"github.com/dlclark/regexp2"
@@ -476,14 +477,14 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 }
 
 func reverseCheck(r *proto.Reverse, timeout int64) bool {
-	if len(ReverseCeyeApiKey) == 0 || len(r.Domain) == 0 {
+	if len(config.ReverseCeyeApiKey) == 0 || len(r.Domain) == 0 {
 		return false
 	}
 
 	time.Sleep(time.Second * time.Duration(timeout))
 
 	sub := strings.Split(r.Domain, ".")[0]
-	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", ReverseCeyeApiKey, sub)
+	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
 
 	resp, err := retryhttpclient.ReverseGet(urlStr)
 	if err != nil {

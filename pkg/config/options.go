@@ -2,15 +2,23 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/output"
+	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 	sliceutil "github.com/zan8in/pins/slice"
+)
+
+var (
+	ReverseCeyeApiKey string
+	ReverseCeyeDomain string
 )
 
 type Options struct {
@@ -62,6 +70,8 @@ type Options struct {
 	// update afrog version
 	UpdateAfrogVersion bool
 
+	UpdateCheck bool
+
 	//
 	MonitorTargets bool
 
@@ -75,7 +85,7 @@ type Options struct {
 	OptLock sync.Mutex
 
 	// Callback scan result
-	ApiCallBack ApiCallBack
+	// OnResult OnResult
 
 	// maximum number of requests to send per second (default 150)
 	RateLimit int
@@ -101,7 +111,111 @@ type Options struct {
 	OJ *output.OutputJson
 }
 
-type ApiCallBack func(any)
+func NewOptions() (*Options, error) {
+
+	options := &Options{}
+	flagSet := goflags.NewFlagSet()
+	flagSet.SetDescription(`afrog`)
+
+	flagSet.CreateGroup("input", "Target",
+		flagSet.StringVarP(&options.Target, "target", "t", "", "target URLs/hosts to scan"),
+		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
+	)
+
+	flagSet.CreateGroup("pocs", "PoCs",
+		flagSet.StringVarP(&options.PocFile, "poc-file", "P", "", "PoC file or directory to scan"),
+		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
+		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
+	)
+
+	flagSet.CreateGroup("output", "Output",
+		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional), support format: html"),
+		flagSet.StringVarP(&options.Json, "json", "j", "", "file to write output to (optional), support format: json"),
+	)
+
+	flagSet.CreateGroup("filter", "Filter",
+		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by keyword , eg: -s tomcat,phpinfo"),
+		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. support: info, low, medium, high, critical, unknown"),
+	)
+
+	flagSet.CreateGroup("rate-limit", "Rate-Limit",
+		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
+	)
+
+	flagSet.CreateGroup("optimization", "Optimization",
+		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", true, "monitor targets state in the scan"),
+		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
+		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
+		flagSet.IntVar(&options.MaxHostNum, "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
+	)
+
+	flagSet.CreateGroup("update", "Update",
+		flagSet.BoolVarP(&options.UpdateCheck, "update-check", "uc", true, "update afrog engine to the latest released version"),
+		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
+		flagSet.BoolVar(&options.UpdateAfrogVersion, "update", false, "update afrog engine to the latest released version"),
+	)
+
+	flagSet.CreateGroup("debug", "Debug",
+		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
+	)
+
+	_ = flagSet.Parse()
+
+	if err := options.verifyOptions(); err != nil {
+		return options, err
+	}
+
+	return options, nil
+}
+
+func (opt *Options) verifyOptions() error {
+
+	config, err := NewConfig()
+	if err != nil {
+		return err
+	}
+	opt.Config = config
+
+	if len(opt.Config.Reverse.Ceye.Domain) == 0 || len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
+		homeDir, _ := os.UserHomeDir()
+		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
+		return fmt.Errorf("`ceye` reverse service not set: %s", configDir)
+	}
+
+	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
+	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+
+	if opt.PocList {
+		return opt.PrintPocList()
+	}
+
+	if len(opt.PocDetail) > 0 {
+		return opt.ShowPocDetail(opt.PocDetail)
+	}
+
+	if opt.UpdateAfrogVersion {
+		return updateEngine()
+	}
+
+	upgrade, err := upgrade.NewUpgrade(opt.UpdatePocs)
+	if err != nil {
+		return err
+	}
+	if opt.UpdateCheck || opt.UpdatePocs {
+		if err = upgrade.UpgradeAfrogPocs(); err != nil {
+			return err
+		}
+		ShowBanner(upgrade)
+	}
+
+	if len(opt.Json) > 0 {
+		opt.OJ = output.NewOutputJson(opt.Json)
+	}
+
+	return nil
+}
 
 func (o *Options) SetSearchKeyword() bool {
 	if len(o.Search) > 0 {
@@ -185,8 +299,7 @@ func (o *Options) ShowPocDetail(pocname string) error {
 		return err
 	}
 
-	fmt.Printf("id: %s\n", poc.Id)
-	fmt.Println()
+	fmt.Printf("id: %s\n\n", poc.Id)
 
 	fmt.Printf("info:\n")
 	fmt.Printf("  name: %s\n", poc.Info.Name)

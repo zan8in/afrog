@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -31,9 +32,9 @@ const (
 	afrogVersion    = "/afrog.version"
 )
 
-func New(updatePoc bool) *Upgrade {
-	homeDir, _ := os.UserHomeDir()
-	return &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}
+func NewUpgrade(updatePoc bool) (*Upgrade, error) {
+	homeDir, err := os.UserHomeDir()
+	return &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}, err
 }
 
 func (u *Upgrade) CheckUpgrade() (bool, error) {
@@ -56,7 +57,10 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 
 	u.RemoteVersion = strings.TrimSpace(string(remoteVersion))
 
-	u.LastestAfrogVersion, _ = getAfrogVersion()
+	u.LastestAfrogVersion, err = getAfrogVersion()
+	if err != nil {
+		return false, err
+	}
 
 	return utils.Compare(strings.TrimSpace(string(remoteVersion)), ">", curVersion), nil
 }
@@ -75,51 +79,55 @@ func getAfrogVersion() (string, error) {
 	return strings.TrimSpace(string(afrogversion)), nil
 }
 
-func (u *Upgrade) UpgradeAfrogPocs() {
+func (u *Upgrade) UpgradeAfrogPocs() error {
 	isUp, err := u.CheckUpgrade()
 	if err != nil {
 		if u.IsUpdatePocs {
-			gologger.Fatal().Msgf("The afrog-pocs update failed, %s\n", err.Error())
+			return fmt.Errorf("the afrog-pocs update failed, %s", err.Error())
 		}
 	}
 	if !isUp {
 		if u.IsUpdatePocs {
-			gologger.Info().Msgf("No new updates found for afrog-pocs!")
+			return fmt.Errorf("no new updates found for afrog-pocs %s", "")
 		}
-		return
 	}
 	if isUp {
 		u.LastestVersion = u.RemoteVersion
 		if u.IsUpdatePocs {
-			gologger.Info().Msgf("Downloading latest afrog-pocs release...")
-			u.Download()
+			gologger.Print().Msg("Downloading latest afrog-pocs release...")
+			return u.Download()
 		}
 	}
+	return err
 }
 
-func (u *Upgrade) Download() {
+func (u *Upgrade) Download() error {
 	resp, err := grab.Get(u.HomeDir, upHost+upPath)
 	if err != nil {
-		gologger.Fatal().Msg(err.Error())
-		return
+		return fmt.Errorf("%s", err.Error())
 	}
-	os.RemoveAll(u.HomeDir + upPathName)
+
+	if err = os.RemoveAll(u.HomeDir + upPathName); err != nil {
+		return err
+	}
+
 	utils.RandSleep(1000)
 
 	u.Unzip(resp.Filename)
 
 	utils.RandSleep(1000)
 
-	os.Remove(resp.Filename)
+	return os.Remove(resp.Filename)
 }
 
-func (u *Upgrade) Unzip(src string) {
+func (u *Upgrade) Unzip(src string) error {
 	uz := utils.NewUnzip()
 
-	_, err := uz.Extract(src, u.HomeDir)
-	if err != nil {
-		gologger.Fatal().Msgf("The afrog-pocs upzip failed, %s\n", err.Error())
+	if _, err := uz.Extract(src, u.HomeDir); err != nil {
+		return fmt.Errorf("the afrog-pocs upzip failed, %s", err.Error())
 	}
 
 	gologger.Info().Msgf("Successfully updated to afrog-pocs %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
+
+	return nil
 }

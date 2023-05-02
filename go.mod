@@ -15,8 +15,7 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/tj/go-update v2.2.5-0.20200519121640-62b4b798fd68+incompatible
-	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
-	github.com/zan8in/goflags v0.0.0-20220917072951-e0cd4abcfeaf
+	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	github.com/zan8in/pins v0.0.0-20230424143752-abcce5d9da35
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
@@ -56,7 +55,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -77,6 +76,7 @@ require (
 	github.com/tidwall/tinyqueue v0.1.1 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb // indirect
+	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 // indirect
 	github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 // indirect
 	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect

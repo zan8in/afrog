@@ -1,4 +1,4 @@
-package core
+package runner
 
 import (
 	"github.com/google/cel-go/cel"

@@ -1,4 +1,4 @@
-package core
+package runner
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/zan8in/afrog/pkg/errors"
 	"github.com/zan8in/afrog/pkg/log"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"gopkg.in/yaml.v2"
@@ -28,25 +27,6 @@ func (c *CustomLib) CompileOptions() []cel.EnvOption {
 
 func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return c.programOptions
-}
-
-func (c *CustomLib) Run(expression string, variablemap map[string]any, call runCallback) {
-	env, err := c.NewCelEnv()
-	if err != nil {
-		call(nil, errors.NewCelEnvError(err))
-		return
-	}
-	val, err := Eval(env, expression, variablemap)
-	if err != nil {
-		call(nil, errors.NewEvalError(err))
-		return
-	}
-	isVul, ok := val.Value().(bool)
-	if !ok {
-		// fmt.Println("successVal Value error: ", err.Error())
-		return
-	}
-	call(isVul, err)
 }
 
 func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
