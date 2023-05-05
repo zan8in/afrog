@@ -34,15 +34,19 @@ const (
 
 func NewUpgrade(updatePoc bool) (*Upgrade, error) {
 	homeDir, err := os.UserHomeDir()
-	return &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}, err
-}
 
-func (u *Upgrade) CheckUpgrade() (bool, error) {
+	u := &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}
+
 	curVersion, err := poc.GetPocVersionNumber()
 	u.CurrVersion = curVersion
 	if err != nil {
-		return false, errors.New("failed to get local version number")
+		return u, errors.New("failed to get local version number")
 	}
+
+	return u, err
+}
+
+func (u *Upgrade) CheckUpgrade() (bool, error) {
 
 	resp, err := http.Get(upHost + upRemoteVersion)
 	if err != nil {
@@ -62,7 +66,7 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 		return false, err
 	}
 
-	return utils.Compare(strings.TrimSpace(string(remoteVersion)), ">", curVersion), nil
+	return utils.Compare(strings.TrimSpace(string(remoteVersion)), ">", u.CurrVersion), nil
 }
 
 func getAfrogVersion() (string, error) {
@@ -92,7 +96,6 @@ func (u *Upgrade) UpgradeAfrogPocs() error {
 		}
 	}
 	if isUp {
-		u.LastestVersion = u.RemoteVersion
 		if u.IsUpdatePocs {
 			gologger.Print().Msg("Downloading latest afrog-pocs release...")
 			return u.Download()
@@ -117,6 +120,8 @@ func (u *Upgrade) Download() error {
 
 	utils.RandSleep(1000)
 
+	u.LastestVersion = u.RemoteVersion
+
 	return os.Remove(resp.Filename)
 }
 
@@ -127,7 +132,10 @@ func (u *Upgrade) Unzip(src string) error {
 		return fmt.Errorf("the afrog-pocs upzip failed, %s", err.Error())
 	}
 
-	gologger.Info().Msgf("Successfully updated to afrog-pocs %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
+	if len(u.RemoteVersion) > 0 {
+		u.CurrVersion = u.RemoteVersion
+	}
+	gologger.Print().Msgf("Successfully updated to afrog-pocs %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
 
 	return nil
 }

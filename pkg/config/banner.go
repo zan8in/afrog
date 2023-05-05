@@ -7,7 +7,7 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-const Version = "2.3.0"
+const Version = "2.3.1"
 
 func ShowBanner(u *upgrade.Upgrade) {
 	gologger.Print().Msgf("\n|\tA F R O G\t>\t%s\t-\t%s\n", EngineV(u), PocV(u))

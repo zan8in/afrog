@@ -70,7 +70,8 @@ type Options struct {
 	// update afrog version
 	UpdateAfrogVersion bool
 
-	UpdateCheck bool
+	// Disable update check
+	DisableUpdateCheck bool
 
 	//
 	MonitorTargets bool
@@ -152,8 +153,8 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("update", "Update",
-		flagSet.BoolVarP(&options.UpdateCheck, "update-check", "uc", true, "update afrog engine to the latest released version"),
-		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to latest released version"),
+		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable update check"),
+		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", true, "update afrog-pocs to latest released version"),
 		flagSet.BoolVar(&options.UpdateAfrogVersion, "update", false, "update afrog engine to the latest released version"),
 	)
 
@@ -203,12 +204,11 @@ func (opt *Options) verifyOptions() error {
 	if err != nil {
 		return err
 	}
-	if opt.UpdateCheck || opt.UpdatePocs {
-		if err = upgrade.UpgradeAfrogPocs(); err != nil {
-			return err
-		}
-		ShowBanner(upgrade)
+
+	if !opt.DisableUpdateCheck {
+		upgrade.UpgradeAfrogPocs()
 	}
+	ShowBanner(upgrade)
 
 	if len(opt.Json) > 0 {
 		opt.OJ = output.NewOutputJson(opt.Json)
