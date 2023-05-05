@@ -182,7 +182,7 @@ func (opt *Options) verifyOptions() error {
 	if len(opt.Config.Reverse.Ceye.Domain) == 0 || len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
 		homeDir, _ := os.UserHomeDir()
 		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
-		return fmt.Errorf("`ceye` reverse service not set: %s", configDir)
+		gologger.Error().Msgf("`ceye` reverse service not set: %s", configDir)
 	}
 
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
