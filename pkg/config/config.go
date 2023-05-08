@@ -36,7 +36,7 @@ type Reverse struct {
 
 type Ceye struct {
 	ApiKey string `yaml:"api-key"`
-	Domain string `yaml:"domain`
+	Domain string `yaml:"domain"`
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
