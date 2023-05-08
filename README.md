@@ -394,7 +394,7 @@ reverse:
 
 ## Screenshot
 
-![](https://github.com/zan8in/afrog/blob/main/images/1-new.png)
+![](https://github.com/zan8in/afrog/blob/main/images/1.png)
 
 <!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
 
