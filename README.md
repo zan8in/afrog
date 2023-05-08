@@ -342,6 +342,7 @@ afrog -t https://example.com
 ```
 
 **Warning occurs when running afrog**
+
 If you see an error message saying:
 ```
 [ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
@@ -393,9 +394,9 @@ reverse:
 
 ## Screenshot
 
-![](https://github.com/zan8in/afrog/blob/main/images/scan-new.png)
+![](https://github.com/zan8in/afrog/blob/main/images/1-new.png)
 
-![](https://github.com/zan8in/afrog/blob/main/images/report-new.png)
+<!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
 
 ## Discussion group
 
