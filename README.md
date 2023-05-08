@@ -400,7 +400,7 @@ reverse:
 
 ## Discussion group
 
-To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as `afrog`. Then, you will be added to the group by the administrator.
+To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
 
 <img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
 
@@ -411,12 +411,12 @@ afrog has joined [404Starlink](https://github.com/knownsec/404StarLink)
 
 ## Disclaimer
 
-This tool is only for **legally authorized** enterprise security construction behavior. If you need to test the usability of this tool, please build a target environment by yourself.
+This tool is intended only for **legally authorized** enterprise security construction purposes. If you want to test the functionality of this tool, you should build a target environment by yourself.
 
-In order to avoid malicious use, all PoCs included in this project are theoretical judgments of vulnerabilities, there is no vulnerability exploitation process, and no real attacks or exploits will be launched on the target.
+To prevent malicious use, all PoCs included in this project are theoretical assessments of vulnerabilities. The tool does not exploit vulnerabilities, launch real attacks or exploits on targets.
 
-When using this tool for detection, you should ensure that the behavior complies with local laws and regulations and has obtained sufficient authorization. **Do not scan unauthorized targets. **
+When using this tool for vulnerability scanning, it is important to ensure that your behavior complies with local laws and regulations, and that you have obtained sufficient authorization. **Do not scan unauthorized targets**.
 
-If you have any illegal behavior in the process of using this tool, you shall bear the corresponding consequences by yourself, and we will not bear any legal and joint responsibility.
+If you engage in any illegal behavior while using this tool, you will be solely responsible for any corresponding consequences, and we will not bear any legal or joint responsibility.
 
-Before installing and using this tool, please **must read carefully and fully understand the contents of each clause**. Restrictions, disclaimers or other clauses involving your significant rights and interests may be bolded or underlined to remind you to pay attention . Unless you have fully read, fully understood and accepted all the terms of this agreement, please do not install and use this tool. Your use behavior or your acceptance of this agreement in any other express or implied manner shall be deemed that you have read and agreed to be bound by this agreement.
+Before installing and using this tool, please **read each clause carefully and thoroughly**. Restrictions, disclaimers, or other clauses that may significantly affect your rights and interests may be highlighted in bold or underlined to draw your attention. Unless you have fully read, fully understood, and agreed to all the terms of this agreement, do not install or use this tool. Your use of the tool or your acceptance of this agreement in any other express or implied manner will be deemed as your acknowledgment and agreement to be bound by this agreement.
