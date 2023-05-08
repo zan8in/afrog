@@ -402,7 +402,7 @@ reverse:
 
 To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
 
-<img src="https://github.com/zan8in/afrog/blob/main/images/afrog.png" width="33%" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" />
 
 ## 404Starlink
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
