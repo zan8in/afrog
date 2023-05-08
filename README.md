@@ -1,5 +1,5 @@
 <h1 align="center">afrog</h1>
-<p align="center">A Vulnerability Scanning Tools For Penetration Testing</p>
+<p align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
