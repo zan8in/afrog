@@ -315,24 +315,23 @@ afrog is a high-performance vulnerability scanner that is fast and stable. It su
 
 you can install it with:
 
-::: code-group
-
-```sh [Binary]
+**Binary**
+```sh
 $ https://github.com/zan8in/afrog/releases
 ```
 
-```sh [Github]
+**Github**
+```sh
 $ git clone https://github.com/zan8in/afrog.git
 $ cd afrog
 $ go run cmd/afrog/main.go
 $ ./afrog -h
 ```
 
-```sh [Go]
+**Go**
+```sh
 $ go install -v https://github.com/zan8in/afrog/cmd/afrog@latest
 ```
-
-:::
 
 ## Running afrog
 
@@ -342,13 +341,12 @@ By default, afrog scans all built-in PoCs, and if it finds any vulnerabilities, 
 afrog -t https://example.com
 ```
 
-::: details Warning occurs when running afrog
+**Warning occurs when running afrog**
 If you see an error message saying:
 ```
 [ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
 ```
 it means you need to modify the [configuration file](getting-started.md#configuration-file).
-:::
 
 To execute a custom PoC directory, you can use the following command:
 
