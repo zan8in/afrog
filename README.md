@@ -297,49 +297,101 @@
 
 ## What is afrog
 
-afrog is an excellent performance, fast and stable, PoC customizable vulnerability scanning (hole digging) tool. PoC involves CVE, CNVD, default password, information leakage, fingerprint identification, unauthorized access, arbitrary file reading, command execution, etc. It helps network security practitioners quickly verify and fix vulnerabilities in a timely manner.
+afrog is a high-performance vulnerability scanner that is fast and stable. It supports user-defined PoC and comes with several built-in types, such as CVE, CNVD, default passwords, information disclosure, fingerprint identification, unauthorized access, arbitrary file reading, and command execution. With afrog, network security professionals can quickly validate and remediate vulnerabilities, which helps to enhance their security defense capabilities.
 
 ## Features
 
-* [x] Open Source
-* [x] Fast, stable, low false positives
-* [x] Detailed html vulnerability report
-* [x] PoC can be customized and updated stably
+* [x] Open source
+* [x] Fast, stable, with low false positives
+* [x] Detailed HTML vulnerability reports
+* [x] Customizable and stably updatable PoCs
 * [x] Active community exchange group
 
-## Example
+## Installation
 
-Basic usage
+### Prerequisites
+
+- [Go](https://go.dev/) version 1.19 or higher.
+
+you can install it with:
+
+::: code-group
+
+```sh [Binary]
+$ https://github.com/zan8in/afrog/releases
 ```
-# Scan a target
-afrog -t http://127.0.0.1
 
-# Scan multiple targets
+```sh [Github]
+$ git clone https://github.com/zan8in/afrog.git
+$ cd afrog
+$ go run cmd/afrog/main.go
+$ ./afrog -h
+```
+
+```sh [Go]
+$ go install -v https://github.com/zan8in/afrog/cmd/afrog@latest
+```
+
+:::
+
+## Running afrog
+
+By default, afrog scans all built-in PoCs, and if it finds any vulnerabilities, it automatically creates an HTML report with the date of the scan as the filename.
+
+```sh
+afrog -t https://example.com
+```
+
+::: details Warning occurs when running afrog
+If you see an error message saying:
+```
+[ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
+```
+it means you need to modify the [configuration file](getting-started.md#configuration-file).
+:::
+
+To execute a custom PoC directory, you can use the following command:
+
+```sh
+afrog -t https://example.com -P mypocs/
+```
+
+Use the command `-s keyword` to perform a fuzzy search on all PoCs and scan the search results. Multiple keywords can be used, separated by commas. For example: `-s weblogic,jboss`.
+
+```sh
+afrog -t https://example.com -s weblogic,jboss
+```
+
+Use the command `-S keyword` to scan vulnerabilities based on their severity level. Severity levels include: `info`, `low`, `medium`, `high`, and `critical`. For example, to only scan high and critical vulnerabilities, use the command `-S high,critical`.
+
+```sh
+afrog -t https://example.com -S high,critical
+```
+
+You can scan multiple URLs at the same time as well.
+
+```sh
 afrog -T urls.txt
-
-# Specify a scan report file
-afrog -t http://127.0.0.1 -o result.html
 ```
 
-Advanced usage
+## Configuration file
 
+The first time you start afrog, it will automatically create a configuration file called `afrog-config.yaml`, which will be saved in the current user directory under `$HOME/.config/afrog/afrog-config.yaml`.
+
+Here is an example config file:
+
+```yaml
+reverse:
+  ceye:
+    api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    domain: "xxxxxx.ceye.io"
 ```
-# Test PoC 
-afrog -t http://127.0.0.1 -P ./test/ 
-afrog -t http://127.0.0.1 -P ./test/demo.yaml 
 
-# Scan by PoC Keywords 
-afrog -t http://127.0.0.1 -s tomcat,springboot,shiro 
+`reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification. To obtain ceye, follow these steps:
 
-# Scan by PoC Vulnerability Severity Level 
-afrog -t http://127.0.0.1 -S high,critical 
-
-# Online update afrog-pocs 
-afrog -up 
-
-# Disable fingerprint recognition 
-afrog -t http://127.0.0.1 -nf
-```
+- Go to the ceye.io website and register an account.
+- Log in and go to the personal settings page.
+- Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
 
 ## Screenshot
 
