@@ -324,7 +324,7 @@ $ https://github.com/zan8in/afrog/releases
 ```sh
 $ git clone https://github.com/zan8in/afrog.git
 $ cd afrog
-$ go run cmd/afrog/main.go
+$ go build cmd/afrog/main.go
 $ ./afrog -h
 ```
 
