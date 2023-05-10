@@ -13,7 +13,7 @@ rules:
             path: /
         expressions:
            - '"apache-activemq" != "" && response.status == 200 && response.body.bcontains(b"<title>Apache ActiveMQ</title>")'
-           - '"thinkphp" != "" && response.status == 200 && response.raw_header.ibcontains(b"thinkphp")'
+           - '"thinkphp" != "" && response.raw_header.ibcontains(b"thinkphp")'
            - '"appex-lotwan-login" != "" && response.status == 200 && response.body.bcontains(b"<title>LotWan 广域网优化系统</title>")'
            - '"avtech-avn801-camera" != "" && response.status == 200 && response.body.bcontains(b"IP Surveillance for Your Life") && response.body.bcontains(b"avtech") && response.body.bcontains(b"/cgi-bin/guest/Login.cgi?rnd=")'
            - '"directadmin-login" != "" && response.status == 200 && response.body.bcontains(b"<title>DirectAdmin Login</title>")'
@@ -57,7 +57,7 @@ rules:
             follow_redirects: true
         expressions:
            - '"apache-activemq" != "" && response.status == 200 && response.body.bcontains(b"<title>Apache ActiveMQ</title>")'
-           - '"thinkphp" != "" && response.status == 200 && response.raw_header.ibcontains(b"thinkphp")'
+           - '"thinkphp" != "" && response.raw_header.ibcontains(b"thinkphp")'
            - '"appex-lotwan-login" != "" && response.status == 200 && response.body.bcontains(b"<title>LotWan 广域网优化系统</title>")'
            - '"avtech-avn801-camera" != "" && response.status == 200 && response.body.bcontains(b"IP Surveillance for Your Life") && response.body.bcontains(b"avtech") && response.body.bcontains(b"/cgi-bin/guest/Login.cgi?rnd=")'
            - '"directadmin-login" != "" && response.status == 200 && response.body.bcontains(b"<title>DirectAdmin Login</title>")'
