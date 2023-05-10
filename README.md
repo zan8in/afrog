@@ -1,4 +1,7 @@
 <h1 align="center">afrog</h1>
+<p align="center">
+  <a href="http://afrog.net"><img src="images/afrog-logo.png" width="60px" alt="afrog"></a>
+</p>
 <h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
 
 <p align="center">
