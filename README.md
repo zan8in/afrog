@@ -1,5 +1,16 @@
 <h1 align="center">afrog</h1>
-<p align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</p>
+<h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
+
+<p align="center">
+<img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=v2%2Fgo.mod">
+<a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
+<a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
+<a href="https://discord.gg/projectdiscovery"><img src="https://img.shields.io/discord/695645237418131507.svg?logo=discord"></a>
+<a href="https://twitter.com/pdnuclei"><img src="https://img.shields.io/twitter/follow/pdnuclei.svg?logo=twitter"></a>
+</p>
 
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
