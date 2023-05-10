@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="http://afrog.net"><img src="images/afrog-logo.svg" width="60px" alt="afrog">
+  <a href="http://afrog.net"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
 <!-- </a> <h1 align="center">afrog</h1> -->
 
