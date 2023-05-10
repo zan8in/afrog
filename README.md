@@ -347,7 +347,7 @@ If you see an error message saying:
 ```
 [ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
 ```
-it means you need to modify the [configuration file](getting-started.md#configuration-file).
+it means you need to modify the [configuration file](#configuration-file).
 
 To execute a custom PoC directory, you can use the following command:
 
