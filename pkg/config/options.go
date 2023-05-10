@@ -74,7 +74,7 @@ type Options struct {
 	DisableUpdateCheck bool
 
 	//
-	MonitorTargets bool
+	DisableMonitorTargets bool
 
 	// Scan count num(targets * allpocs)
 	Count int
@@ -98,7 +98,7 @@ type Options struct {
 	Retries int
 
 	//
-	MaxHostNum int
+	MaxHostError int
 
 	// time to wait in seconds before timeout (default 10)
 	Timeout int
@@ -145,10 +145,10 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
-		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", true, "monitor targets state in the scan"),
+		flagSet.BoolVarP(&options.DisableMonitorTargets, "disable-monitor-targets", "dmt", false, "Disable the monitor-target feature during scanning."),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
-		flagSet.IntVar(&options.MaxHostNum, "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 	)
 

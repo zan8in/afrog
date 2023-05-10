@@ -175,7 +175,7 @@ func (c *Checker) checkURL(target string) (string, error) {
 		return target, nil
 	}
 
-	if tcount > c.Options.MaxHostNum {
+	if tcount > c.Options.MaxHostError {
 		return "", fmt.Errorf("%s is blacklisted", target)
 	}
 

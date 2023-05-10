@@ -102,7 +102,7 @@ func (runner *Runner) Run() error {
 
 	// gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
 
-	if runner.options.MonitorTargets {
+	if !runner.options.DisableMonitorTargets {
 		go runner.monitorTargets()
 	}
 

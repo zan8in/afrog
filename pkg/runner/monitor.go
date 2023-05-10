@@ -16,7 +16,7 @@ func (r *Runner) monitorTargets() {
 
 	ticker := time.NewTicker(time.Second / time.Duration(r.options.RateLimit))
 	swg := sizedwaitgroup.New(r.options.Concurrency)
-	for i := 0; i <= r.options.MaxHostNum; i++ {
+	for i := 0; i <= r.options.MaxHostError; i++ {
 		for _, v := range r.options.Targets.List() {
 			swg.Add()
 			<-ticker.C
@@ -38,7 +38,7 @@ func (r *Runner) checkURL(target string) (string, error) {
 		return target, nil
 	}
 
-	if tcount > r.options.MaxHostNum {
+	if tcount > r.options.MaxHostError {
 		return "", fmt.Errorf("%s is blacklisted", target)
 	}
 
