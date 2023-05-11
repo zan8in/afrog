@@ -197,7 +197,7 @@
                    alt="Typora-Logo"
                  />
             <br>
-            <a href="https://github.com/Double-q1015"><sub>Double-q1015</sub></a>
+            <a href="https://github.com/Double-q1015"><sub>Double...</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/25.png&mask=circle&w=60&h=60"
@@ -255,7 +255,7 @@
                    alt="Typora-Logo"
                  />
             <br>
-            <a href="javascript:void(0);"><sub>江湖人称魏神</sub></a>
+            <a href="javascript:void(0);"><sub>江湖人称魏...</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/33.jpg&mask=circle&w=60&h=60"
