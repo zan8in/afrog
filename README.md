@@ -107,35 +107,35 @@
             <a href="https://github.com/yueyu0740"><sub>冰河</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/12.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/12.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>Sheen</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/13.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/13.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>a16</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/14.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/14.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>A1</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/15.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/15.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/rainbow2972"><sub>rainbow2972</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/16.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/16.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
@@ -144,56 +144,56 @@
 	</tr>	
     <tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/17.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/17.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>茄子</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/18.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/18.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>lei_sec</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/19.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/19.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/G-H-Z"><sub>G-H-Z</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/20.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/20.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/LDDP"><sub>wh1te</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/21.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/21.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>清月</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/22.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/22.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>york</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/23.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/23.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>7eleven.eth</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/24.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/24.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
@@ -202,56 +202,56 @@
     </tr>	
     <tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/25.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/25.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/iceyjchen"><sub>ICEY_</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/26.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/26.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/27.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/27.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/Lay0us1"><sub>Lay0us</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/28.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/28.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>m4sk</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/29.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/29.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://www.yuque.com/chenmoshuren/qyxg2k"><sub>沉默树人</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/30.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/30.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>陈麻子</sub></a>
         </td>
          <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/31.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/31.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/leonardo-o1"><sub>leonardo-o1</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/32.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/32.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
@@ -260,42 +260,42 @@
     </tr>
     <tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/33.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/33.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>若兮风</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/34.png"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/34.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>-sudo</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/35.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/35.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/Cuerz"><sub>Cuerz</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/36.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/36.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>laohuan12138</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/37.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/37.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/exp0l0zzz"><sub>exp0l0zzz</sub></a>
         </td>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/38.jpg"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/38.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
