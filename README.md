@@ -1,3 +1,10 @@
+<style>
+    #contributors img {
+        border-radius: 50% !important;
+    }
+
+</style>
+
 <p align="center">
   <a href="http://afrog.net"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
@@ -27,7 +34,7 @@
 
 
 
-<div><table frame=void>
+<div id="contributors"><table frame=void>
 	<tr>
         <td align="center">
             <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.png"
