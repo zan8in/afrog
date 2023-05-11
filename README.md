@@ -83,8 +83,6 @@
             <br>
             <a href="https://github.com/purple-WL"><sub>purple-WL</sub></a>
         </td>
-	</tr>
-    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/9.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -92,6 +90,8 @@
             <br>
             <a href="javascript:void(0);"><sub>throat</sub></a>
         </td>
+	</tr>
+    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/10.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -141,8 +141,6 @@
             <br>
             <a href="https://github.com/wuha0926"><sub>wuha0926</sub></a>
         </td>
-	</tr>	
-    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/17.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -157,6 +155,8 @@
             <br>
             <a href="javascript:void(0);"><sub>lei_sec</sub></a>
         </td>
+	</tr>	
+    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/19.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -199,8 +199,6 @@
             <br>
             <a href="https://github.com/Double-q1015"><sub>Double-q1015</sub></a>
         </td>
-    </tr>	
-    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/25.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -222,6 +220,8 @@
             <br>
             <a href="https://github.com/Lay0us1"><sub>Lay0us</sub></a>
         </td>
+    </tr>	
+    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/28.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -257,8 +257,6 @@
             <br>
             <a href="javascript:void(0);"><sub>江湖人称魏神</sub></a>
         </td>
-    </tr>
-    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/33.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
@@ -287,6 +285,8 @@
             <br>
             <a href="javascript:void(0);"><sub>laohuan12138</sub></a>
         </td>
+    </tr>
+    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/37.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
