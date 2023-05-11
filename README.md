@@ -32,12 +32,10 @@
 
 ## PoC Contributors
 
-
-
-<div id="contributors"><table frame=void>
+<div><table frame=void>
 	<tr>
         <td align="center">
-            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.png"
+            <img src="https://github.com/zan8in/afrog/blob/main/images/contributors/1.png?mask=circle"
                   alt="Typora-Logo"  class="contributor-img"
                   height="80"/>
             <br>
