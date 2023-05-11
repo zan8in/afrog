@@ -98,7 +98,6 @@ func (runner *Runner) Run() error {
 	// gologger.Print().Msgf("Creating output html file: %s", htemplate.Filename)
 
 	// whitespace show banner
-	fmt.Println()
 
 	// gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
 

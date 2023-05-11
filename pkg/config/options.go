@@ -154,7 +154,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("update", "Update",
 		flagSet.BoolVarP(&options.Update, "update", "un", false, "update afrog engine to the latest released version"),
-		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", true, "update afrog-pocs to the latest released version"),
+		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to the latest released version"),
 		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic afrog-pocs update check"),
 	)
 
@@ -200,14 +200,18 @@ func (opt *Options) verifyOptions() error {
 		return updateEngine()
 	}
 
-	upgrade, err := upgrade.NewUpgrade(opt.UpdatePocs)
+	upgrade, err := upgrade.NewUpgrade(true)
 	if err != nil {
 		return err
 	}
 
 	if !opt.DisableUpdateCheck {
-		upgrade.UpgradeAfrogPocs()
+		info, _ := upgrade.UpgradePocs()
+		if len(info) > 0 && opt.UpdatePocs {
+			gologger.Info().Msg(info)
+		}
 	}
+
 	ShowBanner(upgrade)
 
 	if len(opt.Json) > 0 {

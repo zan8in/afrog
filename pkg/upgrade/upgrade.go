@@ -24,7 +24,6 @@ type Upgrade struct {
 }
 
 const (
-	// upHost = "http://binbin.run/afrog-release"
 	upHost          = "https://gitee.com/zanbin/afrog/raw/main/pocs/v"
 	upPathName      = "/afrog-pocs"
 	upPath          = "/afrog-pocs.zip"
@@ -34,14 +33,17 @@ const (
 
 func NewUpgrade(updatePoc bool) (*Upgrade, error) {
 	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
 
 	u := &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}
 
 	curVersion, err := poc.GetPocVersionNumber()
-	u.CurrVersion = curVersion
 	if err != nil {
-		return u, errors.New("failed to get local version number")
+		return u, errors.New("failed to retrieve the version information of afrog-poc locally")
 	}
+	u.CurrVersion = curVersion
 
 	return u, err
 }
@@ -50,13 +52,13 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 
 	resp, err := http.Get(upHost + upRemoteVersion)
 	if err != nil {
-		return false, errors.New("failed to get remote version number")
+		return false, errors.New("failed to retrieve the version information of afrog-poc remotely")
 	}
 	defer resp.Body.Close()
 
 	remoteVersion, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return false, errors.New("failed to get remote version number")
+		return false, errors.New("failed to retrieve the version information of afrog-poc remotely")
 	}
 
 	u.RemoteVersion = strings.TrimSpace(string(remoteVersion))
@@ -72,36 +74,36 @@ func (u *Upgrade) CheckUpgrade() (bool, error) {
 func getAfrogVersion() (string, error) {
 	resp, err := http.Get(upHost + afrogVersion)
 	if err != nil {
-		return "", errors.New("failed to get remote version number")
+		return "", errors.New("failed to retrieve the version information of afrog remotely")
 	}
 	defer resp.Body.Close()
 
 	afrogversion, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.New("failed to get remote version number")
+		return "", errors.New("failed to retrieve the version information of afrog remotely")
 	}
 	return strings.TrimSpace(string(afrogversion)), nil
 }
 
-func (u *Upgrade) UpgradeAfrogPocs() error {
+func (u *Upgrade) UpgradePocs() (string, error) {
 	isUp, err := u.CheckUpgrade()
 	if err != nil {
 		if u.IsUpdatePocs {
-			return fmt.Errorf("the afrog-pocs update failed, %s", err.Error())
+			return "", fmt.Errorf("afrog-poc update failed. %s", err.Error())
 		}
 	}
 	if !isUp {
 		if u.IsUpdatePocs {
-			return fmt.Errorf("no new updates found for afrog-pocs %s", "")
+			return "The current version of afrog-pocs is already up-to-date.", nil
 		}
 	}
 	if isUp {
 		if u.IsUpdatePocs {
-			gologger.Print().Msg("Downloading latest afrog-pocs release...")
-			return u.Download()
+			gologger.Print().Msg("Downloading the latest version of afrog-pocs...")
+			return "", u.Download()
 		}
 	}
-	return err
+	return "", err
 }
 
 func (u *Upgrade) Download() error {
@@ -129,13 +131,13 @@ func (u *Upgrade) Unzip(src string) error {
 	uz := utils.NewUnzip()
 
 	if _, err := uz.Extract(src, u.HomeDir); err != nil {
-		return fmt.Errorf("the afrog-pocs upzip failed, %s", err.Error())
+		return fmt.Errorf("afrog-poc decompression failed. %s", err.Error())
 	}
 
 	if len(u.RemoteVersion) > 0 {
 		u.CurrVersion = u.RemoteVersion
 	}
-	gologger.Print().Msgf("Successfully updated to afrog-pocs %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
+	gologger.Print().Msgf("afrog-poc has been updated successfully and the path is: %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
 
 	return nil
 }

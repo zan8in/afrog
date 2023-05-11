@@ -33,7 +33,7 @@ func updateEngine() error {
 		return errors.Wrap(err, "could not fetch latest release")
 	}
 	if len(releases) == 0 {
-		gologger.Info().Msgf("No new updates found for afrog engine!")
+		gologger.Info().Msg("afrog is already up-to-date and doesn't require an update.")
 		return nil
 	}
 
