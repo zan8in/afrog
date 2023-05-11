@@ -28,56 +28,56 @@
 <div><table frame=void>
 	<tr>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/1.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/1.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://blog.csdn.net/U_U520"><sub>不动明王</sub></a>
         </td>    
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/2.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/2.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://www.linuxlz.com/"><sub>雪山</sub></a>
         </td> 
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/3.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/3.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/White-hua"><sub>White-hua</sub></a>
         </td> 
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/5.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/5.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0)"><sub>123456</sub></a>
         </td> 
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/6.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/6.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/ifofor"><sub>ifofor</sub></a>
         </td> 
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/7.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/7.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/SkinAir"><sub>Air</sub></a>
         </td>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/8.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/8.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="https://github.com/zhizhuoshuma"><sub>执着</sub></a>
         </td>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/4.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/4.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
@@ -86,21 +86,21 @@
 	</tr>
     <tr>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/9.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/9.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="javascript:void(0);"><sub>throat</sub></a>
         </td>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/10.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/10.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
             <a href="http://secx.store:4000/archives/"><sub>Secx</sub></a>
         </td>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/11.png&mask=circle"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/11.png&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                   height="80"/>
             <br>
