@@ -20,6 +20,7 @@ type Runner struct {
 	options       *config.Options
 	catalog       *catalog.Catalog
 	Report        *report.Report
+	JsonReport    *report.JsonReport
 	OnResult      OnResult
 	PocsYaml      utils.StringSlice
 	PocsEmbedYaml utils.StringSlice
@@ -36,6 +37,12 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		Timeout: options.Timeout,
 		Retries: options.Retries,
 	})
+
+	jr, err := report.NewJsonReport(options.Json, options.JsonAll)
+	if err != nil {
+		return runner, fmt.Errorf("%s", err.Error())
+	}
+	runner.JsonReport = jr
 
 	report, err := report.NewReport(options.Output, report.DefaultTemplate)
 	if err != nil {

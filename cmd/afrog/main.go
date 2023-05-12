@@ -31,6 +31,7 @@ func main() {
 	if err != nil {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
+	defer r.JsonReport.AppendEndOfFile()
 
 	var (
 		lock      = sync.Mutex{}
@@ -58,8 +59,9 @@ func main() {
 			r.Report.SetResult(result)
 			r.Report.Append(utils.GetNumberText(int(number)))
 
-			if len(options.Json) > 0 {
-				options.OJ.AddJson(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget)
+			if len(options.Json) > 0 || len(options.JsonAll) > 0 {
+				r.JsonReport.SetResult(result)
+				r.JsonReport.Append()
 			}
 
 			lock.Unlock()

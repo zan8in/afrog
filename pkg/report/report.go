@@ -56,14 +56,14 @@ func (report *Report) check(fileName string) error {
 
 	suffix := path.Ext(fileName)
 	if suffix != ".html" && suffix != ".htm" {
-		return fmt.Errorf("could not create output file: file suffix must be .html or htm")
+		return fmt.Errorf("please change the file extension of the output to .html or .htm. Unable to create output file")
 	}
 
 	_, err := os.Stat(fileName)
 	if os.IsNotExist(err) {
 		file, err := os.Create(fileName)
 		if err != nil {
-			return fmt.Errorf("could not create output file: %v", err)
+			return fmt.Errorf("unable to create output file: %v", err)
 		}
 		file.Close()
 		time.Sleep(100 * time.Millisecond)

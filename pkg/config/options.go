@@ -51,6 +51,9 @@ type Options struct {
 	// file to write output to (optional), support format: json
 	Json string
 
+	// file to write output to (optional), support format: json
+	JsonAll string
+
 	// search PoC by keyword , eg: -s tomcat
 	Search string
 
@@ -130,8 +133,9 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("output", "Output",
-		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional), support format: html"),
-		flagSet.StringVarP(&options.Json, "json", "j", "", "file to write output to (optional), support format: json"),
+		flagSet.StringVarP(&options.Output, "output", "o", "", "write to the HTML file, including all vulnerability results"),
+		flagSet.StringVarP(&options.Json, "json", "j", "", "write to the JSON file, but it will not include the request and response content"),
+		flagSet.StringVarP(&options.JsonAll, "json-all", "ja", "", "write to the JSON file, including all vulnerability results"),
 	)
 
 	flagSet.CreateGroup("filter", "Filter",
