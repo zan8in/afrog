@@ -401,7 +401,7 @@ afrog -t https://example.com -o result.html
 
 ## Json Output
 
-Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the `-json-all` command parameter.
+Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the [-json-all](#jsonall) command parameter.
 
 ```sh
 afrog  -t https://example.com -json result.json
@@ -414,7 +414,7 @@ The content of the JSON file is updated in real time. However, there is an impor
 
 ## JsonAll
 
-Optional command: `-json-all` `-ja`, The only difference between the `-json-al`l and `-json` commands is that `-json-all` writes all vulnerability results, including `request` and `response`, to a JSON file.
+Optional command: `-json-all` `-ja`, The only difference between the `-json-all` and `-json` commands is that `-json-all` writes all vulnerability results, including `request` and `response`, to a JSON file.
 
 ```sh
 afrog -t https://example.com -json-all result.json
