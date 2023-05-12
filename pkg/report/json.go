@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/pkg/result"
+	fileutil "github.com/zan8in/pins/file"
 	timeutil "github.com/zan8in/pins/time"
-	"github.com/zan8in/retryabledns/fileutil"
 )
 
 type JsonReport struct {
@@ -183,6 +183,10 @@ func (jr *JsonReport) JsonContent() *JsonResult {
 }
 
 func (jr *JsonReport) AppendEndOfFile() error {
+
+	if !fileutil.FileExists(jr.ReportFile) {
+		return nil
+	}
 
 	file, err := os.OpenFile(jr.ReportFile, os.O_RDWR, 0755)
 	if err != nil {
