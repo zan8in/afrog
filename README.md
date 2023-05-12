@@ -391,16 +391,9 @@ You can scan multiple URLs at the same time as well.
 afrog -T urls.txt
 ```
 
-## Output
-
-Optional command: `-o`, writes the vulnerability scan results to the specified HTML file in real time. If the filename is not specified, a HTML file will be automatically created in the ./reports directory.
-
-```sh
-afrog -t https://example.com -o result.html
-```
-
 ## Json Output
 
+### Json
 Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the [-json-all](#jsonall) command parameter.
 
 ```sh
@@ -412,7 +405,8 @@ afrog  -t https://example.com -j result.json
 The content of the JSON file is updated in real time. However, there is an important note to keep in mind: before the scan is completed, if developers want to parse the file content, they need to add a '`]`' symbol to the end of the file by themselves, otherwise it will cause parsing errors. Of course, if you wait for the scan to complete before parsing the file, this issue will not occur.
 :::
 
-## JsonAll
+
+### JsonAll
 
 Optional command: `-json-all` `-ja`, The only difference between the `-json-all` and `-json` commands is that `-json-all` writes all vulnerability results, including `request` and `response`, to a JSON file.
 
