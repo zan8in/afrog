@@ -391,6 +391,26 @@ You can scan multiple URLs at the same time as well.
 afrog -T urls.txt
 ```
 
+## Configuration file
+
+The first time you start afrog, it will automatically create a configuration file called `afrog-config.yaml`, which will be saved in the current user directory under `$HOME/.config/afrog/afrog-config.yaml`.
+
+Here is an example config file:
+
+```yaml
+reverse:
+  ceye:
+    api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    domain: "xxxxxx.ceye.io"
+```
+
+`reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification. To obtain ceye, follow these steps:
+
+- Go to the [ceye.io](http://ceye.io/) website and register an account.
+- Log in and go to the personal settings page.
+- Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
+
+
 ## Json Output (For developers)
 
 ### Json
@@ -415,24 +435,6 @@ afrog -t https://example.com -json-all result.json
 afrog -t https://example.com -ja result.json
 ```
 
-## Configuration file
-
-The first time you start afrog, it will automatically create a configuration file called `afrog-config.yaml`, which will be saved in the current user directory under `$HOME/.config/afrog/afrog-config.yaml`.
-
-Here is an example config file:
-
-```yaml
-reverse:
-  ceye:
-    api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    domain: "xxxxxx.ceye.io"
-```
-
-`reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification. To obtain ceye, follow these steps:
-
-- Go to the [ceye.io](http://ceye.io/) website and register an account.
-- Log in and go to the personal settings page.
-- Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
 
 ## Screenshot
 
