@@ -391,7 +391,7 @@ You can scan multiple URLs at the same time as well.
 afrog -T urls.txt
 ```
 
-## Json Output
+## Json Output (For developers)
 
 ### Json
 Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the [-json-all](#jsonall) command parameter.
