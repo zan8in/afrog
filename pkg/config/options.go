@@ -112,6 +112,8 @@ type Options struct {
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
 
+	DisableOutputHtml bool
+
 	OJ *output.OutputJson
 }
 
@@ -136,6 +138,7 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.Output, "output", "o", "", "write to the HTML file, including all vulnerability results"),
 		flagSet.StringVarP(&options.Json, "json", "j", "", "write to the JSON file, but it will not include the request and response content"),
 		flagSet.StringVarP(&options.JsonAll, "json-all", "ja", "", "write to the JSON file, including all vulnerability results"),
+		flagSet.BoolVarP(&options.DisableOutputHtml, "disable-output-html", "doh", false, "disable the automatic generation of HTML reports (higher priority than the -o command)"),
 	)
 
 	flagSet.CreateGroup("filter", "Filter",

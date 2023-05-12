@@ -182,17 +182,15 @@ func (jr *JsonReport) JsonContent() *JsonResult {
 	return &jresult
 }
 
-func (jr *JsonReport) AppendEndOfFile() {
-	if jr.of == nil {
-		return
+func (jr *JsonReport) AppendEndOfFile() error {
+
+	file, err := os.OpenFile(jr.ReportFile, os.O_RDWR, 0755)
+	if err != nil {
+		return err
 	}
+	defer file.Close()
 
-	jr.Lock()
-	defer jr.Unlock()
-
-	defer jr.of.Close()
-
-	reader := bufio.NewReader(jr.of)
+	reader := bufio.NewReader(file)
 
 	var content []byte
 	for {
@@ -203,10 +201,18 @@ func (jr *JsonReport) AppendEndOfFile() {
 		content = append(content, line...)
 	}
 
-	content = append(content, "]"...)
+	content = content[:len(content)-1]
 
-	wbuf := bufio.NewWriterSize(jr.of, len(content))
-	wbuf.WriteString(string(content))
-	wbuf.Flush()
+	content = append(content, []byte("]")...)
 
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(content)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -31,7 +31,6 @@ func main() {
 	if err != nil {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
-	defer r.JsonReport.AppendEndOfFile()
 
 	var (
 		lock      = sync.Mutex{}
@@ -56,8 +55,10 @@ func main() {
 			atomic.AddUint32(&number, 1)
 			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
-			r.Report.SetResult(result)
-			r.Report.Append(utils.GetNumberText(int(number)))
+			if !options.DisableOutputHtml {
+				r.Report.SetResult(result)
+				r.Report.Append(utils.GetNumberText(int(number)))
+			}
 
 			if len(options.Json) > 0 || len(options.JsonAll) > 0 {
 				r.JsonReport.SetResult(result)
@@ -71,6 +72,12 @@ func main() {
 
 	if err := r.Run(); err != nil {
 		gologger.Fatal().Msg(err.Error())
+	}
+
+	if len(options.Json) > 0 || len(options.JsonAll) > 0 {
+		if err := r.JsonReport.AppendEndOfFile(); err != nil {
+			gologger.Fatal().Msg(err.Error())
+		}
 	}
 
 	time.Sleep(time.Second * 3)
