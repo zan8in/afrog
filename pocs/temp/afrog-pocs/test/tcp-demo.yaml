@@ -1,0 +1,31 @@
+id: tcp-demo
+
+info:
+  name: TCP Demo
+  author: zan8in
+  severity: high
+  verified: true
+  description: TCP Demo
+
+set:
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}:3306"
+      data: "\n"
+      read-size: 48
+    expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:33306"
+      data: "\n"
+      read-size: 48
+    expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
+expression: r0() || r1()
+
+
+
+  

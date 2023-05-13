@@ -74,12 +74,14 @@ type ruleAlias struct {
 // http/tcp/udp cache 是否使用缓存的请求，如果该选项为 true，那么如果在一次探测中其它脚本对相同目标发送过相同请求，那么便使用之前缓存的响应，而不发新的数据包
 // content 用于tcp/udp请求，请求内容，比如：content: "request"
 // read_timeout 用于tcp/udp请求，发送请求之后的读取超时时间（注 实际是一个 int， 但是为了能够变量渲染，设置为 string）
-// connection_id 用于tcp/udp请求，连接 id ,同一个连接 id 复用连接(注 不允许用0； cache 为 true 的时候可能会导致请求不会发送，所以如果有特殊需求记得 cache: false)
 type RuleRequest struct {
-	Content         string            `yaml:"content"`       // tcp/udp专用
-	ReadTimeout     string            `yaml:"read_timeout"`  // tcp/udp专用
-	ConnectionId    string            `yaml:"connection_id"` // tcp/udp专用
-	Raw             string            `yaml:"raw"`           // raw 专用
+	Type            string            `yaml:"type"`         // 传输方式，默认 http，可选：tcp,udp,ssl,go 等任意扩展
+	Host            string            `yaml:"host"`         // tcp/udp 请求的主机名
+	Data            string            `yaml:"data"`         // tcp/udp 发送的内容
+	DataType        string            `yaml:"data-type"`    // tcp/udp 发送的数据类型，默认字符串
+	ReadSize        string            `yaml:"read-size"`    // tcp/udp 读取内容的长度
+	ReadTimeout     string            `yaml:"read-timeout"` // tcp/udp专用
+	Raw             string            `yaml:"raw"`          // raw 专用
 	Method          string            `yaml:"method"`
 	Path            string            `yaml:"path"`
 	Headers         map[string]string `yaml:"headers"`
