@@ -3,6 +3,7 @@ package runner
 import (
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -95,6 +96,16 @@ func (runner *Runner) Execute() {
 	}
 
 	runner.options.Count += runner.options.Targets.Len() * len(newPocSlice)
+
+	latestPocSlice := []poc.Poc{}
+	order := []string{"info", "low", "medium", "high", "critical"}
+	for _, o := range order {
+		for _, s := range newPocSlice {
+			if o == strings.ToLower(s.Info.Severity) {
+				latestPocSlice = append(latestPocSlice, s)
+			}
+		}
+	}
 
 	// runner.authomaticThread()
 
