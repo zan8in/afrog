@@ -1,9 +1,7 @@
 package runner
 
 import (
-	"fmt"
 	"net/http"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -96,8 +94,6 @@ func (runner *Runner) Execute() {
 		newPocSlice = append(newPocSlice, pocSlice...)
 	}
 
-	runner.options.Count += runner.options.Targets.Len() * len(newPocSlice)
-
 	latestPocSlice := []poc.Poc{}
 	order := []string{"info", "low", "medium", "high", "critical"}
 	for _, o := range order {
@@ -108,11 +104,7 @@ func (runner *Runner) Execute() {
 		}
 	}
 
-	for _, s := range latestPocSlice {
-		fmt.Println(s.Info.Severity, s.Id)
-	}
-
-	fmt.Println(len(latestPocSlice))
+	runner.options.Count += runner.options.Targets.Len() * len(latestPocSlice)
 
 	// runner.authomaticThread()
 
@@ -132,7 +124,7 @@ func (runner *Runner) Execute() {
 	})
 	defer p.Release()
 
-	for _, poc := range newPocSlice {
+	for _, poc := range latestPocSlice {
 		for _, t := range runner.options.Targets.List() {
 			wg.Add(1)
 			p.Invoke(&TransData{Target: t.(string), Poc: poc})
@@ -163,8 +155,8 @@ type TransData struct {
 	Poc    poc.Poc
 }
 
-func (runner *Runner) authomaticThread() {
-	if runner.options.Concurrency == 25 && runner.options.Count >= 8000 {
-		runner.options.Concurrency = runtime.NumCPU() * 50
-	}
-}
+// func (runner *Runner) authomaticThread() {
+// 	if runner.options.Concurrency == 25 && runner.options.Count >= 8000 {
+// 		runner.options.Concurrency = runtime.NumCPU() * 50
+// 	}
+// }

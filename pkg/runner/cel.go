@@ -64,8 +64,6 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.
 
 }
 
-type runCallback func(any, error)
-
 func NewCustomLib() *CustomLib {
 	c := &CustomLib{}
 	reg := types.NewEmptyRegistry()
