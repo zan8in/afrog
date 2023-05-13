@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/axgle/mahonia v0.0.0-20180208002826-3358181d7394
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/dlclark/regexp2 v1.4.0
+	github.com/dlclark/regexp2 v1.8.1
 	github.com/google/cel-go v0.9.0
 	github.com/gookit/color v1.5.0
 	github.com/karrick/godirwalk v1.16.1
@@ -60,6 +60,9 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/nxadm/tail v1.4.8 // indirect
+	github.com/onsi/ginkgo v1.15.0 // indirect
+	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect

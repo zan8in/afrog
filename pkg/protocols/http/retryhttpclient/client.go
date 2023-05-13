@@ -96,7 +96,7 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	}
 
 	newpath = strings.ReplaceAll(newpath, " ", "%20")
-	newpath = strings.ReplaceAll(newpath, "+", "%20")
+	// newpath = strings.ReplaceAll(newpath, "+", "%20")
 	newpath = strings.ReplaceAll(newpath, "#", "%23")
 
 	target = target + newpath
