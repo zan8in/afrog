@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 	"strings"
@@ -106,6 +107,12 @@ func (runner *Runner) Execute() {
 			}
 		}
 	}
+
+	for _, s := range latestPocSlice {
+		fmt.Println(s.Info.Severity, s.Id)
+	}
+
+	fmt.Println(len(latestPocSlice))
 
 	// runner.authomaticThread()
 
