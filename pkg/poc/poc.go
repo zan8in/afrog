@@ -97,8 +97,11 @@ type Info struct {
 	Verified       bool           `yaml:"verified"`
 	Description    string         `yaml:"description"`
 	Reference      []string       `yaml:"reference"`
-	Tags           string         `yaml:"tags"`
+	Affected       string         `yaml:"affected"`  // 影响版本
+	Solutions      string         `yaml:"solutions"` // 解决方案
+	Tags           string         `yaml:"tags"`      // 标签
 	Classification Classification `yaml:"classification"`
+	Created        string         `yaml:"created"` // create time
 }
 
 type Classification struct {
