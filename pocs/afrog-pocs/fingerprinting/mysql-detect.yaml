@@ -21,7 +21,7 @@ rules:
   r1:
     request:
       type: tcp
-      host: "{{host}}:3307"
+      host: "{{host}}:3306"
       data: "\n"
     expression: response.raw.ibcontains(b'mysql') || response.raw.ibcontains(b'mariadb')
 expression: r0() || r1()

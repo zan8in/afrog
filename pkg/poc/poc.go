@@ -227,3 +227,13 @@ func (poc *Poc) Reset() {
 	poc.Expression = ""
 	poc.Info = Info{}
 }
+
+func (poc *Poc) IsHTTPType() bool {
+	for _, rule := range poc.Rules {
+		reqType := rule.Value.Request.Type
+		if len(reqType) == 0 || reqType == HTTP_Type {
+			return true
+		}
+	}
+	return false
+}

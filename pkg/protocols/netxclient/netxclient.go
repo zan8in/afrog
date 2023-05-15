@@ -83,8 +83,8 @@ func (nc *NetClient) Request(data string, variableMap map[string]any) error {
 
 	variableMap["fulltarget"] = nc.address
 
-	fmt.Println(variableMap["request"])
-	fmt.Println(variableMap["response"])
+	// fmt.Println(variableMap["request"])
+	// fmt.Println(variableMap["response"])
 
 	return nil
 }

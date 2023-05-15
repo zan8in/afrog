@@ -24,11 +24,11 @@ import (
 var MMutex = &sync.Mutex{}
 
 type Checker struct {
-	Options         *config.Options
-	OriginalRequest *http.Request
-	VariableMap     map[string]any
-	Result          *result.Result
-	CustomLib       *CustomLib
+	Options *config.Options
+	// OriginalRequest *http.Request
+	VariableMap map[string]any
+	Result      *result.Result
+	CustomLib   *CustomLib
 }
 
 func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
@@ -38,9 +38,15 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		}
 	}()
 
-	if target, err = c.checkURL(target); err != nil {
-		c.Result.IsVul = false
-		return err
+	if pocItem.IsHTTPType() {
+		if target, err = c.checkURL(target); err != nil {
+			c.Result.IsVul = false
+			return err
+		}
+	}
+
+	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+		target = "https://" + target
 	}
 
 	c.Result.Target = target
@@ -54,13 +60,12 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		matchCondition = poc.STOP_IF_FIRST_MATCH
 	}
 
-	c.OriginalRequest, err = http.NewRequest("GET", target, nil)
+	originReq, err := http.NewRequest("GET", target, nil)
 	if err != nil {
 		c.Result.IsVul = false
 		return err
 	}
-
-	tempRequest, err := retryhttpclient.ParseRequest(c.OriginalRequest)
+	tempRequest, err := retryhttpclient.ParseRequest(originReq)
 	if err != nil {
 		c.Result.IsVul = false
 		return err

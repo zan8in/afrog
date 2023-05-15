@@ -3,6 +3,7 @@ package runner
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
@@ -59,7 +60,9 @@ func NewRunner(options *config.Options) (*Runner, error) {
 			return runner, err
 		}
 		for _, t := range allTargets {
-			runner.options.Targets.Append(t)
+			if len(strings.TrimSpace(t)) > 0 {
+				runner.options.Targets.Append(t)
+			}
 		}
 	}
 	if runner.options.Targets.Len() == 0 {

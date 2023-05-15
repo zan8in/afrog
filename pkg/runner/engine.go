@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -17,11 +16,11 @@ import (
 var CheckerPool = sync.Pool{
 	New: func() any {
 		return &Checker{
-			Options:         &config.Options{},
-			OriginalRequest: &http.Request{},
-			VariableMap:     make(map[string]any),
-			Result:          &result.Result{},
-			CustomLib:       NewCustomLib(),
+			Options: &config.Options{},
+			// OriginalRequest: &http.Request{},
+			VariableMap: make(map[string]any),
+			Result:      &result.Result{},
+			CustomLib:   NewCustomLib(),
 		}
 	},
 }
@@ -34,7 +33,7 @@ func (e *Engine) AcquireChecker() *Checker {
 }
 
 func (e *Engine) ReleaseChecker(c *Checker) {
-	*c.OriginalRequest = http.Request{}
+	// *c.OriginalRequest = http.Request{}
 	c.VariableMap = make(map[string]any)
 	c.Result = &result.Result{}
 	c.CustomLib = NewCustomLib()
