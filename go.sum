@@ -459,6 +459,10 @@ github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauu
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/pins v0.0.0-20230424143752-abcce5d9da35 h1:h4jdqICROYihn3EjwsEqtV+RzhmHDmaF6esW2b1IkrU=
 github.com/zan8in/pins v0.0.0-20230424143752-abcce5d9da35/go.mod h1:hwq0CUJ14mXaWUCNaD2WXj7aKwUJfuOP0fIt9mpy6i0=
+github.com/zan8in/pins v0.0.0-20230514142223-91b6c1a66aab h1:GcW6iJkLZbzYh6C7QBYE62dH+3y+emYUF79FsqilFfk=
+github.com/zan8in/pins v0.0.0-20230514142223-91b6c1a66aab/go.mod h1:hwq0CUJ14mXaWUCNaD2WXj7aKwUJfuOP0fIt9mpy6i0=
+github.com/zan8in/pins v0.0.0-20230515010316-8f437c6ef394 h1:CgcPacBg8xyZYHk3CaZoACHD1Aa1eQKQA5dHw3K0NKc=
+github.com/zan8in/pins v0.0.0-20230515010316-8f437c6ef394/go.mod h1:hwq0CUJ14mXaWUCNaD2WXj7aKwUJfuOP0fIt9mpy6i0=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af/go.mod h1:7AvjxFJyo5xS0vdGrwa5iwiTYtSMj8V5HGMVTxRstoE=
 github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 h1:NChaJHUwxfGY7OvSLDBiTnHn7FXcecsY00/xoTonlbw=

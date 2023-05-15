@@ -1,0 +1,31 @@
+id: mysql-detect
+
+info:
+  name: MySQL Dectect
+  author: zan8in
+  severity: info
+  verified: true
+  description: MySQL instance was detected
+  tags: network,db,mysql
+
+set:
+  host: request.url.domain
+  hostname: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "\n"
+    expression: response.raw.ibcontains(b'mysql') || response.raw.ibcontains(b'mariadb')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:3307"
+      data: "\n"
+    expression: response.raw.ibcontains(b'mysql') || response.raw.ibcontains(b'mariadb')
+expression: r0() || r1()
+
+
+
+  
