@@ -96,6 +96,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				Network:     rule.Request.Type,
 				ReadTimeout: time.Duration(rule.Request.ReadTimeout),
 				ReadSize:    rule.Request.ReadSize,
+				MaxRetries:  1,
 			}); err == nil {
 				err = nc.Request(rule.Request.Data, c.VariableMap)
 				nc.Close()

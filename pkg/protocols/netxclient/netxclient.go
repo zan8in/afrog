@@ -16,6 +16,7 @@ type Config struct {
 	ReadTimeout  time.Duration
 	RetryDelay   time.Duration
 	ReadSize     int
+	MaxRetries   int
 }
 
 type NetClient struct {
@@ -26,6 +27,10 @@ type NetClient struct {
 
 func NewNetClient(address string, conf Config) (*NetClient, error) {
 	netxconf := netx.Config{}
+
+	if conf.MaxRetries != 0 {
+		netxconf.MaxRetries = conf.MaxRetries
+	}
 
 	if conf.Network != "" {
 		netxconf.Network = conf.Network
