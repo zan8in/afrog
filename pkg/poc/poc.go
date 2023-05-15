@@ -79,8 +79,8 @@ type RuleRequest struct {
 	Host            string            `yaml:"host"`         // tcp/udp 请求的主机名
 	Data            string            `yaml:"data"`         // tcp/udp 发送的内容
 	DataType        string            `yaml:"data-type"`    // tcp/udp 发送的数据类型，默认字符串
-	ReadSize        string            `yaml:"read-size"`    // tcp/udp 读取内容的长度
-	ReadTimeout     string            `yaml:"read-timeout"` // tcp/udp专用
+	ReadSize        int               `yaml:"read-size"`    // tcp/udp 读取内容的长度
+	ReadTimeout     int               `yaml:"read-timeout"` // tcp/udp专用
 	Raw             string            `yaml:"raw"`          // raw 专用
 	Method          string            `yaml:"method"`
 	Path            string            `yaml:"path"`
@@ -88,6 +88,14 @@ type RuleRequest struct {
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
 }
+
+const (
+	HTTP_Type = "http"
+	TCP_Type  = "tcp"
+	UDP_Type  = "udp"
+	SSL_Type  = "ssl"
+	GO_Type   = "go"
+)
 
 // 以下开始是 信息部分
 type Info struct {
