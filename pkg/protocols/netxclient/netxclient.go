@@ -2,7 +2,6 @@ package netxclient
 
 import (
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -95,18 +94,6 @@ func (nc *NetClient) Close() error {
 		return nc.netx.Close()
 	}
 	return nil
-}
-
-func url2ProtoUrl(u *url.URL) *proto.UrlType {
-	return &proto.UrlType{
-		Scheme:   u.Scheme,
-		Domain:   u.Hostname(),
-		Host:     u.Host,
-		Port:     u.Port(),
-		Path:     u.EscapedPath(),
-		Query:    u.RawQuery,
-		Fragment: u.Fragment,
-	}
 }
 
 func setVariableMap(find string, variableMap map[string]any) string {
