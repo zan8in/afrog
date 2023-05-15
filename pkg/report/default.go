@@ -49,12 +49,13 @@ func (report *Report) defaultHmtl(line string) string {
 		if !v.IsVul {
 			continue
 		}
-		reqraw := []byte{}
-		respraw := []byte{}
-		if v.ResultResponse.Url != nil {
-			reqraw = v.ResultRequest.GetRaw()
-			respraw = v.ResultResponse.GetRaw()
-		}
+		// @edit 2023.5.15 10:36 because mysql-detect not html report
+		// reqraw := []byte{}
+		// respraw := []byte{}
+		// if v.ResultResponse.Url != nil {
+		reqraw := v.ResultRequest.GetRaw()
+		respraw := v.ResultResponse.GetRaw()
+		// }
 
 		fullurl := xssfilter(v.FullTarget)
 
