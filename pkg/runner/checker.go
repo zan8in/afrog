@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/pkg/protocols/netxclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
 	"github.com/zan8in/afrog/pkg/result"
 
@@ -83,12 +84,30 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		}
 
 		isMatch := false
-		if len(rule.Request.Raw) > 0 {
-			rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Timeout))}
-			err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
+		reqType := strings.ToLower(rule.Request.Type)
+
+		if len(reqType) > 0 && reqType != string(poc.HTTP_Type) {
+			if nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
+				Network:     rule.Request.Type,
+				ReadTimeout: time.Duration(rule.Request.ReadTimeout),
+				ReadSize:    rule.Request.ReadSize,
+			}); err == nil {
+				err = nc.Request(rule.Request.Data, c.VariableMap)
+				nc.Close()
+			}
+
 		} else {
-			err = retryhttpclient.Request(target, rule, c.VariableMap)
+
+			if len(rule.Request.Raw) > 0 {
+				rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Timeout))}
+				err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
+
+			} else {
+
+				err = retryhttpclient.Request(target, rule, c.VariableMap)
+			}
 		}
+
 		if err == nil {
 			if len(rule.Expressions) > 0 {
 				// multiple expressions
