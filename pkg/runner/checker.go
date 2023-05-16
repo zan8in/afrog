@@ -100,7 +100,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					ReadSize:    rule.Request.ReadSize,
 					MaxRetries:  1,
 				}); err == nil {
-					nc.Request(rule.Request.Data, c.VariableMap)
+					nc.Request(rule.Request.Data, rule.Request.DataType, c.VariableMap)
 					nc.Close()
 				}
 			}

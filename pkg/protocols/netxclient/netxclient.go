@@ -1,6 +1,7 @@
 package netxclient
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -54,9 +55,16 @@ func NewNetClient(address string, conf Config) (*NetClient, error) {
 	return &NetClient{address: address, config: netxconf}, nil
 }
 
-func (nc *NetClient) Request(data string, variableMap map[string]any) error {
+func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) error {
 	nc.address = setVariableMap(nc.address, variableMap)
 	data = setVariableMap(data, variableMap)
+
+	if len(dataType) > 0 {
+		dataType = strings.ToLower(dataType)
+		if dataType == "hex" {
+			data = fromHex(data)
+		}
+	}
 
 	var err error
 	nc.netx, err = netx.NewClient(nc.address, nc.config)
@@ -115,4 +123,12 @@ func setVariableMap(find string, variableMap map[string]any) string {
 		find = strings.ReplaceAll(find, oldstr, newstr)
 	}
 	return find
+}
+
+func fromHex(data string) string {
+	new, err := hex.DecodeString(data)
+	if err == nil {
+		return string(new)
+	}
+	return data
 }
