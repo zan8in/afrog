@@ -1,0 +1,31 @@
+id: mongodb-info-enum
+
+info:
+  name: MongoDB Information - Detect
+  author: pussycat0x
+  severity: info
+  description: |
+    MongoDB build and server information was detected.
+  reference:
+    - https://nmap.org/nsedoc/scripts/mongodb-info.html
+  tags: network,mongodb,enum
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
+      data-type: hex
+    expression: response.raw.ibcontains(b'version') && response.raw.ibcontains(b'maxBsonObjectSize')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:27017"
+      data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
+      data-type: hex
+    expression: response.raw.ibcontains(b'version') && response.raw.ibcontains(b'maxBsonObjectSize')
+expression: r0() || r1()

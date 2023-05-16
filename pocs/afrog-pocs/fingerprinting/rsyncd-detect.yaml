@@ -1,0 +1,32 @@
+id: rsyncd-detect
+
+info:
+  name: Rsyncd Service - Detect
+  author: vsh00t,geeknik
+  severity: info
+  verified: true
+  description: |
+    Rsyncd service was detected.
+  reference:
+    - https://linux.die.net/man/1/rsync
+  tags: network,rsyncd
+  created: 2023/02/06
+
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "?\r\n"
+    expression: 'response.raw.bcontains(b"RSYNCD:")'
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:873"
+      data: "?\r\n"
+    expression: 'response.raw.bcontains(b"RSYNCD:")'
+expression: r0() || r1()

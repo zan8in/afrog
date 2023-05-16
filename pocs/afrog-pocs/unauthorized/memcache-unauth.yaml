@@ -1,0 +1,29 @@
+id: memcache-unauthorized
+
+info:
+  name: Memcache unauthorized
+  author: zan8in
+  severity: high
+  verified: true
+  description: |
+    Memcached是一套分布式的高速缓存系统。它以Key-Value（键值对）形式将数据存储在内存中，由于memcached安全设计缺陷，客户端连接memcached服务器后 无需认证就 可读取、修改服务器缓存内容。
+  created: 2023/05/16
+
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "stats\n"
+    expression: response.raw.ibcontains(b'STAT pid')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:11211"
+      data: "stats\n"
+    expression: response.raw.ibcontains(b'STAT pid')
+expression: r0() || r1()
