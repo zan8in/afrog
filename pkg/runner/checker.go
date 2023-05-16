@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zan8in/afrog/pkg/protocols/gox"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/protocols/netxclient"
 	"github.com/zan8in/afrog/pkg/protocols/raw"
@@ -92,14 +93,19 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		reqType := strings.ToLower(rule.Request.Type)
 
 		if len(reqType) > 0 && reqType != string(poc.HTTP_Type) {
-			if nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
-				Network:     rule.Request.Type,
-				ReadTimeout: time.Duration(rule.Request.ReadTimeout),
-				ReadSize:    rule.Request.ReadSize,
-				MaxRetries:  1,
-			}); err == nil {
-				err = nc.Request(rule.Request.Data, c.VariableMap)
-				nc.Close()
+			if reqType == poc.TCP_Type || reqType == poc.UDP_Type {
+				if nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
+					Network:     rule.Request.Type,
+					ReadTimeout: time.Duration(rule.Request.ReadTimeout),
+					ReadSize:    rule.Request.ReadSize,
+					MaxRetries:  1,
+				}); err == nil {
+					nc.Request(rule.Request.Data, c.VariableMap)
+					nc.Close()
+				}
+			}
+			if reqType == poc.GO_Type {
+				err = gox.Request(target, rule.Request.Data, c.VariableMap)
 			}
 
 		} else {
