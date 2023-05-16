@@ -8,19 +8,20 @@ info:
   description: TCP Demo
 
 set:
+  hostname: request.url.host
   host: request.url.domain
 rules:
   r0:
     request:
       type: tcp
-      host: "{{host}}:3306"
+      host: "{{hostname}}"
       data: "\n"
       read-size: 48
     expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
   r1:
     request:
       type: tcp
-      host: "{{host}}:33306"
+      host: "{{host}}:3306"
       data: "\n"
       read-size: 48
     expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')

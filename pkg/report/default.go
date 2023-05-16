@@ -37,6 +37,16 @@ func (report *Report) defaultHmtl(line string) string {
 			info += "<br/>&nbsp;&nbsp;- <a href='" + rv + "' target='_blank'>" + rv + "</a>"
 		}
 	}
+	if len(htResult.PocInfo.Info.Affected) > 0 {
+		info += "<br/><b>affected:</b> " + htResult.PocInfo.Info.Affected
+
+	}
+	if len(htResult.PocInfo.Info.Solutions) > 0 {
+		info += "<br/><b>solutions:</b> " + htResult.PocInfo.Info.Solutions
+	}
+	if len(htResult.PocInfo.Info.Created) > 0 {
+		info += "<br/><b>created:</b> " + htResult.PocInfo.Info.Created
+	}
 
 	header := "<tbody>"
 
