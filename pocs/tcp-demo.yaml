@@ -16,14 +16,14 @@ rules:
       type: tcp
       host: "{{hostname}}"
       data: "\n"
-      read-size: 48
+      read-size: 1024
     expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
   r1:
     request:
       type: tcp
       host: "{{host}}:3306"
       data: "\n"
-      read-size: 48
+      read-size: 1024
     expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
 expression: r0() || r1()
 

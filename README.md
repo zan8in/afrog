@@ -308,6 +308,13 @@
             <br>
             <a href="https://github.com/CMDB-M"><sub>CMDB-M</sub></a>
         </td>
+        <td align="center">
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/40.jpg&mask=circle&w=60&h=60"
+                   alt="Typora-Logo"
+                 />
+            <br>
+            <a href="javascript:(0);"><sub>li1u</sub></a>
+        </td>
     </tr>
 </table></div>
 

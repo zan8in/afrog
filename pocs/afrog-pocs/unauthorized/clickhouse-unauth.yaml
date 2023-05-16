@@ -1,0 +1,30 @@
+id: clickhouse-unauth
+
+info:
+  name: ClickHouse - Unauthorized Access
+  author: lu4nx
+  severity: high
+  verified: true
+  description: ClickHouse was able to be accessed with no required authentication in place.
+  tags: network,clickhouse,unauth
+  created: 2022/07/20
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "0011436c69636b486f75736520636c69656e741508b1a903000764656661756c7400"
+      data-type: hex
+    expression: response.raw.bcontains(b'ClickHouse') && response.raw.bcontains(b'UTC')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:9000"
+      data: "0011436c69636b486f75736520636c69656e741508b1a903000764656661756c7400"
+      data-type: hex
+    expression: response.raw.bcontains(b'ClickHouse') && response.raw.bcontains(b'UTC')
+expression: r0() || r1()
