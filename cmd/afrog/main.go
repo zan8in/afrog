@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,12 +25,14 @@ func main() {
 
 	options, err := config.NewOptions()
 	if err != nil {
-		gologger.Fatal().Msg(err.Error())
+		gologger.Error().Msg(err.Error())
+		os.Exit(0)
 	}
 
 	r, err := runner.NewRunner(options)
 	if err != nil {
-		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
+		gologger.Error().Msgf("Could not create runner: %s\n", err)
+		os.Exit(0)
 	}
 
 	var (
@@ -71,12 +74,14 @@ func main() {
 	}
 
 	if err := r.Run(); err != nil {
-		gologger.Fatal().Msg(err.Error())
+		gologger.Error().Msgf("runner run err: %s\n", err)
+		os.Exit(0)
 	}
 
 	if len(options.Json) > 0 || len(options.JsonAll) > 0 {
 		if err := r.JsonReport.AppendEndOfFile(); err != nil {
-			gologger.Fatal().Msg(err.Error())
+			gologger.Error().Msgf("json or json-all output err: %s\n", err)
+			os.Exit(0)
 		}
 	}
 

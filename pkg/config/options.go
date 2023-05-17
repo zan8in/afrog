@@ -77,7 +77,7 @@ type Options struct {
 	DisableUpdateCheck bool
 
 	//
-	DisableMonitorTargets bool
+	MonitorTargets bool
 
 	// Scan count num(targets * allpocs)
 	Count int
@@ -152,7 +152,7 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
-		flagSet.BoolVarP(&options.DisableMonitorTargets, "disable-monitor-targets", "dmt", false, "Disable the monitor-target feature during scanning."),
+		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", false, "Enable the monitor-target feature during scanning."),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
@@ -161,7 +161,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("update", "Update",
 		flagSet.BoolVarP(&options.Update, "update", "un", false, "update afrog engine to the latest released version"),
-		flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to the latest released version"),
+		// flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to the latest released version"),
 		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic afrog-pocs update check"),
 	)
 
@@ -189,22 +189,39 @@ func (opt *Options) verifyOptions() error {
 	if len(opt.Config.Reverse.Ceye.Domain) == 0 || len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
 		homeDir, _ := os.UserHomeDir()
 		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
-		gologger.Error().Msgf("`ceye` reverse service not set: %s", configDir)
+		gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
+		gologger.Info().Msgf("go to `%s` to configure the reverse connection platform\n", configDir)
 	}
 
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
 
+	if len(opt.Target) == 0 && len(opt.TargetsFile) == 0 {
+		return fmt.Errorf("either `target` or `target-file` must be set")
+	}
+
 	if opt.PocList {
-		return opt.PrintPocList()
+		err := opt.PrintPocList()
+		if err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		os.Exit(0)
 	}
 
 	if len(opt.PocDetail) > 0 {
-		return opt.ShowPocDetail(opt.PocDetail)
+		err := opt.ShowPocDetail(opt.PocDetail)
+		if err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		os.Exit(0)
 	}
 
 	if opt.Update {
-		return updateEngine()
+		err := updateEngine()
+		if err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		os.Exit(0)
 	}
 
 	upgrade, err := upgrade.NewUpgrade(true)
