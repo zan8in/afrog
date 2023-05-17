@@ -237,3 +237,18 @@ func (poc *Poc) IsHTTPType() bool {
 	}
 	return false
 }
+
+func (poc *Poc) IsReverse() bool {
+	if len(poc.Set) == 0 {
+		return false
+	}
+
+	for _, set := range poc.Set {
+		k, v := set.Key.(string), set.Value.(string)
+		if strings.Contains(k, "reverse") || strings.Contains(v, "reverse.url") {
+			return true
+		}
+	}
+
+	return false
+}
