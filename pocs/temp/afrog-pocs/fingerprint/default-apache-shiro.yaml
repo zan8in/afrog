@@ -1,0 +1,18 @@
+id: default-apache-shiro
+
+info:
+  name: Apache Shiro Default Page
+  author: DhiyaneshDK
+  severity: info
+  description: |
+    shodan-query: title:"Apache Shiro Quickstart"
+    fofa: title="Apache Shiro Quickstart"
+  tags: tech,apache,shiro
+
+rules:
+  r0:
+    request:
+      method: GET 
+      path: /
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Apache Shiro Quickstart</title>')
+expression: r0()
