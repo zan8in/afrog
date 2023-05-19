@@ -1,0 +1,17 @@
+id: arcgis-admin-login
+
+info:
+  name: ArcGIS Admin Login - Detect
+  author: zan8in
+  severity: info
+  reference:
+    - https://enterprise.arcgis.com/en/
+  tags: panel,arcgis,admin,login,detect
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /arcgis/admin/login
+    expression: response.status == 200 && response.body.bcontains(b"arcgisCookieTest") && response.body.bcontains(b"areCookiesEnabled")
+expression: r0()

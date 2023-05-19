@@ -1,0 +1,17 @@
+id: arcgis-rest-login
+
+info:
+  name: ArcGIS REST Login - Detect
+  author: zan8in
+  severity: info
+  reference:
+    - https://enterprise.arcgis.com/en/
+  tags: panel,arcgis,rest,login,detect
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /arcgis/rest/login
+    expression: response.status == 200 && response.body.bcontains(b"ArcGIS") && response.body.bcontains(b"REST Services Directory")
+expression: r0()

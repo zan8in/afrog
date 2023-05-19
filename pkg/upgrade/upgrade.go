@@ -137,7 +137,7 @@ func (u *Upgrade) Unzip(src string) error {
 	if len(u.RemoteVersion) > 0 {
 		u.CurrVersion = u.RemoteVersion
 	}
-	gologger.Print().Msgf("afrog-poc has been updated successfully and the path is: %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
+	gologger.Print().Msgf("Successfully installed afrog-pocs at %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
 
 	return nil
 }

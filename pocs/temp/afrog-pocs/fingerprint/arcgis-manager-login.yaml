@@ -1,0 +1,17 @@
+id: arcgis-manager-login
+
+info:
+  name: ArcGIS Manager Login - Detect
+  author: zan8in
+  severity: info
+  reference:
+    - https://enterprise.arcgis.com/en/
+  tags: panel,arcgis,manager,login,detect
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /arcgis/manager/
+    expression: response.status == 200 && response.body.bcontains(b"ping arcgis/admin root resource") && response.body.bcontains(b"esri.arcgismanager")
+expression: r0()
