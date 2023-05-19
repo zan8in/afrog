@@ -15,7 +15,7 @@ func ShowBanner(u *upgrade.Upgrade) {
 
 func EngineV(u *upgrade.Upgrade) string {
 	if utils.Compare(u.LastestAfrogVersion, ">", Version) {
-		return Version + " > " + log.LogColor.Red(u.LastestAfrogVersion)
+		return Version + " (" + log.LogColor.Red("outdated") + ")" + " > " + log.LogColor.Red(u.LastestAfrogVersion)
 	}
 	return Version
 }
