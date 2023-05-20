@@ -26,6 +26,10 @@ type NetClient struct {
 	netx    *netx.Client
 }
 
+func (nc *NetClient) Config() *netx.Config {
+	return &nc.config
+}
+
 func NewNetClient(address string, conf Config) (*NetClient, error) {
 	netxconf := netx.Config{}
 

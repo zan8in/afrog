@@ -10,13 +10,10 @@ info:
     Anonymous FTP access allows anyone to access your public_ftp folder, allowing unidentified visitors to download (and possibly upload) files on your website. Anonymous FTP creates the potential for a security hole for hackers and is not recommended.
   tags: network,ftp,default-login
 
-set:
-  hostname: request.url.host
-  host: request.url.domain
 rules:
   r0: 
     request:
       type: go
-      data: "ftp_anonymous"
+      data: ftp_anonymous
     expression: response.raw.bcontains(b'Anonymous access allowed,') || response.raw.bcontains(b'Logged in anonymously') || response.raw.bcontains(b'230')
 expression: r0() 
