@@ -26,7 +26,7 @@ func shiro_key(target string, variableMap map[string]any) error {
 	setRequest(target, variableMap)
 
 	if len(result.ShiroKey) > 0 {
-		data := fmt.Sprintf("ShiroKey=%s\r\nRememberMe=%s\r\n", result.ShiroKey, result.RememberMe)
+		data := fmt.Sprintf("ShiroKey: %s\r\nRememberMe: %s\r\n", result.ShiroKey, result.RememberMe)
 		setResponse(data, variableMap)
 	}
 

@@ -483,6 +483,10 @@ github.com/zan8in/shiro v0.0.0-20230519135816-7821a27b3d4a h1:BrN3/ZN8xfYjgaJZI5
 github.com/zan8in/shiro v0.0.0-20230519135816-7821a27b3d4a/go.mod h1:chIgOEudNJIGlpHyYeuwGxqxOkV0N5815dWOL6cNuMA=
 github.com/zan8in/shiro v0.0.0-20230519141321-03d1b933c1d5 h1:6J/Grpk8UtCHi+xaJjP7UKzIf8jV9u14Awbpq9YZ/Q8=
 github.com/zan8in/shiro v0.0.0-20230519141321-03d1b933c1d5/go.mod h1:chIgOEudNJIGlpHyYeuwGxqxOkV0N5815dWOL6cNuMA=
+github.com/zan8in/shiro v0.0.0-20230519150055-0f55f6286a88 h1:yzV97BodXqIAiKLdHql8f7jinecnmBy+DnuvNA48Odo=
+github.com/zan8in/shiro v0.0.0-20230519150055-0f55f6286a88/go.mod h1:chIgOEudNJIGlpHyYeuwGxqxOkV0N5815dWOL6cNuMA=
+github.com/zan8in/shiro v0.0.0-20230519151131-5bf789690050 h1:K7FXsBfhUhl795hwMMx2JX9uhhy2JmwpMYo8MV3aqt4=
+github.com/zan8in/shiro v0.0.0-20230519151131-5bf789690050/go.mod h1:chIgOEudNJIGlpHyYeuwGxqxOkV0N5815dWOL6cNuMA=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
 github.com/zmap/rc2 v0.0.0-20131011165748-24b9757f5521/go.mod h1:3YZ9o3WnatTIZhuOtot4IcUfzoKVjUHqu6WALIyI0nE=
