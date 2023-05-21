@@ -196,10 +196,6 @@ func (opt *Options) verifyOptions() error {
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
 
-	if len(opt.Target) == 0 && len(opt.TargetsFile) == 0 {
-		return fmt.Errorf("either `target` or `target-file` must be set")
-	}
-
 	if opt.PocList {
 		err := opt.PrintPocList()
 		if err != nil {
@@ -234,6 +230,10 @@ func (opt *Options) verifyOptions() error {
 		if len(info) > 0 && opt.UpdatePocs {
 			gologger.Info().Msg(info)
 		}
+	}
+
+	if len(opt.Target) == 0 && len(opt.TargetsFile) == 0 {
+		return fmt.Errorf("either `target` or `target-file` must be set")
 	}
 
 	ShowBanner(upgrade)
