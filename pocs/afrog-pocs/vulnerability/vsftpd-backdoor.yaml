@@ -1,0 +1,30 @@
+id: vsftpd-backdoor
+
+info:
+  name: VSFTPD 2.3.4 - Backdoor Command Execution
+  author: pussycat0x
+  severity: critical
+  description: |
+    VSFTPD 2.3.4 contains a backdoor command execution vulnerability.
+    fofa: app="vsftpd"
+  reference:
+    - https://www.rapid7.com/db/modules/exploit/unix/ftp/vsftpd_234_backdoor/
+  tags: network,vsftpd,ftp,backdoor
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "USER anonymous\r\nPASS anonymous\r\n"
+    expression: response.raw.bcontains(b'vsFTPd 2.3.4')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:21"
+      data: "USER anonymous\r\nPASS anonymous\r\n"
+    expression: response.raw.bcontains(b'vsFTPd 2.3.4')
+expression: r0() || r1()
