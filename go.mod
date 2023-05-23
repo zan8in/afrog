@@ -20,6 +20,7 @@ require (
 	github.com/zan8in/pins v0.0.0-20230520022352-ab8c578785e8
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
+	github.com/zan8in/shiro v0.0.0-20230519151131-5bf789690050
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	google.golang.org/protobuf v1.28.1
@@ -82,7 +83,6 @@ require (
 	github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb // indirect
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 // indirect
 	github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 // indirect
-	github.com/zan8in/shiro v0.0.0-20230519151131-5bf789690050 // indirect
 	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect
 	golang.org/x/mod v0.8.0 // indirect
