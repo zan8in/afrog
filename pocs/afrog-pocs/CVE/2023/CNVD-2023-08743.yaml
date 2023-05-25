@@ -10,6 +10,7 @@ info:
     FOFA: body='<div class="hj-hy-all-one-logo"'
   reference:
     - https://mp.weixin.qq.com/s/NhJe4MUepwqc6SmDJw4aow
+  created: 2023/05/24
 
 set:
   randstr: randomLowercase(12)    

