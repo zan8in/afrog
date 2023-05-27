@@ -1,0 +1,26 @@
+id: springboot-admin-unauth
+
+info:
+    name: Spring boot Admin unauth
+    author: li1u (https://huclilu.github.io/)
+    severity: high
+    verified: true
+    description: |
+     Spring Boot Admin是一个监控和管理的源软件，能够将 Actuator 中的信息进行界面化的展示，也可以监控所有 Spring Boot 应用的健康状况，提供实时警报功能。
+     未授权可获取到actuator下端点信息，包括heapdump转储文件（heapdump中可获取大量敏感信息）以及诸多内网地址信息等。
+     FoFa:title=="Spring Boot Admin"
+    created: 2023/05/27
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /applications
+        expression: |
+            response.status == 200 && 
+            response.content_type.contains("application/json") &&
+            response.body.bcontains(b'"name":') && 
+            response.body.bcontains(b'"buildVersion":') && 
+            response.body.bcontains(b'"status":') && 
+            response.body.bcontains(b'"instances":')
+expression: r0()
