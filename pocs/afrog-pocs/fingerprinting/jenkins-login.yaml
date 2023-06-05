@@ -15,5 +15,7 @@ rules:
             method: GET
             path: /login
         expression: |
-          response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
+          response.status == 200 && 
+          (response.body.ibcontains(b'Sign in [Jenkins]') ||
+          response.body.ibcontains(b'<title>登录 [Jenkins]</title>'))
 expression: r0()

@@ -109,6 +109,8 @@ type Options struct {
 	// http/socks5 proxy to use
 	Proxy string
 
+	MaxRespBodySize int
+
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
 
@@ -152,10 +154,11 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
-		flagSet.BoolVarP(&options.MonitorTargets, "monitor-targets", "mt", false, "Enable the monitor-target feature during scanning."),
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
+		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning."),
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size (default 2m)"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 	)
 

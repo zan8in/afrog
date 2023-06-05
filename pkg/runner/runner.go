@@ -34,9 +34,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner.engine = NewEngine(options)
 
 	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:   options.Proxy,
-		Timeout: options.Timeout,
-		Retries: options.Retries,
+		Proxy:           options.Proxy,
+		Timeout:         options.Timeout,
+		Retries:         options.Retries,
+		MaxRespBodySize: options.MaxRespBodySize,
 	})
 
 	jr, err := report.NewJsonReport(options.Json, options.JsonAll)
