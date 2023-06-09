@@ -32,11 +32,18 @@ type ConfigHttp struct {
 
 type Reverse struct {
 	Ceye Ceye `yaml:"ceye"`
+	Jndi Jndi `yaml:"jndi"`
 }
 
 type Ceye struct {
 	ApiKey string `yaml:"api-key"`
 	Domain string `yaml:"domain"`
+}
+
+type Jndi struct {
+	JndiAddress string `yaml:"jndi_address"`
+	LdapPort    string `yaml:"ldap_port"`
+	ApiPort     string `yaml:"api_port"`
 }
 
 const afrogConfigFilename = "afrog-config.yaml"
@@ -63,6 +70,9 @@ func NewConfig() (*Config, error) {
 		reverse := c.Reverse
 		reverse.Ceye.ApiKey = ""
 		reverse.Ceye.Domain = ""
+		reverse.Jndi.JndiAddress = ""
+		reverse.Jndi.LdapPort = ""
+		reverse.Jndi.ApiPort = ""
 		c.Reverse = reverse
 		WriteConfiguration(&c)
 	}

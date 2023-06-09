@@ -466,6 +466,10 @@ func ReverseGet(target string) ([]byte, error) {
 	return respBody, err
 }
 
+func Get(target string) ([]byte, int, error) {
+	return simpleRtryHttpGet(target)
+}
+
 func Url2UrlType(u *url.URL) *proto.UrlType {
 	return &proto.UrlType{
 		Scheme:   u.Scheme,
