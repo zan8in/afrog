@@ -53,7 +53,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner.Report = report
 
 	if len(runner.options.Target) > 0 {
-		runner.options.Targets.Append(runner.options.Target)
+		for _, t := range runner.options.Target {
+			runner.options.Targets.Append(t)
+		}
+
 	}
 	if len(runner.options.TargetsFile) > 0 {
 		allTargets, err := utils.ReadFileLineByLine(runner.options.TargetsFile)

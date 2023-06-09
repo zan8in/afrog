@@ -34,7 +34,7 @@ type Options struct {
 	Targets sliceutil.SafeSlice
 
 	// target URLs/hosts to scan
-	Target string
+	Target goflags.StringSlice
 
 	// list of target URLs/hosts to scan (one per line)
 	TargetsFile string
@@ -129,7 +129,7 @@ func NewOptions() (*Options, error) {
 	flagSet.SetDescription(`afrog`)
 
 	flagSet.CreateGroup("input", "Target",
-		flagSet.StringVarP(&options.Target, "target", "t", "", "target URLs/hosts to scan"),
+		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
 	)
 
