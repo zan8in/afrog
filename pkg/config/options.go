@@ -192,7 +192,8 @@ func (opt *Options) verifyOptions() error {
 	}
 	opt.Config = config
 
-	if len(opt.Config.Reverse.Ceye.Domain) == 0 || len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
+	if (len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) ||
+		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
 		homeDir, _ := os.UserHomeDir()
 		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
 		gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
@@ -201,6 +202,10 @@ func (opt *Options) verifyOptions() error {
 
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+
+	ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
+	ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
+	ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 
 	if opt.PocList {
 		err := opt.PrintPocList()

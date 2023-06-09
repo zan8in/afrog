@@ -249,6 +249,12 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 			continue
 		}
 
+		if value == "newJNDI()" {
+			c.VariableMap[key] = c.newJNDI()
+			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+			continue
+		}
+
 		out, err := c.CustomLib.RunEval(value, c.VariableMap)
 		if err != nil {
 			// fixed set string failed bug
@@ -281,7 +287,20 @@ func (c *Checker) newRerverse() *proto.Reverse {
 	return &proto.Reverse{
 		Url:                utils.ParseUrl(u),
 		Domain:             u.Hostname(),
-		Ip:                 "",
+		Ip:                 u.Host,
+		IsDomainNameServer: false,
+	}
+}
+
+func (c *Checker) newJNDI() *proto.Reverse {
+	randomstr := utils.CreateRandomString(22)
+	urlStr := fmt.Sprintf("http://%s:%s/%s", config.ReverseJndi, config.ReverseLdapPort, randomstr)
+	u, _ := url.Parse(urlStr)
+	url := utils.ParseUrl(u)
+	return &proto.Reverse{
+		Url:                url,
+		Domain:             u.Hostname(),
+		Ip:                 config.ReverseJndi,
 		IsDomainNameServer: false,
 	}
 }

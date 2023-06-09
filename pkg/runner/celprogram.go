@@ -356,6 +356,20 @@ var (
 					return types.Bool(reverseCheck(reverse, timeout))
 				},
 			},
+			&functions.Overload{
+				Operator: "reverse_jndi_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					reverse, ok := lhs.Value().(*proto.Reverse)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+					}
+					timeout, ok := rhs.Value().(int64)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
+					}
+					return types.Bool(jndiCheck(reverse, timeout))
+				},
+			},
 			// other
 			&functions.Overload{
 				Operator: "sleep_int",
@@ -497,6 +511,28 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 
 	if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
 		return false
+	}
+
+	return false
+}
+
+func jndiCheck(reverse *proto.Reverse, timeout int64) bool {
+	if len(config.ReverseJndi) == 0 && len(config.ReverseApiPort) == 0 {
+		return false
+	}
+
+	time.Sleep(time.Second * time.Duration(timeout))
+
+	urlStr := fmt.Sprintf("http://%s:%s/?api=%s", reverse.Url.Domain, config.ReverseApiPort, reverse.Url.Path[1:])
+
+	resp, err := retryhttpclient.ReverseGet(urlStr)
+	if err != nil {
+		return false
+	}
+
+	if strings.Contains(string(resp), "yes") {
+
+		return true
 	}
 
 	return false
