@@ -1,0 +1,26 @@
+id: geoserver-default-login
+
+info:
+  name: Geoserver Default Admin Login
+  author: For3stCo1d
+  severity: high
+  verified: true
+  description: |
+    Geoserver default admin credentials were discovered.
+    fofa-query: app="GeoServer"
+  reference:
+    - http://geoserver.org/
+  tags: geoserver,default-login
+  created: 2023/06/14
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /geoserver/j_spring_security_check
+      body: username=admin&password=geoserver
+    expression: |
+      response.status == 302 &&
+      response.headers["location"].contains("/geoserver/web") &&
+      !response.headers["location"].contains("error=true")
+expression: r0()

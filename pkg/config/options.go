@@ -249,10 +249,6 @@ func (opt *Options) verifyOptions() error {
 
 	ShowBanner(upgrade)
 
-	if len(opt.Json) > 0 {
-		opt.OJ = output.NewOutputJson(opt.Json)
-	}
-
 	return nil
 }
 
