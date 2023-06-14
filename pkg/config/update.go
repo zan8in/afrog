@@ -12,6 +12,10 @@ import (
 	githubstore "github.com/zan8in/goupdate/stores/github"
 )
 
+func UpdateAfrogEngine() error {
+	return updateEngine()
+}
+
 func updateEngine() error {
 	var command string
 	switch runtime.GOOS {
