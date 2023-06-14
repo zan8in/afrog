@@ -44,6 +44,7 @@ func ftp_anonymous(target string, variableMap map[string]any) error {
 
 	setResponse(data, variableMap)
 	setRequest(host, variableMap)
+	setTarget(host, variableMap)
 	setFullTarget(host, variableMap)
 
 	return nil
@@ -99,5 +100,5 @@ func ftp_login(host string, variableMap map[string]any) (string, error) {
 }
 
 func init() {
-	funcMap["ftp_anonymous"] = ftp_anonymous
+	funcMap["ftp-anonymous"] = ftp_anonymous
 }

@@ -56,3 +56,7 @@ func setResponse(data string, vmap map[string]any) {
 func setFullTarget(data string, vmap map[string]any) {
 	vmap["fulltarget"] = data
 }
+
+func setTarget(data string, vmap map[string]any) {
+	vmap["target"] = data
+}

@@ -162,6 +162,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			pocRstTemp.FullTarget = c.VariableMap["fulltarget"].(string)
 			c.Result.FullTarget = c.VariableMap["fulltarget"].(string)
 		}
+		if c.VariableMap["target"] != nil {
+			c.Result.Target = c.VariableMap["target"].(string)
+		}
 		c.Result.AllPocResult = append(c.Result.AllPocResult, &pocRstTemp)
 
 		if rule.StopIfMismatch && !isMatch {

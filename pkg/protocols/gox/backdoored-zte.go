@@ -43,6 +43,7 @@ func backdoored_zte(target string, variableMap map[string]any) error {
 
 	setResponse(data, variableMap)
 	setRequest(host, variableMap)
+	setTarget(host, variableMap)
 	setFullTarget(host, variableMap)
 
 	return nil
@@ -84,5 +85,5 @@ func telnet_login(host string, variableMap map[string]any) (string, error) {
 }
 
 func init() {
-	funcMap["backdoored_zte"] = backdoored_zte
+	funcMap["backdoored-zte"] = backdoored_zte
 }

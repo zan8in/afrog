@@ -4,6 +4,7 @@ info:
   name: FTP Anonymous Login
   author: C3l3si4n,pussycat0x
   severity: medium
+  verified: true
   reference:
     - https://tools.ietf.org/html/rfc2577
   description: |
@@ -14,6 +15,6 @@ rules:
   r0: 
     request:
       type: go
-      data: ftp_anonymous
+      data: ftp-anonymous
     expression: response.raw.bcontains(b'Anonymous access allowed,') || response.raw.bcontains(b'Logged in anonymously') || response.raw.bcontains(b'230')
 expression: r0() 
