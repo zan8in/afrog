@@ -4,8 +4,13 @@ info:
     name: Ruijie RG-UAC Information Disclosure
     author: jweny(https://github.com/jweny) daffainfo
     severity: high
+    verified: true
     description: |
-        fofa-query: 'title="RG-UAC登录页面"'
+        Ruijie RG-UAC Unified Internet Behavior Management Audit System is susceptible to information disclosure. Attackers could obtain user accounts and passwords by reviewing the source code of web pages, resulting in the leakage of administrator user authentication information.
+        FOFA: title="RG-UAC登录页面"
+    reference:
+        - https://www.adminxe.com/2163.html
+    tags: ruijie,cnvd,cnvd2021,disclosure
 
 rules:
     r0:
