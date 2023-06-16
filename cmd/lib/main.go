@@ -7,12 +7,7 @@ import (
 )
 
 func main() {
-	err := afrog.NewScanner([]string{""}, afrog.Scanner{
-		TargetsFile: "./nacos.txt",
-		Search:      "nacos-detect",
-		// PocFile:     "./pocs/temp/afrog-pocs/",
-		Concurrency: 200,
-		Output:      "./r.html",
-	})
-	fmt.Println(err)
+	if err := afrog.NewScanner([]string{"http://example.com"}, afrog.Scanner{}); err != nil {
+		fmt.Println(err.Error())
+	}
 }

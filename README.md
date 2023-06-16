@@ -468,6 +468,29 @@ afrog -t https://example.com -ja result.json
 
 <!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
 
+## As Library
+
+### Simple Example
+
+Scan the website `http://example.com`
+
+```golang
+package main
+
+import (
+	"fmt"
+
+	"github.com/zan8in/afrog"
+)
+
+func main() {
+	if err := afrog.NewScanner([]string{"http://example.com"}, afrog.Scanner{}); err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+```
+
 ## Discussion group
 
 To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
