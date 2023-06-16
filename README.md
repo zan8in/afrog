@@ -491,6 +491,11 @@ func main() {
 
 ```
 
+More examples:
+
+- [Basic scanner](examples/basic_scan/main.go)
+- [Read URL batch scan from file](examples/multiline_scan/main.go)
+
 ## Discussion group
 
 To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
