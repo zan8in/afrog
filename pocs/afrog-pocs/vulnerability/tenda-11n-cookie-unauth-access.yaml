@@ -6,9 +6,14 @@ info:
   severity: high
   description: |
     Tenda 11N无线路由器由于只验证Cookie，导致任意用户伪造Cookie即可进入后台
-    app="TENDA-11N无线路由器"
+    FOFA: app="TENDA-11N无线路由器"
+    FOFA: product=="Tenda-11N-Wireless-AP"
+    SHODAN: http.title:"Tenda 11N"
   reference:
-    - http://wiki.peiqi.tech/wiki/iot/Tenda/Tenda%2011N%E6%97%A0%E7%BA%BF%E8%B7%AF%E7%94%B1%E5%99%A8%20Cookie%20%E8%B6%8A%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E.html
+    - https://github.com/D0ngsec/vulns/blob/main/Tenda/Tenda_11N_Authentication_Bypass.md
+    - https://nvd.nist.gov/vuln/detail/CVE-2022-42233
+  tags: cve,cve2022,tenda,auth-bypass,router,iot
+  created: 2023/06/16
 
 rules:
   r0:
