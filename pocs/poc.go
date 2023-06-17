@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"io/ioutil"
 	"strings"
 
 	"github.com/zan8in/afrog/pkg/poc"
@@ -68,4 +69,19 @@ func ReadPocs(path string) (poc.Poc, error) {
 		return poc, err
 	}
 	return poc, nil
+}
+
+func ReadPocsString(path string) ([]byte, error) {
+
+	file, err := f.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
