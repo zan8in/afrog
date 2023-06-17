@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -291,6 +292,21 @@ var (
 					}
 
 					return types.Int(utils.Mmh3Hash32(utils.Base64Encode(b)))
+				},
+			},
+			&functions.Overload{
+				Operator: "hexdecode_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to hexdecode_string", value.Type())
+					}
+					dst := make([]byte, hex.DecodedLen(len(v)))
+					n, err := hex.Decode(dst, []byte(v))
+					if err != nil {
+						return types.ValOrErr(value, "unexpected type '%s' passed to hexdecode_string", err.Error())
+					}
+					return types.String(string(dst[:n]))
 				},
 			},
 			// random

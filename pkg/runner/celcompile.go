@@ -100,6 +100,10 @@ var (
 				decls.NewOverload("faviconHash_stringOrBytes",
 					[]*exprpb.Type{decls.Any},
 					decls.Int)),
+			decls.NewFunction("hexdecode",
+				decls.NewOverload("hexdecode_string",
+					[]*exprpb.Type{decls.String},
+					decls.String)),
 			// random
 			decls.NewFunction("randomInt",
 				decls.NewOverload("randomInt_int_int",
