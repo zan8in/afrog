@@ -1,0 +1,25 @@
+id: mobile-management-panel
+
+info:
+  name: Mobile Management Platform Panel - Detect
+  author: ritikchaddha
+  severity: info
+  verified: true
+  description: |
+    Mobile Management Platform panel was detected.
+    FOFA: title="移动管理平台-企业管理"
+  tags: panel,mobile,management
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expression: |
+      response.status == 200 && 
+      (response.body.bcontains(b'移动管理平台-企业管理') || 
+      response.body.bcontains(b'Mobile management platform'))
+expression: r0()
+

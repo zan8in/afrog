@@ -1,0 +1,21 @@
+id: thinkphp-errors
+
+info:
+  name: ThinkPHP Errors - Sensitive Information Exposure
+  author: j4vaovo
+  severity: medium
+  verified: true
+  description: |
+    FOFA: app="ThinkPHP" && title="System Error"
+  tags: thinkphp,misconfig,exposure
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expression: |
+      (response.status == 200 || response.status == 404 || response.status == 500) &&
+      (response.body.ibcontains(b'<title>系统发生错误</title>') || response.body.ibcontains(b'<title>System Error</title>'))
+expression: r0()

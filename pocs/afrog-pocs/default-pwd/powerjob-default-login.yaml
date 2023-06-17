@@ -1,0 +1,30 @@
+id: powerjob-default-login
+
+info:
+  name: PowerJob - Default Login
+  author: j4vaovo
+  severity: high
+  verified: true
+  description: |
+    PowerJob default login credentials were discovered.
+    SHODAN: http.title:"PowerJob"
+    FOFA: title="PowerJob"
+  reference:
+    - https://www.yuque.com/powerjob/guidence/trial
+  tags: powerjob,default-login
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /appInfo/assert
+      headers:
+        Content-Type: application/json
+      body: |
+         {"appName":"powerjob-worker-samples","password":"powerjob123"}
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'{"success":true,"data":') &&
+      response.headers["content-type"].contains('application/json')
+expression: r0()

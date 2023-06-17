@@ -1,0 +1,26 @@
+id: zeppelin-unauth
+
+info:
+  name: Apache Zeppelin - Unauthenticated Access
+  author: j4vaovo
+  severity: high
+  verified: true
+  description: |
+    Apache Zeppelin server was able to be accessed because no authentication was required.
+    SHODAN: title:"Zeppelin"
+    FOFA: title="Zeppelin"
+  reference:
+    - https://www.adminxe.com/2172.html
+  tags: misconfig,apache,zeppelin,unauth
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/security/ticket
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'status":"OK') &&
+      response.body.bcontains(b'"ticket":"anonymous"')
+expression: r0()

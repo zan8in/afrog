@@ -1,0 +1,24 @@
+id: livehelperchat-admin-panel
+
+info:
+  name: Live Helper Chat Admin Login Panel - Detect
+  author: ritikchaddha
+  severity: info
+  verified: true
+  description: |
+    Live Helper Chat admin login panel was detected.
+    SHODAN: title:"Live Helper Chat"
+    FOFA: title="Live Helper Chat"
+  tags: livehelperchat,panel
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /site_admin/user/login
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'Live Helper Chat') &&
+      response.body.bcontains(b'Please login')
+expression: r0()

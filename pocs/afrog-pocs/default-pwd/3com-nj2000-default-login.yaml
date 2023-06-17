@@ -1,0 +1,27 @@
+id: 3com-nj2000-default-login
+
+info:
+  name: 3COM NJ2000 - Default Login
+  author: daffainfo
+  severity: high
+  verified: true
+  description: |
+    3COM NJ2000 contains a default login vulnerability. Default admin login password of 'password' was found. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
+    SHODAN: http.title:"ManageEngine Password"
+    FOFA: body="NJ2000"
+  reference:
+    - https://www.manualslib.com/manual/204158/3com-Intellijack-Nj2000.html?page=12
+  tags: default-login,3com,nj2000
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /login.html
+      body: password=password
+    expression: |
+      response.status == 200 && 
+      response.body.ibcontains(b'<title>3Com Corporation Web Interface</title>') &&
+      response.body.bcontains(b'<frame name="mainFrame" src="blank.html">')
+expression: r0()

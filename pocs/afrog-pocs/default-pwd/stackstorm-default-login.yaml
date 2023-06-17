@@ -1,0 +1,32 @@
+id: stackstorm-default-login
+
+info:
+  name: StackStorm Default Login
+  author: PaperPen
+  severity: high
+  verified: true
+  description: |
+    A StackStorm default admin login was discovered.
+    FOFA: app="stackstorm"
+  reference:
+    - https://github.com/StackStorm/st2-docker
+  tags: stackstorm,default-login
+  created: 2023/06/17
+
+set:
+  basic: base64("st2admin:Ch@ngeMe")
+rules:
+  r0:
+    request:
+      method: POST
+      path: /auth/tokens
+      headers:
+        Content-Type: application/json
+        Authorization: Basic {{basic}}
+    expression: |
+      response.status == 201 &&
+      response.body.bcontains(b'"user":') &&
+      response.body.bcontains(b'"token":') &&
+      response.body.bcontains(b'"expiry":')
+expression: r0()
+      

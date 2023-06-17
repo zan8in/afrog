@@ -1,0 +1,26 @@
+id: nifi-unauth
+
+info:
+  name: Apache NiFi - Unauthenticated Access
+  author: pwnhxl
+  severity: high
+  verified: true
+  description: |
+     Apache NiFi server was able to be accessed because no authentication was required.
+     SHODAN: title:"NiFi"
+     FOFA: title="nifi" && body="Did you mean"
+  reference:
+    - https://github.com/jm0x0/apache_nifi_processor_rce
+  tags: misconfig,apache,nifi,unauth
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /nifi-api/access/config
+    expression: |
+      response.status == 200 && 
+      response.headers["content-type"].contains("application/json") &&
+      response.body.bcontains(b'"supportsLogin":false}')
+expression: r0()

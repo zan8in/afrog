@@ -1,0 +1,20 @@
+id: casemanager-panel
+
+info:
+  name: CaseManager Login Panel - Detect
+  author: ffffffff0x
+  severity: info
+  verified: true
+  description: |
+    CaseManager login panel was detected.
+    FOFA: title="CaseManager"
+  tags: casemanager,panel
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login
+    expression: response.status == 200 && response.body.ibcontains(b'<title>CaseManager</title>')
+expression: r0()

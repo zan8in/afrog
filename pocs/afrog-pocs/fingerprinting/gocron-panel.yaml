@@ -1,0 +1,21 @@
+id: gocron-panel
+
+info:
+  name: Gocron Panel - Detect
+  author: ffffffff0x
+  severity: info
+  verified: true
+  description: |
+    Gocron panel was detected.
+    FOFA: app="gocron-定时任务系统"
+  tags: gocron,panel
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expression: response.status == 200 && "<title>gocron - (.*)</title>".bmatches(response.body)
+expression: r0()

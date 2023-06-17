@@ -1,0 +1,27 @@
+id: openemr-default-login
+
+info:
+  name: OpenEMR - Default Admin Discovery
+  author: Geekby
+  severity: high
+  verified: true
+  description: |
+    OpenEMR default admin credentials were discovered.
+    FOFA: app="OpenEMR"
+    SHODAN: http.html:"OpenEMR"
+  reference:
+    - https://github.com/openemr/openemr-devops/tree/master/docker/openemr/6.1.0/#openemr-official-docker-image
+  tags: openemr,default-login
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /interface/main/main_screen.php?auth=login&site=default
+      body: new_login_session_management=1&languageChoice=1&authUser=admin&clearPass=pass&languageChoice=10
+    expression: |
+      response.status == 302 &&
+      response.raw_header.bcontains(b'main.php?token_main=') &&
+      response.raw_header.bcontains(b'OpenEMR')
+expression: r0()

@@ -1,0 +1,20 @@
+id: manageengine-analytics
+
+info:
+  name: ZOHO ManageEngine Analytics Plus Panel - Detect
+  author: dhiyaneshDK
+  severity: info
+  verified: true
+  description: |
+    ZOHO ManageEngine analytics plus panel was detected.
+    FOFA: app="ZOHO-流量管理"
+  tags: panel,zoho,manageengine
+  created: 2023/06/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /iam/login
+    expression: response.status == 200  && response.body.ibcontains(b'<title>ManageEngine Analytics Plus</title>')
+expression: r0()
