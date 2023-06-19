@@ -494,7 +494,7 @@ func main() {
 More examples:
 
 - [Basic scanner](examples/basic_scan/main.go)
-- [Read URL batch scan from file](examples/multiline_scan/main.go)
+- [Read URL batch scan from file](examples/batch_scan/main.go)
 
 ## Discussion group
 
