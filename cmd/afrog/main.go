@@ -86,5 +86,6 @@ func main() {
 	}
 
 	time.Sleep(time.Second * 3)
+	gologger.Print().Msg("")
 
 }

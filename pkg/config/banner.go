@@ -10,7 +10,7 @@ import (
 const Version = "2.5.5"
 
 func ShowBanner(u *upgrade.Upgrade) {
-	gologger.Print().Msgf("\n|\tA F R O G\t>\t%s\t-\t%s\n\n", EngineV(u), PocV(u))
+	gologger.Print().Msgf("\n|\tA F 🐸 O G\t|\t%s/%s\n\n", EngineV(u), PocV(u))
 }
 
 func EngineV(u *upgrade.Upgrade) string {

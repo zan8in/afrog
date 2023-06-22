@@ -42,6 +42,9 @@ type Options struct {
 	// PoC file or directory to scan
 	PocFile string
 
+	// Append PoC file or directory to scan
+	AppendPoc goflags.StringSlice
+
 	// show afrog-pocs list
 	PocList bool
 
@@ -129,12 +132,13 @@ func NewOptions() (*Options, error) {
 	flagSet.SetDescription(`afrog`)
 
 	flagSet.CreateGroup("input", "Target",
-		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan", goflags.NormalizedStringSliceOptions),
+		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",
 		flagSet.StringVarP(&options.PocFile, "poc-file", "P", "", "PoC file or directory to scan"),
+		flagSet.StringSliceVarP(&options.AppendPoc, "append-poc", "ap", nil, "append PoC file or directory to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
 		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
 	)
@@ -157,11 +161,11 @@ func NewOptions() (*Options, error) {
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
-		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request (default 1)"),
-		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout (default 10)"),
+		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
+		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
 		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning."),
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
-		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size (default 2m)"),
+		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 	)
 
@@ -191,21 +195,6 @@ func (opt *Options) verifyOptions() error {
 		return err
 	}
 	opt.Config = config
-
-	if (len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) ||
-		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
-		homeDir, _ := os.UserHomeDir()
-		configDir := homeDir + "/.config/afrog/afrog-config.yaml"
-		gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
-		gologger.Info().Msgf("go to `%s` to configure the reverse connection platform\n", configDir)
-	}
-
-	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
-	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
-
-	ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
-	ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
-	ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 
 	if opt.PocList {
 		err := opt.PrintPocList()
@@ -248,6 +237,23 @@ func (opt *Options) verifyOptions() error {
 	}
 
 	ShowBanner(upgrade)
+
+	if (len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) ||
+		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
+		homeDir, _ := os.UserHomeDir()
+		configDir := strings.ReplaceAll(homeDir+"/.config/afrog/afrog-config.yaml", "\\", "/")
+		gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
+		gologger.Info().Msgf("Go to [%s] to configure the reverse connection platform\n", configDir)
+		gologger.Info().Msg("Tutorial: https://github.com/zan8in/afrog/wiki/Configuration")
+		gologger.Print().Msg("")
+	}
+
+	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
+	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+
+	ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
+	ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
+	ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 
 	return nil
 }
