@@ -176,7 +176,8 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	resp.Body.Close()
 
 	// respbody gbk to utf8 encoding
-	utf8RespBody := utils.Str2UTF8(string(respBody))
+	// utf8RespBody := utils.Str2UTF8(string(respBody))
+	utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/issues/68
 
 	// store the response
 	protoResp := &proto.Response{}
