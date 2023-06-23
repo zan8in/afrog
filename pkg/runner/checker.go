@@ -111,7 +111,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		} else {
 
 			if len(rule.Request.Raw) > 0 {
-				rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(int(c.Options.Timeout))}
+				rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(c.Options.Proxy, int(c.Options.Timeout))}
 				err = rt.RawHttpRequest(rule.Request.Raw, target, c.VariableMap)
 
 			} else {

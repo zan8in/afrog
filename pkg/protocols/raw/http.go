@@ -22,9 +22,20 @@ type RawHttp struct {
 	RawhttpClient *rawhttp.Client
 }
 
-func GetRawHTTP(timeout int) *rawhttp.Client {
+func GetRawHTTP(proxy string, timeout int) *rawhttp.Client {
 	if rawHttpClient == nil {
 		rawHttpOptions := rawhttp.DefaultOptions
+
+		if len(proxy) > 0 {
+			if err := LoadProxyServers(proxy); err == nil {
+				if ProxyURL != "" {
+					rawHttpOptions.Proxy = ProxyURL
+				} else if ProxySocksURL != "" {
+					rawHttpOptions.Proxy = ProxySocksURL
+				}
+			}
+		}
+
 		rawHttpOptions.Timeout = time.Duration(timeout) * time.Second
 		rawHttpClient = rawhttp.NewClient(rawHttpOptions)
 	}
