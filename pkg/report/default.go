@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zan8in/afrog/pkg/utils"
 	timeutil "github.com/zan8in/pins/time"
 )
 
@@ -66,6 +67,7 @@ func (report *Report) defaultHmtl(line string) string {
 		reqraw := v.ResultRequest.GetRaw()
 		respraw := v.ResultResponse.GetRaw()
 		// }
+		respbody := utils.Str2UTF8(string(respraw))
 
 		fullurl := xssfilter(v.FullTarget)
 
@@ -85,7 +87,7 @@ func (report *Report) defaultHmtl(line string) string {
 			</div>
 			</td>
 		</tr>
-	`, fullurl, fullurl, reqraw, respraw)
+	`, fullurl, fullurl, reqraw, respbody)
 	}
 
 	footer := "</tbody></table>"

