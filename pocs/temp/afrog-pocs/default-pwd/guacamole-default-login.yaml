@@ -1,0 +1,26 @@
+id: guacamole-default-login
+
+info:
+  name: Guacamole Default Login
+  author: r3dg33k
+  severity: high
+  verified: true
+  description: Guacamole default admin login credentials were detected.
+  reference:
+    - https://wiki.debian.org/Guacamole#:~:text=You%20can%20now%20access%20the,password%20are%20both%20%22guacadmin%22
+  tags: guacamole,default-login
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /api/tokens
+      body: username=guacadmin&password=guacadmin
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"username"') && 
+      response.body.bcontains(b'"authToken"')  && 
+      response.body.bcontains(b'"guacadmin"')
+expression: r0()
+

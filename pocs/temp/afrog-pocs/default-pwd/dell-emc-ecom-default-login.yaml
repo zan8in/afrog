@@ -1,0 +1,26 @@
+id: dell-emc-ecom-default-login
+
+info:
+  name: Dell EMC ECOM Default Login
+  author: Techryptic (@Tech)
+  severity: high
+  verified: false
+  description: Dell EMC ECOM default login information "(admin:#1Password)" was discovered.
+  reference:
+    - https://www.dell.com/support/kbdoc/en-za/000171270/vipr-controller-operation-denied-by-clariion-array-you-are-not-privileged-to-perform-the-requested-operation
+  solutions: To resolve this issue, perform a "remsys" and "addsys" with no other operations occurring (reference the appropriate SMI-S provider documentation) and specify the new password when re-adding the array.
+    If there are issues performing the "addsys" operation, it is recommended to restart the management server on each SP.
+  tags: dell,emc,ecom,default-login
+  created: 2023/06/24
+
+set:
+  admin: base64("admin:#1Password")
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      headers:
+        Authorization: Basic {{admin}}
+    expression: response.status == 200 && response.body.bcontains(b'Welcome to ECOM') &&  response.raw_header.bcontains(b'ECOMSecurity')
+expression: r0()

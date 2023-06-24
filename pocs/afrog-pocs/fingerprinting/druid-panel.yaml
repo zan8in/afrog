@@ -11,5 +11,5 @@ rules:
     request:
       method: GET
       path: /druid/login.html
-    expression: response.status == 200 && response.body.bcontains(b'<title>druid monitor</title>')
+    expression: response.status == 200 && response.body.ibcontains(b'<title>druid monitor</title>')
 expression: r0()

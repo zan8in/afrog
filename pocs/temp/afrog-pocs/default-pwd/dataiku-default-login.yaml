@@ -1,0 +1,23 @@
+id: dataiku-default-login
+
+info:
+  name: Dataiku - Default Login
+  author: random-robbie
+  severity: high
+  verified: true
+  description: |
+    Dataiku contains a default login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations. This vulnerability may also lead to server-side request forgery and/or remote code execution.
+    SHODAN: title:"dataiku"
+  reference:
+    - https://www.dataiku.com
+  tags: default-login,dataiku
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /dip/api/login
+      body: login=admin&password=admin
+    expression: response.status == 200 && response.raw_header.ibcontains(b'dss_access_token')
+expression: r0()

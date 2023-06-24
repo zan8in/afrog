@@ -1,0 +1,27 @@
+id: dolphinscheduler-default-login
+
+info:
+  name: Apache DolphinScheduler Default Login
+  author: For3stCo1d
+  severity: high
+  verified: true
+  description: |
+    Apache DolphinScheduler default admin credentials were discovered.
+    SHODAN: http.title:"DolphinScheduler"
+    FOFA: title="DolphinScheduler"
+  reference:
+    - https://github.com/apache/dolphinscheduler
+  tags: apache,dolphinscheduler,default-login,oss
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /dolphinscheduler/login
+      body: userName=admin&userPassword=dolphinscheduler123
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"msg":"login success"') &&
+      response.body.bcontains(b'"sessionId":')
+expression: r0()

@@ -1,0 +1,31 @@
+id: aem-felix-console
+
+info:
+  name: Adobe Experience Manager Felix Console - Default Login
+  author: DhiyaneshDk
+  severity: high
+  verified: true
+  description: |
+    Adobe Experience Manager Felix Console contains a default admin login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations. Remote code execution may also be possible via installation of OSGI bundle.
+    SHODAN: http.title:"AEM Sign In"
+    SHODAN: http.component:"Adobe Experience Manager"
+  reference:
+    - https://github.com/0ang3el/aem-hacker/blob/master/aem_hacker.py
+    - https://github.com/0ang3el/aem-rce-bundle
+  tags: default-login,misconfig,aem,adobe
+  created: 2023/06/24
+
+set:
+  admin: base64("admin:admin")
+rules:
+  r0:
+    request:
+      method: GET
+      path: /system/console/bundles
+      headers:
+        Authorization: Basic {{admin}}
+    expression: |
+      response.status == 200 &&
+      response.body.ibcontains(b'<title>Adobe Experience Manager Web Console - Bundles</title>') &&
+      response.raw_header.bcontains(b'text/html')
+expression: r0()

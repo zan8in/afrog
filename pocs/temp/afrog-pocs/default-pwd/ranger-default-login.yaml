@@ -1,0 +1,24 @@
+id: ranger-default-login
+
+info:
+  name: Apache Ranger - Default Login
+  author: For3stCo1d
+  severity: high
+  verified: true
+  description: |
+    Apache Ranger contains a default login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
+    SHODAN: http.title:"Ranger - Sign In"
+    FOFA: title="Ranger - Sign In"
+  reference:
+    - https://github.com/apache/ranger
+  tags: apache,ranger,default-login
+  created: 2023/06/23
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /login
+      body: username=admin&password=admin
+    expression: response.status == 200 && response.body.bcontains(b'"statusCode":200') && response.body.bcontains(b'"msgDesc":"Login Successful"')
+expression: r0()

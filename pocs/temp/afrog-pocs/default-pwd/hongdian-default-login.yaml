@@ -1,0 +1,32 @@
+id: hongdian-default-login
+
+info:
+  name: Hongdian Default Login
+  author: gy741
+  severity: high
+  verified: false
+  description: Hongdian default login information was detected.
+  reference:
+    - https://ssd-disclosure.com/ssd-advisory-hongdian-h8922-multiple-vulnerabilities/
+  tags: hongdian,default-login
+  created: 2023/06/24
+
+set:
+  admin: base64("admin:admin")
+  guest: base64("guest:guest")
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      headers:
+        Authorization: Basic {{admin}}
+    expression: response.status == 200 && response.body.bcontains(b'status_main.cgi') && response.headers["content-type"].contains('text/html')
+  r1:
+    request:
+      method: GET
+      path: /
+      headers:
+        Authorization: Basic {{guest}}
+    expression: response.status == 200 && response.body.bcontains(b'status_main.cgi') && response.headers["content-type"].contains('text/html')
+expression: r0() || r1()

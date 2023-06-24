@@ -8,6 +8,8 @@ info:
   description: FRP default login credentials were discovered.
   reference:
     - https://github.com/fatedier/frp/issues/1840
+  tags: frp,default-login
+  created: 2023/06/24
 
 rules:
   r0:

