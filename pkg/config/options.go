@@ -6,8 +6,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/output"
+	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
@@ -308,11 +310,13 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 }
 
 func (o *Options) PrintPocList() error {
+	// ebemed pocs
 	plist, err := pocs.GetPocs()
 	if err != nil {
 		return err
 	}
 
+	gologger.Print().Msg("---------- Embed PoCs -----------------")
 	number := 1
 	for _, v := range plist {
 		if poc, err := pocs.ReadPocs(v); err == nil {
@@ -324,6 +328,50 @@ func (o *Options) PrintPocList() error {
 			number++
 		}
 	}
+
+	pocsDirectory := []string{}
+	c := catalog.New("")
+
+	// afrog-pocs
+	pocsDir, _ := poc.InitPocHomeDirectory()
+	if len(pocsDir) > 0 {
+		pocsDirectory = append(pocsDirectory, pocsDir)
+	}
+
+	gologger.Print().Msg("---------- Local afrog-pocs -----------------")
+	afrogpocs := c.GetPocsPath(pocsDirectory)
+	for _, v := range afrogpocs {
+		if poc, err := poc.ReadPocs(v); err == nil {
+			gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+				log.LogColor.Time(number),
+				log.LogColor.Title(poc.Id),
+				log.LogColor.Green(poc.Info.Name),
+				log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+			number++
+		}
+	}
+
+	// append pocs
+	if len(o.AppendPoc) > 0 {
+		for _, v := range o.AppendPoc {
+			pocsDirectory = append(pocsDirectory, v)
+		}
+	}
+
+	// list poc of afrog-pocs and append pocs
+	gologger.Print().Msg("---------- Local append-pocs -----------------")
+	appendpocs := c.GetPocsPath(pocsDirectory)
+	for _, v := range appendpocs {
+		if poc, err := poc.ReadPocs(v); err == nil {
+			gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+				log.LogColor.Time(number),
+				log.LogColor.Title(poc.Id),
+				log.LogColor.Green(poc.Info.Name),
+				log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+			number++
+		}
+	}
+
 	gologger.Print().Msgf("--------------------------------\r\nTotal: %d\n", number-1)
 
 	return nil
