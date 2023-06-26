@@ -11,7 +11,6 @@ import (
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/result"
 	"github.com/zan8in/afrog/pkg/runner"
-	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/gologger"
 )
@@ -169,13 +168,13 @@ func (opt *Scanner) verifyOptions() error {
 		os.Exit(0)
 	}
 
-	upgrade, err := upgrade.NewUpgrade(true)
+	au, err := config.NewAfrogUpdate(true)
 	if err != nil {
 		return err
 	}
 
 	if !opt.DisableUpdateCheck {
-		info, _ := upgrade.UpgradePocs()
+		info, _ := au.AfrogUpdatePocs()
 		if len(info) > 0 {
 			gologger.Info().Msg(info)
 		}
@@ -185,7 +184,7 @@ func (opt *Scanner) verifyOptions() error {
 		return fmt.Errorf("either `target` or `target-file` must be set")
 	}
 
-	config.ShowBanner(upgrade)
+	config.ShowBanner(au)
 
 	return nil
 }
