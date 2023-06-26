@@ -1,4 +1,4 @@
-package upgrade
+package config
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-type Upgrade struct {
+type AfrogUpdate struct {
 	HomeDir             string
 	CurrVersion         string
 	RemoteVersion       string
@@ -31,13 +31,13 @@ const (
 	afrogVersion    = "/afrog.version"
 )
 
-func NewUpgrade(updatePoc bool) (*Upgrade, error) {
+func NewAfrogUpdate(updatePoc bool) (*AfrogUpdate, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
 
-	u := &Upgrade{HomeDir: homeDir, IsUpdatePocs: updatePoc}
+	u := &AfrogUpdate{HomeDir: homeDir, IsUpdatePocs: updatePoc}
 
 	curVersion, err := poc.GetPocVersionNumber()
 	if err != nil {
@@ -48,7 +48,7 @@ func NewUpgrade(updatePoc bool) (*Upgrade, error) {
 	return u, err
 }
 
-func (u *Upgrade) CheckUpgrade() (bool, error) {
+func (u *AfrogUpdate) CheckAfrogUpdate() (bool, error) {
 
 	resp, err := http.Get(upHost + upRemoteVersion)
 	if err != nil {
@@ -85,8 +85,8 @@ func getAfrogVersion() (string, error) {
 	return strings.TrimSpace(string(afrogversion)), nil
 }
 
-func (u *Upgrade) UpgradePocs() (string, error) {
-	isUp, err := u.CheckUpgrade()
+func (u *AfrogUpdate) AfrogUpdatePocs() (string, error) {
+	isUp, err := u.CheckAfrogUpdate()
 	if err != nil {
 		if u.IsUpdatePocs {
 			return "", fmt.Errorf("afrog-poc update failed. %s", err.Error())
@@ -106,7 +106,7 @@ func (u *Upgrade) UpgradePocs() (string, error) {
 	return "", err
 }
 
-func (u *Upgrade) Download() error {
+func (u *AfrogUpdate) Download() error {
 	resp, err := grab.Get(u.HomeDir, upHost+upPath)
 	if err != nil {
 		return fmt.Errorf("%s", err.Error())
@@ -127,7 +127,7 @@ func (u *Upgrade) Download() error {
 	return os.Remove(resp.Filename)
 }
 
-func (u *Upgrade) Unzip(src string) error {
+func (u *AfrogUpdate) Unzip(src string) error {
 	uz := utils.NewUnzip()
 
 	if _, err := uz.Extract(src, u.HomeDir); err != nil {

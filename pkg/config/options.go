@@ -10,7 +10,6 @@ import (
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/output"
 	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/upgrade"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/goflags"
@@ -222,13 +221,13 @@ func (opt *Options) verifyOptions() error {
 		os.Exit(0)
 	}
 
-	upgrade, err := upgrade.NewUpgrade(true)
+	au, err := NewAfrogUpdate(true)
 	if err != nil {
 		return err
 	}
 
 	if !opt.DisableUpdateCheck {
-		info, _ := upgrade.UpgradePocs()
+		info, _ := au.AfrogUpdatePocs()
 		if len(info) > 0 && opt.UpdatePocs {
 			gologger.Info().Msg(info)
 		}
@@ -238,7 +237,7 @@ func (opt *Options) verifyOptions() error {
 		return fmt.Errorf("either `target` or `target-file` must be set")
 	}
 
-	ShowBanner(upgrade)
+	ShowBanner(au)
 
 	if (len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) ||
 		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
