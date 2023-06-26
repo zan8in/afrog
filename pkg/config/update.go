@@ -57,12 +57,19 @@ func updateEngine() error {
 		return fmt.Errorf("no compatible binary found for %s/%s", currentOS, runtime.GOARCH)
 	}
 
+	oldURL := final.URL
+
 	//https://gitee.com/zanbin/afrog/releases/download/v2.0.1/afrog_windows_amd64.zip
 	final.URL = strings.Replace(final.URL, "github.com/zan8in", "gitee.com/zanbin", -1)
 
 	tarball, err := final.DownloadProxy(progress.Reader)
 	if err != nil {
-		return errors.Wrap(err, "could not download latest release")
+		// if gitee errors
+		final.URL = oldURL
+		tarball, err = final.DownloadProxy(progress.Reader)
+		if err != nil {
+			return errors.Wrap(err, "could not download latest release")
+		}
 	}
 
 	if err := m.Install(tarball); err != nil {
