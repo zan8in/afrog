@@ -341,6 +341,20 @@
             <br>
             <a href="https://github.com/HuiTaiL6"><sub>HuiTaiL</sub></a>
         </td>
+        <td align="center">
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/45.png&mask=circle&w=60&h=60"
+                   alt="Typora-Logo"
+                 />
+            <br>
+            <a href="https://github.com/Miracles666"><sub>Miracles666</sub></a>
+        </td>
+        <td align="center">
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/46.jpg&mask=circle&w=60&h=60"
+                   alt="Typora-Logo"
+                 />
+            <br>
+            <a href="javascript:void(0);"><sub>Observer</sub></a>
+        </td>
     </tr>
 </table></div>
 
