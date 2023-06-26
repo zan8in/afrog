@@ -128,6 +128,28 @@ var (
 					}
 				},
 			},
+			&functions.Overload{
+				Operator: "toUpper_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toUpper_string", value.Type())
+					}
+
+					return types.String(strings.ToUpper(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "toLower_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toLower_string", value.Type())
+					}
+
+					return types.String(strings.ToLower(string(v)))
+				},
+			},
 
 			// []byte
 			&functions.Overload{
