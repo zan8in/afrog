@@ -4,9 +4,12 @@ info:
     name: 用友 NC bsh.servlet.BshServlet 远程命令执行漏洞
     author: B1anda0
     severity: critical
+    verified: true
     description: 用友 NC bsh.servlet.BshServlet 存在远程命令执行漏洞，通过BeanShell 执行远程命令获取服务器权限 icon_hash="1085941792"
     reference:
         - https://mp.weixin.qq.com/s/FvqC1I_G14AEQNztU0zn8A
+    tags: yonyou,yonyounc,rce
+    created: 2023/06/26
 
 set:
     r1: randomInt(8000, 9999)
