@@ -348,6 +348,8 @@
             <br>
             <a href="https://github.com/Miracles666"><sub>Miracles666</sub></a>
         </td>
+    </td>
+     <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/46.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
