@@ -314,6 +314,26 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 	return false
 }
 
+func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, severity string) bool {
+	var isShow bool
+	if len(o.Search) > 0 && o.SetSearchKeyword() && len(o.Severity) > 0 && o.SetSeverityKeyword() {
+		if o.CheckPocKeywords(pocId, pocInfoName) && o.CheckPocSeverityKeywords(severity) {
+			isShow = true
+		}
+	} else if len(o.Severity) > 0 && o.SetSeverityKeyword() {
+		if o.CheckPocSeverityKeywords(severity) {
+			isShow = true
+		}
+	} else if len(o.Search) > 0 && o.SetSearchKeyword() {
+		if o.CheckPocKeywords(pocId, pocInfoName) {
+			isShow = true
+		}
+	} else {
+		isShow = true
+	}
+	return isShow
+}
+
 func (o *Options) PrintPocList() error {
 
 	var number = 1
@@ -322,12 +342,14 @@ func (o *Options) PrintPocList() error {
 		gologger.Print().Msg("---------- Embed PoCs -----------------")
 		for _, v := range pocs.EmbedFileList {
 			if poc, err := pocs.EmbedReadPocByPath(v); err == nil {
-				gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-					log.LogColor.Time(number),
-					log.LogColor.Title(poc.Id),
-					log.LogColor.Green(poc.Info.Name),
-					log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-				number++
+				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
+					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+						log.LogColor.Time(number),
+						log.LogColor.Title(poc.Id),
+						log.LogColor.Green(poc.Info.Name),
+						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+					number++
+				}
 			}
 		}
 	}
@@ -337,12 +359,14 @@ func (o *Options) PrintPocList() error {
 		gologger.Print().Msg("---------- Local afrog-pocs -----------------")
 		for _, v := range poc.LocalFileList {
 			if poc, err := poc.LocalReadPocByPath(v); err == nil {
-				gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-					log.LogColor.Time(number),
-					log.LogColor.Title(poc.Id),
-					log.LogColor.Green(poc.Info.Name),
-					log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-				number++
+				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
+					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+						log.LogColor.Time(number),
+						log.LogColor.Title(poc.Id),
+						log.LogColor.Green(poc.Info.Name),
+						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+					number++
+				}
 			}
 		}
 	}
@@ -352,12 +376,14 @@ func (o *Options) PrintPocList() error {
 		gologger.Print().Msg("---------- Local append-pocs -----------------")
 		for _, v := range poc.LocalAppendList {
 			if poc, err := poc.LocalReadPocByPath(v); err == nil {
-				gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-					log.LogColor.Time(number),
-					log.LogColor.Title(poc.Id),
-					log.LogColor.Green(poc.Info.Name),
-					log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-				number++
+				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
+					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+						log.LogColor.Time(number),
+						log.LogColor.Title(poc.Id),
+						log.LogColor.Green(poc.Info.Name),
+						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+					number++
+				}
 			}
 		}
 	}
