@@ -7,7 +7,17 @@ import (
 )
 
 func main() {
+	// for _, line := range pocs.EmbedFileList {
+	// 	b, err := pocs.EmbedReadFile(line)
+	// 	if err != nil {
+	// 		fmt.Printf(err.Error())
+	// 		return
+	// 	}
+	// 	fmt.Println(string(b))
+	// 	return
+	// }
 
+	return
 	v2 := `
 	<SCRIPT LANGUAGE="JavaScript">
     <!--

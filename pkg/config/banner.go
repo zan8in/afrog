@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/gologger"
@@ -8,8 +10,12 @@ import (
 
 const Version = "2.6.1"
 
+func InitBanner() {
+	fmt.Printf("\r\n|\tA F 🐸 O G\t|")
+}
 func ShowBanner(u *AfrogUpdate) {
-	gologger.Print().Msgf("\n|\tA F 🐸 O G\t|\t%s/%s\n\n", EngineV(u), PocV(u))
+	InitBanner()
+	fmt.Printf("\r\t\t\t\t%s/%s\n\n", EngineV(u), PocV(u))
 }
 
 func EngineV(u *AfrogUpdate) string {

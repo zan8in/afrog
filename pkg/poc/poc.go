@@ -1,6 +1,8 @@
 package poc
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,7 +121,69 @@ type Classification struct {
 	CweId       string  `yaml:"cwe-id"`
 }
 
-const afrogPocsDirectory = "afrog-pocs"
+const DefaultLocalPocDirectory = "afrog-pocs"
+
+var (
+	LocalFileList   []string
+	LocalAppendList []string
+)
+var LocalPocDirectory string
+
+func init() {
+	LocalPocDirectory, _ = InitPocHomeDirectory()
+	LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
+}
+
+func InitLocalAppendList(pathFolder []string) {
+	if len(pathFolder) == 0 {
+		return
+	}
+
+	for _, path := range pathFolder {
+		if f, err := LocalWalkFiles(path); err == nil {
+			LocalAppendList = append(LocalAppendList, f...)
+		}
+	}
+}
+
+func LocalReadContentByName(name string) ([]byte, error) {
+	var (
+		err    error
+		result []byte
+	)
+
+	if len(LocalFileList) == 0 && len(LocalAppendList) == 0 {
+		return nil, fmt.Errorf("local file list is empty")
+	}
+
+	for _, file := range LocalFileList {
+		file = strings.ReplaceAll(file, "\\", "/")
+		lastSlashIndex := strings.LastIndex(file, "/")
+		if lastSlashIndex != -1 {
+			fname := file[lastSlashIndex+1:]
+			if name == fname || name+".yaml" == fname || name+".yml" == fname {
+				return ioutil.ReadFile(file)
+			}
+		}
+	}
+
+	if len(LocalAppendList) == 0 {
+		return nil, fmt.Errorf("applend file list is empty")
+	}
+
+	for _, file := range LocalAppendList {
+		file = strings.ReplaceAll(file, "\\", "/")
+		lastSlashIndex := strings.LastIndex(file, "/")
+		if lastSlashIndex != -1 {
+			fname := file[lastSlashIndex+1:]
+			if name == fname || name+".yaml" == fname || name+".yml" == fname {
+				return ioutil.ReadFile(file)
+			}
+		}
+	}
+
+	return result, err
+}
 
 // Initialize afrog-pocs directory
 // @return pocsDir {{UserHomeDir}}/afrog-pocs
@@ -129,7 +193,7 @@ func InitPocHomeDirectory() (string, error) {
 		return "", err
 	}
 
-	pocsDir := filepath.Join(homeDir, afrogPocsDirectory)
+	pocsDir := filepath.Join(homeDir, DefaultLocalPocDirectory)
 
 	_, err = os.Stat(pocsDir)
 	if err != nil {
@@ -139,21 +203,8 @@ func InitPocHomeDirectory() (string, error) {
 	return pocsDir, err
 }
 
-func GetPocPath() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "1"
-	}
-
-	configFile := filepath.Join(homeDir, afrogPocsDirectory)
-	if !utils.Exists(configFile) {
-		return ""
-	}
-	return configFile
-}
-
 func GetPocVersionNumber() (string, error) {
-	version := GetPocPath() + "/version"
+	version := LocalPocDirectory + "/version"
 	v, err := utils.ReadFromFile(version)
 	if err != nil {
 		return "0", nil
@@ -161,9 +212,27 @@ func GetPocVersionNumber() (string, error) {
 	return strings.TrimSpace(string(v)), nil
 }
 
+func LocalWalkFiles(folderPath string) ([]string, error) {
+	fileList := []string{}
+	err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 检查是否为文件且以 .yaml 或 .yml 扩展名结尾
+		if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
+			fileList = append(fileList, path)
+		}
+
+		return nil
+	})
+
+	return fileList, err
+}
+
 // Read a poc yaml file from disk.
 // `pocYaml` is a poc yaml file of absolute path.
-func ReadPocs(pocYaml string) (Poc, error) {
+func LocalReadPocByPath(pocYaml string) (Poc, error) {
 	var poc = Poc{}
 
 	file, err := os.Open(pocYaml)

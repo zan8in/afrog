@@ -57,7 +57,7 @@ func (runner *Runner) Execute() {
 	var pocSlice []poc.Poc
 
 	for _, pocYaml := range runner.PocsYaml {
-		p, err := poc.ReadPocs(pocYaml)
+		p, err := poc.LocalReadPocByPath(pocYaml)
 		if err != nil {
 			gologger.Error().Msg(err.Error())
 			continue
@@ -66,7 +66,7 @@ func (runner *Runner) Execute() {
 	}
 
 	for _, pocEmbedYaml := range runner.PocsEmbedYaml {
-		p, err := pocs.ReadPocs(pocEmbedYaml)
+		p, err := pocs.EmbedReadPocByPath(pocEmbedYaml)
 		if err != nil {
 			gologger.Error().Msg(err.Error())
 			continue
