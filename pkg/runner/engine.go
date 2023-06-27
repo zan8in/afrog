@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -9,8 +8,6 @@ import (
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/result"
-	"github.com/zan8in/afrog/pocs"
-	"github.com/zan8in/gologger"
 )
 
 var CheckerPool = sync.Pool{
@@ -54,63 +51,20 @@ func NewEngine(options *config.Options) *Engine {
 
 func (runner *Runner) Execute() {
 
-	var pocSlice []poc.Poc
+	options := runner.options
 
-	for _, pocYaml := range runner.PocsYaml {
-		p, err := poc.LocalReadPocByPath(pocYaml)
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			continue
-		}
-		pocSlice = append(pocSlice, p)
+	pocSlice := options.CreatePocList()
+
+	options.Count += options.Targets.Len() * len(pocSlice)
+
+	if options.Smart {
+		options.SmartControl()
 	}
 
-	for _, pocEmbedYaml := range runner.PocsEmbedYaml {
-		p, err := pocs.EmbedReadPocByPath(pocEmbedYaml)
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			continue
-		}
-		pocSlice = append(pocSlice, p)
-	}
-
-	// added search poc by keywords
-	newPocSlice := []poc.Poc{}
-	if len(runner.options.Search) > 0 && runner.options.SetSearchKeyword() {
-		for _, v := range pocSlice {
-			if runner.options.CheckPocKeywords(v.Id, v.Info.Name) {
-				newPocSlice = append(newPocSlice, v)
-			}
-		}
-	} else if len(runner.options.Severity) > 0 && runner.options.SetSeverityKeyword() {
-		// added severity filter @date: 2022.6.13 10:58
-		for _, v := range pocSlice {
-			if runner.options.CheckPocSeverityKeywords(v.Info.Severity) {
-				newPocSlice = append(newPocSlice, v)
-			}
-		}
-	} else {
-		newPocSlice = append(newPocSlice, pocSlice...)
-	}
-
-	latestPocSlice := []poc.Poc{}
-	order := []string{"info", "low", "medium", "high", "critical"}
-	for _, o := range order {
-		for _, s := range newPocSlice {
-			if o == strings.ToLower(s.Info.Severity) {
-				latestPocSlice = append(latestPocSlice, s)
-			}
-		}
-	}
-
-	runner.options.Count += runner.options.Targets.Len() * len(latestPocSlice)
-
-	// runner.authomaticThread()
-
-	runner.engine.ticker = time.NewTicker(time.Second / time.Duration(runner.options.RateLimit))
+	runner.engine.ticker = time.NewTicker(time.Second / time.Duration(options.RateLimit))
 	var wg sync.WaitGroup
 
-	p, _ := ants.NewPoolWithFunc(runner.options.Concurrency, func(p any) {
+	p, _ := ants.NewPoolWithFunc(options.Concurrency, func(p any) {
 		defer wg.Done()
 		<-runner.engine.ticker.C
 
@@ -123,7 +77,7 @@ func (runner *Runner) Execute() {
 	})
 	defer p.Release()
 
-	for _, poc := range latestPocSlice {
+	for _, poc := range pocSlice {
 		for _, t := range runner.options.Targets.List() {
 			wg.Add(1)
 			p.Invoke(&TransData{Target: t.(string), Poc: poc})
@@ -153,9 +107,3 @@ type TransData struct {
 	Target string
 	Poc    poc.Poc
 }
-
-// func (runner *Runner) authomaticThread() {
-// 	if runner.options.Concurrency == 25 && runner.options.Count >= 8000 {
-// 		runner.options.Concurrency = runtime.NumCPU() * 50
-// 	}
-// }

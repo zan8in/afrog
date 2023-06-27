@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -103,6 +104,9 @@ type Options struct {
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
 
+	// Smart Control Concurrency
+	Smart bool
+
 	// number of times to retry a failed request (default 1)
 	Retries int
 
@@ -158,6 +162,7 @@ func NewOptions() (*Options, error) {
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -402,4 +407,63 @@ func (o *Options) ReadPocDetail() {
 		gologger.Print().Msgf("%s\n", string(content))
 		return
 	}
+}
+
+func (o *Options) CreatePocList() []poc.Poc {
+	var pocSlice []poc.Poc
+
+	for _, pocYaml := range poc.LocalAppendList {
+		if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+			pocSlice = append(pocSlice, p)
+		}
+	}
+
+	for _, pocYaml := range poc.LocalFileList {
+		if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+			pocSlice = append(pocSlice, p)
+
+		}
+	}
+
+	for _, pocEmbedYaml := range pocs.EmbedFileList {
+		if p, err := pocs.EmbedReadPocByPath(pocEmbedYaml); err == nil {
+			pocSlice = append(pocSlice, p)
+		}
+	}
+
+	newPocSlice := []poc.Poc{}
+	for _, poc := range pocSlice {
+		if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
+			newPocSlice = append(newPocSlice, poc)
+		}
+	}
+
+	latestPocSlice := []poc.Poc{}
+	order := []string{"info", "low", "medium", "high", "critical"}
+	for _, o := range order {
+		for _, s := range newPocSlice {
+			if o == strings.ToLower(s.Info.Severity) {
+				latestPocSlice = append(latestPocSlice, s)
+			}
+		}
+	}
+
+	return latestPocSlice
+}
+
+func (o *Options) SmartControl() {
+	numCPU := runtime.NumCPU()
+	targetLen := o.Targets.Len()
+
+	if o.Concurrency == 25 && targetLen <= 10 {
+		o.Concurrency = 10
+	} else if o.Concurrency == 25 && targetLen >= 1000 {
+		o.Concurrency = numCPU * 30
+	} else if o.Concurrency == 25 && targetLen >= 500 {
+		o.Concurrency = numCPU * 20
+	} else if o.Concurrency == 25 && targetLen >= 100 {
+		o.Concurrency = numCPU * 10
+	}
+
+	fmt.Println(targetLen, o.Concurrency)
 }
