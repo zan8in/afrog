@@ -12,8 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/axgle/mahonia"
 	"github.com/zan8in/afrog/pkg/proto"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
 
 func IsBlank(value string) bool {
@@ -201,7 +202,11 @@ func Str2UTF8(str string) string {
 		return ""
 	}
 	if !utf8.ValidString(str) {
-		return mahonia.NewDecoder("gb18030").ConvertString(str)
+		utf8Bytes, _ := ioutil.ReadAll(transform.NewReader(
+			strings.NewReader(str),
+			simplifiedchinese.GBK.NewDecoder(),
+		))
+		return string(utf8Bytes)
 	}
 	return str
 }
