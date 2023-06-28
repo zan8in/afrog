@@ -206,8 +206,14 @@ func (opt *Options) verifyOptions() error {
 		poc.InitLocalAppendList(opt.AppendPoc)
 	}
 
+	// init test poc
+	if len(opt.PocFile) > 0 {
+		poc.InitLocalTestList([]string{opt.PocFile})
+
+	}
+
 	// initialized embed poc、local poc and append poc
-	if len(pocs.EmbedFileList) == 0 && len(poc.LocalFileList) == 0 && len(poc.LocalAppendList) == 0 {
+	if len(pocs.EmbedFileList) == 0 && len(poc.LocalFileList) == 0 && len(poc.LocalAppendList) == 0 && len(poc.LocalTestList) == 0 {
 		return fmt.Errorf("PoCs is not empty")
 	}
 
@@ -411,6 +417,15 @@ func (o *Options) ReadPocDetail() {
 
 func (o *Options) CreatePocList() []poc.Poc {
 	var pocSlice []poc.Poc
+
+	if len(o.PocFile) > 0 && len(poc.LocalTestList) > 0 {
+		for _, pocYaml := range poc.LocalTestList {
+			if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+				pocSlice = append(pocSlice, p)
+			}
+		}
+		return pocSlice
+	}
 
 	for _, pocYaml := range poc.LocalAppendList {
 		if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {

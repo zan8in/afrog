@@ -126,6 +126,7 @@ const DefaultLocalPocDirectory = "afrog-pocs"
 var (
 	LocalFileList   []string
 	LocalAppendList []string
+	LocalTestList   []string
 )
 var LocalPocDirectory string
 
@@ -142,6 +143,18 @@ func InitLocalAppendList(pathFolder []string) {
 	for _, path := range pathFolder {
 		if f, err := LocalWalkFiles(path); err == nil {
 			LocalAppendList = append(LocalAppendList, f...)
+		}
+	}
+}
+
+func InitLocalTestList(pathFolder []string) {
+	if len(pathFolder) == 0 {
+		return
+	}
+
+	for _, path := range pathFolder {
+		if f, err := LocalWalkFiles(path); err == nil {
+			LocalTestList = append(LocalTestList, f...)
 		}
 	}
 }
