@@ -53,6 +53,7 @@ type RuleMap struct {
 // 用于帮助yaml解析，保证Rule有序
 type RuleMapSlice []RuleMap
 type Rule struct {
+	Brute          yaml.MapSlice `yaml:"brute"`
 	Request        RuleRequest   `yaml:"request"`
 	Expression     string        `yaml:"expression"`
 	Expressions    []string      `yaml:"expressions"`
@@ -64,6 +65,7 @@ type Rule struct {
 }
 
 type ruleAlias struct {
+	Brute          yaml.MapSlice `yaml:"brute"`
 	Request        RuleRequest   `yaml:"request"`
 	Expression     string        `yaml:"expression"`
 	Expressions    []string      `yaml:"expressions"`
@@ -266,6 +268,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 
+	r.Brute = tmp.Brute
 	r.Request = tmp.Request
 	r.Expression = tmp.Expression
 	r.Expressions = append(r.Expressions, tmp.Expressions...)

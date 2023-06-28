@@ -1,0 +1,22 @@
+id: brute
+
+info:
+  name: Brute Test
+  author: zan8in
+  severity: info
+
+rules:
+  r0:
+    brute:
+      path:
+        - "php.php"
+        - "info.php"
+        - "phpinfo.php"
+        - "infophp.php"
+        - "php_info.php"
+        - "test.php"
+    request:
+      method: GET
+      path: /"{{path}}"
+    expression: response.status == 200
+expression: r0()
