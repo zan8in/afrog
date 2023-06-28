@@ -49,6 +49,7 @@ rules:
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
            - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
            - '"thinkphp-debug" != "" && response.body.bcontains(b">错误</span>") && response.body.bcontains(b">SQL</span>") &&  response.body.bcontains(b">调试</span>")'
+           - '"nginxWebUI" != "" && response.status == 200 && response.body.ibcontains(b"<title>nginxWebUI</title>")'
            
     r1:
         request:
@@ -93,5 +94,6 @@ rules:
            - '"rabbitmq-dashboard" != "" && response.status == 200 && response.body.bcontains(b"<title>RabbitMQ Management</title>")'
            - '"cobbler-webgui" != "" && response.status == 200 && response.body.bcontains(b"<title>Cobbler Web Interface</title>")'
            - '"thinkphp-debug" != "" && response.body.bcontains(b">错误</span>") && response.body.bcontains(b">SQL</span>") &&  response.body.bcontains(b">调试</span>")'
+           - '"nginxWebUI" != "" && response.status == 200 && response.body.ibcontains(b"<title>nginxWebUI</title>")'
            
 expression: r0() || r1()
