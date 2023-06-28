@@ -44,6 +44,7 @@ func updateEngine() error {
 	}
 
 	latest := releases[0]
+	fmt.Println(latest)
 
 	var currentOS string
 	switch runtime.GOOS {
