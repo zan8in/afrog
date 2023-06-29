@@ -1,0 +1,17 @@
+id: ms17-010
+
+info:
+  name: 永恒之蓝漏洞 (MS17-010)
+  author: fscan
+  severity: critical
+  verified: true
+  tags: ms17-010,ms17,rce
+  created: 2023/06/29
+
+rules:
+  r0:
+    request:
+      type: go
+      data: ms17-010
+    expression: response.raw.bcontains(b'MS17-010')
+expression: r0()

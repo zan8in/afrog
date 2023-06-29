@@ -479,6 +479,4 @@ func (o *Options) SmartControl() {
 	} else if o.Concurrency == 25 && targetLen >= 100 {
 		o.Concurrency = numCPU * 10
 	}
-
-	fmt.Println(targetLen, o.Concurrency)
 }
