@@ -504,3 +504,15 @@ func ParseRequest(oReq *http.Request) (*proto.Request, error) {
 	}
 	return req, nil
 }
+
+func GetDefaultTimeout() time.Duration {
+	return defaultTimeout
+}
+
+func GetMaxDefaultBody() int64 {
+	if maxDefaultBody == 0 {
+		return int64(2 * 1024 * 1024)
+	}
+
+	return maxDefaultBody
+}
