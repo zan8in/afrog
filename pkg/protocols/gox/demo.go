@@ -19,6 +19,9 @@ func demo(target string, variableMap map[string]any) error {
 	body := "hello world"
 	setResponse(body, variableMap)
 
+	// err := ExampleGet("http://example.com", true)
+	// fmt.Println(err)
+
 	setFullTarget(target, variableMap)
 
 	return nil
@@ -41,7 +44,6 @@ func ExampleGet(target string, redirect bool) error {
 
 	// 自定义 headers
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("自定义属性", "自定义值")
 
 	resp := &http.Response{}
 	if !redirect {
@@ -90,7 +92,6 @@ func ExamplePost(target, body string) error {
 
 	// 自定义 headers
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("自定义属性", "自定义值")
 
 	resp, err := retryhttpclient.RtryNoRedirect.Do(req)
 	if err != nil {
