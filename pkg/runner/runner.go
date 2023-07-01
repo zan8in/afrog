@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/pkg/result"
 	"github.com/zan8in/afrog/pkg/utils"
 	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/gologger"
 )
 
 type OnResult func(*result.Result)
@@ -73,8 +74,6 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		return runner, errors.New("target not found")
 	}
 
-	// gologger.Print().Msgf("Targets loaded for scan: %d", runner.options.Targets.Len())
-
 	// init pocs
 	if len(runner.options.PocFile) > 0 {
 		runner.options.PocsDirectory.Set(runner.options.PocFile)
@@ -101,21 +100,22 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner.PocsYaml = allPocsYamlSlice
 	runner.PocsEmbedYaml = pocs.EmbedFileList
 
-	// runner.options.Count = (len(allPocsYamlSlice) + len(allPocsEmbedYamlSlice)) * runner.options.Targets.Len()
+	if len(config.ReverseJndi) > 0 && len(config.ReverseLdapPort) > 0 && len(config.ReverseApiPort) > 0 {
+		if !JndiTest() {
+			gologger.Info().Msg("JNDI platform exception may affect some POCs")
+		}
+	}
+
+	if len(config.ReverseCeyeDomain) > 0 && len(config.ReverseCeyeApiKey) > 0 {
+		if !CeyeTest() {
+			gologger.Info().Msg("Ceye platform exception may affect some POCs")
+		}
+	}
 
 	return runner, nil
 }
 
 func (runner *Runner) Run() error {
-
-	// show banner
-	// gologger.Print().Msgf("PoCs added in last update: %d", len(allPocsYamlSlice))
-	// gologger.Print().Msgf("PoCs loaded for scan: %d", len(allPocsYamlSlice)+len(allPocsEmbedYamlSlice))
-	// gologger.Print().Msgf("Creating output html file: %s", htemplate.Filename)
-
-	// whitespace show banner
-
-	// gologger.Print().Msg("Tip: Fingerprint has been disabled, the replacement tool is Pyxis (https://github.com/zan8in/pyxis)\n\n")
 
 	if runner.options.MonitorTargets {
 		go runner.monitorTargets()

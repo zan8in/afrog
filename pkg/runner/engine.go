@@ -1,12 +1,15 @@
 package runner
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/poc"
+	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/result"
 )
 
@@ -106,4 +109,28 @@ func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 type TransData struct {
 	Target string
 	Poc    poc.Poc
+}
+
+func JndiTest() bool {
+	url := "http://" + config.ReverseJndi + ":" + config.ReverseApiPort + "/?api=test"
+	resp, _, err := retryhttpclient.Get(url)
+	if err != nil {
+		return false
+	}
+	if strings.Contains(string(resp), "no") || strings.Contains(string(resp), "yes") {
+		return true
+	}
+	return false
+}
+
+func CeyeTest() bool {
+	url := fmt.Sprintf("http://%s.%s", "test", config.ReverseCeyeDomain)
+	resp, _, err := retryhttpclient.Get(url)
+	if err != nil {
+		return false
+	}
+	if strings.Contains(string(resp), "\"meta\":") || strings.Contains(string(resp), "201") {
+		return true
+	}
+	return false
 }
