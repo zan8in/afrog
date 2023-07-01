@@ -17,13 +17,19 @@ rules:
       type: tcp
       host: "{{hostname}}"
       data: "\n"
-    expression: response.raw.ibcontains(b'mysql') || response.raw.ibcontains(b'mariadb')
+    expression: |
+      response.raw.ibcontains(b"mysql") || 
+      response.raw.ibcontains(b"mariadb") ||
+      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3}".bmatches(response.raw)
   r1:
     request:
       type: tcp
       host: "{{host}}:3306"
       data: "\n"
-    expression: response.raw.ibcontains(b'mysql') || response.raw.ibcontains(b'mariadb')
+    expression: |
+      response.raw.ibcontains(b"mysql") || 
+      response.raw.ibcontains(b"mariadb") ||
+      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3}".bmatches(response.raw)
 expression: r0() || r1()
 
 
