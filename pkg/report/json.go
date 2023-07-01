@@ -111,13 +111,13 @@ func (jr *JsonReport) SetResult(result *result.Result) {
 
 func (jr *JsonReport) Append() error {
 	jr.Lock()
+	defer jr.Unlock()
 
 	var err error
-
+	var isFirst bool
 	if jr.of == nil {
 		jr.of, err = os.OpenFile(jr.ReportFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 		if err != nil {
-			jr.Unlock()
 			return err
 		}
 
@@ -126,25 +126,26 @@ func (jr *JsonReport) Append() error {
 		wbuf := bufio.NewWriterSize(jr.of, len(header))
 		wbuf.WriteString(header)
 		wbuf.Flush()
+
+		isFirst = true
 	}
 
-	go func() {
-		defer jr.Unlock()
+	jresult := jr.JsonContent()
+	ja, err := json.Marshal(jresult)
+	if err != nil {
+		return err
+	}
 
-		jresult := jr.JsonContent()
+	var content string
+	if isFirst {
+		content = string(ja)
+	} else {
+		content = "," + string(ja)
+	}
 
-		ja, err := json.Marshal(jresult)
-		if err != nil {
-			return
-		}
-
-		content := string(ja) + ","
-
-		wbuf := bufio.NewWriterSize(jr.of, len(content))
-		wbuf.WriteString(content)
-		wbuf.Flush()
-
-	}()
+	wbuf := bufio.NewWriterSize(jr.of, len(content))
+	wbuf.WriteString(content)
+	wbuf.Flush()
 
 	return nil
 }
@@ -184,39 +185,54 @@ func (jr *JsonReport) JsonContent() *JsonResult {
 
 func (jr *JsonReport) AppendEndOfFile() error {
 
-	if !fileutil.FileExists(jr.ReportFile) {
-		return nil
-	}
+	// of, err := os.OpenFile(jr.ReportFile, os.O_WRONLY|os.O_TRUNC|os.O_APPEND, 0666)
+	// if err != nil {
+	// 	return err
+	// }
 
-	file, err := os.OpenFile(jr.ReportFile, os.O_RDWR, 0755)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	ending := "]"
+	wbuf := bufio.NewWriterSize(jr.of, len(ending))
+	wbuf.WriteString(ending)
+	wbuf.Flush()
 
-	reader := bufio.NewReader(file)
+	// wbuf := bufio.NewWriterSize(of, len(ending))
+	// wbuf.WriteString(ending)
+	// wbuf.Flush()
 
-	var content []byte
-	for {
-		line, _, err := reader.ReadLine()
-		if err != nil {
-			break
-		}
-		content = append(content, line...)
-	}
+	// ioutil.WriteFile(jr.ReportFile, []byte(ending), 0666)
+	// if !fileutil.FileExists(jr.ReportFile) {
+	// 	return nil
+	// }
 
-	content = content[:len(content)-1]
+	// file, err := os.OpenFile(jr.ReportFile, os.O_RDWR, 0755)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer file.Close()
 
-	content = append(content, []byte("]")...)
+	// reader := bufio.NewReader(file)
 
-	_, err = file.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-	_, err = file.Write(content)
-	if err != nil {
-		return err
-	}
+	// var content []byte
+	// for {
+	// 	line, _, err := reader.ReadLine()
+	// 	if err != nil {
+	// 		break
+	// 	}
+	// 	content = append(content, line...)
+	// }
+
+	// content = content[:len(content)-1]
+
+	// content = append(content, []byte("]")...)
+
+	// _, err = file.Seek(0, 0)
+	// if err != nil {
+	// 	return err
+	// }
+	// _, err = file.Write(content)
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
