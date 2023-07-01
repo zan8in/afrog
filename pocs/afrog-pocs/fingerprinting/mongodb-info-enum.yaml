@@ -17,15 +17,8 @@ rules:
   r0:
     request:
       type: tcp
-      host: "{{hostname}}"
-      data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
-      data-type: hex
-    expression: response.raw.ibcontains(b'version') && response.raw.ibcontains(b'maxBsonObjectSize')
-  r1:
-    request:
-      type: tcp
       host: "{{host}}:27017"
       data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
       data-type: hex
     expression: response.raw.ibcontains(b'version') && response.raw.ibcontains(b'maxBsonObjectSize')
-expression: r0() || r1()
+expression:  r0()
