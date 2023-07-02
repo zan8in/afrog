@@ -24,8 +24,8 @@ rules:
     extractors:
       - type: regex
         extractor:
-          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
-          mysql: ext1["mysql"]
+          ext: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext["mysql"]
     
   r1:
     request:
@@ -39,8 +39,8 @@ rules:
     extractors:
       - type: regex
         extractor:
-          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
-          mysql: ext1["mysql"]
+          ext: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext["mysql"]
 expression: r0() || r1() 
 
 
