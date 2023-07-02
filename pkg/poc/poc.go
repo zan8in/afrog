@@ -58,6 +58,7 @@ type Rule struct {
 	Expression     string        `yaml:"expression"`
 	Expressions    []string      `yaml:"expressions"`
 	Output         yaml.MapSlice `yaml:"output"`
+	Extractors     []Extractors  `yaml:"extractors"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
 	BeforeSleep    int           `yaml:"before_sleep"`
@@ -70,6 +71,7 @@ type ruleAlias struct {
 	Expression     string        `yaml:"expression"`
 	Expressions    []string      `yaml:"expressions"`
 	Output         yaml.MapSlice `yaml:"output"`
+	Extractors     []Extractors  `yaml:"extractors"`
 	StopIfMatch    bool          `yaml:"stop_if_match"`
 	StopIfMismatch bool          `yaml:"stop_if_mismatch"`
 	BeforeSleep    int           `yaml:"before_sleep"`
@@ -273,6 +275,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 	r.Expression = tmp.Expression
 	r.Expressions = append(r.Expressions, tmp.Expressions...)
 	r.Output = tmp.Output
+	r.Extractors = append(r.Extractors, tmp.Extractors...)
 	r.StopIfMatch = tmp.StopIfMatch
 	r.StopIfMismatch = tmp.StopIfMismatch
 	r.BeforeSleep = tmp.BeforeSleep
@@ -336,4 +339,9 @@ func (poc *Poc) IsReverse() bool {
 	}
 
 	return false
+}
+
+type Extractors struct {
+	Type      string        `yaml:"type"`      // regex,str
+	Extractor yaml.MapSlice `yaml:"extractor"` //
 }
