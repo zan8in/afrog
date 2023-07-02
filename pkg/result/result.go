@@ -11,6 +11,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/proto"
 	"github.com/zan8in/afrog/pkg/utils"
+	"gopkg.in/yaml.v2"
 )
 
 type Result struct {
@@ -21,6 +22,7 @@ type Result struct {
 	AllPocResult []*PocResult
 	Output       string
 	FingerResult any
+	Extractor    yaml.MapSlice
 }
 
 type PocResult struct {
@@ -86,11 +88,22 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole(number string) {
+	extinfo := ""
+	if len(r.Extractor) > 0 {
+		for _, v := range r.Extractor {
+			switch value := v.Value.(type) {
+			case map[string]string:
+			case string:
+				extinfo += " " + v.Key.(string) + ":" + fmt.Sprintf("%v", value)
+			}
+		}
+	}
+
 	fulltarget, _ := url.QueryUnescape(html.EscapeString(r.FullTarget)) // fixed %!/(MISSING) BUG
 	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
-			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + "\r\n")
+			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + log.LogColor.Extractor(extinfo) + "\r\n")
 }
 
 func (r *Result) Reset() {
