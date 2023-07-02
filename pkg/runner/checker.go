@@ -151,6 +151,10 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.UpdateVariableMap(rule.Output)
 		}
 
+		if len(rule.Extractors) > 0 {
+			c.UpdateVariableMapExtractor(rule.Extractors)
+		}
+
 		pocRstTemp := result.PocResult{IsVul: isMatch}
 		if c.VariableMap["response"] != nil {
 			pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
@@ -281,6 +285,45 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 			c.CustomLib.UpdateCompileOption(key, decls.String)
 		}
 	}
+}
+
+func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
+	for _, v := range extractors {
+		tpe := v.Type
+		extMap := v.Extractor
+		if len(extMap) == 0 {
+			continue
+		}
+		for _, item := range extMap {
+			key := item.Key.(string)
+			value := item.Value.(string)
+
+			if tpe == "word" {
+				c.VariableMap[key] = value
+				c.CustomLib.UpdateCompileOption(key, decls.String)
+				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
+				continue
+			}
+
+			out, err := c.CustomLib.RunEval(value, c.VariableMap)
+			if err != nil {
+				continue
+			}
+
+			switch value := out.Value().(type) {
+			case map[string]string:
+				c.VariableMap[key] = value
+				c.CustomLib.UpdateCompileOption(key, StrStrMapType)
+				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
+			case string:
+				c.VariableMap[key] = fmt.Sprintf("%v", out)
+				c.CustomLib.UpdateCompileOption(key, decls.String)
+				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
+			}
+
+		}
+	}
+
 }
 
 func (c *Checker) newRerverse() *proto.Reverse {
