@@ -20,7 +20,13 @@ rules:
     expression: |
       response.raw.ibcontains(b"mysql") || 
       response.raw.ibcontains(b"mariadb") ||
-      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3}".bmatches(response.raw)
+      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}".bmatches(response.raw)
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext1["mysql"]
+    
   r1:
     request:
       type: tcp
@@ -30,7 +36,12 @@ rules:
       response.raw.ibcontains(b"mysql") || 
       response.raw.ibcontains(b"mariadb") ||
       "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3}".bmatches(response.raw)
-expression: r0() || r1()
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext1["mysql"]
+expression: r0() || r1() 
 
 
 
