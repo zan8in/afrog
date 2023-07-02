@@ -20,20 +20,12 @@ rules:
     expression: |
       response.raw.ibcontains(b"mysql") || 
       response.raw.ibcontains(b"mariadb") ||
-      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3}".bmatches(response.raw)
+      "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}".bmatches(response.raw)
     extractors:
       - type: regex
         extractor:
-          ext1: '"(?P<mysqlver>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3})".bsubmatch(response.raw)'
-          mysqlver: ext1["mysqlver"]
-      - type: regex
-        extractor:
-          ext2: '"(?P<orcalver>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3})".bsubmatch(response.raw)'
-          orcalver: ext2["orcalver"]
-      - type: word
-        extractor:
-          user: "root"
-          pass: "123456"
+          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext1["mysql"]
     
   r1:
     request:
@@ -47,14 +39,12 @@ rules:
     extractors:
       - type: regex
         extractor:
-          ext1: '"(?P<mysqlver>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3})".bsubmatch(response.raw)'
-          mysqlver: ext1["mysqlver"]
-      - type: regex
-        extractor:
-          ext2: '"(?P<orcalver>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,3})".bsubmatch(response.raw)'
-          orcalver: ext2["orcalver"]
-      - type: word
-        extractor:
-          user: "root"
-          pass: "123456"
+          ext1: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          mysql: ext1["mysql"]
+
+extractors:
+  - type: word
+    extractor:
+      user: 'root'
+      pass: "123456"
 expression: r0() || r1() 

@@ -25,4 +25,11 @@ rules:
         headers:
           User-Agent: Nacos-Server
     expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
+
+extractors:
+  - type: word
+    extractor:
+      user: "{{r1}}"
+      pass: "{{r2}}"
+
 expression: r0() || r1()

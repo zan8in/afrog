@@ -147,11 +147,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 
 		c.CustomLib.WriteRuleFunctionsROptions(k, isMatch)
 
-		if len(rule.Output) > 0 {
+		if len(rule.Output) > 0 && isMatch {
 			c.UpdateVariableMap(rule.Output)
 		}
 
-		if len(rule.Extractors) > 0 {
+		if len(rule.Extractors) > 0 && isMatch {
 			c.UpdateVariableMapExtractor(rule.Extractors)
 		}
 
@@ -177,6 +177,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		}
 
 		if rule.StopIfMatch && isMatch {
+			if len(pocItem.Extractors) > 0 {
+				c.UpdateVariableMapExtractor(pocItem.Extractors)
+			}
 			c.Result.IsVul = true
 			return err
 		}
@@ -187,10 +190,17 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		}
 
 		if matchCondition == poc.STOP_IF_FIRST_MATCH && isMatch {
+			if len(pocItem.Extractors) > 0 {
+				c.UpdateVariableMapExtractor(pocItem.Extractors)
+			}
 			c.Result.IsVul = true
 			return err
 		}
 
+	}
+
+	if len(pocItem.Extractors) > 0 {
+		c.UpdateVariableMapExtractor(pocItem.Extractors)
 	}
 
 	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
@@ -299,9 +309,10 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 			value := item.Value.(string)
 
 			if tpe == "word" {
-				c.VariableMap[key] = value
+				new := setVariableMap(value, c.VariableMap)
+				c.VariableMap[key] = new
 				c.CustomLib.UpdateCompileOption(key, decls.String)
-				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
+				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: new})
 				continue
 			}
 
@@ -359,4 +370,20 @@ func checkExpression(expression string) string {
 	}
 	return ""
 
+}
+
+func setVariableMap(find string, variableMap map[string]any) string {
+	for k, v := range variableMap {
+		_, isMap := v.(map[string]string)
+		if isMap {
+			continue
+		}
+		newstr := fmt.Sprintf("%v", v)
+		oldstr := "{{" + k + "}}"
+		if !strings.Contains(find, oldstr) {
+			continue
+		}
+		find = strings.ReplaceAll(find, oldstr, newstr)
+	}
+	return find
 }
