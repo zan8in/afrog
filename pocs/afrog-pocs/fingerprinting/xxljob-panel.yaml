@@ -1,0 +1,36 @@
+id: xxljob-panel
+
+info:
+  name: XXLJOB Admin Login Panel - Detect
+  author: pdteam,daffainfo,ritikchaddha
+  severity: info
+  verified: true
+  description: |
+    XXLJOB admin login panel was detected.
+    SHODAN: http.favicon.hash:1691956220
+    FOFA: icon_hash="1691956220"
+  tags: panel,xxljob,login
+  created: 2023/07/06
+
+rules:
+  r0: 
+    request:
+      method: GET
+      path: /xxl-job-admin/toLogin
+    expression: response.status == 200 && response.body.bcontains(b'<a><b>XXL</b>JOB</a>')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"\"admin_version\":\"(?P<admin_version>.*?)\"".bsubmatch(response.raw)'
+          admin_version: ext1["admin_version"]
+  r1:
+    request:
+      method: GET
+      path: /toLogin
+    expression: response.status == 200 && response.body.bcontains(b'<a><b>XXL</b>JOB</a>')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"\"admin_version\":\"(?P<admin_version>.*?)\"".bsubmatch(response.raw)'
+          admin_version: ext1["admin_version"]
+expression: r0() || r1()
