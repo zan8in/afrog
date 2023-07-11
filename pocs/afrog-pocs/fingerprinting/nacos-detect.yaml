@@ -10,7 +10,20 @@ rules:
   r0:
     request:
       method: GET
+      path: /nacos/v1/console/server/state?accessToken&username
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"auth_system_type":') && 
+      response.body.bcontains(b'"auth_enabled":')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"\"version\":\"(?P<version>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})\"".bsubmatch(response.raw)'
+          version: ext1["version"]
+  r1:
+    request:
+      method: GET
       path: /nacos/
       follow_redirects: true
     expression: response.status == 200 && response.body.bcontains(b'<title>Nacos</title>')
-expression: r0()
+expression: r0() || r1()
