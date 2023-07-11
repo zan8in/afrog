@@ -533,6 +533,10 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		return false
 	}
 
+	if !config.ReverseCeyeLive {
+		return false
+	}
+
 	time.Sleep(time.Second * time.Duration(timeout))
 
 	sub := strings.Split(r.Domain, ".")[0]
@@ -556,6 +560,10 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 
 func jndiCheck(reverse *proto.Reverse, timeout int64) bool {
 	if len(config.ReverseJndi) == 0 && len(config.ReverseApiPort) == 0 {
+		return false
+	}
+
+	if !config.ReverseJndiLive {
 		return false
 	}
 

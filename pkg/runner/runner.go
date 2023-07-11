@@ -128,6 +128,9 @@ func checkReversePlatform() {
 
 			if !JndiTest() {
 				gologger.Info().Msg("JNDI platform exception may affect some POCs")
+				config.ReverseJndiLive = false
+			} else {
+				config.ReverseJndiLive = true
 			}
 
 		}()
@@ -141,6 +144,9 @@ func checkReversePlatform() {
 
 			if !CeyeTest() {
 				gologger.Info().Msg("Ceye platform exception may affect some POCs")
+				config.ReverseCeyeLive = false
+			} else {
+				config.ReverseCeyeLive = true
 			}
 
 		}()

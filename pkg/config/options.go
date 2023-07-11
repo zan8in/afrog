@@ -23,6 +23,9 @@ var (
 	ReverseJndi       string
 	ReverseLdapPort   string
 	ReverseApiPort    string
+
+	ReverseCeyeLive bool
+	ReverseJndiLive bool
 )
 
 type Options struct {
