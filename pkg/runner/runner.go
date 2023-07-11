@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
@@ -100,17 +101,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner.PocsYaml = allPocsYamlSlice
 	runner.PocsEmbedYaml = pocs.EmbedFileList
 
-	if len(config.ReverseJndi) > 0 && len(config.ReverseLdapPort) > 0 && len(config.ReverseApiPort) > 0 {
-		if !JndiTest() {
-			gologger.Info().Msg("JNDI platform exception may affect some POCs")
-		}
-	}
-
-	if len(config.ReverseCeyeDomain) > 0 && len(config.ReverseCeyeApiKey) > 0 {
-		if !CeyeTest() {
-			gologger.Info().Msg("Ceye platform exception may affect some POCs")
-		}
-	}
+	checkReversePlatform()
 
 	return runner, nil
 }
@@ -124,4 +115,37 @@ func (runner *Runner) Run() error {
 	runner.Execute()
 
 	return nil
+}
+
+func checkReversePlatform() {
+
+	wg := sync.WaitGroup{}
+	if len(config.ReverseJndi) > 0 && len(config.ReverseLdapPort) > 0 && len(config.ReverseApiPort) > 0 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if !JndiTest() {
+				gologger.Info().Msg("JNDI platform exception may affect some POCs")
+			}
+
+		}()
+	}
+
+	if len(config.ReverseCeyeDomain) > 0 && len(config.ReverseCeyeApiKey) > 0 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if !CeyeTest() {
+				gologger.Info().Msg("Ceye platform exception may affect some POCs")
+			}
+
+		}()
+
+	}
+
+	wg.Wait()
 }

