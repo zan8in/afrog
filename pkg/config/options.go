@@ -14,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
+	fileutil "github.com/zan8in/pins/file"
 	sliceutil "github.com/zan8in/pins/slice"
 )
 
@@ -54,6 +55,9 @@ type Options struct {
 
 	// show a afrog-pocs detail
 	PocDetail string
+
+	ExcludePocs     goflags.StringSlice
+	ExcludePocsFile string
 
 	// file to write output to (optional), support format: html
 	Output string
@@ -148,6 +152,8 @@ func NewOptions() (*Options, error) {
 		flagSet.StringSliceVarP(&options.AppendPoc, "append-poc", "ap", nil, "append PoC file or directory to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
 		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
+		flagSet.StringSliceVarP(&options.ExcludePocs, "exclude-pocs", "ep", nil, "pocs to exclude from the scan (comma-separated)", goflags.NormalizedStringSliceOptions),
+		flagSet.StringVarP(&options.ExcludePocsFile, "exclude-pocs-file", "epf", "", "list of pocs to exclude from scan (file)"),
 	)
 
 	flagSet.CreateGroup("output", "Output",
@@ -466,7 +472,16 @@ func (o *Options) CreatePocList() []poc.Poc {
 		}
 	}
 
-	return latestPocSlice
+	// exclude pocs
+	excludePocs, _ := o.parseExcludePocs()
+	finalPocSlice := []poc.Poc{}
+	for _, poc := range latestPocSlice {
+		if !isExcludePoc(poc.Id, excludePocs) {
+			finalPocSlice = append(finalPocSlice, poc)
+		}
+	}
+
+	return finalPocSlice
 }
 
 func (o *Options) SmartControl() {
@@ -482,4 +497,38 @@ func (o *Options) SmartControl() {
 	} else if o.Concurrency == 25 && targetLen >= 100 {
 		o.Concurrency = numCPU * 10
 	}
+}
+
+func (o *Options) parseExcludePocs() ([]string, error) {
+	var excludePocs []string
+	if len(o.ExcludePocs) > 0 {
+		excludePocs = append(excludePocs, o.ExcludePocs...)
+	}
+
+	if len(o.ExcludePocsFile) > 0 {
+		cdata, err := fileutil.ReadFile(o.ExcludePocsFile)
+		if err != nil {
+			if len(excludePocs) > 0 {
+				return excludePocs, nil
+			} else {
+				return excludePocs, err
+			}
+		}
+		for poc := range cdata {
+			excludePocs = append(excludePocs, poc)
+		}
+	}
+	return excludePocs, nil
+}
+
+func isExcludePoc(poc string, excludePocs []string) bool {
+	if len(excludePocs) == 0 {
+		return false
+	}
+	for _, ep := range excludePocs {
+		if poc == ep {
+			return true
+		}
+	}
+	return false
 }
