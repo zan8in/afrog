@@ -2,12 +2,14 @@ package runner
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/pkg/config"
+	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/result"
@@ -68,10 +70,20 @@ func (runner *Runner) Execute() {
 	var wg sync.WaitGroup
 
 	p, _ := ants.NewPoolWithFunc(options.Concurrency, func(p any) {
+
 		defer wg.Done()
 		<-runner.engine.ticker.C
 
 		tap := p.(*TransData)
+
+		if options.MonitorPocExecution {
+			startTime := time.Now()
+			defer func(target, pocId string) {
+				endTime := time.Now()
+				elapsedTime := endTime.Sub(startTime)
+				fmt.Printf(" [%s] [%s] TIME: %v\n", target, pocId, parseElaspsedTime(elapsedTime))
+			}(tap.Target, tap.Poc.Id)
+		}
 
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
 			runner.executeExpression(tap.Target, &tap.Poc)
@@ -88,6 +100,26 @@ func (runner *Runner) Execute() {
 	}
 
 	wg.Wait()
+}
+
+func parseElaspsedTime(time time.Duration) string {
+	s := fmt.Sprintf("%v", time)
+	if len(s) > 0 {
+		if strings.HasSuffix(s, "s") && !strings.HasSuffix(s, "ms") {
+			t := strings.Replace(s, "s", "", -1)
+			ts, err := strconv.ParseFloat(t, 64)
+			if err != nil {
+				return s
+			}
+			if ts >= 40 {
+				return log.LogColor.Midium(s)
+			}
+		}
+		if strings.HasSuffix(s, "m") {
+			return log.LogColor.Red(s)
+		}
+	}
+	return log.LogColor.Green(s)
 }
 
 func (runner *Runner) executeExpression(target string, poc *poc.Poc) {

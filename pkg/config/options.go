@@ -90,8 +90,9 @@ type Options struct {
 	// Disable update check
 	DisableUpdateCheck bool
 
-	//
 	MonitorTargets bool
+
+	MonitorPocExecution bool
 
 	// Scan count num(targets * allpocs)
 	Count int
@@ -142,7 +143,7 @@ func NewOptions() (*Options, error) {
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`afrog`)
 
-	flagSet.CreateGroup("input", "Target",
+	flagSet.CreateGroup("target", "Target",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
 	)
@@ -177,10 +178,11 @@ func NewOptions() (*Options, error) {
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
 		flagSet.IntVar(&options.Timeout, "timeout", 10, "time to wait in seconds before timeout"),
-		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning."),
+		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
+		// flagSet.BoolVar(&options.MonitorPocExecution, "mpe", false, "enable POC execution time monitoring and print the execution time of each POC on the console"),
 	)
 
 	flagSet.CreateGroup("update", "Update",
@@ -189,7 +191,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic afrog-pocs update check"),
 	)
 
-	flagSet.CreateGroup("debug", "Debug",
+	flagSet.CreateGroup("proxy", "Proxy",
 		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
 	)
 
@@ -476,7 +478,7 @@ func (o *Options) CreatePocList() []poc.Poc {
 	excludePocs, _ := o.parseExcludePocs()
 	finalPocSlice := []poc.Poc{}
 	for _, poc := range latestPocSlice {
-		if !isExcludePoc(poc.Id, excludePocs) {
+		if !isExcludePoc(poc, excludePocs) {
 			finalPocSlice = append(finalPocSlice, poc)
 		}
 	}
@@ -521,12 +523,13 @@ func (o *Options) parseExcludePocs() ([]string, error) {
 	return excludePocs, nil
 }
 
-func isExcludePoc(poc string, excludePocs []string) bool {
+func isExcludePoc(poc poc.Poc, excludePocs []string) bool {
 	if len(excludePocs) == 0 {
 		return false
 	}
 	for _, ep := range excludePocs {
-		if poc == ep {
+		v := strings.ToLower(ep)
+		if strings.Contains(strings.ToLower(poc.Id), v) || strings.Contains(strings.ToLower(poc.Info.Name), v) {
 			return true
 		}
 	}
