@@ -1,0 +1,17 @@
+id: tianjing-panel
+
+info:
+  name: 天镜脆弱性扫描与管理系统
+  author: zan8in
+  severity: info
+  verified: true
+  tags: tianjing,panel
+  created: 2023/07/20
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login/loginIndex.action
+    expression: response.status == 200 && response.body.ibcontains(b'<title>天镜脆弱性扫描与管理系统</title>')
+expression: r0()

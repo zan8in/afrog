@@ -1,0 +1,17 @@
+id: taihe-panel
+
+info:
+  name: 泰合信息安全运营中心系统-日志审计
+  author: zan8in
+  severity: info
+  verified: true
+  tags: taihe,panel
+  created: 2023/07/20
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sa/login.jsp
+    expression: response.status == 200 && response.body.ibcontains(b'<title>泰合信息安全运营中心系统-日志审计 - 登录</title>')
+expression: r0()

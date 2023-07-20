@@ -1,0 +1,17 @@
+id: tianyue-panel
+
+info:
+  name: 天玥运维安全网关
+  author: zan8in
+  severity: info
+  verified: true
+  tags: tianyue,panel
+  created: 2023/07/20
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /client/login/index
+    expression: response.status == 200 && response.body.ibcontains(b'<title>天玥运维安全网关V')
+expression: r0()
