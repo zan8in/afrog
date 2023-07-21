@@ -80,6 +80,10 @@ func post(target, body string) (string, string, bool) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", "", false
+	}
+
 	delay := int(milliseconds / 1000)
 
 	if delay >= 5 {
