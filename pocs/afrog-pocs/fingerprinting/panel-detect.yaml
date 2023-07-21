@@ -98,5 +98,6 @@ rules:
            - '"tianjing-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>天镜脆弱性扫描与管理系统</title>")'
            - '"taihe-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>泰合信息安全运营中心系统-日志审计 - 登录</title>")'
            - '"tianyue-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>天玥运维安全网关V")'
+           - '"h3c-hci-management-panel" != "" && response.status == 200 && response.body.bcontains(b"/uis/spring_check?")'
            
 expression: r0() || r1()
