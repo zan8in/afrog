@@ -1,0 +1,17 @@
+id: h3c-imc-panel
+
+info:
+  name: H3C Intelligent Management Center Panel
+  author: zan8in
+  severity: info
+  verified: true
+  tags: h3c,imc,panel
+  created: 2023/07/24
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /imc/login.jsf
+    expression: response.status == 200 && response.body.bcontains(b'POPUP_WINDOW_SESSION_ID')
+expression: r0()
