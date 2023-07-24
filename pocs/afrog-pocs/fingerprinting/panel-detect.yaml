@@ -55,6 +55,7 @@ rules:
            - '"tianyue-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>天玥运维安全网关V")'
            - '"h3c-hci-management-panel" != "" && response.status == 200 && response.body.bcontains(b"/uis/spring_check?")'
            - '"superset-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Superset</title>")'
+           - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            
     r1:
         request:
@@ -105,5 +106,6 @@ rules:
            - '"tianyue-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>天玥运维安全网关V")'
            - '"h3c-hci-management-panel" != "" && response.status == 200 && response.body.bcontains(b"/uis/spring_check?")'
            - '"superset-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Superset</title>")'
+           - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            
 expression: r0() || r1()
