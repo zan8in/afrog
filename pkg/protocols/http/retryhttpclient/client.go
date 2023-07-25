@@ -131,6 +131,12 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	// 	rule.Request.Headers["Content-Type"] = "application/x-www-form-urlencoded"
 	// }
 
+	// Tips: poc rule.request.host is changed
+	// created: 2023/07/25
+	if len(rule.Request.Host) > 0 {
+		req.Request.Host = setVariableMap(rule.Request.Host, variableMap)
+	}
+
 	for k, v := range rule.Request.Headers {
 		req.Header.Add(k, setVariableMap(v, variableMap))
 	}
@@ -223,7 +229,7 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	protoReq.Body = []byte(rule.Request.Body)
 
 	reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
-	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + req.URL.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + string(rule.Request.Body))
+	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + resp.Request.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + string(rule.Request.Body))
 	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
 	variableMap["request"] = protoReq
 
