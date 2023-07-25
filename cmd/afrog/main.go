@@ -69,6 +69,8 @@ func main() {
 			}
 
 			lock.Unlock()
+
+			// os.Exit(0)
 		}
 
 	}
