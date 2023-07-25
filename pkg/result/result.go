@@ -94,16 +94,17 @@ func (r *Result) PrintColorResultInfoConsole(number string) {
 			switch value := v.Value.(type) {
 			case map[string]string:
 			case string:
-				extinfo += " " + v.Key.(string) + ":" + fmt.Sprintf("%v", value)
+				extinfo += "," + log.LogColor.Extractor(v.Key.(string)) + "=\"" + log.LogColor.Extractor(fmt.Sprintf("%v", value)) + "\""
 			}
 		}
+		extinfo = "[" + strings.TrimLeft(extinfo, ",") + "]"
 	}
 
 	fulltarget, _ := url.QueryUnescape(html.EscapeString(r.FullTarget)) // fixed %!/(MISSING) BUG
 	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
 		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
 		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
-			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + log.LogColor.Extractor(extinfo) + "\r\n")
+			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + " " + extinfo + "\r\n")
 }
 
 func (r *Result) Reset() {

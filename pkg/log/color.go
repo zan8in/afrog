@@ -45,7 +45,7 @@ func NewColor() *Color {
 		Bold:      color.Bold.Render,
 		Red:       color.FgLightRed.Render,
 		Green:     color.FgLightGreen.Render,
-		Extractor: color.FgMagenta.Render,
+		Extractor: color.Yellow.Render,
 	}
 }
 
