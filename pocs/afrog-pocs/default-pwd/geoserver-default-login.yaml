@@ -23,4 +23,9 @@ rules:
       response.status == 302 &&
       response.headers["location"].contains("/geoserver/web") &&
       !response.headers["location"].contains("error=true")
+    extractors:
+      - type: word
+        extractor:
+          user: 'admin'
+          pass: "geoserver"
 expression: r0()
