@@ -1,0 +1,45 @@
+id: arcgis-login
+
+info:
+  name: ArcGIS Admin Login - Detect
+  author: zan8in
+  severity: info
+  reference:
+    - https://enterprise.arcgis.com/en/
+  tags: panel,arcgis,admin,login,detect
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /arcgis/admin/login
+    expression: response.status == 200 && response.body.bcontains(b"arcgisCookieTest") && response.body.bcontains(b"areCookiesEnabled")
+    extractors:
+      - type: word
+        extractor:
+          adminpath: "/arcgis/admin/login"
+          managerpath: "/arcgis/manager/"
+          restpath: "/arcgis/rest/login"
+  r1:
+    request:
+      method: GET
+      path: /arcgis/manager/
+    expression: response.status == 200 && response.body.bcontains(b"ping arcgis/admin root resource") && response.body.bcontains(b"esri.arcgismanager")
+    extractors:
+      - type: word
+        extractor:
+          adminpath: "/arcgis/admin/login"
+          managerpath: "/arcgis/manager/"
+          restpath: "/arcgis/rest/login"
+  r2:
+    request:
+      method: GET
+      path: /arcgis/rest/login
+    expression: response.status == 200 && response.body.bcontains(b"ArcGIS") && response.body.bcontains(b"REST Services Directory")
+    extractors:
+      - type: word
+        extractor:
+          adminpath: "/arcgis/admin/login"
+          managerpath: "/arcgis/manager/"
+          restpath: "/arcgis/rest/login"
+expression: r0() || r1() || r2()
