@@ -5,25 +5,37 @@ info:
   author: zan8in
   severity: info
   verified: true
+  tags: nacos,panel
+  created: 2023/07/27
 
 rules:
   r0:
     request:
       method: GET
-      path: /nacos/v1/console/server/state?accessToken&username
+      path: /nacos/v1/console/server/state
     expression: |
-      response.status == 200 && 
-      response.body.bcontains(b'"auth_system_type":') && 
-      response.body.bcontains(b'"auth_enabled":')
+      response.status == 200 && response.body.bcontains(b'"standalone_mode":') && response.body.bcontains(b'"version":')
     extractors:
       - type: regex
         extractor:
-          ext1: '"\"version\":\"(?P<version>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})\"".bsubmatch(response.raw)'
-          version: ext1["version"]
+          search: '"\"version\":\"(?P<nacos>.*?)\"".bsubmatch(response.body)'
+          nacos: search["nacos"]
+    
   r1:
+    request:
+      method: GET
+      path: /v1/console/server/state
+    expression: |
+      response.status == 200 && response.body.bcontains(b'"standalone_mode":') && response.body.bcontains(b'"version":')
+    extractors:
+      - type: regex
+        extractor:
+          search: '"\"version\":\"(?P<nacos>.*?)\"".bsubmatch(response.body)'
+          nacos: search["nacos"]
+  r2:
     request:
       method: GET
       path: /nacos/
       follow_redirects: true
-    expression: response.status == 200 && response.body.bcontains(b'<title>Nacos</title>')
-expression: r0() || r1()
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Nacos</title>')
+expression: r0() || r1() || r2()
