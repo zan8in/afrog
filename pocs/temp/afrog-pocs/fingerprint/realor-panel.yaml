@@ -5,8 +5,6 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
-    "CASMain.XGI?cmd=GetDirApp" && title=="瑞友应用虚拟化系统"
   tags: realor,panel
   creatd: 2023/07/29
 
@@ -16,9 +14,4 @@ rules:
       method: GET
       path: /index.php?s=/Admin/userlist
     expression: response.status == 200 && response.body.ibcontains(b'<title>欢迎使用瑞友应用虚拟化系统_管理后台</title>')
-  r1:
-    request:
-      method: GET
-      path: /
-    expression: response.status == 200 && response.body.ibcontains(b'Realor Co.Ltd') && response.body.bcontains(b'realoronline.gif')
-expression: r0() || r1()
+expression: r0()
