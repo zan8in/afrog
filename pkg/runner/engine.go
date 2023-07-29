@@ -75,74 +75,35 @@ func (runner *Runner) Execute() {
 		<-runner.engine.ticker.C
 
 		tap := p.(*TransData)
-
-		// if options.MonitorPocExecution {
-		// 	startTime := time.Now()
-
-		// 	closeChan := make(chan bool)
-		// 	defer func() {
-		// 		closeChan <- true
-		// 	}()
-
-		// 	timerChan := make(chan bool)
-		// 	go func() {
-		// 		for {
-		// 			select {
-		// 			case <-timerChan:
-		// 				fmt.Println("Timeout! 10 seconds have passed.")
-		// 				ticker := time.NewTicker(1 * time.Minute)
-		// 				for range ticker.C {
-		// 					endTime := time.Now()
-		// 					elapsedTime := endTime.Sub(startTime)
-		// 					fmt.Printf(" [%s] [%s] TIME: %v\n", tap.Target, tap.Poc.Id, parseElaspsedTime(elapsedTime))
-		// 				}
-		// 			case <-closeChan:
-		// 				return
-		// 			}
-		// 		}CVE-2023-25157
-		// 	}()
-		// 	go func() {
-		// 		time.Sleep(200 * time.Millisecond)
-		// 		timerChan <- true
-		// 	}()
-		// }
-
 		if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+			if options.PocExecutionDurationMonitor {
+				timeout := make(chan bool)
+				go func(target string, poc poc.Poc) {
+					runner.executeExpression(tap.Target, &tap.Poc)
+					timeout <- true
+				}(tap.Target, tap.Poc)
 
-			// timeout := make(chan bool)
-
-			// go func(target string, poc poc.Poc) {
-
-			// start := time.Now()
-
-			runner.executeExpression(tap.Target, &tap.Poc)
-
-			// elapsed := time.Since(start)
-			// fmt.Printf(target, poc.Id, " Thread finished in %v seconds\n", elapsed.Seconds())
-			// timeout <- true
-
-			// }(tap.Target, tap.Poc)
-
-			// // 设置整体的超时时间为1分钟
-			// select {
-			// case <-timeout:
-			// 	return
-			// case <-time.After(1 * time.Minute):
-			// 	fmt.Println(tap.Target, tap.Poc.Id, " Timeout: 1 minute elapsed")
-
-			// 	// 设置每30秒提醒一次，直到所有线程都结束
-			// 	for {
-			// 		select {
-			// 		case <-timeout:
-			// 			fmt.Println(tap.Target, tap.Poc.Id, "All threads finished")
-			// 			return
-			// 		case <-time.After(30 * time.Second):
-			// 			fmt.Println(tap.Target, tap.Poc.Id, " Still waiting...")
-			// 		}
-			// 	}
-			// }
+				select {
+				case <-timeout:
+					return
+				case <-time.After(1 * time.Minute):
+					fmt.Println(tap.Target, tap.Poc.Id, " Timeout: 1 minute elapsed")
+					var num = 1
+					for {
+						select {
+						case <-timeout:
+							fmt.Printf("[%s] [%s] finished, Timeout > %d minutes elapsed\n", tap.Target, tap.Poc.Id, num)
+							return
+						case <-time.After(1 * time.Minute):
+							num++
+							fmt.Printf("[%s] [%s] still waiting... Timeout: %d minute elapsed\n", tap.Target, tap.Poc.Id, num)
+						}
+					}
+				}
+			} else {
+				runner.executeExpression(tap.Target, &tap.Poc)
+			}
 		}
-
 	})
 	defer p.Release()
 

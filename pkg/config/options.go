@@ -92,7 +92,11 @@ type Options struct {
 
 	MonitorTargets bool
 
-	MonitorPocExecution bool
+	// POC Execution Duration Tracker
+	PocExecutionDurationMonitor bool
+
+	// Single Vulnerability Stopper
+	VulnerabilityScannerBreakpoint bool
 
 	// Scan count num(targets * allpocs)
 	Count int
@@ -182,7 +186,8 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
-		// flagSet.BoolVar(&options.MonitorPocExecution, "mpe", false, "enable POC execution time monitoring and print the execution time of each POC on the console"),
+		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
+		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 	)
 
 	flagSet.CreateGroup("update", "Update",

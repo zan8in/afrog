@@ -68,9 +68,11 @@ func main() {
 				r.JsonReport.Append()
 			}
 
-			lock.Unlock()
+			if options.VulnerabilityScannerBreakpoint {
+				os.Exit(0)
+			}
 
-			// os.Exit(0)
+			lock.Unlock()
 		}
 
 	}
