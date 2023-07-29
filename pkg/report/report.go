@@ -113,14 +113,18 @@ func (report *Report) Write(data string) error {
 		wbuf.Flush()
 	}
 
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func(f *os.File) {
 		defer report.Unlock()
 		defer f.Close()
+		defer wg.Done()
 
 		wbuf := bufio.NewWriterSize(report.of, len(data))
 		wbuf.WriteString(data)
 		wbuf.Flush()
 	}(f)
+	wg.Wait()
 
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/pkg/poc"
 	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/result"
+	"github.com/zan8in/gologger"
 )
 
 var CheckerPool = sync.Pool{
@@ -87,16 +88,16 @@ func (runner *Runner) Execute() {
 				case <-timeout:
 					return
 				case <-time.After(1 * time.Minute):
-					fmt.Println(tap.Target, tap.Poc.Id, " Timeout: 1 minute elapsed")
+					gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, 1)))
 					var num = 1
 					for {
 						select {
 						case <-timeout:
-							fmt.Printf("[%s] [%s] finished, Timeout > %d minutes elapsed\n", tap.Target, tap.Poc.Id, num)
+							gologger.Info().Msg(log.LogColor.Time("The PoC for [%s] on [%s] has completed execution, taking over [%d] minute.", tap.Target, tap.Poc.Id, num))
 							return
 						case <-time.After(1 * time.Minute):
 							num++
-							fmt.Printf("[%s] [%s] still waiting... Timeout: %d minute elapsed\n", tap.Target, tap.Poc.Id, num)
+							gologger.Info().Msg(log.LogColor.Time("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, num))
 						}
 					}
 				}
