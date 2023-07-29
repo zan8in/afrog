@@ -17,9 +17,9 @@ rules:
     extractors:
       - type: word
         extractor:
-          adminpath: "/arcgis/admin/login"
-          managerpath: "/arcgis/manager/"
-          restpath: "/arcgis/rest/login"
+          admin: "/arcgis/admin/login"
+          manager: "/arcgis/manager/"
+          rest: "/arcgis/rest/login"
   r1:
     request:
       method: GET
@@ -28,9 +28,9 @@ rules:
     extractors:
       - type: word
         extractor:
-          adminpath: "/arcgis/admin/login"
-          managerpath: "/arcgis/manager/"
-          restpath: "/arcgis/rest/login"
+          admin: "/arcgis/admin/login"
+          manager: "/arcgis/manager/"
+          rest: "/arcgis/rest/login"
   r2:
     request:
       method: GET
@@ -39,7 +39,7 @@ rules:
     extractors:
       - type: word
         extractor:
-          adminpath: "/arcgis/admin/login"
-          managerpath: "/arcgis/manager/"
-          restpath: "/arcgis/rest/login"
+          admin: "/arcgis/admin/login"
+          manager: "/arcgis/manager/"
+          rest: "/arcgis/rest/login"
 expression: r0() || r1() || r2()

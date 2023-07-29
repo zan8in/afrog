@@ -57,6 +57,7 @@ rules:
            - '"superset-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Superset</title>")'
            - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            - '"basic-auth-detect" != "" && response.status == 401 && response.raw_header.ibcontains(b"Www-Authenticate:")'
+           - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
            
     r1:
         request:
@@ -109,5 +110,6 @@ rules:
            - '"superset-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Superset</title>")'
            - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            - '"sangfor-ssl-vpn-detect" != "" && response.status == 200 && response.body.ibcontains(b"login_psw.csp")'
+           - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
            
 expression: r0() || r1()
