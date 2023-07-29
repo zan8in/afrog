@@ -349,6 +349,39 @@ func simpleRtryHttpGet(target string) ([]byte, int, error) {
 	return respBody, resp.StatusCode, err
 }
 
+func simpleRtryHttpGetTimeout(target string, timeout time.Duration) ([]byte, int, error) {
+	if len(target) == 0 {
+		return []byte(""), 0, errors.New("no target specified")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	req.Header.Add("User-Agent", utils.RandomUA())
+
+	resp, err := RtryNoRedirect.Do(req)
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return []byte(""), 0, err
+	}
+
+	reader := io.LimitReader(resp.Body, maxDefaultBody)
+	respBody, err := io.ReadAll(reader)
+	if err != nil {
+		resp.Body.Close()
+		return []byte(""), 0, err
+	}
+
+	return respBody, resp.StatusCode, err
+}
+
 var (
 	HTTP_PREFIX  = "http://"
 	HTTPS_PREFIX = "https://"
@@ -474,7 +507,11 @@ func ReverseGet(target string) ([]byte, error) {
 }
 
 func Get(target string) ([]byte, int, error) {
-	return simpleRtryHttpGet(target)
+	return simpleRtryHttpGetTimeout(target, defaultTimeout)
+}
+
+func GetTimeout(target string, timeout time.Duration) ([]byte, int, error) {
+	return simpleRtryHttpGetTimeout(target, timeout)
 }
 
 func Url2UrlType(u *url.URL) *proto.UrlType {
