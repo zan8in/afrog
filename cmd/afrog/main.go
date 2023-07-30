@@ -19,10 +19,6 @@ import (
 
 func main() {
 
-	// go func() {
-	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
-	// }()
-
 	options, err := config.NewOptions()
 	if err != nil {
 		gologger.Error().Msg(err.Error())

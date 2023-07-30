@@ -58,6 +58,7 @@ rules:
            - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            - '"basic-auth-detect" != "" && response.status == 401 && response.raw_header.ibcontains(b"Www-Authenticate:")'
            - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
+           - '"mobileiron-system-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>MobileIron System Manager: Sign In</title>")'
            
     r1:
         request:
@@ -111,5 +112,6 @@ rules:
            - '"openfire-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Openfire")'
            - '"sangfor-ssl-vpn-detect" != "" && response.status == 200 && response.body.ibcontains(b"login_psw.csp")'
            - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
+           - '"mobileiron-system-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>MobileIron System Manager: Sign In</title>")'
            
 expression: r0() || r1()
