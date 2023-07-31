@@ -7,6 +7,7 @@
 
 # Test binary, built with `go test -c`
 *.test
+*.db*
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
@@ -40,6 +41,7 @@ cmd/afrog/build.cmd
 cmd/afrog/main.rc
 cmd/afrog/main.syso
 
+cmd/sqlite*
 cmd/pool*
 cmd/server*
 cmd/update*
