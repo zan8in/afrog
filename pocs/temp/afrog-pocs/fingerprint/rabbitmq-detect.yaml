@@ -1,0 +1,31 @@
+id: rabbitmq-detect
+
+info:
+  name: RabbitMQ Detection
+  author: pussycat0x
+  severity: info
+  description: |
+    RabbitMQ is an open-source message-broker software that originally implemented the Advanced Message Queuing Protocol and has since been extended with a plug-in architecture to support Streaming Text Oriented Messaging Protocol, MQ Telemetry Transport, and other protocols.
+    SHODAN: product:"RabbitMQ"
+  reference:
+    - https://nmap.org/nsedoc/scripts/amqp-info.html
+  tags: network,rabbitmq,oss
+  created: 2023/08/07
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "AMQP\u0000\u0000\t\u0001"
+    expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:5672"
+      data: "AMQP\u0000\u0000\t\u0001"
+    expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
+expression: r0() || r1()
