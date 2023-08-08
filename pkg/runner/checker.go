@@ -338,8 +338,16 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 }
 
 func (c *Checker) newRerverse() *proto.Reverse {
+
+	urlStr := ""
 	sub := utils.CreateRandomString(12)
-	urlStr := fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
+
+	if config.ReverseEyeShLive {
+		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
+	} else if config.ReverseCeyeLive {
+		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
+	}
+
 	u, _ := url.Parse(urlStr)
 	return &proto.Reverse{
 		Url:                utils.ParseUrl(u),

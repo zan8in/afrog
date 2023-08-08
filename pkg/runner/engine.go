@@ -182,3 +182,22 @@ func CeyeTest() bool {
 	}
 	return false
 }
+
+func EyeTest() bool {
+	index := strings.Index(config.ReverseEyeDomain, ".")
+	domain := config.ReverseEyeDomain
+
+	if index != -1 {
+		domain = config.ReverseEyeDomain[:index]
+	}
+
+	url := fmt.Sprintf("http://eyes.sh/api/dns/%s/test/?token=%s", domain, config.ReverseEyeToken)
+	resp, _, err := retryhttpclient.Get(url)
+	if err != nil {
+		return false
+	}
+	if strings.Contains(string(resp), "False") {
+		return true
+	}
+	return false
+}

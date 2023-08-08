@@ -153,5 +153,24 @@ func checkReversePlatform() {
 
 	}
 
+	if len(config.ReverseEyeDomain) > 0 && len(config.ReverseEyeToken) > 0 {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			if !EyeTest() {
+				gologger.Info().Msg("Eye.sh platform exception may affect some POCs")
+				config.ReverseEyeShLive = false
+			} else {
+				config.ReverseEyeShLive = true
+			}
+
+		}()
+
+	} else {
+		gologger.Info().Msg("Version 2.7.8 introduces the Eye.sh backlink configuration option. For more details, please refer to the afrog wiki.")
+	}
+
 	wg.Wait()
 }

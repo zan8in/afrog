@@ -33,10 +33,16 @@ type ConfigHttp struct {
 type Reverse struct {
 	Ceye Ceye `yaml:"ceye"`
 	Jndi Jndi `yaml:"jndi"`
+	Eye  Eye  `yaml:"eye"`
 }
 
 type Ceye struct {
 	ApiKey string `yaml:"api-key"`
+	Domain string `yaml:"domain"`
+}
+
+type Eye struct {
+	Token  string `yaml:"token"`
 	Domain string `yaml:"domain"`
 }
 

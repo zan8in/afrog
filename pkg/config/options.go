@@ -21,12 +21,15 @@ import (
 var (
 	ReverseCeyeApiKey string
 	ReverseCeyeDomain string
+	ReverseEyeToken   string
+	ReverseEyeDomain  string
 	ReverseJndi       string
 	ReverseLdapPort   string
 	ReverseApiPort    string
 
-	ReverseCeyeLive bool
-	ReverseJndiLive bool
+	ReverseCeyeLive  bool
+	ReverseEyeShLive bool
+	ReverseJndiLive  bool
 )
 
 type Options struct {
@@ -284,6 +287,9 @@ func (opt *Options) verifyOptions() error {
 
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+
+	ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
+	ReverseEyeToken = opt.Config.Reverse.Eye.Token
 
 	ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
 	ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort

@@ -529,30 +529,38 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 }
 
 func reverseCheck(r *proto.Reverse, timeout int64) bool {
-	if len(config.ReverseCeyeApiKey) == 0 || len(r.Domain) == 0 {
-		return false
-	}
-
-	if !config.ReverseCeyeLive {
+	if r == nil || (len(r.Domain) == 0 && len(r.Ip) == 0) {
 		return false
 	}
 
 	time.Sleep(time.Second * time.Duration(timeout))
 
+	urlStr := ""
 	sub := strings.Split(r.Domain, ".")[0]
-	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
-
-	resp, err := retryhttpclient.ReverseGet(urlStr)
-	if err != nil {
-		return false
+	if config.ReverseEyeShLive {
+		domain := strings.Split(r.Domain, ".")[1]
+		urlStr = fmt.Sprintf("http://eyes.sh/api/dns/%s/%s/?token=%s", domain, sub, config.ReverseEyeToken)
+		resp, err := retryhttpclient.ReverseGet(urlStr)
+		if err != nil {
+			return false
+		}
+		if bytes.Contains(resp, []byte("True")) {
+			return true
+		}
 	}
+	if config.ReverseCeyeLive {
+		urlStr = fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
+		resp, err := retryhttpclient.ReverseGet(urlStr)
+		if err != nil {
+			return false
+		}
+		if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
+			return true
+		}
 
-	if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) { // api返回结果不为空
-		return true
-	}
-
-	if bytes.Contains(resp, []byte(`<title>503`)) { // api返回结果不为空
-		return false
+		if bytes.Contains(resp, []byte(`<title>503`)) {
+			return false
+		}
 	}
 
 	return false
