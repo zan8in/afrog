@@ -541,16 +541,17 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 		domain := strings.Split(r.Domain, ".")[1]
 		urlStr = fmt.Sprintf("http://eyes.sh/api/dns/%s/%s/?token=%s", domain, sub, config.ReverseEyeToken)
 		resp, err := retryhttpclient.ReverseGet(urlStr)
-		if err != nil {
-			return false
-		}
-		if bytes.Contains(resp, []byte("True")) {
+		// if err != nil {
+		// 	return false
+		// }
+		if err == nil && bytes.Contains(resp, []byte("True")) {
 			return true
 		}
 	}
 	if config.ReverseCeyeLive {
 		urlStr = fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
 		resp, err := retryhttpclient.ReverseGet(urlStr)
+		// fmt.Println(string(resp))
 		if err != nil {
 			return false
 		}

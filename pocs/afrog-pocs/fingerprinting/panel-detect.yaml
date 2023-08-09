@@ -60,6 +60,11 @@ rules:
            - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
            - '"mobileiron-system-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>MobileIron System Manager: Sign In</title>")'
            - '"konga-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Konga</title>")'
+           - '"cockpit-detect" != "" && response.status == 200 && response.body.ibcontains(b"window.cockpit_po") && response.body.ibcontains(b"Cockpit authentication is configured incorrectly")'
+           - '"harbor-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Harbor</title>")'
+           - '"nexus-repository-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Nexus Repository Manager</title>")'
+           - '"emqx-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>EMQX Dashboard</title>")'
+           - '"portainer-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Portainer</title>")'
            
     r1:
         request:
@@ -115,5 +120,10 @@ rules:
            - '"realor-detect" != "" && response.status == 200 && response.body.ibcontains(b"Realor Co.Ltd") && response.body.ibcontains(b"realoronline.gif")'
            - '"mobileiron-system-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>MobileIron System Manager: Sign In</title>")'
            - '"konga-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Konga</title>")'
+           - '"cockpit-detect" != "" && response.status == 200 && response.body.ibcontains(b"window.cockpit_po") && response.body.ibcontains(b"Cockpit authentication is configured incorrectly")'
+           - '"harbor-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Harbor</title>")'
+           - '"nexus-repository-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Nexus Repository Manager</title>")'
+           - '"emqx-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>EMQX Dashboard</title>")'
+           - '"portainer-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Portainer</title>")'
            
 expression: r0() || r1()

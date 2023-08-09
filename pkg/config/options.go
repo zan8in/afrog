@@ -119,6 +119,12 @@ type Options struct {
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
 
+	// maximum number of requests to send per second (default 150)
+	ReverseRateLimit int
+
+	// maximum number of afrog-pocs to be executed in parallel (default 25)
+	ReverseConcurrency int
+
 	// Smart Control Concurrency
 	Smart bool
 
@@ -180,6 +186,8 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
+		flagSet.IntVarP(&options.ReverseRateLimit, "reverse-rate-limit", "rrl", 100, "reverse poc maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.ReverseConcurrency, "reverse-concurrency", "rc", 25, "reverse poc maximum number of afrog-pocs to be executed in parallel"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -435,6 +443,27 @@ func (o *Options) ReadPocDetail() {
 		gologger.Print().Msgf("%s\n", string(content))
 		return
 	}
+}
+
+func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
+	result := []poc.Poc{}
+	other := []poc.Poc{}
+	for _, poc := range allpocs {
+		flag := false
+		for _, item := range poc.Set {
+			key := item.Key.(string)
+			if key == "reverse" {
+				flag = true
+				break
+			}
+		}
+		if flag {
+			result = append(result, poc)
+		} else {
+			other = append(other, poc)
+		}
+	}
+	return result, other
 }
 
 func (o *Options) CreatePocList() []poc.Poc {

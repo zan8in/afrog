@@ -1,0 +1,33 @@
+id: rpcbind-portmapper-detect
+
+info:
+  name: Rpcbind Portmapper - Detect
+  author: geeknik
+  severity: info
+  verified: true
+  description: Rpcbind portmapper was detected.
+  reference: 
+    - https://book.hacktricks.xyz/pentesting/pentesting-rpcbind
+  tags: network,rpcbind,portmap
+  created: 2023/08/09
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "8000002836ed646d0000000000000002000186a0000000040000000400000000000000000000000000000000"
+      data-type: hex
+    expression: response.raw.bcontains(b'/run/rpcbind.sock')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:111"
+      data: "8000002836ed646d0000000000000002000186a0000000040000000400000000000000000000000000000000"
+      data-type: hex
+    expression: response.raw.bcontains(b'/run/rpcbind.sock')
+expression: r0() || r1()
+
