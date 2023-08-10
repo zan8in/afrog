@@ -72,6 +72,7 @@ func (runner *Runner) Execute() {
 	}
 
 	rwg := sync.WaitGroup{}
+
 	rwg.Add(1)
 	go func() {
 		defer rwg.Done()
@@ -85,36 +86,8 @@ func (runner *Runner) Execute() {
 			<-runner.engine.ticker.C
 
 			tap := p.(*TransData)
-			if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
-				if options.PocExecutionDurationMonitor {
-					timeout := make(chan bool)
-					go func(target string, poc poc.Poc) {
-						runner.executeExpression(tap.Target, &tap.Poc)
-						timeout <- true
-					}(tap.Target, tap.Poc)
+			runner.exec(tap)
 
-					select {
-					case <-timeout:
-						return
-					case <-time.After(1 * time.Minute):
-						gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, 1)))
-						var num = 1
-						for {
-							select {
-							case <-timeout:
-								gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has completed execution, taking over [%d] minute.", tap.Target, tap.Poc.Id, num)))
-								return
-							case <-time.After(1 * time.Minute):
-								num++
-								gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, num)))
-							}
-						}
-					}
-				} else {
-					runner.executeExpression(tap.Target, &tap.Poc)
-					// fmt.Println("1--------------------------------")
-				}
-			}
 		})
 		defer p.Release()
 
@@ -144,36 +117,8 @@ func (runner *Runner) Execute() {
 			<-runner.engine.ticker.C
 
 			tap := p.(*TransData)
-			if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
-				if options.PocExecutionDurationMonitor {
-					timeout := make(chan bool)
-					go func(target string, poc poc.Poc) {
-						runner.executeExpression(tap.Target, &tap.Poc)
-						timeout <- true
-					}(tap.Target, tap.Poc)
+			runner.exec(tap)
 
-					select {
-					case <-timeout:
-						return
-					case <-time.After(1 * time.Minute):
-						gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, 1)))
-						var num = 1
-						for {
-							select {
-							case <-timeout:
-								gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has completed execution, taking over [%d] minute.", tap.Target, tap.Poc.Id, num)))
-								return
-							case <-time.After(1 * time.Minute):
-								num++
-								gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, num)))
-							}
-						}
-					}
-				} else {
-					runner.executeExpression(tap.Target, &tap.Poc)
-					// fmt.Println("2--------------------------------")
-				}
-			}
 		})
 		defer p.Release()
 
@@ -188,6 +133,40 @@ func (runner *Runner) Execute() {
 	}()
 
 	rwg.Wait()
+}
+
+func (runner *Runner) exec(tap *TransData) {
+	options := runner.options
+
+	if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+		if options.PocExecutionDurationMonitor {
+			timeout := make(chan bool)
+			go func(target string, poc poc.Poc) {
+				runner.executeExpression(tap.Target, &tap.Poc)
+				timeout <- true
+			}(tap.Target, tap.Poc)
+
+			select {
+			case <-timeout:
+				return
+			case <-time.After(1 * time.Minute):
+				gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, 1)))
+				var num = 1
+				for {
+					select {
+					case <-timeout:
+						gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has completed execution, taking over [%d] minute.", tap.Target, tap.Poc.Id, num)))
+						return
+					case <-time.After(1 * time.Minute):
+						num++
+						gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, num)))
+					}
+				}
+			}
+		} else {
+			runner.executeExpression(tap.Target, &tap.Poc)
+		}
+	}
 }
 
 func parseElaspsedTime(time time.Duration) string {
