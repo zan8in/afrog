@@ -19,45 +19,45 @@ urls*
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-release
-reports
+*release
+*reports
 .vscode
 .idea
 
-docs/POCLIST.md*
+*docs/POCLIST.md*
 
-pocs/afrog-pocs/e-privbox/
-pocs/afrog-pocs/a-private/
+*pocs/afrog-pocs/e-privbox/
+*pocs/afrog-pocs/a-private/
 
 /afrog-pocs/
 
-pocs/deleted*
-pocs/peiqi*
-pocs/test*
+*pocs/deleted*
+*pocs/peiqi*
+*pocs/test*
 
 
-cmd/afrog/afrog.ico
-cmd/afrog/build.cmd
-cmd/afrog/main.rc
-cmd/afrog/main.syso
+*cmd/afrog/afrog.ico
+*cmd/afrog/build.cmd
+*cmd/afrog/main.rc
+*cmd/afrog/main.syso
 
-cmd/sqlite*
-cmd/pool*
-cmd/server*
-cmd/update*
-cmd/ants*
-cmd/api*
-cmd/celgo*
-cmd/ctx*
-cmd/download*
-cmd/fingerprint*
-cmd/flag*
-cmd/html*
-cmd/poc*
-cmd/rules*
-cmd/socket*
-cmd/title*
-cmd/workgroup*
-cmd/xray*
+*cmd/sqlite*
+*cmd/pool*
+*cmd/server*
+*cmd/update*
+*cmd/ants*
+*cmd/api*
+*cmd/celgo*
+*cmd/ctx*
+*cmd/download*
+*cmd/fingerprint*
+*cmd/flag*
+*cmd/html*
+*cmd/poc*
+*cmd/rules*
+*cmd/socket*
+*cmd/title*
+*cmd/workgroup*
+*cmd/xray*
 
-dist/
+*dist/
