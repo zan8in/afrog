@@ -6,7 +6,7 @@
 <h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
 
 <p align="center">
-<img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod">
+<img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog/v2?filename=go.mod">
 <a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
 <a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
 <a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
