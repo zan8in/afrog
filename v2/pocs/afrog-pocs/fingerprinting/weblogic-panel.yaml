@@ -14,5 +14,5 @@ rules:
             method: GET
             path: /console/login/LoginForm.jsp
         expression: |
-          response.status == 200 && "WebLogic Server Version: (.*?)<".bmatches(response.body)
+          response.status == 200 && ("WebLogic Server Version: (.*?)<".bmatches(response.body) || "WebLogic Server 版本: (.*?)<".bmatches(response.body))
 expression: r0()
