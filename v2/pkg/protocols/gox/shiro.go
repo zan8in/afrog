@@ -1,40 +1,40 @@
 package gox
 
-import (
-	"fmt"
+// import (
+// 	"fmt"
 
-	"github.com/zan8in/shiro"
-)
+// 	"github.com/zan8in/shiro"
+// )
 
-func shiro_key(target string, variableMap map[string]any) error {
-	s, err := shiro.NewShiro()
-	if err != nil {
-		return err
-	}
+// func shiro_key(target string, variableMap map[string]any) error {
+// 	s, err := shiro.NewShiro()
+// 	if err != nil {
+// 		return err
+// 	}
 
-	result, err := s.Run(shiro.Options{
-		Target: target,
-	})
-	if err != nil {
-		return err
-	}
+// 	result, err := s.Run(shiro.Options{
+// 		Target: target,
+// 	})
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if result == nil {
-		return fmt.Errorf("result is nil")
-	}
+// 	if result == nil {
+// 		return fmt.Errorf("result is nil")
+// 	}
 
-	setRequest(target, variableMap)
+// 	setRequest(target, variableMap)
 
-	if len(result.ShiroKey) > 0 {
-		data := fmt.Sprintf("ShiroKey: %s\r\nRememberMe: %s\r\n", result.ShiroKey, result.RememberMe)
-		setResponse(data, variableMap)
-	}
+// 	if len(result.ShiroKey) > 0 {
+// 		data := fmt.Sprintf("ShiroKey: %s\r\nRememberMe: %s\r\n", result.ShiroKey, result.RememberMe)
+// 		setResponse(data, variableMap)
+// 	}
 
-	setFullTarget(target, variableMap)
+// 	setFullTarget(target, variableMap)
 
-	return nil
-}
+// 	return nil
+// }
 
-func init() {
-	funcMap["shiro_key"] = shiro_key
-}
+// func init() {
+// 	funcMap["shiro_key"] = shiro_key
+// }

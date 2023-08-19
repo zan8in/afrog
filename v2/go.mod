@@ -1,4 +1,4 @@
-module github.com/zan8in/afrog
+module github.com/zan8in/afrog/v2
 
 go 1.20
 
@@ -19,7 +19,6 @@ require (
 	github.com/zan8in/pins v0.0.0-20230626022940-9f79c110bd78
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
-	github.com/zan8in/shiro v0.0.0-20230519151131-5bf789690050
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	google.golang.org/protobuf v1.28.1
@@ -74,7 +73,6 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/tidwall/btree v1.4.3 // indirect
 	github.com/tidwall/buntdb v1.2.10 // indirect
 	github.com/tidwall/gjson v1.14.3 // indirect

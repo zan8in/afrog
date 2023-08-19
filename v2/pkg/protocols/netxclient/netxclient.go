@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/proto"
+	"github.com/zan8in/afrog/v2/pkg/proto"
 	"github.com/zan8in/pins/netx"
 )
 

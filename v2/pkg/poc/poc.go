@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v2/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
 

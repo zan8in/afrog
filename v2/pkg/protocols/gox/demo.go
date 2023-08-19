@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v2/pkg/utils"
 	"github.com/zan8in/retryablehttp"
 )
 

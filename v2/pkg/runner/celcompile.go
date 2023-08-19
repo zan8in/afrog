@@ -4,7 +4,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/zan8in/afrog/pkg/proto"
+	"github.com/zan8in/afrog/v2/pkg/proto"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 

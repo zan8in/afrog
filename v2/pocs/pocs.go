@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"strings"
 
-	"github.com/zan8in/afrog/pkg/poc"
+	"github.com/zan8in/afrog/v2/pkg/poc"
 	"gopkg.in/yaml.v2"
 )
 

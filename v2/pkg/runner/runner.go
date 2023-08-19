@@ -6,14 +6,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/zan8in/afrog/pkg/catalog"
-	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/pkg/report"
-	"github.com/zan8in/afrog/pkg/result"
-	"github.com/zan8in/afrog/pkg/utils"
-	"github.com/zan8in/afrog/pocs"
+	"github.com/zan8in/afrog/v2/pkg/catalog"
+	"github.com/zan8in/afrog/v2/pkg/config"
+	"github.com/zan8in/afrog/v2/pkg/poc"
+	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v2/pkg/report"
+	"github.com/zan8in/afrog/v2/pkg/result"
+	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v2/pocs"
 	"github.com/zan8in/gologger"
 )
 

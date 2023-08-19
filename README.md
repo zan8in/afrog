@@ -529,7 +529,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/zan8in/afrog"
+	"github.com/zan8in/afrog/v2"
 )
 
 func main() {
