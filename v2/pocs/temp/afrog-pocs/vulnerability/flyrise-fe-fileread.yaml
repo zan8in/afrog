@@ -1,0 +1,18 @@
+id: yonyou-grp-u8-logs-disclosure
+
+info:
+  name: 用友 GRP-U8 管理平台 logs 敏感信息泄露
+  author: zan8in
+  severity: high
+  tags: yonyou,logs,disclosure
+  created: 2023/08/19
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /logs/info.log
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b' - [ INFO ]  write')
+expression: r0()
