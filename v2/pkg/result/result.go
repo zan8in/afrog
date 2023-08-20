@@ -2,8 +2,6 @@ package result
 
 import (
 	"fmt"
-	"html"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -100,11 +98,9 @@ func (r *Result) PrintColorResultInfoConsole(number string) {
 		extinfo = "[" + strings.TrimLeft(extinfo, ",") + "]"
 	}
 
-	fulltarget, _ := url.QueryUnescape(html.EscapeString(r.FullTarget)) // fixed %!/(MISSING) BUG
-	fmt.Printf("\r" + log.LogColor.Time(number+" "+utils.GetNowDateTime()) + " " +
-		log.LogColor.Vulner(""+r.PocInfo.Id+"") + " " +
-		log.LogColor.GetColor(r.PocInfo.Info.Severity, ""+
-			strings.ToUpper(r.PocInfo.Info.Severity)+"") + " " + fulltarget + " " + extinfo + "\r\n")
+	fmt.Printf("\r%v %v %v %v\r\n", log.LogColor.Time(number+" "+utils.GetNowDateTime()),
+		log.LogColor.Vulner(""+r.PocInfo.Id+"")+" "+log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)+""), r.FullTarget, extinfo)
+
 }
 
 func (r *Result) Reset() {
