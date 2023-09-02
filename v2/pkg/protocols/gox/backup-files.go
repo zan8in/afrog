@@ -86,7 +86,7 @@ var (
 		"504B0304",                         // zip
 	}
 
-	csize = 50
+	csize = 20
 
 	maxSize = 500
 

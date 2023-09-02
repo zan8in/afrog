@@ -42,7 +42,28 @@ func GetRawHTTP(proxy string, timeout int) *rawhttp.Client {
 	return rawHttpClient
 }
 
-func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string]any) error {
+func addCookie(request, cookie string) string {
+	if len(cookie) == 0 {
+		return request
+	}
+
+	list := strings.Split(request, "\n")
+	isCookie := false
+	for k, l := range list {
+		if strings.HasPrefix(strings.ToLower(l), "cookie:") {
+			list[k] = strings.TrimSuffix(l, ";") + "; " + cookie
+			isCookie = true
+		}
+	}
+
+	if !isCookie && len(list) > 2 {
+		list = append(list[:2], append([]string{"Cookie: " + cookie}, list[2:]...)...)
+	}
+
+	return strings.Join(list, "\n")
+}
+
+func (r *RawHttp) RawHttpRequest(request, cookie, baseurl string, variableMap map[string]any) error {
 	var err error
 	var resp *http.Response
 
@@ -51,7 +72,10 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, variableMap map[string
 
 	request = AssignVariableRaw(request, variableMap)
 
-	rhttp, err := Parse(request, baseurl, true)
+	ckrequest := addCookie(request, cookie)
+	// fmt.Println(ckrequest)
+
+	rhttp, err := Parse(ckrequest, baseurl, true)
 	if err != nil {
 		return fmt.Errorf("parse Failed, %s", err.Error())
 	}

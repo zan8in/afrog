@@ -148,6 +148,8 @@ type Options struct {
 	DisableOutputHtml bool
 
 	OJ *output.OutputJson
+
+	Cookie string
 }
 
 func NewOptions() (*Options, error) {
@@ -199,6 +201,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
+		flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

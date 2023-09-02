@@ -63,7 +63,7 @@ func Init(opt *Options) (err error) {
 	return nil
 }
 
-func Request(target string, rule poc.Rule, variableMap map[string]any) error {
+func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
@@ -149,6 +149,12 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	if rule.Request.Method == http.MethodPost && len(req.Header.Get("Content-Type")) == 0 {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
+
+	ck := convertCookie(req.Header.Get("Cookie"), cookie)
+	if len(ck) > 0 {
+		req.Header.Set("Cookie", ck)
+	}
+	fmt.Println(req.Header.Get("Cookie"))
 
 	// latency
 	var milliseconds int64
@@ -237,6 +243,23 @@ func Request(target string, rule poc.Rule, variableMap map[string]any) error {
 	variableMap["fulltarget"] = target
 
 	return nil
+}
+
+func convertCookie(old, new string) string {
+
+	if len(new) > 0 && len(old) > 0 {
+		return fmt.Sprintf(strings.TrimSuffix(new, ";") + ";" + old)
+	}
+
+	if len(new) > 0 && len(old) == 0 {
+		return new
+	}
+
+	if len(new) == 0 && len(old) > 0 {
+		return old
+	}
+
+	return ""
 }
 
 func url2ProtoUrl(u *url.URL) *proto.UrlType {
