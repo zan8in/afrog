@@ -16,26 +16,31 @@ import (
 )
 
 type Scanner struct {
-	Target             []string
-	TargetsFile        string
-	PocFile            string
-	Output             string
-	Json               string
-	JsonAll            string
-	Search             string
-	Silent             bool
-	Severity           string
-	Update             bool
-	DisableUpdateCheck bool
-	MonitorTargets     bool
-	RateLimit          int
-	Concurrency        int
-	Retries            int
-	MaxHostError       int
-	Timeout            int
-	Proxy              string
-	MaxRespBodySize    int
-	DisableOutputHtml  bool
+	Target                         []string
+	TargetsFile                    string
+	PocFile                        string
+	Output                         string
+	Json                           string
+	JsonAll                        string
+	Search                         string
+	Silent                         bool
+	Severity                       string
+	Update                         bool
+	DisableUpdateCheck             bool
+	MonitorTargets                 bool
+	RateLimit                      int
+	Concurrency                    int
+	Retries                        int
+	MaxHostError                   int
+	Timeout                        int
+	Proxy                          string
+	MaxRespBodySize                int
+	DisableOutputHtml              bool
+	ReverseRateLimit               int
+	ReverseConcurrency             int
+	Smart                          bool
+	PocExecutionDurationMonitor    bool
+	VulnerabilityScannerBreakpoint bool
 }
 
 func NewScanner(target []string, opt Scanner) error {
@@ -62,32 +67,42 @@ func NewScanner(target []string, opt Scanner) error {
 	s.Proxy = opt.WithProxy()
 	s.MaxRespBodySize = opt.WithMaxRespBodySize()
 	s.DisableOutputHtml = opt.WithDisableOutputHtml()
+	s.ReverseConcurrency = opt.WithReverseConcurrency()
+	s.ReverseRateLimit = opt.WithReverseRateLimit()
+	s.Smart = opt.WithSmart()
+	s.PocExecutionDurationMonitor = opt.WithPocExecutionDurationMonitor()
+	s.VulnerabilityScannerBreakpoint = opt.WithVulnerabilityScannerBreakpoint()
 
 	if err := s.verifyOptions(); err != nil {
 		return err
 	}
 
 	options := &config.Options{
-		Target:             s.Target,
-		TargetsFile:        s.TargetsFile,
-		PocFile:            s.PocFile,
-		Output:             s.Output,
-		Json:               s.Json,
-		JsonAll:            s.JsonAll,
-		Search:             s.Search,
-		Silent:             s.Silent,
-		Severity:           s.Severity,
-		Update:             s.Update,
-		DisableUpdateCheck: s.DisableUpdateCheck,
-		MonitorTargets:     s.MonitorTargets,
-		RateLimit:          s.RateLimit,
-		Concurrency:        s.Concurrency,
-		Retries:            s.Retries,
-		MaxHostError:       s.MaxHostError,
-		Timeout:            s.Timeout,
-		Proxy:              s.Proxy,
-		MaxRespBodySize:    s.MaxRespBodySize,
-		DisableOutputHtml:  s.DisableOutputHtml,
+		Target:                         s.Target,
+		TargetsFile:                    s.TargetsFile,
+		PocFile:                        s.PocFile,
+		Output:                         s.Output,
+		Json:                           s.Json,
+		JsonAll:                        s.JsonAll,
+		Search:                         s.Search,
+		Silent:                         s.Silent,
+		Severity:                       s.Severity,
+		Update:                         s.Update,
+		DisableUpdateCheck:             s.DisableUpdateCheck,
+		MonitorTargets:                 s.MonitorTargets,
+		RateLimit:                      s.RateLimit,
+		Concurrency:                    s.Concurrency,
+		Retries:                        s.Retries,
+		MaxHostError:                   s.MaxHostError,
+		Timeout:                        s.Timeout,
+		Proxy:                          s.Proxy,
+		MaxRespBodySize:                s.MaxRespBodySize,
+		DisableOutputHtml:              s.DisableOutputHtml,
+		ReverseRateLimit:               s.ReverseRateLimit,
+		ReverseConcurrency:             s.ReverseConcurrency,
+		Smart:                          s.Smart,
+		PocExecutionDurationMonitor:    s.PocExecutionDurationMonitor,
+		VulnerabilityScannerBreakpoint: s.VulnerabilityScannerBreakpoint,
 	}
 
 	config, err := config.NewConfig()
@@ -300,4 +315,25 @@ func (s *Scanner) WithMaxRespBodySize() int {
 }
 func (s *Scanner) WithDisableOutputHtml() bool {
 	return s.DisableOutputHtml
+}
+func (s *Scanner) WithReverseRateLimit() int {
+	if s.ReverseRateLimit > 0 {
+		return s.ReverseRateLimit
+	}
+	return 50
+}
+func (s *Scanner) WithReverseConcurrency() int {
+	if s.ReverseConcurrency > 0 {
+		return s.ReverseConcurrency
+	}
+	return 20
+}
+func (s *Scanner) WithSmart() bool {
+	return s.Smart
+}
+func (s *Scanner) WithPocExecutionDurationMonitor() bool {
+	return s.PocExecutionDurationMonitor
+}
+func (s *Scanner) WithVulnerabilityScannerBreakpoint() bool {
+	return s.VulnerabilityScannerBreakpoint
 }
