@@ -92,7 +92,8 @@ func NewScanner(target []string, opt Scanner) error {
 
 	config, err := config.NewConfig()
 	if err != nil {
-		return err
+		gologger.Error().Msg(err.Error())
+		os.Exit(0)
 	}
 
 	options.Config = config
@@ -136,6 +137,10 @@ func NewScanner(target []string, opt Scanner) error {
 				r.JsonReport.Append()
 			}
 
+			if options.VulnerabilityScannerBreakpoint {
+				os.Exit(0)
+			}
+
 			lock.Unlock()
 		}
 
@@ -154,6 +159,7 @@ func NewScanner(target []string, opt Scanner) error {
 	}
 
 	time.Sleep(time.Second * 3)
+	gologger.Print().Msg("")
 
 	return nil
 }
