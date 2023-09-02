@@ -37,13 +37,10 @@ func ExampleGet(target string, redirect bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
 	defer cancel()
 
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodPost, target, nil)
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return err
 	}
-
-	// 自定义 headers
-	req.Header.Add("Content-Type", "application/json")
 
 	resp := &http.Response{}
 	if !redirect {

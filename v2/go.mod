@@ -16,7 +16,7 @@ require (
 	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	github.com/zan8in/goupdate v0.0.0-20230517020245-1a8f08a07d8b
-	github.com/zan8in/pins v0.0.0-20230626022940-9f79c110bd78
+	github.com/zan8in/pins v0.0.0-20230902064916-96d97e1e7dd6
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
 	go.uber.org/zap v1.21.0

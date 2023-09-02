@@ -475,6 +475,8 @@ github.com/zan8in/goupdate v0.0.0-20230517020245-1a8f08a07d8b h1:ojv22cDSt5Q+2N2
 github.com/zan8in/goupdate v0.0.0-20230517020245-1a8f08a07d8b/go.mod h1:TVvI0amOMZzPRSmeMQnbyUElBktDBkjEZwx8K6OOgbU=
 github.com/zan8in/pins v0.0.0-20230626022940-9f79c110bd78 h1:tYfPqFrgx0LYQ/+B3T8rRraXFjkM9YHB0wnarv1TX+M=
 github.com/zan8in/pins v0.0.0-20230626022940-9f79c110bd78/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
+github.com/zan8in/pins v0.0.0-20230902064916-96d97e1e7dd6 h1:Czxtb8MQu5aZM/SpGN7qLSB2mtwaNMtoGX2OujJ2XR8=
+github.com/zan8in/pins v0.0.0-20230902064916-96d97e1e7dd6/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af/go.mod h1:7AvjxFJyo5xS0vdGrwa5iwiTYtSMj8V5HGMVTxRstoE=
 github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 h1:NChaJHUwxfGY7OvSLDBiTnHn7FXcecsY00/xoTonlbw=

@@ -1,0 +1,18 @@
+id: backup-files
+
+info:
+  name: Compressed Backup File - Detect
+  author: zan8in,toufik-airane,dwisiswant0,ffffffff0x,pwnhxl
+  severity: high
+  verified: true
+  description: Multiple compressed backup files were detected.
+  tags: exposure,backup
+  created: 2023/09/02
+
+rules:
+  r0:
+    request:
+      type: go
+      data: "backup-files"
+    expression: response.raw.bcontains(b'backup-file-url:')
+expression: r0()
