@@ -154,7 +154,6 @@ func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) e
 	if len(ck) > 0 {
 		req.Header.Set("Cookie", ck)
 	}
-	fmt.Println(req.Header.Get("Cookie"))
 
 	// latency
 	var milliseconds int64

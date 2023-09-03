@@ -286,7 +286,8 @@ func (opt *Options) verifyOptions() error {
 
 	ShowBanner(au)
 
-	if (len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) ||
+	if ((len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) &&
+		(len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0)) ||
 		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
 		homeDir, _ := os.UserHomeDir()
 		configDir := strings.ReplaceAll(homeDir+"/.config/afrog/afrog-config.yaml", "\\", "/")

