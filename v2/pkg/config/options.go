@@ -150,6 +150,8 @@ type Options struct {
 	OJ *output.OutputJson
 
 	Cookie string
+
+	Version bool
 }
 
 func NewOptions() (*Options, error) {
@@ -214,6 +216,10 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
 	)
 
+	flagSet.CreateGroup("version", "Version",
+		flagSet.BoolVarP(&options.Version, "version", "v", false, "afrog version"),
+	)
+
 	_ = flagSet.Parse()
 
 	if err := options.verifyOptions(); err != nil {
@@ -230,6 +236,11 @@ func (opt *Options) verifyOptions() error {
 		return err
 	}
 	opt.Config = config
+
+	if opt.Version {
+		ShowVersion()
+		os.Exit(0)
+	}
 
 	// init append poc
 	if len(opt.AppendPoc) > 0 {

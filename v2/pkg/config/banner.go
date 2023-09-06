@@ -18,6 +18,11 @@ func ShowBanner(u *AfrogUpdate) {
 	fmt.Printf("\r\t\t\t\t%s/%s\n\n", EngineV(u), PocV(u))
 }
 
+func ShowVersion() {
+	InitBanner()
+	fmt.Printf("\r\t\t\t\t%s\n\n", Version)
+}
+
 func EngineV(u *AfrogUpdate) string {
 	if utils.Compare(u.LastestAfrogVersion, ">", Version) {
 		return Version + " (" + log.LogColor.Red("outdated") + ")" + " > " + log.LogColor.Red(u.LastestAfrogVersion)
