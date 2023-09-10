@@ -1,0 +1,17 @@
+id: secvpn-detect
+
+info:
+  name: 中远麒麟堡垒机
+  author: zan8in
+  severity: info
+  verified: true
+  tags: secvpn,fingerprint
+  created: 2023/09/06
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin.php?controller=admin_index&action=login
+    expression: response.status == 200 && response.body.bcontains(b"url=\"admin.php?controller=admin_index&action=get_user_login_fristauth&username=")
+expression: r0()

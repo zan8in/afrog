@@ -1,0 +1,22 @@
+id: secvpn-admin-commonuser-sqli
+
+info:
+  name: 中远麒麟堡垒机 SQL 注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    中远麒麟堡垒机能够提供细粒度的访问控制,最大限度保护用户资源的安全。麒麟堡垒机存在SQL注入漏洞漏洞
+    FOFA: body="url=\"admin.php?controller=admin_index&action=get_user_login_fristauth&username="
+  reference:
+    - https://mp.weixin.qq.com/s/lQZFyP2BmFvDdtmIPz08uw
+  tags: secvpn,sqli
+  created: 2023/09/06
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin.php?controller=admin_commonuser
+    expression: response.status == 200 && response.body.bcontains(b'"result":0') && response.body.bcontains(b'"msg":"username and password does not match!"')
+expression: r0()
