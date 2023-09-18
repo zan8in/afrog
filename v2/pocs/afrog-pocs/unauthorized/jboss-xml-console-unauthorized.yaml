@@ -1,4 +1,4 @@
-id: jboss-default-password
+id: jboss-xml-console-unauthorized
 
 info:
     name: JBoss JMX Console Weak Credential Discovery
