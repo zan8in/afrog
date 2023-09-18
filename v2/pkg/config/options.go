@@ -222,14 +222,14 @@ func NewOptions() (*Options, error) {
 
 	_ = flagSet.Parse()
 
-	if err := options.verifyOptions(); err != nil {
+	if err := options.VerifyOptions(); err != nil {
 		return options, err
 	}
 
 	return options, nil
 }
 
-func (opt *Options) verifyOptions() error {
+func (opt *Options) VerifyOptions() error {
 
 	config, err := NewConfig()
 	if err != nil {

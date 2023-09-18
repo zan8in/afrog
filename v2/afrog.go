@@ -12,36 +12,11 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/afrog/v2/pkg/runner"
 	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 )
 
-type Scanner struct {
-	Target                         []string
-	TargetsFile                    string
-	PocFile                        string
-	Output                         string
-	Json                           string
-	JsonAll                        string
-	Search                         string
-	Silent                         bool
-	Severity                       string
-	Update                         bool
-	DisableUpdateCheck             bool
-	MonitorTargets                 bool
-	RateLimit                      int
-	Concurrency                    int
-	Retries                        int
-	MaxHostError                   int
-	Timeout                        int
-	Proxy                          string
-	MaxRespBodySize                int
-	DisableOutputHtml              bool
-	ReverseRateLimit               int
-	ReverseConcurrency             int
-	Smart                          bool
-	PocExecutionDurationMonitor    bool
-	VulnerabilityScannerBreakpoint bool
-}
+type Scanner config.Options
 
 func NewScanner(target []string, opt Scanner) error {
 
@@ -72,10 +47,7 @@ func NewScanner(target []string, opt Scanner) error {
 	s.Smart = opt.WithSmart()
 	s.PocExecutionDurationMonitor = opt.WithPocExecutionDurationMonitor()
 	s.VulnerabilityScannerBreakpoint = opt.WithVulnerabilityScannerBreakpoint()
-
-	if err := s.verifyOptions(); err != nil {
-		return err
-	}
+	s.AppendPoc = opt.WithAppendPoc()
 
 	options := &config.Options{
 		Target:                         s.Target,
@@ -103,6 +75,7 @@ func NewScanner(target []string, opt Scanner) error {
 		Smart:                          s.Smart,
 		PocExecutionDurationMonitor:    s.PocExecutionDurationMonitor,
 		VulnerabilityScannerBreakpoint: s.VulnerabilityScannerBreakpoint,
+		AppendPoc:                      s.AppendPoc,
 	}
 
 	config, err := config.NewConfig()
@@ -112,6 +85,10 @@ func NewScanner(target []string, opt Scanner) error {
 	}
 
 	options.Config = config
+
+	if err := options.VerifyOptions(); err != nil {
+		return err
+	}
 
 	r, err := runner.NewRunner(options)
 	if err != nil {
@@ -179,37 +156,6 @@ func NewScanner(target []string, opt Scanner) error {
 	return nil
 }
 
-func (opt *Scanner) verifyOptions() error {
-
-	if opt.Update {
-		err := config.UpdateAfrogEngine()
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-		}
-		os.Exit(0)
-	}
-
-	au, err := config.NewAfrogUpdate(true)
-	if err != nil {
-		return err
-	}
-
-	if !opt.DisableUpdateCheck {
-		info, _ := au.AfrogUpdatePocs()
-		if len(info) > 0 {
-			gologger.Info().Msg(info)
-		}
-	}
-
-	if len(opt.Target) == 0 && len(opt.TargetsFile) == 0 {
-		return fmt.Errorf("either `target` or `target-file` must be set")
-	}
-
-	config.ShowBanner(au)
-
-	return nil
-}
-
 func (s *Scanner) WithTargetsFile() string {
 	if len(s.TargetsFile) > 0 {
 		return s.TargetsFile
@@ -255,8 +201,8 @@ func (s *Scanner) WithSilent() bool {
 }
 
 func (s *Scanner) WithSeverity() string {
-	if len(s.Search) > 0 {
-		return s.Search
+	if len(s.Severity) > 0 {
+		return s.Severity
 	}
 	return ""
 }
@@ -336,4 +282,10 @@ func (s *Scanner) WithPocExecutionDurationMonitor() bool {
 }
 func (s *Scanner) WithVulnerabilityScannerBreakpoint() bool {
 	return s.VulnerabilityScannerBreakpoint
+}
+func (s *Scanner) WithAppendPoc() goflags.StringSlice {
+	if len(s.AppendPoc) > 0 {
+		return s.AppendPoc
+	}
+	return goflags.StringSlice{}
 }
