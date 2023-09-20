@@ -371,6 +371,13 @@
             <br>
             <a href="javascript:void(0);"><sub>TryA9ain</sub></a>
         </td>
+        <td align="center">
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/49.jpg&mask=circle&w=60&h=60"
+                   alt="Typora-Logo"
+                 />
+            <br>
+            <a href="https://github.com/fgz00"><sub>fgz00</sub></a>
+        </td>
     </tr>
 </table></div>
 
