@@ -12,6 +12,7 @@ import (
 	"github.com/remeh/sizedwaitgroup"
 	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/gologger"
 	iputil "github.com/zan8in/pins/ip"
 	urlutil "github.com/zan8in/pins/url"
 	"github.com/zan8in/retryablehttp"
@@ -148,6 +149,12 @@ func processData(target string, wg *sizedwaitgroup.SizedWaitGroup, shouldStop ch
 }
 
 func backup_files(target string, variableMap map[string]any) error {
+	defer func() {
+		if r := recover(); r != nil {
+			gologger.Debug().Msgf("%v", r)
+		}
+	}()
+
 	setRequest(target, variableMap)
 
 	shouldStop := make(chan string)
