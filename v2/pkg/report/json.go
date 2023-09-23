@@ -25,7 +25,7 @@ type JsonReport struct {
 
 type JsonResult struct {
 	IsVul      bool          `json:"isvul,omitempty"`
-	Target     string        `json:"target`
+	Target     string        `json:"target"`
 	FullTarget string        `json:"fulltarget,omitempty"`
 	PocInfo    JsonPocInfo   `json:"pocinfo,omitempty"`
 	PocResult  []JsonReqResp `json:"pocresult,omitempty"`
