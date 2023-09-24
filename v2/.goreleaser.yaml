@@ -16,7 +16,7 @@ builds:
     - goos: darwin
       goarch: 386
     - goos: windows
-      goarch: arm
+      goarch: arm,386
     - goos: windows
       goarch: arm64
 
