@@ -65,7 +65,7 @@ var (
 		PRIMARY KEY ("id")
 	  );
 
-	  CREATE INDEX "search"
+	  CREATE INDEX "idx_search"
 		ON "result" (
 		"taskid",
 		"vulid",

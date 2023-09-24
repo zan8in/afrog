@@ -8,7 +8,7 @@ builds:
   id: afrog
 
   env:
-  - CGO_ENABLED=0
+  - CGO_ENABLED=1
 
   goos: [windows,linux,darwin]
   goarch: [amd64,386,arm,arm64]

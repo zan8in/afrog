@@ -6,11 +6,12 @@ import (
 	"os"
 	"text/template"
 
+	"github.com/zan8in/afrog/v2/pkg/db"
 	"github.com/zan8in/afrog/v2/pkg/db/sqlite"
 	"github.com/zan8in/gologger"
 )
 
-//go:embed template/List.html static/prism.js static/prism.css
+//go:embed template/List.html static/prism.js static/prism.css static/afrog-logo.svg
 var templates embed.FS
 
 func StartServer(addr string) {
@@ -43,6 +44,8 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	count := sqlite.Count()
+
 	// 解析模板文件
 	tmpl, err := template.ParseFS(templates, "template/List.html")
 	if err != nil {
@@ -50,8 +53,18 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	respData := struct {
+		DataList         []db.ResultData
+		CurrentDataCount int
+		TotalDataCount   int64
+	}{
+		DataList:         data,
+		CurrentDataCount: len(data),
+		TotalDataCount:   count,
+	}
+
 	// 渲染模板并将结果写入响应
-	err = tmpl.Execute(w, data)
+	err = tmpl.Execute(w, respData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -7,7 +7,9 @@ require (
 	github.com/dlclark/regexp2 v1.8.1
 	github.com/google/cel-go v0.9.0
 	github.com/gookit/color v1.5.0
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/karrick/godirwalk v1.16.1
+	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/panjf2000/ants/v2 v2.6.0
 	github.com/pkg/errors v0.9.1
@@ -53,14 +55,12 @@ require (
 	github.com/gosuri/uiprogress v0.0.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

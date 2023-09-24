@@ -209,3 +209,13 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 
 	return data, nil
 }
+
+func Count() int64 {
+	var count int64
+	query := "SELECT COUNT(*) FROM " + db2.TableName
+	err := dbx.Get(&count, query)
+	if err != nil {
+		return 0
+	}
+	return count
+}

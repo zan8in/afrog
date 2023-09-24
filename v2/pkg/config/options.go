@@ -154,7 +154,8 @@ type Options struct {
 
 	Version bool
 
-	Server bool
+	Web    bool
+	Sqlite bool
 }
 
 func NewOptions() (*Options, error) {
@@ -164,7 +165,8 @@ func NewOptions() (*Options, error) {
 	flagSet.SetDescription(`afrog`)
 
 	flagSet.CreateGroup("server", "Server",
-		flagSet.BoolVar(&options.Server, "server", false, "web server"),
+		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
+		flagSet.BoolVar(&options.Sqlite, "sqlite", false, "Enable SQLite mode."),
 	)
 
 	flagSet.CreateGroup("target", "Target",
@@ -249,7 +251,7 @@ func (opt *Options) VerifyOptions() error {
 		os.Exit(0)
 	}
 
-	if opt.Server {
+	if opt.Web {
 		serveraddress := ":16868"
 		if config.ServerAddress != "" {
 			serveraddress = config.ServerAddress
