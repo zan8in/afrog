@@ -15,7 +15,8 @@ type Config struct {
 	// TargetSizeWaitGroup      int32      `yaml:"target_sizewaitgroup"`
 	// FingerprintSizeWaitGroup int32      `yaml:"fingerprint_sizewaitgroup"`
 	// ConfigHttp               ConfigHttp `yaml:"http"`
-	Reverse Reverse `yaml:"reverse"`
+	ServerAddress string  `yaml:"server"`
+	Reverse       Reverse `yaml:"reverse"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -73,6 +74,7 @@ func NewConfig() (*Config, error) {
 		// configHttp.MaxResponseBodySize = 1024 * 1024 * 2
 		// configHttp.UserAgent = ""
 		// c.ConfigHttp = configHttp
+		c.ServerAddress = ""
 		reverse := c.Reverse
 		reverse.Ceye.ApiKey = ""
 		reverse.Ceye.Domain = ""

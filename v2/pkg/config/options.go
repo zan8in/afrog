@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/utils"
 	"github.com/zan8in/afrog/v2/pocs"
+	"github.com/zan8in/afrog/v2/web"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 	fileutil "github.com/zan8in/pins/file"
@@ -152,6 +153,8 @@ type Options struct {
 	Cookie string
 
 	Version bool
+
+	Server bool
 }
 
 func NewOptions() (*Options, error) {
@@ -159,6 +162,10 @@ func NewOptions() (*Options, error) {
 	options := &Options{}
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`afrog`)
+
+	flagSet.CreateGroup("server", "Server",
+		flagSet.BoolVar(&options.Server, "server", false, "web server"),
+	)
 
 	flagSet.CreateGroup("target", "Target",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
@@ -240,6 +247,14 @@ func (opt *Options) VerifyOptions() error {
 	if opt.Version {
 		ShowVersion()
 		os.Exit(0)
+	}
+
+	if opt.Server {
+		serveraddress := ":16868"
+		if config.ServerAddress != "" {
+			serveraddress = config.ServerAddress
+		}
+		web.StartServer(serveraddress)
 	}
 
 	// init append poc

@@ -1,0 +1,60 @@
+package web
+
+import (
+	"embed"
+	"net/http"
+	"os"
+	"text/template"
+
+	"github.com/zan8in/afrog/v2/pkg/db/sqlite"
+	"github.com/zan8in/gologger"
+)
+
+//go:embed template/List.html static/prism.js static/prism.css
+var templates embed.FS
+
+func StartServer(addr string) {
+
+	err := sqlite.InitX()
+	if err != nil {
+		gologger.Error().Msg(err.Error())
+		os.Exit(0)
+	}
+
+	http.HandleFunc("/", listHandler)
+
+	http.Handle("/static/", http.FileServer(http.FS(templates)))
+
+	// 启动HTTP服务器并监听端口
+	gologger.Info().Msg("Serving HTTP on :: port " + addr[1:] + " (http://[::]" + addr + "/) ...")
+	http.ListenAndServe(addr, nil)
+
+}
+
+func listHandler(w http.ResponseWriter, r *http.Request) {
+	// 获取查询参数
+	keyword := r.URL.Query().Get("keyword")
+	severity := r.URL.Query().Get("severity")
+	page := r.URL.Query().Get("page")
+
+	data, err := sqlite.SelectX(severity, keyword, page)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 解析模板文件
+	tmpl, err := template.ParseFS(templates, "template/List.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 渲染模板并将结果写入响应
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+}
