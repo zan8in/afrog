@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report List - Afrog A Security Tool for Bug Bounty, Pentest and Red Teaming.</title>
+    <link rel="icon" type="image/svg+xml" href="/static/afrog-logo.svg">
+    <!-- 引入 Prism.js 核心库 -->
+    <!-- <script src="/static/prism.js"></script> -->
+
+    <!-- 引入 Prism.js 的默认主题样式 -->
+    <!-- <link rel="stylesheet" href="/static/prism.css"> -->
+
+    <style>
+        /* Reset CSS */
+        * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        }
+
+        /* Typography */
+        body {
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        color: #333;
+        background-color: #333;
+        }
+
+        h1, h2, h3 {
+        font-weight: bold;
+        margin-bottom: 10px;
+        }
+
+        p {
+        margin-bottom: 20px;
+        }
+
+        /* Links */
+        a {
+        color: #007bff;
+        text-decoration: none;
+        }
+
+        a:hover {
+        text-decoration: underline;
+        }
+
+        /* Buttons */
+        .button {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        }
+
+        .button:hover {
+        background-color: #0056b3;
+        }
+
+        /* Containers */
+        .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        }
+
+        /* Header */
+        /* .header {
+        background-color: #333;
+        color: #fff;
+        padding: 20px 0;
+        } */
+
+        /* Footer */
+        /* .footer {
+        background-color: #333;
+        color: #fff;
+        padding: 20px 0;
+        text-align: center;
+        } */
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+        body {
+            font-size: 14px;
+        }
+        }
+
+        /* body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+        } */
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .vulnerability {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+
+        .vulnerability-header {
+            cursor: pointer;
+            padding: 8px;
+            background-color: #f0f0f0;
+            display: flex;
+            /* justify-content: space-between; */
+            align-items: center;
+        }
+
+        .vulnerability-body {
+            display: none;
+            padding: 10px;
+        }
+
+        .vulnerability-header:hover {
+            background-color: #e0e0e0;
+        }
+
+        .vulnerability.open .vulnerability-body {
+            display: block;
+        }
+
+        .vulnerability-title {
+            color: green;
+            font-weight: bold;
+        }
+
+        /* 使用 CSS 控制 FullTarget 文本截断和省略号 */
+        .full-target {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+
+
+        .request-response {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .request {
+            flex: 1;
+            padding-right: 10px;
+            border-right: 1px solid #ccc;
+        }
+
+        .response {
+            flex: 1;
+            padding-left: 10px;
+        }
+        
+        .request-response  xmp {
+            white-space: pre-wrap; /* 保留换行符并自动换行 */
+            word-wrap: break-word;
+            background-color: #f0f0f0;
+            padding: 10px;
+            text-align: left; /* 文本左对齐 */
+            border: 1px solid #ccc; /* 添加边框 */
+            border-radius: 5px; /* 圆角边框 */
+            font-family: monospace; /* 使用等宽字体 */
+            font-size: 14px; /* 字体大小 */
+            line-height: 1.5;
+        }
+
+
+        /* 背景颜色 */
+        /* body {
+            background-color: #f5f5f5; 
+        } */
+
+        .filter {
+            padding: 0 0 0 0;
+        }
+
+        /* 页面容器 */
+        .container {
+            background-color: #fff; /* 白色容器背景 */
+            color: #333; /* 主要文本颜色，深灰色 */
+            
+        }
+
+        /* 链接颜色 */
+        a {
+            color: #0078d4; /* 蓝色链接 */
+        }
+
+        /* 鼠标悬停链接颜色 */
+        a:hover {
+            color: #005cbf; /* 悬停链接颜色 */
+        }
+
+        /* 按钮样式 */
+        button {
+            background-color: #333; /* 深灰色按钮背景 */
+            color: #fff; /* 按钮文本颜色，白色 */
+            border: none;
+            border-radius: 4px;
+            padding: 5px 20px;
+            cursor: pointer;
+        }
+
+        /* 按钮悬停效果 */
+        button:hover {
+            background-color: #555; /* 悬停时的按钮背景颜色 */
+        }
+
+        /* 输入框样式 */
+        input[type="text"],
+        select {
+            border: 1px solid #ddd; /* 输入框边框颜色 */
+            border-radius: 4px;
+            padding: 5px;
+        }
+
+        /* 漏洞等级下拉菜单样式 */
+        #severity {
+            background-color: #fff; /* 白色下拉菜单背景 */
+            color: #333; /* 文本颜色，深灰色 */
+        }
+
+        /* 漏洞搜索输入框样式 */
+        #search {
+            background-color: #fff; /* 白色输入框背景 */
+            color: #333; /* 文本颜色，深灰色 */
+        }
+
+        /* 漏洞筛选按钮样式 */
+        #filter-button {
+            background-color: #333; /* 深灰色按钮背景 */
+            color: #fff; /* 按钮文本颜色，白色 */
+        }
+
+        /* 悬停效果 */
+        #filter-button:hover {
+            background-color: #555; /* 悬停时的按钮背景颜色 */
+        }
+
+        /* 设置最大高度和滚动条 */
+        .max-height {
+            max-height: 300px; /* 设置最大高度，根据需要进行调整 */
+            overflow: auto; /* 允许滚动条出现 */
+        }
+
+        /* 定义不同严重性级别的颜色 */
+        .critical {
+            color: purple;
+            font-weight: bold;
+        }
+        .high {
+            color: red;
+            font-weight: bold;
+        }
+        .medium {
+            color: hwb(46 2% 2% / 0.534);
+            font-weight: bold;
+        }
+        .low {
+            color: rgb(0, 110, 255);
+            font-weight: bold;
+        }
+        .info {
+            color: blue;
+            font-weight: bold;
+        }
+
+        .header {
+            display: flex; /* 使用 Flex 布局 */
+            align-items: center; /* 垂直居中对齐 LOGO 和筛选功能 */
+            padding-bottom: 10px; /* 添加一些内边距 */
+        }
+
+        .logo {
+            max-width: 30px; /* 设置 LOGO 图片的最大宽度 */
+            margin-right: 10px; /* 添加一些外边距 */
+        }
+
+        /* 悬浮按钮的样式 */
+        .scroll-top-button {
+            display: none; /* 初始时隐藏 */
+            position: fixed;
+            bottom: 20px; /* 距离底部的距离 */
+            right: 20px; /* 距离右侧的距离 */
+            width: 40px;
+            height: 40px;
+            background-color: #007BFF; /* 按钮背景颜色 */
+            color: #fff; /* 按钮文字颜色 */
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            text-align: center;
+            line-height: 40px; /* 垂直居中文本 */
+            font-size: 24px;
+        }
+
+        /* 当鼠标悬停时改变按钮颜色 */
+        .scroll-top-button:hover {
+            background-color: #0056b3;
+        }
+
+        /* 添加一些动画效果 */
+        .scroll-top-button span {
+            transition: transform 0.3s;
+        }
+
+        /* 当按钮被点击时旋转箭头图标 */
+        .scroll-top-button.active span {
+            transform: rotate(180deg);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- 添加 LOGO 图片 -->
+            <img src="/static/afrog-logo.svg" alt="Afrog Logo" class="logo"><b class="high">Beta Version</b>&nbsp;&nbsp;
+            <div class="filter">
+                <label>Severity:</label>
+                <label>
+                    <input type="checkbox" name="severity" value="critical"> Critical
+                </label>
+                <label>
+                    <input type="checkbox" name="severity" value="high"> High
+                </label>
+                <label>
+                    <input type="checkbox" name="severity" value="medium"> Medium
+                </label>
+                <label>
+                    <input type="checkbox" name="severity" value="low"> Low
+                </label>
+                <label>
+                    <input type="checkbox" name="severity" value="info"> Info
+                </label>
+                &nbsp;
+                <label for="search">Vulnerability: </label>
+                <input type="text" id="search" placeholder="Search by POC ID or Name">
+                &nbsp;
+                <button id="filter-button">Search</button>
+                &nbsp;
+                <span>Current/Total: {{.CurrentDataCount}}/{{.TotalDataCount}}</span>
+                <script>
+                    // 获取URL参数
+                    var urlParams = new URLSearchParams(window.location.search);
+                    var severityParam = urlParams.get("severity");
+                    var keywordParam = urlParams.get("keyword");
+
+                    if (severityParam) {
+                        // 分割 severity 参数，因为它可能包含多个值，以逗号分隔
+                        var selectedSeverities = severityParam.split(',');
+
+                        // 遍历复选框，如果值在 selectedSeverities 中，则选中
+                        var checkboxes = document.querySelectorAll('input[name="severity"]');
+                        checkboxes.forEach(function(checkbox) {
+                            if (selectedSeverities.includes(checkbox.value)) {
+                                checkbox.checked = true;
+                            }
+                        });
+                    }
+
+                    if (keywordParam != "") {
+                        document.getElementById("search").value = keywordParam;
+                    }
+                </script>
+            </div>
+        </div>
+        {{if .}}
+        {{range .DataList}}
+        <div class="vulnerability">
+            <div class="vulnerability-header">
+                <span>{{.Created}}</span>&nbsp;
+                <span class="vulnerability-title">{{.VulID}}</span>&nbsp;
+                {{ if eq .Severity "INFO" }}
+                    <span class="vulnerability-level info">INFO</span>
+                {{ else if eq .Severity "LOW" }}
+                    <span class="vulnerability-level low">LOW</span>
+                {{ else if eq .Severity "MEDIUM" }}
+                    <span class="vulnerability-level medium">MEDIUM</span>
+                {{ else if eq .Severity "HIGH" }}
+                    <span class="vulnerability-level high">HIGH</span>
+                {{ else if eq .Severity "CRITICAL" }}
+                    <span class="vulnerability-level critical">CRITICAL</span>
+                {{ end }}
+                &nbsp;
+                <span class="full-target">{{.FullTarget}}</span>
+            </div>
+            <div class="vulnerability-body">
+                {{range .ResultList}}
+                <div class="request-response">
+                    {{if .Request}}
+                    <div class="request max-height">
+                        <xmp class="request request-data language-html">{{.Request}}</xmp>
+                    </div>
+                    {{end}}
+
+                    {{if .Response}}
+                    <div class="response max-height">
+                        <xmp class="response response-data language-html">{{.Response}}</xmp>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- 分页控件 -->
+        <button id="prevPage">Previous Page</button>&nbsp;
+        <span id="currentPage">Page: 1</span>&nbsp;
+        <button id="nextPage">Next Page</button>&nbsp;
+        <span>Current/Total: {{.CurrentDataCount}}/{{.TotalDataCount}}</span>
+
+        {{else}}
+            <!-- 没有数据时显示消息 -->
+            <p>No matching</p>
+        {{end}}
+    </div>
+    
+    <!-- 在页面底部添加回到顶部按钮 -->
+    <div id="scrollTopButton" class="scroll-top-button" onclick="scrollToTop()">
+        <span>&uarr;</span>
+    </div>
+
+
+    <script>
+        // // 获取所有拥有.full-target类的元素
+        // var fullTargets = document.querySelectorAll('.full-target');
+
+        // // 遍历所有.full-target元素
+        // fullTargets.forEach(function(fullTarget) {
+        //     // 获取元素的实际宽度
+        //     var actualWidth = fullTarget.offsetWidth;
+            
+        //     // 根据需要设置动态的max-width，例如内容宽度的80%
+        //     var dynamicMaxWidth = actualWidth * 0.8; // 可以根据需要进行调整
+            
+        //     // 设置max-width属性
+        //     fullTarget.style.maxWidth = dynamicMaxWidth + 'px';
+        // });
+
+
+        var pageParam = urlParams.get("page");
+
+        // 每页显示的行数
+        var pageSize = 100;
+
+        // 当前页码
+        var currentPage = 1;
+        if (pageParam > 0) {
+            currentPage = pageParam;
+        }
+
+        // JavaScript 代码可以在这里添加，以实现展开和关闭列表项的功能
+        const vulnerabilities = document.querySelectorAll('.vulnerability');
+
+        var listSize = 0;
+        vulnerabilities.forEach(vulnerability => {
+            const header = vulnerability.querySelector('.vulnerability-header');
+            header.addEventListener('click', () => {
+                vulnerability.classList.toggle('open');
+            });
+            listSize++;
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+        const filterButton = document.getElementById('filter-button');
+        const searchInput = document.getElementById('search');
+        const vulnerabilities = document.querySelectorAll('.vulnerability');
+
+        
+
+        // 添加筛选按钮的点击事件处理程序
+        filterButton.addEventListener('click', function () {
+            // 获取选中的漏洞等级
+            var selectedSeverities = [];
+            var severityCheckboxes = document.querySelectorAll('input[name="severity"]:checked');
+            severityCheckboxes.forEach(function (checkbox) {
+                selectedSeverities.push(checkbox.value);
+            });
+            const selectedSeverity = selectedSeverities.join(',');
+            const searchText = searchInput.value.toLowerCase();
+
+            var url = '/?severity=' + encodeURIComponent(selectedSeverity) + '&keyword=' + encodeURIComponent(searchText);
+            window.location.href = url;
+
+        });
+    });
+
+
+    
+
+    // 获取数据表格和分页控件
+    var dataTable = document.getElementById("data");
+    var prevButton = document.getElementById("prevPage");
+    var nextButton = document.getElementById("nextPage");
+    var currentPageText = document.getElementById("currentPage");
+
+    function updatePage(currentPage) {
+        if (severityParam == null) {
+            severityParam = ""
+        }
+        if (keywordParam == null) {
+            keywordParam = ""
+        }
+        var url = '/?severity=' + encodeURIComponent(severityParam) + '&keyword=' + encodeURIComponent(keywordParam) + '&page=' + encodeURIComponent(currentPage);
+        window.location.href = url;
+    }
+
+
+    // 更新当前页码文本
+    currentPageText.textContent = "Page: " + currentPage;
+
+    // 上一页按钮点击事件
+    prevButton.addEventListener("click", function() {
+        if (currentPage > 1) {
+            currentPage--;
+            updatePage(currentPage);
+        }
+    });
+
+    // 下一页按钮点击事件
+    nextButton.addEventListener("click", function() {
+        if (listSize >= pageSize) {
+            currentPage++;
+            updatePage(currentPage);
+        }
+    });
+
+    // 当页面滚动时显示或隐藏按钮
+    window.onscroll = function() {
+        scrollFunction();
+    };
+
+    function scrollFunction() {
+        var scrollTopButton = document.getElementById("scrollTopButton");
+        if (document.body.scrollTop > 20 || document.documentElement.scrollTop > 20) {
+            scrollTopButton.style.display = "block";
+        } else {
+            scrollTopButton.style.display = "none";
+        }
+    }
+
+    // 点击按钮时平滑滚动到页面顶部
+    function scrollToTop() {
+        var scrollStep = -window.scrollY / (500 / 15); // 控制滚动速度
+        var scrollInterval = setInterval(function() {
+            if (window.scrollY !== 0) {
+                window.scrollBy(0, scrollStep);
+            } else {
+                clearInterval(scrollInterval);
+            }
+        }, 15);
+    }
+
+    </script>
+
+    
+</body>
+</html>

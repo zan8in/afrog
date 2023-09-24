@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漏洞列表</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .vulnerability {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            background-color: #fff;
+        }
+
+        .vulnerability-header {
+            cursor: pointer;
+            padding: 10px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vulnerability-body {
+            display: none;
+            padding: 10px;
+        }
+
+        .vulnerability-header:hover {
+            background-color: #e0e0e0;
+        }
+
+        .vulnerability.open .vulnerability-body {
+            display: block;
+        }
+
+        .vulnerability-title {
+            font-weight: bold;
+        }
+
+        .request-response {
+            display: flex;
+        }
+
+        .request {
+            flex: 1;
+            padding-right: 10px;
+            border-right: 1px solid #ccc;
+        }
+
+        .response {
+            flex: 1;
+            padding-left: 10px;
+        }
+        
+        .request-response pre {
+            white-space: pre-wrap; /* 保留换行符并自动换行 */
+            background-color: #f0f0f0;
+            padding: 10px;
+            text-align: left; /* 文本左对齐 */
+            border: 1px solid #ccc; /* 添加边框 */
+            border-radius: 5px; /* 圆角边框 */
+            font-family: monospace; /* 使用等宽字体 */
+            font-size: 14px; /* 字体大小 */
+            line-height: 1.5;
+        }
+
+
+        /* 背景颜色 */
+        /* body {
+            background-color: #f5f5f5; 
+        } */
+
+        .filter {
+            padding: 0 0 10px 0;
+        }
+
+        /* 页面容器 */
+        .container {
+            background-color: #fff; /* 白色容器背景 */
+            color: #333; /* 主要文本颜色，深灰色 */
+            
+        }
+
+        /* 链接颜色 */
+        a {
+            color: #0078d4; /* 蓝色链接 */
+        }
+
+        /* 鼠标悬停链接颜色 */
+        a:hover {
+            color: #005cbf; /* 悬停链接颜色 */
+        }
+
+        /* 按钮样式 */
+        button {
+            background-color: #333; /* 深灰色按钮背景 */
+            color: #fff; /* 按钮文本颜色，白色 */
+            border: none;
+            border-radius: 4px;
+            padding: 5px 20px;
+            cursor: pointer;
+        }
+
+        /* 按钮悬停效果 */
+        button:hover {
+            background-color: #555; /* 悬停时的按钮背景颜色 */
+        }
+
+        /* 输入框样式 */
+        input[type="text"],
+        select {
+            border: 1px solid #ddd; /* 输入框边框颜色 */
+            border-radius: 4px;
+            padding: 5px;
+        }
+
+        /* 漏洞等级下拉菜单样式 */
+        #severity {
+            background-color: #fff; /* 白色下拉菜单背景 */
+            color: #333; /* 文本颜色，深灰色 */
+        }
+
+        /* 漏洞搜索输入框样式 */
+        #search {
+            background-color: #fff; /* 白色输入框背景 */
+            color: #333; /* 文本颜色，深灰色 */
+        }
+
+        /* 漏洞筛选按钮样式 */
+        #filter-button {
+            background-color: #333; /* 深灰色按钮背景 */
+            color: #fff; /* 按钮文本颜色，白色 */
+        }
+
+        /* 悬停效果 */
+        #filter-button:hover {
+            background-color: #555; /* 悬停时的按钮背景颜色 */
+        }
+
+        /* 设置最大高度和滚动条 */
+        .max-height {
+            max-height: 300px; /* 设置最大高度，根据需要进行调整 */
+            overflow: auto; /* 允许滚动条出现 */
+        }
+
+        /* 定义不同严重性级别的颜色 */
+        .critical {
+            color: purple;
+        }
+        .high {
+            color: red;
+        }
+        .medium {
+            color: yellow;
+        }
+        .low {
+            color: blue;
+        }
+        .info {
+            color: darkblue;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="filter">
+            <label>Filter by Severity:</label>
+            <label>
+                <input type="checkbox" name="severity" value="critical"> Critical
+            </label>
+            <label>
+                <input type="checkbox" name="severity" value="high"> High
+            </label>
+            <label>
+                <input type="checkbox" name="severity" value="medium"> Medium
+            </label>
+            <label>
+                <input type="checkbox" name="severity" value="low"> Low
+            </label>
+            <label>
+                <input type="checkbox" name="severity" value="info"> Info
+            </label>
+            &nbsp;
+            <label for="search">漏洞搜索：</label>
+            <input type="text" id="search" placeholder="搜索漏洞">
+            &nbsp;
+            <button id="filter-button">筛选</button>
+            <script>
+                // 获取URL参数
+                var urlParams = new URLSearchParams(window.location.search);
+                var severityParam = urlParams.get("severity");
+                var keywordParam = urlParams.get("keyword");
+
+                if (severityParam) {
+                    // 分割 severity 参数，因为它可能包含多个值，以逗号分隔
+                    var selectedSeverities = severityParam.split(',');
+
+                    // 遍历复选框，如果值在 selectedSeverities 中，则选中
+                    var checkboxes = document.querySelectorAll('input[name="severity"]');
+                    checkboxes.forEach(function(checkbox) {
+                        if (selectedSeverities.includes(checkbox.value)) {
+                            checkbox.checked = true;
+                        }
+                    });
+                }
+
+                if (keywordParam != "") {
+                    document.getElementById("search").value = keywordParam;
+                }
+            </script>
+        </div>
+        {{if .}}
+        {{range .}}
+        <div class="vulnerability">
+            <div class="vulnerability-header">
+                <span class="vulnerability-title">{{.VulID}} {{.Target}}</span>
+                {{ if eq .Severity "INFO" }}
+                    <span class="vulnerability-level info">INFO</span>
+                {{ else if eq .Severity "LOW" }}
+                    <span class="vulnerability-level low">LOW</span>
+                {{ else if eq .Severity "MEDIUM" }}
+                    <span class="vulnerability-level medium">MEDIUM</span>
+                {{ else if eq .Severity "HIGH" }}
+                    <span class="vulnerability-level high">HIGH</span>
+                {{ else if eq .Severity "CRITICAL" }}
+                    <span class="vulnerability-level critical">CRITICAL</span>
+                {{ end }}
+            </div>
+            <div class="vulnerability-body">
+                {{range .ResultList}}
+                <div class="request-response">
+                    <div class="request max-height">
+                        <pre class="request request-data">{{.Request}}</pre>
+                    </div>
+                    <div class="response max-height">
+                        <pre class="response-data">{{.Response}}</pre>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- 分页控件 -->
+        <button id="prevPage">上一页</button>
+        <span id="currentPage">页码: 1</span>
+        <button id="nextPage">下一页</button>
+
+        {{else}}
+            <!-- 没有数据时显示消息 -->
+            <p>No matching</p>
+        {{end}}
+    </div>
+    
+    <script>
+        var pageParam = urlParams.get("page");
+
+        // 每页显示的行数
+        var pageSize = 100;
+
+        // 当前页码
+        var currentPage = 1;
+        if (pageParam > 0) {
+            currentPage = pageParam;
+        }
+
+        // JavaScript 代码可以在这里添加，以实现展开和关闭列表项的功能
+        const vulnerabilities = document.querySelectorAll('.vulnerability');
+
+        var listSize = 0;
+        vulnerabilities.forEach(vulnerability => {
+            const header = vulnerability.querySelector('.vulnerability-header');
+            header.addEventListener('click', () => {
+                vulnerability.classList.toggle('open');
+            });
+            listSize++;
+        });
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+        const filterButton = document.getElementById('filter-button');
+        const searchInput = document.getElementById('search');
+        const vulnerabilities = document.querySelectorAll('.vulnerability');
+
+        
+
+        // 添加筛选按钮的点击事件处理程序
+        filterButton.addEventListener('click', function () {
+            // 获取选中的漏洞等级
+            var selectedSeverities = [];
+            var severityCheckboxes = document.querySelectorAll('input[name="severity"]:checked');
+            severityCheckboxes.forEach(function (checkbox) {
+                selectedSeverities.push(checkbox.value);
+            });
+            const selectedSeverity = selectedSeverities.join(',');
+            const searchText = searchInput.value.toLowerCase();
+
+            var url = '/list?severity=' + encodeURIComponent(selectedSeverity) + '&keyword=' + encodeURIComponent(searchText);
+            window.location.href = url;
+
+        });
+    });
+
+
+    
+
+    // 获取数据表格和分页控件
+    var dataTable = document.getElementById("data");
+    var prevButton = document.getElementById("prevPage");
+    var nextButton = document.getElementById("nextPage");
+    var currentPageText = document.getElementById("currentPage");
+
+    function updatePage(currentPage) {
+        if (severityParam == null) {
+            severityParam = ""
+        }
+        if (keywordParam == null) {
+            keywordParam = ""
+        }
+        var url = '/list?severity=' + encodeURIComponent(severityParam) + '&keyword=' + encodeURIComponent(keywordParam) + '&page=' + encodeURIComponent(currentPage);
+        window.location.href = url;
+    }
+
+
+    // 更新当前页码文本
+    currentPageText.textContent = "页码: " + currentPage;
+
+    // 上一页按钮点击事件
+    prevButton.addEventListener("click", function() {
+        if (currentPage > 1) {
+            currentPage--;
+            updatePage(currentPage);
+        }
+    });
+
+    // 下一页按钮点击事件
+    nextButton.addEventListener("click", function() {
+        if (listSize >= pageSize) {
+            currentPage++;
+            updatePage(currentPage);
+        }
+    });
+
+
+    </script>
+</body>
+</html>

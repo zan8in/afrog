@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Data List</title>
+</head>
+<body>
+    <h1>Data List</h1>
+    <table>
+        <tr>
+            <th>Column1</th>
+            <th>Column2</th>
+            <!-- 继续添加列标题 -->
+        </tr>
+        {{range .}}
+        <tr>
+            <td>{{.VulID}}</td>
+            <td>{{.Target}}</td>
+            <!-- 继续添加列数据 -->
+        </tr>
+        {{end}}
+    </table>
+</body>
+</html>
