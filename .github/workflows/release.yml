@@ -15,6 +15,12 @@ jobs:
         with:
           fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
           submodules: 'true'
+
+      - name: Install cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install musl-tools
+          export PATH=/usr/local/musl/bin:$PATH
       
       # - run: git fetch --prune --unshallow
       - run: git fetch --prune
