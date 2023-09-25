@@ -11,6 +11,11 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: 'true'
+      - uses: goreleaser/goreleaser-action@v4
+        with: 
+          args: "release --clean"
+          version: latest
+          workdir: v2/
       - run: git fetch --prune --unshallow
       - name: setup dependencies
         uses: actions/setup-go@v2
