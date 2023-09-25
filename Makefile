@@ -1,4 +1,4 @@
-PACKAGE_NAME          := github.com/zan8in/afrog/v2
+PACKAGE_NAME          := github.com/zan8in/afrog
 GOLANG_CROSS_VERSION  ?= v1.20
 
 SYSROOT_DIR     ?= sysroots
@@ -20,7 +20,7 @@ release-dry-run:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME) \
+		-w /go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
 		--clean --skip-validate --skip-publish
 
