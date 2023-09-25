@@ -1,109 +1,33 @@
-project_name: afrog
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-builds:
-  - main: ./cmd/afrog/
-    binary: afrog
-  - id: afrog-linux-macos
-    goos:
-    - darwin
-    goarch:
-    - amd64
-    - arm64
-    ldflags:
-    - -s -w
-    flags:
-    - -trimpath
-    - -buildmode=pie
-    env:
-    - CGO_ENABLED=1
-    - >-
-        {{- if eq .Os "darwin" }}
-          {{- if eq .Arch "amd64"}}CC=zig c -target x86_64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
-        {{- end }}
-    - >-
-        {{- if eq .Os "darwin" }}
-          {{- if eq .Arch "amd64"}}CC=zig c++ -target x86_64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-macos-none -F{{ .Env.SDK_PATH }}/System/Library/Frameworks{{- end }}
-        {{- end }}
-  
-  - id: afrog-linux
-    goos:
-    - linux
-    goarch:
-    - amd64
-    - arm64
-    ldflags:
-    - -s -w
-    flags:
-    - -trimpath
-    env:
-    - CGO_ENABLED=1
-    - >-
-        {{- if eq .Os "linux" }}
-          {{- if eq .Arch "amd64" }}CC=zig c -target x86_64-linux-musl{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-linux-musl{{- end }}
-        {{- end }}
-    - >-
-        {{- if eq .Os "linux" }}
-          {{- if eq .Arch "amd64" }}CC=zig c++ -target x86_64-linux-musl{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-linux-musl{{- end }}
-        {{- end }}
 
-  - id: afrog-windows
-    goos:
-    - windows
-    goarch:
-    - amd64
-    - arm64
-    ldflags:
-    - -s -w
-    flags:
+builds:
+- main: cmd/afrog/main.go
+  binary: afrog
+  id: afrog
+
+  env:
+  - CGO_ENABLED=1
+
+  goos: [windows,linux,darwin]
+  goarch: [amd64,arm64]
+
+  flags:
     - -trimpath
-    env:
-    - CGO_ENABLED=1
-    - >-
-        {{- if eq .Os "windows" }}
-          {{- if eq .Arch "amd64" }}CC=zig c -target x86_64-windows-gnu{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c -target aarch64-windows-gnu{{- end }}
-        {{- end }}
-    - >-
-        {{- if eq .Os "windows" }}
-          {{- if eq .Arch "amd64" }}CC=zig c++ -target x86_64-windows-gnu{{- end }}
-          {{- if eq .Arch "arm64"}}CC=zig c++ -target aarch64-windows-gnu{{- end }}
-        {{- end }}
 
 archives:
-  - format: zip
-    # this name template makes the OS and Arch compatible with the results of uname.
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-    - goos: windows
-      format: zip
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+- format: zip
+  id: afrog
+  builds: [afrog]
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
-# The lines beneath this are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/use them.
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+checksum:
+  algorithm: sha256
+
+announce:
+  slack:
+    enabled: true
+    channel: '#release'
+    username: GoReleaser
+    message_template: 'New Release: {{ .ProjectName }} {{.Tag}} is published! Check it out at {{ .ReleaseURL }}'
