@@ -1,5 +1,5 @@
 PACKAGE_NAME          := github.com/zan8in/afrog/v2
-GOLANG_CROSS_VERSION  ?= v1.20
+GOLANG_CROSS_VERSION  ?= v2.8.6
 
 SYSROOT_DIR     ?= sysroots
 SYSROOT_ARCHIVE ?= sysroots.tar.bz2
@@ -21,7 +21,7 @@ release-dry-run:
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
 		-w /go/src/$(PACKAGE_NAME) \
-		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
+		github.com/zan8in/afrog/v2:${GOLANG_CROSS_VERSION} \
 		--clean --skip-validate --skip-publish
 
 .PHONY: release
@@ -38,5 +38,5 @@ release:
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
 		-w /go/src/$(PACKAGE_NAME) \
-		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
+		github.com/zan8in/afrog/v2:${GOLANG_CROSS_VERSION} \
 		release --clean
