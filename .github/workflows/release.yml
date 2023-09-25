@@ -27,6 +27,8 @@ jobs:
           args: "release --clean"
           version: latest
           workdir: v2/
+        env: 
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
                   
       - name: release dry run
         run: make release-dry-run
