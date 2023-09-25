@@ -36,7 +36,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
 archives:
-  - id: golang-cross
+  - id: afrog
     builds:
       - darwin-amd64
       - linux-armhf
