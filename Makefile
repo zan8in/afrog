@@ -18,10 +18,10 @@ release-dry-run:
 		--rm \
 		-e CGO_ENABLED=1 \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v `pwd`:/go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
+		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
-		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
+		-w /go/src/$(PACKAGE_NAME) \
+		https://github.com/zan8in/afrog/releases/tag/v2.8.6 \
 		--rm-dist --skip-validate --skip-publish
 
 .PHONY: release
@@ -35,8 +35,8 @@ release:
 		-e CGO_ENABLED=1 \
 		--env-file .release-env \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v `pwd`:/go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
+		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
-		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
+		-w /go/src/$(PACKAGE_NAME) \
+		https://github.com/zan8in/afrog/releases/tag/v2.8.6 \
 		release --rm-dist
