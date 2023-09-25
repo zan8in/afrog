@@ -1,4 +1,4 @@
-PACKAGE_NAME          := github.com/zan8in/afrog/v2/cmd/afrog
+PACKAGE_NAME          := github.com/zan8in/afrog/v2
 GOLANG_CROSS_VERSION  ?= v1.20
 
 SYSROOT_DIR     ?= sysroots
