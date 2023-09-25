@@ -1,6 +1,6 @@
 builds:
   - id: darwin-amd64
-    main: cmd/afrog
+    main: /v2/cmd/afrog/
     binary: afrog
     goos:
       - darwin
@@ -16,7 +16,7 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
   - id: linux-armhf
-    main: cmd/afrog
+    main: /v2/cmd/afrog/
     binary: afrog
     goos:
       - linux
