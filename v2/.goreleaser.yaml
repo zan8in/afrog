@@ -1,41 +1,28 @@
+before:
+  hooks:
+    - go mod tidy
+
 builds:
-  - id: darwin-amd64
-    main: ./cmd/afrog/
-    binary: afrog
-    goos:
-      - darwin
-    goarch:
-      - amd64
-    env:
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
-      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
-      - CC=o64-clang
-      - CXX=o64-clang++
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-  - id: linux-armhf
-    main: ./cmd/afrog/
-    binary: afrog
-    goos:
-      - linux
-    goarch:
-      - arm
-    goarm:
-      - 7
-    env:
-      - CC=arm-linux-gnueabihf-gcc
-      - CXX=arm-linux-gnueabihf-g++
-      - CGO_CFLAGS=--sysroot=/sysroot/linux/armhf
-      - CGO_LDFLAGS=--sysroot=/sysroot/linux/armhf
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/linux/armhf
-      - PKG_CONFIG_PATH=/sysroot/linux/armhf/opt/vc/lib/pkgconfig:/sysroot/linux/armhf/usr/lib/arm-linux-gnueabihf/pkgconfig:/sysroot/linux/armhf/usr/lib/pkgconfig:/sysroot/linux/armhf/usr/local/lib/pkgconfig
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-      
+- main: cmd/afrog/main.go
+  binary: afrog
+  id: afrog
+
+  env:
+  - CGO_ENABLED=1
+
+  goos: [windows,linux,darwin]
+  goarch: [amd64,arm64]
+  ignore:
+    - goos: darwin
+      goarch: 386
+    - goos: windows
+      goarch: arm,386
+    - goos: windows
+      goarch: arm64
+
+  flags:
+    - -trimpath
+
 archives:
 - format: zip
   id: afrog

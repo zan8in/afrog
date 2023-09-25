@@ -16,6 +16,8 @@ import (
 )
 
 var dbx *sqlx.DB
+var insertChannel chan *result.Result
+var wg sync.WaitGroup
 
 func InitX() error {
 

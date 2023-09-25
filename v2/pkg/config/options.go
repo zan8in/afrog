@@ -154,8 +154,7 @@ type Options struct {
 
 	Version bool
 
-	Web    bool
-	Sqlite bool
+	Web bool
 }
 
 func NewOptions() (*Options, error) {
@@ -163,11 +162,6 @@ func NewOptions() (*Options, error) {
 	options := &Options{}
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`afrog`)
-
-	flagSet.CreateGroup("server", "Server",
-		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
-		flagSet.BoolVar(&options.Sqlite, "sqlite", false, "Enable SQLite mode."),
-	)
 
 	flagSet.CreateGroup("target", "Target",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
@@ -227,6 +221,10 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("version", "Version",
 		flagSet.BoolVarP(&options.Version, "version", "v", false, "afrog version"),
+	)
+
+	flagSet.CreateGroup("server", "Server",
+		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
 	)
 
 	_ = flagSet.Parse()

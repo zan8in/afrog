@@ -32,12 +32,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if options.Sqlite {
-		err = sqlite.InitX()
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			os.Exit(0)
-		}
+	err = sqlite.InitX()
+	if err != nil {
+		gologger.Error().Msg(err.Error())
+		os.Exit(0)
 	}
 
 	var (
@@ -63,9 +61,7 @@ func main() {
 			atomic.AddUint32(&number, 1)
 			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
-			if options.Sqlite {
-				go sqlite.SetResultX(result)
-			}
+			go sqlite.SetResultX(result)
 
 			if !options.DisableOutputHtml {
 				r.Report.SetResult(result)
@@ -101,7 +97,5 @@ func main() {
 	time.Sleep(time.Second * 3)
 	gologger.Print().Msg("")
 
-	if options.Sqlite {
-		sqlite.CloseX()
-	}
+	sqlite.CloseX()
 }

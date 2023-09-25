@@ -9,7 +9,6 @@ require (
 	github.com/gookit/color v1.5.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/karrick/godirwalk v1.16.1
-	github.com/mattn/go-sqlite3 v1.14.17
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/panjf2000/ants/v2 v2.6.0
 	github.com/pkg/errors v0.9.1
@@ -25,8 +24,8 @@ require (
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
-	gorm.io/driver/sqlite v1.5.2
-	gorm.io/gorm v1.25.2
+	gorm.io/driver/sqlite v1.5.3
+	gorm.io/gorm v1.25.4
 )
 
 require (
@@ -61,6 +60,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
