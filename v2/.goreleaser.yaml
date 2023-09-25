@@ -15,22 +15,20 @@ builds:
       - -mod=readonly
     ldflags:
       - -s -w -X main.version={{.Version}}
-  - id: linux-armhf
+  - id: linux-amd64
     main: ./cmd/afrog/
     binary: afrog
     goos:
       - linux
     goarch:
       - amd64
-    goarm:
-      - 7
     env:
-      - CC=arm-linux-gnueabihf-gcc
-      - CXX=arm-linux-gnueabihf-g++
-      - CGO_CFLAGS=--sysroot=/sysroot/linux/armhf
-      - CGO_LDFLAGS=--sysroot=/sysroot/linux/armhf
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/linux/armhf
-      - PKG_CONFIG_PATH=/sysroot/linux/armhf/opt/vc/lib/pkgconfig:/sysroot/linux/armhf/usr/lib/arm-linux-gnueabihf/pkgconfig:/sysroot/linux/armhf/usr/lib/pkgconfig:/sysroot/linux/armhf/usr/local/lib/pkgconfig
+      - CC=x86_64-linux-musl-gcc
+      - CXX=x86_64-linux-musl-g++
+      - CGO_CFLAGS=--sysroot=/sysroot/linux/amd64
+      - CGO_LDFLAGS=--sysroot=/sysroot/linux/amd64
+      - PKG_CONFIG_SYSROOT_DIR=/sysroot/linux/amd64
+      - PKG_CONFIG_PATH=/sysroot/linux/amd64/opt/vc/lib/pkgconfig:/sysroot/linux/amd64/usr/lib/arm-linux-gnueabihf/pkgconfig:/sysroot/linux/amd64/usr/lib/pkgconfig:/sysroot/linux/amd64/usr/local/lib/pkgconfig
     flags:
       - -mod=readonly
     ldflags:
@@ -39,7 +37,7 @@ archives:
   - id: afrog
     builds:
       - darwin-amd64
-      - linux-armhf
+      - linux-amd64
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format: zip
     wrap_in_directory: true

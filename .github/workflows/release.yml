@@ -30,11 +30,11 @@ jobs:
         env: 
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
                   
-      - name: release dry run
-        run: make release-dry-run
+      # - name: release dry run
+      #   run: make release-dry-run
 
-      - name: setup release environment
-        run: |-
-          echo 'GITHUB_TOKEN=${{secrets.GITHUB_TOKEN}}' > .release-env
-      - name: release publish
-        run: make release
+      # - name: setup release environment
+      #   run: |-
+      #     echo 'GITHUB_TOKEN=${{secrets.GITHUB_TOKEN}}' > .release-env
+      # - name: release publish
+      #   run: make release
