@@ -20,9 +20,9 @@ release-dry-run:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME)/v2 \
+		-w /go/src/$(PACKAGE_NAME) \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		--rm-dist --skip-validate --skip-publish
+		--rm-dist --skip-validate --skip-publish --workdir=v2/
 
 .PHONY: release
 release:
@@ -37,6 +37,6 @@ release:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v `pwd`:/go/src/$(PACKAGE_NAME) \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME)/v2 \
+		-w /go/src/$(PACKAGE_NAME) \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		release --rm-dist
+		release --rm-dist  --workdir=v2/
