@@ -6,6 +6,8 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
 builds:
+  - main: cmd/afrog/main.go
+    binary: afrog
   - id: afrog-linux-macos
     goos:
     - darwin
@@ -77,7 +79,7 @@ builds:
         {{- end }}
 
 archives:
-  - format: tar.gz
+  - format: zip
     # this name template makes the OS and Arch compatible with the results of uname.
     name_template: >-
       {{ .ProjectName }}_
