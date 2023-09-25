@@ -16,7 +16,8 @@ jobs:
           fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
           submodules: 'true'
       
-      - run: git fetch --prune --unshallow
+      # - run: git fetch --prune --unshallow
+      - run: git fetch --prune
 
       - uses: actions/setup-go@v4
         with:
