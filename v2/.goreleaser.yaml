@@ -69,9 +69,6 @@ release:
     name: afrog
   # Add other release targets as needed...
 
-checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
-
 signs:
   - artifacts:
       - checksums.txt
