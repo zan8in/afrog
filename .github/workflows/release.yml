@@ -1,28 +1,33 @@
-name: 🎉 Release Binary
+name: release
 
+# run only on tags
 on:
   push:
     tags:
-      - '*'
-  workflow_dispatch:
+      - 'v*'
 
-jobs: 
-  release: 
-    runs-on: ubuntu-latest
+permissions:
+   contents: write # needed to write releases
 
-    steps: 
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
       - uses: actions/checkout@v3
-        with: 
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v4
-        with: 
-          go-version: 1.20.x
-
-      - uses: goreleaser/goreleaser-action@v4
-        with: 
-          args: "release --rm-dist"
+        with:
+          fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
+      - uses: actions/setup-go@v3
+        with:
+          go-version: 1.20
+          cache: true
+      - uses: goto-bus-stop/setup-zig@v2
+      - name: Set output
+        id: macos_sdk
+        run: echo "path=$(xcrun --show-sdk-path)" >> $GITHUB_OUTPUT
+      - uses: goreleaser/goreleaser-action@v4          # run goreleaser
+        with:
           version: latest
-          workdir: v2/
-        env: 
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          args: release --clean
+        env:
+          SDK_PATH: ${{ steps.macos_sdk.outputs.path }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
