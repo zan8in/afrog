@@ -1,40 +1,82 @@
-before:
-  hooks:
-    - go mod tidy
+project_name: afrog
+homepage: https://github.com/zan8in/afrog
+description: A Security Tool for Bug Bounty, Pentest and Red Teaming.
 
 builds:
-- main: cmd/afrog/main.go
-  binary: afrog
-  id: afrog
+  - id: linux
+    os:
+      - linux
+    arch:
+      - amd64
+      - arm64
+    goos: linux
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=1
+    go_build_flags:
+      - -tags=main
+      - -ldflags='-s -w'
+    main:
+      goos: linux
+      goarch: amd64
 
-  env:
-  - CGO_ENABLED=1
+  - id: windows
+    os:
+      - windows
+    arch:
+      - amd64
+    goos: windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=1
+    go_build_flags:
+      - -tags=main
+      - -ldflags='-s -w'
+    main:
+      goos: windows
+      goarch: amd64
 
-  goos: [windows,linux,darwin]
-  goarch: [amd64,arm64]
-  ignore:
-    - goos: darwin
-      goarch: 386
-    - goos: windows
-      goarch: arm,386
-    - goos: windows
-      goarch: arm64
+# Add more platforms as needed...
 
-  flags:
-    - -trimpath
-
-archives:
-- format: zip
-  id: afrog
-  builds: [afrog]
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^build:'
 
 checksum:
-  algorithm: sha256
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
 
-announce:
-  slack:
-    enabled: true
-    channel: '#release'
-    username: GoReleaser
-    message_template: 'New Release: {{ .ProjectName }} {{.Tag}} is published! Check it out at {{ .ReleaseURL }}'
+tarball:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz'
+  format: tar.gz
+
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.zip'
+    format: zip
+    files:
+      - dist/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/*
+
+release:
+  github:
+    owner: zan8in
+    name: afrog
+  # Add other release targets as needed...
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+
+signs:
+  - artifacts:
+      - checksums.txt
+      - '*.tar.gz'
+      - '*.zip'
+      - '*.gz'
+      - '*.bz2'
+    cmd: gpg --output '{{ .ArtifactName }}.sig' --detach-sig '{{ .ArtifactName }}'
