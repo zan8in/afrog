@@ -35,28 +35,19 @@ builds:
       - -mod=readonly
     ldflags:
       - -s -w -X main.version={{.Version}}
+      
 archives:
-  - id: afrog
-    builds:
-      - darwin-amd64
-      - linux-armhf
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}"
-    format: zip
-    wrap_in_directory: true
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ .Tag }}"
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+- format: zip
+  id: afrog
+  builds: [afrog]
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
-release:
-  github:
-    owner: goreleaser
-    name: afrog
-  prerelease: auto
-  draft: false
+checksum:
+  algorithm: sha256
+
+announce:
+  slack:
+    enabled: true
+    channel: '#release'
+    username: GoReleaser
+    message_template: 'New Release: {{ .ProjectName }} {{.Tag}} is published! Check it out at {{ .ReleaseURL }}'
