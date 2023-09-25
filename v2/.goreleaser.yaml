@@ -1,6 +1,6 @@
-project_name: afrog
-homepage: https://github.com/zan8in/afrog
-description: A Security Tool for Bug Bounty, Pentest and Red Teaming.
+project:
+  homepage: https://github.com/zan8in/afrog
+  description: A Security Tool for Bug Bounty, Pentest and Red Teaming.
 
 builds:
   - id: linux
@@ -9,7 +9,8 @@ builds:
     arch:
       - amd64
       - arm64
-    goos: linux
+    goos:
+      - linux
     goarch:
       - amd64
       - arm64
@@ -27,7 +28,8 @@ builds:
       - windows
     arch:
       - amd64
-    goos: windows
+    goos:
+      - windows
     goarch:
       - amd64
     env:
@@ -53,21 +55,10 @@ changelog:
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
 
-tarball:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz'
-  format: tar.gz
-
-archives:
-  - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.zip'
-    format: zip
-    files:
-      - dist/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}/*
-
 release:
   github:
     owner: zan8in
     name: afrog
-  # Add other release targets as needed...
 
 signs:
   - artifacts:
