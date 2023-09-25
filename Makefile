@@ -1,5 +1,5 @@
 PACKAGE_NAME          := github.com/zan8in/afrog
-GOLANG_CROSS_VERSION  ?= v1.20
+GOLANG_CROSS_VERSION  ?= v1.19.5
 
 SYSROOT_DIR     ?= sysroots
 SYSROOT_ARCHIVE ?= sysroots.tar.bz2
@@ -18,11 +18,11 @@ release-dry-run:
 		--rm \
 		-e CGO_ENABLED=1 \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v `pwd`:/go/src/$(PACKAGE_NAME) \
+		-v `pwd`:/go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
 		-v `pwd`/sysroot:/sysroot \
 		-w /go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		--clean --skip-validate --skip-publish
+		--rm-dist --skip-validate --skip-publish
 
 .PHONY: release
 release:
@@ -35,8 +35,8 @@ release:
 		-e CGO_ENABLED=1 \
 		--env-file .release-env \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v `pwd`:/go/src/$(PACKAGE_NAME) \
+		-v `pwd`:/go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
 		-v `pwd`/sysroot:/sysroot \
-		-w /go/src/$(PACKAGE_NAME) \
+		-w /go/src/$(PACKAGE_NAME)/v2/cmd/afrog \
 		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-		release --clean
+		release --rm-dist
