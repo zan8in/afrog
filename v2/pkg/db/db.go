@@ -3,9 +3,12 @@ package db
 import (
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/zan8in/afrog/v2/pkg/poc"
+	"github.com/zan8in/afrog/v2/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
 
@@ -107,4 +110,17 @@ func createTaskID() string {
 	randomNum := randomGenerator.Intn(10000)
 	taskID := fmt.Sprintf("%d%d", timestamp, randomNum)
 	return taskID
+}
+
+func GetSqliteFullDBName() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	configFile := filepath.Join(homeDir, ".config", "afrog", DBName+".db")
+	if !utils.Exists(configFile) {
+		return configFile
+	}
+	return configFile
 }

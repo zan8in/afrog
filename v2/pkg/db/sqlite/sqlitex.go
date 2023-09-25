@@ -54,7 +54,7 @@ func saveToDatabaseX() {
 }
 
 func initDBX() error {
-	dbx = sqlx.MustConnect("sqlite3", "file:"+db2.DBName+".db?cache=shared&mode=rwc&_journal_mode=WAL")
+	dbx = sqlx.MustConnect("sqlite3", "file:"+db2.GetSqliteFullDBName()+".db?cache=shared&mode=rwc&_journal_mode=WAL")
 
 	// 设置连接池参数（可选）
 	dbx.SetMaxOpenConns(50) // 设置最大打开连接数
