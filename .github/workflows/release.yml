@@ -24,7 +24,7 @@ jobs:
       
       - uses: goreleaser/goreleaser-action@v4
         with: 
-          args: "release --clean"
+          args: "release --clean --config .goreleaser.yaml"
           version: latest
           workdir: v2/
         env: 
@@ -46,7 +46,7 @@ jobs:
       
       - uses: goreleaser/goreleaser-action@v4
         with: 
-          args: "release --clean --config .goreleaser.mac.yml"
+          args: "release --clean --config .goreleaser.mac.yaml"
           version: latest
           workdir: v2/
         env: 
