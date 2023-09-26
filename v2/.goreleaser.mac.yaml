@@ -11,8 +11,8 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1  # 启用CGO
-      - CC=o64-clang
-      - CXX=o64-clang++
+      # - CC=o64-clang
+      # - CXX=o64-clang++
     flags:
       - -mod=readonly
     ldflags:
