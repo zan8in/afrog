@@ -14,21 +14,39 @@ jobs:
     steps:
       - name: Install o64-clang
         run: |
-          brew install filosottile/musl-cross/musl-cross
+          sudo apt-get update
+          
       - uses: actions/checkout@v3
         with:
           # fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
           submodules: 'true'
 
+      - name: Install o64-clang and o64-clang++
+        run: |
+          sudo apt-get update
+          sudo apt-get install clang llvm
+          wget https://github.com/filosottile/musl-cross/releases/download/v0.9.0/x86_64-linux-musl-cross.tgz
+          tar xf x86_64-linux-musl-cross.tgz
+          mv x86_64-linux-musl-cross /usr/local
+          echo 'export PATH=$PATH:/usr/local/x86_64-linux-musl-cross/bin' >> $GITHUB_ENV
+
+
+      - name: Install x86_64-linux-musl-gcc and x86_64-linux-musl-g++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          
+  
+      - name: Install aarch64-linux-gnu-gcc and aarch64-linux-gnu-g++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          
+
       - name: Install cross-compiler
         run: |
           sudo apt-get update
-          sudo apt-get install musl-tools
-          export PATH=/usr/local/musl/bin:$PATH
-
           sudo apt-get install mingw-w64
-
-          sudo apt-get install gcc-aarch64-linux-gnu
       
       # - run: git fetch --prune --unshallow
       # - run: git fetch --prune

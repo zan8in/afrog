@@ -11,8 +11,6 @@ builds:
       - amd64
     env:
       - CGO_ENABLED=1  # 启用CGO
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/macos/amd64
-      - PKG_CONFIG_PATH=/sysroot/macos/amd64/usr/local/lib/pkgconfig
       - CC=o64-clang
       - CXX=o64-clang++
     flags:
@@ -30,10 +28,6 @@ builds:
       - CGO_ENABLED=1  # 启用CGO
       - CC=x86_64-linux-musl-gcc
       - CXX=x86_64-linux-musl-g++
-      - CGO_CFLAGS=--sysroot=/sysroot/linux/amd64
-      - CGO_LDFLAGS=--sysroot=/sysroot/linux/amd64
-      - PKG_CONFIG_SYSROOT_DIR=/sysroot/linux/amd64
-      - PKG_CONFIG_PATH=/sysroot/linux/amd64/opt/vc/lib/pkgconfig:/sysroot/linux/amd64/usr/lib/arm-linux-gnueabihf/pkgconfig:/sysroot/linux/amd64/usr/lib/pkgconfig:/sysroot/linux/amd64/usr/local/lib/pkgconfig
     flags:
       - -mod=readonly
     ldflags:
