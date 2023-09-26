@@ -38,7 +38,7 @@ jobs:
 
       - name: Install osxcross
         run: |
-          git clone https://github.com/tpoechtrager/osxcross.git /usr/local/osxcross
+          sudo git clone https://github.com/tpoechtrager/osxcross.git /usr/local/osxcross
           cd /usr/local/osxcross
           UNATTENDED=yes OSX_VERSION_MIN=10.6 ./build.sh
       - name: Add o64-clang to PATH
