@@ -5,12 +5,16 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install o64-clang
+        run: |
+          brew install filosottile/musl-cross/musl-cross
       - uses: actions/checkout@v3
         with:
           # fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
