@@ -2,21 +2,6 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: darwin-amd64
-    main: ./cmd/afrog/
-    binary: afrog
-    goos:
-      - darwin
-    goarch:
-      - amd64
-    env:
-      - CGO_ENABLED=1  # 启用CGO
-      - CC=o64-clang
-      - CXX=o64-clang++
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
   - id: linux-amd64
     main: ./cmd/afrog/
     binary: afrog
@@ -51,7 +36,7 @@ builds:
 
   - id: linux-arm64
     main: ./cmd/afrog/
-    binary: afrog-arm64  # 设置不同的二进制名称以区分
+    binary: afrog  # 设置不同的二进制名称以区分
     goos:
       - linux
     goarch:
@@ -69,7 +54,6 @@ builds:
 archives:
   - id: afrog
     builds:
-      - darwin-amd64
       - linux-amd64
       - linux-arm64
       - windows-amd64

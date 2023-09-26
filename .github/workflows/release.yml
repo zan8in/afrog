@@ -1,61 +1,27 @@
 name: release
 
-# run only on tags
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
-  release:
+  build-linux:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install o64-clang
-        run: |
-          sudo apt-get update
-          
       - uses: actions/checkout@v3
-        with:
-          # fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
-          submodules: 'true'
 
-      - name: Install o64-clang and o64-clang++
-        run: |
-          sudo apt-get update
-          sudo apt-get install docker.io
-          sudo systemctl start docker
-          docker run --rm -v $(pwd):/workdir -w /workdir ekidd/rust-musl-builder:latest sh -c 'rustup target add x86_64-unknown-linux-musl && \
-          cargo install cargo-audit && \
-          apt-get update && \
-          apt-get install musl-tools -y && \
-          apt-get install clang llvm -y'
-          docker run --rm -v $(pwd):/workdir -w /workdir ekidd/rust-musl-builder:latest sh -c '/usr/local/o64-clang/bin/o64-clang --version'
-
-      - name: Install x86_64-linux-musl-gcc and x86_64-linux-musl-g++
+      - name: cross-compile
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
-          
-  
-      - name: Install aarch64-linux-gnu-gcc and aarch64-linux-gnu-g++
-        run: |
-          sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          
 
-      - name: Install cross-compiler
-        run: |
-          sudo apt-get update
           sudo apt-get install mingw-w64
-      
-      # - run: git fetch --prune --unshallow
-      # - run: git fetch --prune
 
       - uses: actions/setup-go@v4
         with:
           go-version: 1.20.x
+      
       - uses: goreleaser/goreleaser-action@v4
         with: 
           args: "release --clean"
@@ -63,3 +29,38 @@ jobs:
           workdir: v2/
         env: 
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: cross-compile
+        run: |
+          brew install filosottile/musl-cross/musl-cross
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+      
+      - uses: goreleaser/goreleaser-action@v4
+        with: 
+          args: "release --clean --config .goreleaser.mac.yml"
+          version: latest
+          workdir: v2/
+        env: 
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      
+      # # - run: git fetch --prune --unshallow
+      # # - run: git fetch --prune
+
+      
+      # - uses: goreleaser/goreleaser-action@v4
+      #   with: 
+      #     args: "release --clean"
+      #     version: latest
+      #     workdir: v2/
+      #   env: 
+      #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
