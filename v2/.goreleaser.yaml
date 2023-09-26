@@ -35,7 +35,7 @@ builds:
       - -s -w -X main.version={{.Version}}
   - id: windows-amd64
     main: ./cmd/afrog/
-    binary: afrog.exe
+    binary: afrog
     goos:
       - windows
     goarch:
@@ -50,11 +50,29 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
 
+  - id: linux-arm64
+    main: ./cmd/afrog/
+    binary: afrog-arm64  # 设置不同的二进制名称以区分
+    goos:
+      - linux
+    goarch:
+      - arm64  # 设置为 arm64
+    env:
+      - CGO_ENABLED=1  # 启用 CGO
+      - CC=aarch64-linux-gnu-gcc  # Linux arm64 的交叉编译工具链
+      - CXX=aarch64-linux-gnu-g++
+      # 添加其他必要的环境变量，以支持 CGO
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
 archives:
   - id: afrog
     builds:
       - darwin-amd64
       - linux-amd64
+      - linux-arm64
       - windows-amd64
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format: zip

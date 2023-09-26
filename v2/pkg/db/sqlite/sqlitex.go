@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	db2 "github.com/zan8in/afrog/v2/pkg/db"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/gologger"
