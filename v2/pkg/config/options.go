@@ -254,7 +254,11 @@ func (opt *Options) VerifyOptions() error {
 		if config.ServerAddress != "" {
 			serveraddress = config.ServerAddress
 		}
-		web.StartServer(serveraddress)
+		err = web.StartServer(serveraddress)
+		if err != nil {
+			gologger.Error().Msg(err.Error())
+			os.Exit(0)
+		}
 	}
 
 	// init append poc

@@ -3,7 +3,6 @@ package web
 import (
 	"embed"
 	"net/http"
-	"os"
 	"text/template"
 
 	"github.com/zan8in/afrog/v2/pkg/db"
@@ -14,12 +13,11 @@ import (
 //go:embed template/List.html static/prism.js static/prism.css static/afrog-logo.svg
 var templates embed.FS
 
-func StartServer(addr string) {
+func StartServer(addr string) error {
 
 	err := sqlite.InitX()
 	if err != nil {
-		gologger.Error().Msg(err.Error())
-		os.Exit(0)
+		return err
 	}
 
 	http.HandleFunc("/", listHandler)
@@ -28,7 +26,7 @@ func StartServer(addr string) {
 
 	// 启动HTTP服务器并监听端口
 	gologger.Info().Msg("Serving HTTP on :: port " + addr[1:] + " (http://[::]" + addr + "/) ...")
-	http.ListenAndServe(addr, nil)
+	return http.ListenAndServe(addr, nil)
 
 }
 
