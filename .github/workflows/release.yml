@@ -24,7 +24,8 @@ jobs:
       
       - uses: goreleaser/goreleaser-action@v4
         with: 
-          args: "release --clean --snapshot --config .goreleaser.yaml"
+          # args: "release --clean --snapshot --config .goreleaser.yaml"
+          args: "release --clean --config .goreleaser.yaml"
           version: latest
           workdir: v2/
         env: 
@@ -41,14 +42,6 @@ jobs:
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
           brew install gcc
           g++ --version
-      # - name: Add o64-clang to PATH
-      #   run: echo 'export PATH=/usr/local/osxcross/target/bin:$PATH' >> $GITHUB_ENV
-        
-      # - name: Set CC and CXX for o64-clang
-      #   run: |
-      #     export CC=o64-clang
-      #     export CXX=o64-clang++
-      
 
       - uses: actions/setup-go@v4
         with:
@@ -56,7 +49,8 @@ jobs:
       
       - uses: goreleaser/goreleaser-action@v4
         with: 
-          args: "release --clean --snapshot --config .goreleaser.mac.yaml"
+          # args: "release --clean --snapshot --config .goreleaser.mac.yaml"
+          args: "release --clean --config .goreleaser.mac.yaml"
           version: latest
           workdir: v2/
         env: 
