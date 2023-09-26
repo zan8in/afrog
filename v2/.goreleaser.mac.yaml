@@ -26,7 +26,7 @@ archives:
     format: zip
     wrap_in_directory: true
 checksum:
-  name_template: 'checksums.txt'
+  name_template: 'checksums.mac.txt'
 snapshot:
   name_template: "{{ .Tag }}"
 changelog:
