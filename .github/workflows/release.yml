@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
-          # submodules: 'true'
+          # fetch-depth: 0 # this is important, otherwise it won't checkout the full tree (i.e. no previous tags)
+          submodules: 'true'
 
       - name: Install cross-compiler
         run: |
