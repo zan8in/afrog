@@ -21,6 +21,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install musl-tools
           export PATH=/usr/local/musl/bin:$PATH
+
+          sudo apt-get install mingw-w64
       
       # - run: git fetch --prune --unshallow
       - run: git fetch --prune

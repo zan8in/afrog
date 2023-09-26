@@ -33,11 +33,29 @@ builds:
       - -mod=readonly
     ldflags:
       - -s -w -X main.version={{.Version}}
+  - id: windows-amd64
+    main: ./cmd/afrog/
+    binary: afrog.exe
+    goos:
+      - windows
+    goarch:
+      - amd64
+    env:
+      - CGO_ENABLED=1  # 启用CGO
+      - CC=x86_64-w64-mingw32-gcc  # Windows的交叉编译工具链
+      - CXX=x86_64-w64-mingw32-g++
+      # 添加其他必要的环境变量，以支持CGO
+    flags:
+      - -mod=readonly
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
 archives:
   - id: afrog
     builds:
       - darwin-amd64
       - linux-amd64
+      - windows-amd64
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format: zip
     wrap_in_directory: true
