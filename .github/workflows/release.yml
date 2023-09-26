@@ -1,4 +1,4 @@
-name: release
+name: 🎉 Release Binary
 
 on:
   push:
@@ -6,68 +6,23 @@ on:
       - '*'
   workflow_dispatch:
 
-jobs:
-  build-linux:
+jobs: 
+  release: 
     runs-on: ubuntu-latest
 
-    steps:
+    steps: 
       - uses: actions/checkout@v3
-
-      - name: cross-compile
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-          sudo apt-get install mingw-w64
+        with: 
+          fetch-depth: 0
 
       - uses: actions/setup-go@v4
-        with:
+        with: 
           go-version: 1.20.x
-      
+
       - uses: goreleaser/goreleaser-action@v4
         with: 
-          # args: "release --clean --snapshot --config .goreleaser.yaml"
-          args: "release --clean --config .goreleaser.yaml"
+          args: "release --rm-dist"
           version: latest
           workdir: v2/
         env: 
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-  build-macos:
-    runs-on: macos-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install osxcross
-        run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-          brew install gcc
-          g++ --version
-
-      - uses: actions/setup-go@v4
-        with:
-          go-version: 1.20.x
-      
-      - uses: goreleaser/goreleaser-action@v4
-        with: 
-          # args: "release --clean --snapshot --config .goreleaser.mac.yaml"
-          args: "release --clean --config .goreleaser.mac.yaml"
-          version: latest
-          workdir: v2/
-        env: 
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-      
-      # # - run: git fetch --prune --unshallow
-      # # - run: git fetch --prune
-
-      
-      # - uses: goreleaser/goreleaser-action@v4
-      #   with: 
-      #     args: "release --clean"
-      #     version: latest
-      #     workdir: v2/
-      #   env: 
-      #     GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

@@ -1,79 +1,40 @@
 before:
   hooks:
     - go mod tidy
-builds:
-  - id: linux-amd64
-    main: ./cmd/afrog/
-    binary: afrog
-    goos:
-      - linux
-    goarch:
-      - amd64
-    env:
-      - CGO_ENABLED=1  # 启用CGO
-      - CC=x86_64-linux-musl-gcc
-      - CXX=x86_64-linux-musl-g++
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
-  - id: windows-amd64
-    main: ./cmd/afrog/
-    binary: afrog
-    goos:
-      - windows
-    goarch:
-      - amd64
-    env:
-      - CGO_ENABLED=1  # 启用CGO
-      - CC=x86_64-w64-mingw32-gcc  # Windows的交叉编译工具链
-      - CXX=x86_64-w64-mingw32-g++
-      # 添加其他必要的环境变量，以支持CGO
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
 
-  - id: linux-arm64
-    main: ./cmd/afrog/
-    binary: afrog  # 设置不同的二进制名称以区分
-    goos:
-      - linux
-    goarch:
-      - arm64  # 设置为 arm64
-    env:
-      - CGO_ENABLED=1  # 启用 CGO
-      - CC=aarch64-linux-gnu-gcc  # Linux arm64 的交叉编译工具链
-      - CXX=aarch64-linux-gnu-g++
-      # 添加其他必要的环境变量，以支持 CGO
-    flags:
-      - -mod=readonly
-    ldflags:
-      - -s -w -X main.version={{.Version}}
+builds:
+- main: cmd/afrog/main.go
+  binary: afrog
+  id: afrog
+
+  env:
+  - CGO_ENABLED=0
+
+  goos: [windows,linux,darwin]
+  goarch: [amd64,386,arm,arm64]
+  ignore:
+    - goos: darwin
+      goarch: 386
+    - goos: windows
+      goarch: arm
+    - goos: windows
+      goarch: arm64
+
+  flags:
+    - -trimpath
 
 archives:
-  - id: afrog
-    builds:
-      - linux-amd64
-      - linux-arm64
-      - windows-amd64
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format: zip
-    wrap_in_directory: true
-checksum:
-  name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ .Tag }}"
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^docs:'
-      - '^test:'
+- format: zip
+  id: afrog
+  builds: [afrog]
+  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
-release:
-  github:
-    owner: zan8in
-    name: afrog
-  prerelease: auto
-  draft: false
+checksum:
+  algorithm: sha256
+
+announce:
+  slack:
+    enabled: true
+    channel: '#release'
+    username: GoReleaser
+    message_template: 'New Release: {{ .ProjectName }} {{.Tag}} is published! Check it out at {{ .ReleaseURL }}'
