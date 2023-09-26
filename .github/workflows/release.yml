@@ -24,12 +24,14 @@ jobs:
       - name: Install o64-clang and o64-clang++
         run: |
           sudo apt-get update
-          sudo apt-get install clang llvm
-          wget https://github.com/filosottile/musl-cross/releases/download/v0.9.0/x86_64-linux-musl-cross.tgz
-          tar xf x86_64-linux-musl-cross.tgz
-          mv x86_64-linux-musl-cross /usr/local
-          echo 'export PATH=$PATH:/usr/local/x86_64-linux-musl-cross/bin' >> $GITHUB_ENV
-
+          sudo apt-get install docker.io
+          sudo systemctl start docker
+          docker run --rm -v $(pwd):/workdir -w /workdir ekidd/rust-musl-builder:latest sh -c 'rustup target add x86_64-unknown-linux-musl && \
+          cargo install cargo-audit && \
+          apt-get update && \
+          apt-get install musl-tools -y && \
+          apt-get install clang llvm -y'
+          docker run --rm -v $(pwd):/workdir -w /workdir ekidd/rust-musl-builder:latest sh -c '/usr/local/o64-clang/bin/o64-clang --version'
 
       - name: Install x86_64-linux-musl-gcc and x86_64-linux-musl-g++
         run: |
