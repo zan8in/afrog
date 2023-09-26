@@ -38,16 +38,16 @@ jobs:
 
       - name: Install osxcross
         run: |
-          sudo git clone https://github.com/tpoechtrager/osxcross.git /usr/local/osxcross
-          cd /usr/local/osxcross
-          UNATTENDED=yes OSX_VERSION_MIN=10.6 ./build.sh
-      - name: Add o64-clang to PATH
-        run: echo 'export PATH=/usr/local/osxcross/target/bin:$PATH' >> $GITHUB_ENV
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+          brew install gcc
+          g++ --version
+      # - name: Add o64-clang to PATH
+      #   run: echo 'export PATH=/usr/local/osxcross/target/bin:$PATH' >> $GITHUB_ENV
         
-      - name: Set CC and CXX for o64-clang
-        run: |
-          export CC=o64-clang
-          export CXX=o64-clang++
+      # - name: Set CC and CXX for o64-clang
+      #   run: |
+      #     export CC=o64-clang
+      #     export CXX=o64-clang++
       
 
       - uses: actions/setup-go@v4
