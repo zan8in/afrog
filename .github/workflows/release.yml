@@ -23,6 +23,8 @@ jobs:
           export PATH=/usr/local/musl/bin:$PATH
 
           sudo apt-get install mingw-w64
+
+          apt-get install gcc-aarch64-linux-gnu
       
       # - run: git fetch --prune --unshallow
       - run: git fetch --prune
