@@ -36,9 +36,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: cross-compile
+      - name: Install osxcross
         run: |
-          brew install filosottile/musl-cross/musl-cross
+          git clone https://github.com/tpoechtrager/osxcross.git /usr/local/osxcross
+          cd /usr/local/osxcross
+          UNATTENDED=yes OSX_VERSION_MIN=10.6 ./build.sh
+      - name: Add o64-clang to PATH
+        run: echo 'export PATH=/usr/local/osxcross/target/bin:$PATH' >> $GITHUB_ENV
+        
+      - name: Set CC and CXX for o64-clang
+        run: |
+          export CC=o64-clang
+          export CXX=o64-clang++
+      
 
       - uses: actions/setup-go@v4
         with:
