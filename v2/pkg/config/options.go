@@ -12,7 +12,6 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/utils"
 	"github.com/zan8in/afrog/v2/pocs"
-	"github.com/zan8in/afrog/v2/web"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 	fileutil "github.com/zan8in/pins/file"
@@ -154,7 +153,7 @@ type Options struct {
 
 	Version bool
 
-	Web bool
+	// Web bool
 }
 
 func NewOptions() (*Options, error) {
@@ -223,9 +222,9 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVarP(&options.Version, "version", "v", false, "afrog version"),
 	)
 
-	flagSet.CreateGroup("server", "Server",
-		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
-	)
+	// flagSet.CreateGroup("server", "Server",
+	// 	flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
+	// )
 
 	_ = flagSet.Parse()
 
@@ -249,17 +248,17 @@ func (opt *Options) VerifyOptions() error {
 		os.Exit(0)
 	}
 
-	if opt.Web {
-		serveraddress := ":16868"
-		if config.ServerAddress != "" {
-			serveraddress = config.ServerAddress
-		}
-		err = web.StartServer(serveraddress)
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			os.Exit(0)
-		}
-	}
+	// if opt.Web {
+	// 	serveraddress := ":16868"
+	// 	if config.ServerAddress != "" {
+	// 		serveraddress = config.ServerAddress
+	// 	}
+	// 	err = web.StartServer(serveraddress)
+	// 	if err != nil {
+	// 		gologger.Error().Msg(err.Error())
+	// 		os.Exit(0)
+	// 	}
+	// }
 
 	// init append poc
 	if len(opt.AppendPoc) > 0 {

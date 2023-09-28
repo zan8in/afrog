@@ -11,7 +11,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/zan8in/afrog/v2/pkg/config"
-	"github.com/zan8in/afrog/v2/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/afrog/v2/pkg/runner"
 	"github.com/zan8in/afrog/v2/pkg/utils"
@@ -32,11 +31,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	err = sqlite.InitX()
-	if err != nil {
-		gologger.Error().Msg(err.Error())
-		os.Exit(0)
-	}
+	// err = sqlite.InitX()
+	// if err != nil {
+	// 	gologger.Error().Msg(err.Error())
+	// 	os.Exit(0)
+	// }
 
 	var (
 		lock      = sync.Mutex{}
@@ -61,7 +60,7 @@ func main() {
 			atomic.AddUint32(&number, 1)
 			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
 
-			go sqlite.SetResultX(result)
+			// go sqlite.SetResultX(result)
 
 			if !options.DisableOutputHtml {
 				r.Report.SetResult(result)
@@ -97,5 +96,5 @@ func main() {
 	time.Sleep(time.Second * 3)
 	gologger.Print().Msg("")
 
-	sqlite.CloseX()
+	// sqlite.CloseX()
 }
