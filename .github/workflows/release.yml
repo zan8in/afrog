@@ -3,7 +3,7 @@ name: 🎉 Release Binary
 on:
   push:
     tags:
-      - 'v2.8.8'
+      - 'v*'
   workflow_dispatch:
 
 jobs: 

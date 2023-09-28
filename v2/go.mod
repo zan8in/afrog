@@ -7,6 +7,7 @@ require (
 	github.com/dlclark/regexp2 v1.8.1
 	github.com/google/cel-go v0.9.0
 	github.com/gookit/color v1.5.0
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/karrick/godirwalk v1.16.1
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/panjf2000/ants/v2 v2.6.0
@@ -40,21 +41,26 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230315223031-1e5ddd10389e // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/getsentry/sentry-go v0.16.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-github v17.0.0+incompatible // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/gosuri/uilive v0.0.4 // indirect
 	github.com/gosuri/uiprogress v0.0.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/logoove/sqlite v1.15.3 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -66,6 +72,7 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/tidwall/btree v1.4.3 // indirect
@@ -85,6 +92,16 @@ require (
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/tools v0.9.3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	lukechampine.com/uint128 v1.2.0 // indirect
+	modernc.org/cc/v3 v3.41.0 // indirect
+	modernc.org/ccgo/v3 v3.16.15 // indirect
+	modernc.org/libc v1.24.1 // indirect
+	modernc.org/mathutil v1.5.0 // indirect
+	modernc.org/memory v1.6.0 // indirect
+	modernc.org/opt v0.1.3 // indirect
+	modernc.org/sqlite v1.25.0 // indirect
+	modernc.org/strutil v1.1.3 // indirect
+	modernc.org/token v1.1.0 // indirect
 )
 
 require (
