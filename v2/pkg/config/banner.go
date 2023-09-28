@@ -15,12 +15,12 @@ func InitBanner() {
 }
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s/%s\n\n", EngineV(u), PocV(u))
+	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Happy October 1st!")
 }
 
 func ShowVersion() {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s\n\n", Version)
+	fmt.Printf("%s\n\n", Version)
 }
 
 func EngineV(u *AfrogUpdate) string {
