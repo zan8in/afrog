@@ -107,6 +107,11 @@ func (u *AfrogUpdate) AfrogUpdatePocs() (string, error) {
 }
 
 func (u *AfrogUpdate) Download() error {
+	// @date 2023/10/12 first removed it before download afrog-pocs.zip
+	if err := os.RemoveAll(u.HomeDir + upPath); err != nil {
+		return err
+	}
+
 	resp, err := grab.Get(u.HomeDir, upHost+upPath)
 	if err != nil {
 		return fmt.Errorf("%s", err.Error())
