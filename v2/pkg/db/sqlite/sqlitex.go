@@ -14,6 +14,7 @@ import (
 	db2 "github.com/zan8in/afrog/v2/pkg/db"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/gologger"
+	randutil "github.com/zan8in/pins/rand"
 )
 
 var dbx *sqlx.DB
@@ -48,9 +49,22 @@ func saveToDatabaseX() {
 
 		go func(r *result.Result) {
 			defer wgAddx.Done()
-			if err := addx(r); err != nil {
-				gologger.Error().Msgf("Error inserting result into database: %v\n", err)
+
+			// @date 2023/10/12 added insert sqlite failed repeat 5 time.
+			c := 0
+			for {
+				if err := addx(r); err != nil {
+					if strings.Contains(err.Error(), "database is locked") && c < 5 {
+						c++
+						randutil.RandSleep(1000)
+						continue
+					}
+					gologger.Error().Msgf("Error inserting result into database: %v\n", err)
+					break
+				}
+				break
 			}
+
 		}(r)
 	}
 	wgAddx.Wait()
