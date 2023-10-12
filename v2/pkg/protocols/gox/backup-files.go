@@ -97,6 +97,12 @@ var (
 )
 
 func getFilenames(target string) []string {
+	defer func() {
+		if r := recover(); r != nil {
+			gologger.Error().Msgf("[backup_files:getFilenames] error: %v", r)
+		}
+	}()
+
 	result := []string{}
 
 	for _, v := range filenames {
@@ -140,6 +146,12 @@ func processData(target string, wg *sizedwaitgroup.SizedWaitGroup, shouldStop ch
 	wg.Add()
 	defer wg.Done()
 
+	defer func() {
+		if r := recover(); r != nil {
+			gologger.Error().Msgf("[backup_files:processData] error: %v", r)
+		}
+	}()
+
 	body := GetBackupFile(target)
 	if len(body) > 0 {
 		respBody = body
@@ -151,7 +163,7 @@ func processData(target string, wg *sizedwaitgroup.SizedWaitGroup, shouldStop ch
 func backup_files(target string, variableMap map[string]any) error {
 	defer func() {
 		if r := recover(); r != nil {
-			gologger.Debug().Msgf("%v", r)
+			gologger.Error().Msgf("[backup_files] error: %v", r)
 		}
 	}()
 
@@ -177,17 +189,14 @@ func backup_files(target string, variableMap map[string]any) error {
 		}()
 	}()
 
-	select {
-	case resultUrl := <-shouldStop:
-		if len(resultUrl) > 0 {
-			setResponse(respBody+"\r\n\r\nbackup-file-url: "+resultUrl, variableMap)
-			setRequest(resultUrl, variableMap)
-			setTarget(target, variableMap)
-			setFullTarget(resultUrl, variableMap)
+	resultUrl := <-shouldStop
+	if len(resultUrl) > 0 {
+		setResponse(respBody+"\r\n\r\nbackup-file-url: "+resultUrl, variableMap)
+		setRequest(resultUrl, variableMap)
+		setTarget(target, variableMap)
+		setFullTarget(resultUrl, variableMap)
 
-			return nil
-		}
-
+		return nil
 	}
 
 	return fmt.Errorf("err")
@@ -199,6 +208,12 @@ func init() {
 }
 
 func GetBackupFile(target string) string {
+	defer func() {
+		if r := recover(); r != nil {
+			gologger.Error().Msgf("[backup_files:GetBackupFile] error: %v", r)
+		}
+	}()
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
