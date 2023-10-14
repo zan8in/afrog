@@ -1,0 +1,57 @@
+id: tomcat-manager
+
+info:
+  name: Apache Tomcat Manager Path Normalization Panel - Detect
+  author: brenocss,organiccrap
+  severity: info
+  verified: true
+  description: Apache Tomcat Manager Path Normalization login panel was discovered via path normalization. Normalizing a path involves modifying the string that identifies a path or file so that it conforms to a valid path on the target operating system.
+  reference: 
+    - https://i.blackhat.com/us-18/Wed-August-8/us-18-Orange-Tsai-Breaking-Parser-Logic-Take-Your-Path-Normalization-Off-And-Pop-0days-Out-2.pdf
+  tags: panel,tomcat,apache,misconfig
+  created: 2023/10/14
+
+set:
+  randstr: randomLowercase(10)
+rules:
+  r00:
+    request:
+      method: GET
+      path: /manager/html
+    expression: (response.status == 401 || response.status == 200) && (response.body.bcontains(b'Apache Tomcat') || response.body.bcontains(b'Tomcat Manager'))
+  r01:
+    request:
+      method: GET
+      path: /host-manager/html
+    expression: (response.status == 401 || response.status == 200) && (response.body.bcontains(b'Apache Tomcat') || response.body.bcontains(b'Tomcat Manager'))
+  r0:
+    request:
+      method: GET
+      path: "/..;/manager/html"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+  r1:
+    request:
+      method: GET
+      path: "/..;/..;/manager/html;/"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+  r2:
+    request:
+      method: GET
+      path: "/..;/host-manager/html"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+  r3:
+    request:
+      method: GET
+      path: "/..;/..;/host-manager/html;/"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+  r4:
+    request:
+      method: GET
+      path: "/{{randstr}}/..;/manager/html"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+  r5:
+    request:
+      method: GET
+      path: "/{{randstr}}/..;/host-manager/html"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+expression: r00() || r01() || r0() || r1() || r2() || r3() || r4() || r5()

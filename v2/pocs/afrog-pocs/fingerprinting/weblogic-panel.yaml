@@ -8,11 +8,21 @@ info:
   description: |
     shodan-query: product:"Oracle Weblogic"
 
+set:
+  randstr: randomLowercase(10)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /console/login/LoginForm.jsp
-        expression: |
-          response.status == 200 && ("WebLogic Server Version: (.*?)<".bmatches(response.body) || "WebLogic Server 版本: (.*?)<".bmatches(response.body))
-expression: r0()
+  r0:
+    request:
+      method: GET
+      path: /console/login/LoginForm.jsp
+    expression: |
+      response.status == 200 && ("WebLogic Server Version: (.*?)<".bmatches(response.body) || "WebLogic Server 版本: (.*?)<".bmatches(response.body))
+  r1:
+    request:
+      method: GET
+      path: /{{randstr}}
+    expression: |
+      response.status == 404 &&
+      response.body.bcontains(b'Error 404--Not Found') &&
+      response.body.bcontains(b'From RFC 2068')
+expression: r0() || r1()

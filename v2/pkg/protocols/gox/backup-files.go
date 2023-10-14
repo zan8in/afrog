@@ -143,14 +143,14 @@ func getFilenames(target string) []string {
 }
 
 func processData(target string, wg *sizedwaitgroup.SizedWaitGroup, shouldStop chan string) {
-	wg.Add()
-	defer wg.Done()
-
 	defer func() {
 		if r := recover(); r != nil {
 			gologger.Error().Msgf("[backup_files:processData] error: %v", r)
 		}
 	}()
+
+	wg.Add()
+	defer wg.Done()
 
 	body := GetBackupFile(target)
 	if len(body) > 0 {
