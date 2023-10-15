@@ -11,6 +11,7 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/output"
 	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v2/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v2/pocs"
 	"github.com/zan8in/afrog/v2/web"
 	"github.com/zan8in/goflags"
@@ -155,6 +156,9 @@ type Options struct {
 	Version bool
 
 	Web bool
+
+	// webhook
+	Dingtalk bool
 }
 
 func NewOptions() (*Options, error) {
@@ -227,6 +231,10 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
 	)
 
+	flagSet.CreateGroup("webhook", "Webhook",
+		flagSet.BoolVar(&options.Dingtalk, "dingtalk", false, "Start a dingtalk webhook."),
+	)
+
 	_ = flagSet.Parse()
 
 	if err := options.VerifyOptions(); err != nil {
@@ -243,6 +251,12 @@ func (opt *Options) VerifyOptions() error {
 		return err
 	}
 	opt.Config = config
+
+	if opt.Dingtalk {
+		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
+			return fmt.Errorf("Dingtalk webhook token is required")
+		}
+	}
 
 	if opt.Version {
 		ShowVersion()

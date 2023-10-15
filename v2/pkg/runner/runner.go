@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/report"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v2/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v2/pocs"
 	"github.com/zan8in/gologger"
 )
@@ -28,12 +29,23 @@ type Runner struct {
 	PocsYaml      utils.StringSlice
 	PocsEmbedYaml utils.StringSlice
 	engine        *Engine
+	Ding          *dingtalk.Dingtalk
 }
 
 func NewRunner(options *config.Options) (*Runner, error) {
+	var err error
+
 	runner := &Runner{options: options}
 
 	runner.engine = NewEngine(options)
+
+	runner.Ding, err = dingtalk.New(options.Config.Webhook.Dingtalk.Tokens,
+		options.Config.Webhook.Dingtalk.AtMobiles,
+		options.Config.Webhook.Dingtalk.Range,
+		options.Config.Webhook.Dingtalk.AtAll)
+	if err != nil {
+		return nil, err
+	}
 
 	retryhttpclient.Init(&retryhttpclient.Options{
 		Proxy:           options.Proxy,

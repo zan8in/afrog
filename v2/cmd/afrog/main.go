@@ -63,6 +63,10 @@ func main() {
 
 			go sqlite.SetResultX(result)
 
+			if options.Dingtalk {
+				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget))
+			}
+
 			if !options.DisableOutputHtml {
 				r.Report.SetResult(result)
 				r.Report.Append(utils.GetNumberText(int(number)))

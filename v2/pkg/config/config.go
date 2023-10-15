@@ -17,6 +17,7 @@ type Config struct {
 	// ConfigHttp               ConfigHttp `yaml:"http"`
 	ServerAddress string  `yaml:"server"`
 	Reverse       Reverse `yaml:"reverse"`
+	Webhook       Webhook `yaml:"webhook"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -29,6 +30,17 @@ type ConfigHttp struct {
 	MaxConnsPerHost     int    `yaml:"max_conns_per_host"`
 	MaxResponseBodySize int    `yaml:"max_responsebody_sizse"`
 	UserAgent           string `yaml:"user_agent"`
+}
+
+type Webhook struct {
+	Dingtalk Dingtalk `yaml:"dingtalk"`
+}
+
+type Dingtalk struct {
+	Tokens    []string `yaml:"tokens"`
+	AtMobiles []string `yaml:"at_mobiles"`
+	AtAll     bool     `yaml:"at_all"`
+	Range     string   `yaml:"range"`
 }
 
 type Reverse struct {
@@ -59,22 +71,8 @@ const afrogConfigFilename = "afrog-config.yaml"
 func NewConfig() (*Config, error) {
 	if isExistConfigFile() != nil {
 		c := Config{}
-		// c.PocSizeWaitGroup = 25
-		// c.TargetSizeWaitGroup = 25
-		// c.FingerprintSizeWaitGroup = 100
-		// configHttp := c.ConfigHttp
-		// configHttp.Proxy = ""
-		// configHttp.DialTimeout = 10
-		// configHttp.ReadTimeout = "10000ms"
-		// configHttp.WriteTimeout = "3000ms"
-		// configHttp.MaxIdle = "1h"
-		// configHttp.MaxRedirect = 3
-		// configHttp.Concurrency = 4096
-		// configHttp.MaxConnsPerHost = 512 // MaxConnsPerHost是一个限流的参数，保证对一个Host最大的打开连接数，如果超过这个数字，则会直接拒绝，这里默认值是512，但如果你打算用来做压测之类的事情，需要增加这个值，比如这里我就增加到了16384
-		// configHttp.MaxResponseBodySize = 1024 * 1024 * 2
-		// configHttp.UserAgent = ""
-		// c.ConfigHttp = configHttp
-		c.ServerAddress = ""
+		c.ServerAddress = ":16868"
+
 		reverse := c.Reverse
 		reverse.Ceye.ApiKey = ""
 		reverse.Ceye.Domain = ""
@@ -82,6 +80,14 @@ func NewConfig() (*Config, error) {
 		reverse.Jndi.LdapPort = ""
 		reverse.Jndi.ApiPort = ""
 		c.Reverse = reverse
+
+		webhook := c.Webhook
+		webhook.Dingtalk.Tokens = []string{""}
+		webhook.Dingtalk.AtMobiles = []string{""}
+		webhook.Dingtalk.AtAll = false
+		webhook.Dingtalk.Range = "high,critical"
+		c.Webhook = webhook
+
 		WriteConfiguration(&c)
 	}
 	return ReadConfiguration()
