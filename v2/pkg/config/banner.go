@@ -8,14 +8,14 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-const Version = "2.8.8"
+const Version = "2.8.9"
 
 func InitBanner() {
 	fmt.Printf("\r\n|\tA F 🐸 O G\t|")
 }
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Happy October 1st!")
+	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Bring color to life")
 }
 
 func ShowVersion() {
