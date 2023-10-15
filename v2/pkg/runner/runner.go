@@ -39,12 +39,14 @@ func NewRunner(options *config.Options) (*Runner, error) {
 
 	runner.engine = NewEngine(options)
 
-	runner.Ding, err = dingtalk.New(options.Config.Webhook.Dingtalk.Tokens,
-		options.Config.Webhook.Dingtalk.AtMobiles,
-		options.Config.Webhook.Dingtalk.Range,
-		options.Config.Webhook.Dingtalk.AtAll)
-	if err != nil {
-		return nil, err
+	if options.Dingtalk {
+		runner.Ding, err = dingtalk.New(options.Config.Webhook.Dingtalk.Tokens,
+			options.Config.Webhook.Dingtalk.AtMobiles,
+			options.Config.Webhook.Dingtalk.Range,
+			options.Config.Webhook.Dingtalk.AtAll)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	retryhttpclient.Init(&retryhttpclient.Options{
