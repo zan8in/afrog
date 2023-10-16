@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -560,12 +559,12 @@ func ParseRequest(oReq *http.Request) (*proto.Request, error) {
 	req.ContentType = oReq.Header.Get("Content-Type")
 	if oReq.Body == nil || oReq.Body == http.NoBody {
 	} else {
-		data, err := ioutil.ReadAll(oReq.Body)
+		data, err := io.ReadAll(oReq.Body)
 		if err != nil {
 			return nil, err
 		}
 		req.Body = data
-		oReq.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+		oReq.Body = io.NopCloser(bytes.NewBuffer(data))
 	}
 	return req, nil
 }

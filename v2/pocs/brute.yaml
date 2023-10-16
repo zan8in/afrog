@@ -18,5 +18,5 @@ rules:
     request:
       method: GET
       path: /"{{path}}"
-    expression: response.status == 200
+    expression: response.status == 500
 expression: r0()
