@@ -19,24 +19,24 @@ rules:
         expression: response.status == 200 && response.body.bcontains(b"jboss.management.local") && response.body.bcontains(b"jboss.web")
     r1:
         request:
-        method: GET
-        path: /jmx-console/
-        headers:
-            Authorization: "Basic YWRtaW46YWRtaW4="
+            method: GET
+            path: /jmx-console/
+            headers:
+                Authorization: "Basic YWRtaW46YWRtaW4="
         expression: response.status == 200 && response.body.bcontains(b'JMImplementation')
     r2:
         request:
-        method: GET
-        path: /jmx-console/
-        headers:
-            Authorization: "Basic cm9vdDpyb290"
+            method: GET
+            path: /jmx-console/
+            headers:
+                Authorization: "Basic cm9vdDpyb290"
         expression: response.status == 200 && response.body.bcontains(b'JMImplementation')
     r3:
         request:
-        method: GET
-        path: /jmx-console/
-        headers:
-            Authorization: "Basic YWRtaW46MTIzNDU2"
+            method: GET
+            path: /jmx-console/
+            headers:
+                Authorization: "Basic YWRtaW46MTIzNDU2"
         expression: response.status == 200 && response.body.bcontains(b'JMImplementation')
 expression: r0() || r1() || r2() || r3()
 
