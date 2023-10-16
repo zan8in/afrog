@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -56,7 +56,7 @@ func (u *AfrogUpdate) CheckAfrogUpdate() (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	remoteVersion, err := ioutil.ReadAll(resp.Body)
+	remoteVersion, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, errors.New("failed to retrieve the version information of afrog-poc remotely")
 	}
@@ -78,7 +78,7 @@ func getAfrogVersion() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	afrogversion, err := ioutil.ReadAll(resp.Body)
+	afrogversion, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("failed to retrieve the version information of afrog remotely")
 	}
