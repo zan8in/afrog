@@ -13,6 +13,7 @@ type Color struct {
 	Midium    func(a ...any) string
 	High      func(a ...any) string
 	Critical  func(a ...any) string
+	Unkown    func(a ...any) string
 	Vulner    func(a ...any) string
 	Time      func(a ...any) string
 	Title     func(a ...any) string
@@ -38,6 +39,7 @@ func NewColor() *Color {
 		Midium:    color.FgYellow.Render,
 		High:      color.FgLightRed.Render,
 		Critical:  color.RGB(180, 84, 255).Sprint,
+		Unkown:    color.BgDefault.Render,
 		Vulner:    color.FgLightGreen.Render,
 		Time:      color.Gray.Render,
 		Title:     color.FgLightBlue.Render,
@@ -62,6 +64,8 @@ func (c *Color) GetColor(level string, log string) string {
 		return c.High(log)
 	case utils.CRITICAL:
 		return c.Critical(log)
+	case utils.UNKOWN:
+		return c.Unkown(log)
 	default:
 		if level == "time" {
 			return c.Low(log)

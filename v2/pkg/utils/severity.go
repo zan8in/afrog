@@ -14,6 +14,8 @@ const (
 	HIGH
 
 	CRITICAL
+
+	UNKOWN
 )
 
 var SeverityMap = map[string]Severity{
@@ -22,4 +24,5 @@ var SeverityMap = map[string]Severity{
 	"medium":   MEDIUM,
 	"high":     HIGH,
 	"critical": CRITICAL,
+	"unkown":   UNKOWN,
 }
