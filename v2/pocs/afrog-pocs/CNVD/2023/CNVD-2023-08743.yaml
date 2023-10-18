@@ -11,6 +11,7 @@ info:
   reference:
     - https://mp.weixin.qq.com/s/NhJe4MUepwqc6SmDJw4aow
     - https://mp.weixin.qq.com/s/N5qe_tuqRC1QxwX6RvvXeg
+  tags: hjsoft,cve,cve2023,sqli
   created: 2023/06/22
 
 set:
