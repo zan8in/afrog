@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -85,6 +86,29 @@ func main() {
 		}
 
 	}
+
+	// Setup graceful exits
+	// resumeFileName := types.DefaultResumeFilePath()
+	c := make(chan os.Signal, 1)
+	defer close(c)
+	signal.Notify(c, os.Interrupt)
+	go func(runner *runner.Runner) {
+		for range c {
+			gologger.Print().Msg("")
+			gologger.Info().Msg("CTRL+C pressed: Exiting")
+			// gologger.Info().Msgf("Current scan progress: %s\n", runner.ScanProgress.String())
+
+			resumeFileName, err := runner.ScanProgress.SaveScanProgress()
+			if len(resumeFileName) > 0 {
+				gologger.Info().Msgf("Creating resume file: %s\n", resumeFileName)
+				gologger.Info().Msgf("Resume Example: afrog -resume %s\n", resumeFileName)
+			}
+			if err != nil {
+				gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
+			}
+			os.Exit(0)
+		}
+	}(r)
 
 	if err := r.Run(); err != nil {
 		gologger.Error().Msgf("runner run err: %s\n", err)

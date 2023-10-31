@@ -93,9 +93,16 @@ func (runner *Runner) Execute() {
 
 		for _, poc := range reversePocs {
 			for _, t := range runner.options.Targets.List() {
+				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
+					runner.NotVulCallback()
+					continue
+				}
+
 				wg.Add(1)
 				p.Invoke(&TransData{Target: t.(string), Poc: poc})
 			}
+			// Record PoC completion progress
+			runner.ScanProgress.Increment(poc.Id)
 		}
 
 		wg.Wait()
@@ -124,9 +131,17 @@ func (runner *Runner) Execute() {
 
 		for _, poc := range otherPocs {
 			for _, t := range runner.options.Targets.List() {
+				// check resume
+				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
+					runner.NotVulCallback()
+					continue
+				}
+
 				wg.Add(1)
 				p.Invoke(&TransData{Target: t.(string), Poc: poc})
 			}
+			// Record PoC completion progress
+			runner.ScanProgress.Increment(poc.Id)
 		}
 
 		wg.Wait()
@@ -203,6 +218,10 @@ func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 
 	c.Check(target, poc)
 	runner.OnResult(c.Result)
+}
+
+func (runner *Runner) NotVulCallback() {
+	runner.OnResult(&result.Result{IsVul: false})
 }
 
 type TransData struct {

@@ -159,6 +159,9 @@ type Options struct {
 
 	// webhook
 	Dingtalk bool
+
+	// resume
+	Resume string
 }
 
 func NewOptions() (*Options, error) {
@@ -170,6 +173,7 @@ func NewOptions() (*Options, error) {
 	flagSet.CreateGroup("target", "Target",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
+		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.cfg"),
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",

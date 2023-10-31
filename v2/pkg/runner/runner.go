@@ -30,6 +30,7 @@ type Runner struct {
 	PocsEmbedYaml utils.StringSlice
 	engine        *Engine
 	Ding          *dingtalk.Dingtalk
+	ScanProgress  *ScanProgress
 }
 
 func NewRunner(options *config.Options) (*Runner, error) {
@@ -47,6 +48,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if runner.ScanProgress, err = NewScanProgress(options.Resume); err != nil {
+		return nil, fmt.Errorf("%s %s", options.Resume, err.Error())
 	}
 
 	retryhttpclient.Init(&retryhttpclient.Options{
