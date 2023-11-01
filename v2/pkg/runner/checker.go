@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -60,17 +61,17 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		matchCondition = poc.STOP_IF_FIRST_MATCH
 	}
 
-	// originReq, err := http.NewRequest("GET", target, nil)
-	// if err != nil {
-	// 	c.Result.IsVul = false
-	// 	return err
-	// }
-	// tempRequest, err := retryhttpclient.ParseRequest(originReq)
-	// if err != nil {
-	// 	c.Result.IsVul = false
-	// 	return err
-	// }
-	// c.VariableMap["request"] = tempRequest
+	originReq, err := http.NewRequest("GET", target, nil)
+	if err != nil {
+		c.Result.IsVul = false
+		return err
+	}
+	tempRequest, err := retryhttpclient.ParseRequest(originReq)
+	if err != nil {
+		c.Result.IsVul = false
+		return err
+	}
+	c.VariableMap["request"] = tempRequest
 
 	if len(pocItem.Set) > 0 {
 		c.UpdateVariableMap(pocItem.Set)
