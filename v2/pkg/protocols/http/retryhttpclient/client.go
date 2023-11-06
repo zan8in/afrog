@@ -196,12 +196,12 @@ func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) e
 
 	newRespHeader := make(map[string]string)
 	rawHeaderBuilder := strings.Builder{}
-	for k := range resp.Header {
-		newRespHeader[strings.ToLower(k)] = resp.Header.Get(k)
+	for k, v := range resp.Header {
+		newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
 
 		rawHeaderBuilder.WriteString(k)
 		rawHeaderBuilder.WriteString(": ")
-		rawHeaderBuilder.WriteString(resp.Header.Get(k))
+		rawHeaderBuilder.WriteString(strings.Join(v, ";"))
 		rawHeaderBuilder.WriteString("\n")
 	}
 	protoResp.Headers = newRespHeader
