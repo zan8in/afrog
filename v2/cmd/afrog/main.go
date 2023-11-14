@@ -85,6 +85,10 @@ func main() {
 			lock.Unlock()
 		}
 
+		if options.Debug {
+			result.Debug()
+		}
+
 	}
 
 	// Setup graceful exits

@@ -162,6 +162,9 @@ type Options struct {
 
 	// resume
 	Resume string
+
+	// debug
+	Debug bool
 }
 
 func NewOptions() (*Options, error) {
@@ -227,8 +230,9 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
 	)
 
-	flagSet.CreateGroup("version", "Version",
-		flagSet.BoolVarP(&options.Version, "version", "v", false, "afrog version"),
+	flagSet.CreateGroup("debug", "Debug",
+		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
+		flagSet.BoolVar(&options.Version, "version", false, "show afrog version"),
 	)
 
 	flagSet.CreateGroup("server", "Server",

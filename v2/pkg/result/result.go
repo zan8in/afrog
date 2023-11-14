@@ -9,6 +9,7 @@ import (
 	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/proto"
 	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/gologger"
 	"gopkg.in/yaml.v2"
 )
 
@@ -100,6 +101,19 @@ func (r *Result) PrintColorResultInfoConsole(number string) {
 
 	fmt.Printf("\r%v %v %v %v\r\n", log.LogColor.Time(number+" "+utils.GetNowDateTime()),
 		log.LogColor.Vulner(""+r.PocInfo.Id+"")+" "+log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)+""), r.FullTarget, extinfo)
+
+}
+
+func (r *Result) Debug() {
+
+	for k, v := range r.AllPocResult {
+		k++
+		gologger.Info().Msgf("[%d][%s] Dumped Request\n", k, r.PocInfo.Id)
+		gologger.Print().Msgf("%s\n", v.ResultRequest.GetRaw())
+
+		gologger.Info().Msgf("[%d][%s] Dumped Response\n", k, r.PocInfo.Id)
+		gologger.Print().Msgf("%s\n", v.ResultResponse.GetRaw())
+	}
 
 }
 
