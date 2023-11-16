@@ -338,16 +338,26 @@ func (opt *Options) VerifyOptions() error {
 
 	ShowBanner(au)
 
-	if ((len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) &&
-		(len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0)) ||
-		(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
-		homeDir, _ := os.UserHomeDir()
-		configDir := strings.ReplaceAll(homeDir+"/.config/afrog/afrog-config.yaml", "\\", "/")
-		gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
-		gologger.Info().Msgf("Go to [%s] to configure the reverse connection platform\n", configDir)
-		gologger.Info().Msg("Tutorial: https://github.com/zan8in/afrog/wiki/Configuration")
-		gologger.Print().Msg("")
+	if len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
+		gologger.Info().Msg("API Key of CEYE is not configured")
 	}
+	if len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0 {
+		gologger.Info().Msg("API Key of EYE  is not configured")
+	}
+	if len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0 {
+		gologger.Info().Msg("API Key of JNDI is not configured")
+	}
+
+	// if ((len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) &&
+	// 	(len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0)) ||
+	// 	(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
+	// 	homeDir, _ := os.UserHomeDir()
+	// 	configDir := strings.ReplaceAll(homeDir+"/.config/afrog/afrog-config.yaml", "\\", "/")
+	// 	gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
+	// 	gologger.Info().Msgf("Go to [%s] to configure the reverse connection platform\n", configDir)
+	// 	gologger.Info().Msg("Tutorial: https://github.com/zan8in/afrog/wiki/Configuration")
+	// 	gologger.Print().Msg("")
+	// }
 
 	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain

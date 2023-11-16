@@ -146,7 +146,7 @@ func checkReversePlatform() {
 			defer wg.Done()
 
 			if !JndiTest() {
-				gologger.Info().Msg("JNDI platform exception may affect some POCs")
+				gologger.Info().Msg("Load of JNDI is failed")
 				config.ReverseJndiLive = false
 			} else {
 				config.ReverseJndiLive = true
@@ -162,7 +162,7 @@ func checkReversePlatform() {
 			defer wg.Done()
 
 			if !CeyeTest() {
-				gologger.Info().Msg("Ceye platform exception may affect some POCs")
+				gologger.Info().Msg("Load of CEYE is failed")
 				config.ReverseCeyeLive = false
 			} else {
 				config.ReverseCeyeLive = true
@@ -179,7 +179,7 @@ func checkReversePlatform() {
 			defer wg.Done()
 
 			if !EyeTest() {
-				gologger.Info().Msg("Eye.sh platform exception may affect some POCs")
+				gologger.Info().Msg("Load of EYE  is failed")
 				config.ReverseEyeShLive = false
 			} else {
 				config.ReverseEyeShLive = true
@@ -187,9 +187,9 @@ func checkReversePlatform() {
 
 		}()
 
-	} else {
-		gologger.Info().Msg("Version 2.7.8 introduces the Eye.sh backlink configuration option. For more details, please refer to the afrog wiki.")
-	}
+	} //else {
+	// 	gologger.Info().Msg("Version 2.7.8 introduces the Eye.sh backlink configuration option. For more details, please refer to the afrog wiki.")
+	// }
 
 	wg.Wait()
 }
