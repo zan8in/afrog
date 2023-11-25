@@ -456,6 +456,28 @@ var (
 					return types.String(timestamp)
 				},
 			},
+			&functions.Overload{
+				Operator: "versionCompare_string_string_string",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 3 {
+						return types.Bool(false)
+					}
+					v1, ok := values[0].(types.String)
+					if !ok {
+						return types.ValOrErr(v1, "unexpected type '%v' passed to versionCompare", v1.Type())
+					}
+					operator, ok := values[1].(types.String)
+					if !ok {
+						return types.ValOrErr(operator, "unexpected type '%v' passed to versionCompare", operator.Type())
+					}
+					v2, ok := values[2].(types.String)
+					if !ok {
+						return types.ValOrErr(v2, "unexpected type '%v' passed to versionCompare", v2.Type())
+					}
+
+					return types.Bool(utils.Compare(string(v1), string(operator), string(v2)))
+				},
+			},
 		),
 	}
 )

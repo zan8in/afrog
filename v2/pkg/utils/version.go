@@ -104,6 +104,9 @@ func vCompareSlice(v1s []string, operator string, v2s []string) bool {
 
 // Compare operator为 < <= > >= ==
 func Compare(v1, operator, v2 string) bool {
+	if len(v1) == 0 || len(v2) == 0 || len(operator) == 0 {
+		return false
+	}
 	v1s := strings.Split(v1, ".")
 	v2s := strings.Split(v2, ".")
 	return vCompareSlice(v1s, operator, v2s)

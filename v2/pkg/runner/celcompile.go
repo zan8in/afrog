@@ -165,6 +165,11 @@ var (
 			decls.NewFunction("timestamp_second",
 				decls.NewOverload("timestamp_second_string", []*exprpb.Type{decls.Int},
 					decls.String)),
+			// compare version
+			decls.NewFunction("versionCompare",
+				decls.NewOverload("versionCompare_string_string_string",
+					[]*exprpb.Type{decls.String, decls.String, decls.String},
+					decls.Bool)),
 		),
 	}
 )
