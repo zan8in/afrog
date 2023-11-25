@@ -1,0 +1,43 @@
+id: activemq-version
+
+info:
+  name: ActiveMQ Version Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: ActiveMQ Version Detect
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+  port: request.url.port
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "\n"
+      read-size: 1024
+    expression: response.raw.ibcontains(b'ActiveMQ')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"ProviderVersion.+(?P<version>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          version: ext1["version"]
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:61616"
+      data: "\n"
+      read-size: 1024
+    expression: response.raw.ibcontains(b'ActiveMQ')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"ProviderVersion.+(?P<version>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          version: ext1["version"]
+expression: r0() || r1()
+
+
+
+  
