@@ -392,6 +392,13 @@
             <br>
             <a href="javascript:void(0);"><sub>二大爷</sub></a>
         </td>
+        <td align="center">
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/52.png&mask=circle&w=60&h=60"
+                   alt="Typora-Logo"
+                 />
+            <br>
+            <a href="https://github.com/wanswu"><sub>Wans</sub></a>
+        </td>
     </tr>
 </table></div>
 
