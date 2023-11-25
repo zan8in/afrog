@@ -600,14 +600,12 @@ func (o *Options) CreatePocList() []poc.Poc {
 		sort.Sort(POCSlices(finalPocSlice))
 	}
 
-	for _, poc := range finalPocSlice {
-		gologger.Print().Msgf("[%s][%s][%s] author:%s\n",
-			log.LogColor.Title(poc.Id),
-			log.LogColor.Green(poc.Info.Name),
-			log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-	}
-
-	os.Exit(0)
+	// for _, poc := range finalPocSlice {
+	// 	gologger.Print().Msgf("[%s][%s][%s] author:%s\n",
+	// 		log.LogColor.Title(poc.Id),
+	// 		log.LogColor.Green(poc.Info.Name),
+	// 		log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+	// }
 
 	return finalPocSlice
 }
