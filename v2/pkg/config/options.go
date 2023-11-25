@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
@@ -165,6 +166,11 @@ type Options struct {
 
 	// debug
 	Debug bool
+
+	// sort
+	// -sort severity (default low, info, medium, high, critical)
+	// -sort a-z
+	Sort string
 }
 
 func NewOptions() (*Options, error) {
@@ -218,6 +224,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 		flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
+		flagSet.StringVar(&options.Sort, "sort", "", "Scan sorting, default security level scanning, `-sort a-z` scan in alphabetical order"),
 	)
 
 	flagSet.CreateGroup("update", "Update",
@@ -589,7 +596,37 @@ func (o *Options) CreatePocList() []poc.Poc {
 		}
 	}
 
+	if o.Sort == "a-z" {
+		sort.Sort(POCSlices(finalPocSlice))
+	}
+
+	for _, poc := range finalPocSlice {
+		gologger.Print().Msgf("[%s][%s][%s] author:%s\n",
+			log.LogColor.Title(poc.Id),
+			log.LogColor.Green(poc.Info.Name),
+			log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
+	}
+
+	os.Exit(0)
+
 	return finalPocSlice
+}
+
+// 定义包含 POC 结构的切片
+type POCSlices []poc.Poc
+
+// 实现 sort.Interface 接口的 Len、Less 和 Swap 方法
+func (s POCSlices) Len() int {
+	return len(s)
+}
+
+func (s POCSlices) Less(i, j int) bool {
+	// 比较两个 poc.Id 字段的首字母
+	return s[i].Id < s[j].Id
+}
+
+func (s POCSlices) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
 
 func (o *Options) SmartControl() {
