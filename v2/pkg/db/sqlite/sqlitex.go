@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/logoove/sqlite"
 	db2 "github.com/zan8in/afrog/v2/pkg/db"
+	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/gologger"
 	randutil "github.com/zan8in/pins/rand"
@@ -126,8 +127,9 @@ func addx(r *result.Result) error {
 				respRaw = pocResult.ResultResponse.Raw
 			}
 			pocList = append(pocList, db2.PocResult{
-				Request:  string(reqRaw),
-				Response: string(respRaw),
+				FullTarget: pocResult.FullTarget,
+				Request:    string(reqRaw),
+				Response:   string(respRaw),
 			})
 		}
 	}
@@ -222,6 +224,10 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 		// item.Result = strings.ReplaceAll(item.Result, "\n", "<br>")
 		json.Unmarshal([]byte(item.Result), &data[key].ResultList)
 		data[key].Result = ""
+
+		po := poc.Poc{}
+		json.Unmarshal([]byte(item.Poc), &po)
+		data[key].PocInfo = po
 	}
 
 	return data, nil

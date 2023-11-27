@@ -46,6 +46,7 @@ type ResultData struct {
 	FingerPrint string
 	Extractor   string
 	ResultList  []PocResult
+	PocInfo     poc.Poc
 }
 
 var (
