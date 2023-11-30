@@ -1,0 +1,25 @@
+id: openstack-dashboard-login
+
+info:
+  name: OpenStack Dashboard Login Panel - Detect
+  author: dhiyaneshDK,hackergautam
+  severity: info
+  verified: true
+  description: OpenStack Dashboard login panel was detected.
+  reference:
+    - https://www.exploit-db.com/ghdb/6464
+  tags: panel,openstack,edb
+  created: 2023/11/30
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /dashboard/auth/login/
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Login - OpenStack Dashboard</title>')
+  r1:
+    request:
+      method: GET
+      path: /horizon/auth/login/?next=/horizon/
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Login - OpenStack Dashboard</title>')
+expression: r0() || r1()
