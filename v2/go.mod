@@ -20,7 +20,7 @@ require (
 	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	github.com/zan8in/goupdate v1.0.0
-	github.com/zan8in/pins v0.0.0-20230902064916-96d97e1e7dd6
+	github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
 	go.uber.org/zap v1.21.0
@@ -62,7 +62,7 @@ require (
 	github.com/mamh-mixed/go-gitee v0.0.0-20221206115455-d359bf67671f // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
@@ -86,8 +86,10 @@ require (
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb // indirect
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 // indirect
+	github.com/zan8in/hunter v0.0.0-20231124141003-279f87adc68c // indirect
 	github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 // indirect
 	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
+	github.com/zan8in/zoomeye v0.0.0-20231205123808-a066c9ca8d2a // indirect
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.13.0 // indirect

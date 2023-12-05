@@ -171,6 +171,15 @@ type Options struct {
 	// -sort severity (default low, info, medium, high, critical)
 	// -sort a-z
 	Sort string
+
+	// cyberspace search
+	Cyberspace string
+
+	// cyberspace search keywords
+	Query string
+
+	// query count
+	QueryCount int
 }
 
 func NewOptions() (*Options, error) {
@@ -182,6 +191,9 @@ func NewOptions() (*Options, error) {
 	flagSet.CreateGroup("target", "Target",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
+		flagSet.StringVarP(&options.Cyberspace, "cyberspace", "cs", "", "cyberspace search, eg: -cs zoomeye"),
+		flagSet.StringVarP(&options.Query, "query", "q", "", "cyberspace search keywords, eg: -q app:'tomcat'"),
+		flagSet.IntVarP(&options.QueryCount, "query-count", "qc", 100, "cyberspace search data count, eg: -qc 1000"),
 		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.cfg"),
 	)
 
@@ -339,42 +351,32 @@ func (opt *Options) VerifyOptions() error {
 		}
 	}
 
-	if len(opt.Target) == 0 && len(opt.TargetsFile) == 0 {
-		return fmt.Errorf("either `target` or `target-file` must be set")
+	if len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0) {
+
+		ShowBanner(au)
+
+		if len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
+			gologger.Info().Msg("API Key of CEYE is not configured")
+		}
+		if len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0 {
+			gologger.Info().Msg("API Key of EYE  is not configured")
+		}
+		if len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0 {
+			gologger.Info().Msg("API Key of JNDI is not configured")
+		}
+
+		ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
+		ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+
+		ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
+		ReverseEyeToken = opt.Config.Reverse.Eye.Token
+
+		ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
+		ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
+		ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
+	} else {
+		return fmt.Errorf("target or cyberspace or query is empty")
 	}
-
-	ShowBanner(au)
-
-	if len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
-		gologger.Info().Msg("API Key of CEYE is not configured")
-	}
-	if len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0 {
-		gologger.Info().Msg("API Key of EYE  is not configured")
-	}
-	if len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0 {
-		gologger.Info().Msg("API Key of JNDI is not configured")
-	}
-
-	// if ((len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0) &&
-	// 	(len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0)) ||
-	// 	(len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0) {
-	// 	homeDir, _ := os.UserHomeDir()
-	// 	configDir := strings.ReplaceAll(homeDir+"/.config/afrog/afrog-config.yaml", "\\", "/")
-	// 	gologger.Info().Msg("The reverse connection platform is not configured, which may affect the validation of certain RCE PoCs")
-	// 	gologger.Info().Msgf("Go to [%s] to configure the reverse connection platform\n", configDir)
-	// 	gologger.Info().Msg("Tutorial: https://github.com/zan8in/afrog/wiki/Configuration")
-	// 	gologger.Print().Msg("")
-	// }
-
-	ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
-	ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
-
-	ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
-	ReverseEyeToken = opt.Config.Reverse.Eye.Token
-
-	ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
-	ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
-	ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 
 	return nil
 }

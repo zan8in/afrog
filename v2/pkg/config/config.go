@@ -11,13 +11,10 @@ import (
 
 // Config is a afrog-config.yaml catalog helper implementation
 type Config struct {
-	// PocSizeWaitGroup         int32      `yaml:"poc_sizewaitgroup"`
-	// TargetSizeWaitGroup      int32      `yaml:"target_sizewaitgroup"`
-	// FingerprintSizeWaitGroup int32      `yaml:"fingerprint_sizewaitgroup"`
-	// ConfigHttp               ConfigHttp `yaml:"http"`
-	ServerAddress string  `yaml:"server"`
-	Reverse       Reverse `yaml:"reverse"`
-	Webhook       Webhook `yaml:"webhook"`
+	ServerAddress string     `yaml:"server"`
+	Reverse       Reverse    `yaml:"reverse"`
+	Webhook       Webhook    `yaml:"webhook"`
+	Cyberspace    Cyberspace `yaml:"cyberspace"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -65,6 +62,10 @@ type Jndi struct {
 	ApiPort     string `yaml:"api_port"`
 }
 
+type Cyberspace struct {
+	ZoomEyes []string `yaml:"zoom_eyes"`
+}
+
 const afrogConfigFilename = "afrog-config.yaml"
 
 // Create and initialize afrog-config.yaml configuration info
@@ -87,6 +88,10 @@ func NewConfig() (*Config, error) {
 		webhook.Dingtalk.AtAll = false
 		webhook.Dingtalk.Range = "high,critical"
 		c.Webhook = webhook
+
+		cyberspace := c.Cyberspace
+		cyberspace.ZoomEyes = []string{""}
+		c.Cyberspace = cyberspace
 
 		WriteConfiguration(&c)
 	}

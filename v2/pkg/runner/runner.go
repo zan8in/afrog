@@ -8,6 +8,7 @@ import (
 
 	"github.com/zan8in/afrog/v2/pkg/catalog"
 	"github.com/zan8in/afrog/v2/pkg/config"
+	"github.com/zan8in/afrog/v2/pkg/cyberspace"
 	"github.com/zan8in/afrog/v2/pkg/poc"
 	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v2/pkg/report"
@@ -31,6 +32,7 @@ type Runner struct {
 	engine        *Engine
 	Ding          *dingtalk.Dingtalk
 	ScanProgress  *ScanProgress
+	Cyberspace    *cyberspace.Cyberspace
 }
 
 func NewRunner(options *config.Options) (*Runner, error) {
@@ -48,6 +50,15 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// cyberspace
+	if len(options.Cyberspace) > 0 && len(options.Query) > 0 {
+		cyberspace, err := cyberspace.New(options.Config, options.Cyberspace, options.Query, options.QueryCount)
+		if err != nil {
+			return nil, err
+		}
+		runner.Cyberspace = cyberspace
 	}
 
 	if runner.ScanProgress, err = NewScanProgress(options.Resume); err != nil {
@@ -90,7 +101,19 @@ func NewRunner(options *config.Options) (*Runner, error) {
 			}
 		}
 	}
-	if runner.options.Targets.Len() == 0 {
+	// cyberspace search
+	if runner.Cyberspace != nil {
+		cyberTargets, err := runner.Cyberspace.GetTargets()
+		if err == nil && len(cyberTargets) > 0 {
+			for _, t := range cyberTargets {
+				if len(strings.TrimSpace(t)) > 0 {
+					runner.options.Targets.Append(t)
+				}
+			}
+		}
+	}
+
+	if runner.options.Targets.Len() == 0 && runner.Cyberspace == nil {
 		return runner, errors.New("target not found")
 	}
 
