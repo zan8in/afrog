@@ -1147,6 +1147,7 @@ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
+github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/tidwall/assert v0.1.0 h1:aWcKyRBUAdLoVebxo95N7+YZVTFF/ASTr7BN4sLP6XI=
@@ -1218,8 +1219,6 @@ github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauu
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/goupdate v1.0.0 h1:H3ZVndassN6jNkJROAEkGFHbiyax0yG1RSKXMhzvgLY=
 github.com/zan8in/goupdate v1.0.0/go.mod h1:lB3IFGNY/wLFj1qfPOyee2m7lplg/mSDpsng+ax7sc8=
-github.com/zan8in/hunter v0.0.0-20231124141003-279f87adc68c h1:qwplyYkAeWhFbbbP+3ETYfcTY+aDphqXbMYEfK/kV8E=
-github.com/zan8in/hunter v0.0.0-20231124141003-279f87adc68c/go.mod h1:CgKeKwXgq1B02GoCaiwZtWZFg58GOtSSXMf6wGfyS5Q=
 github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86 h1:sAwnml3XSZlSYr0yMUvGUgtNQ1fJoU6AdwyMh1mKHwc=
 github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
@@ -1230,10 +1229,8 @@ github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7 h1:hso8sYwVmh
 github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7/go.mod h1:KPJ+327tfi0jnoLfzQL8nbBcO/BGP+sUU1inh4GrmDA=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
-github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d h1:x33DOnRnwp5lPU+wxjjtGewu5G67tpVUIqSvglKN9c4=
-github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
-github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64 h1:YFsoDncnPwJdO/zbmVamtpKzLg3bVARIqDDYHKguHI4=
-github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
+github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a h1:0FJgwyL9TXasVoqtFFju3LW50jk86wL7QTX+Jt8RmKA=
+github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a/go.mod h1:UYlugM8aUoAPbKHb+uwenKXwfkFknLib1ioBsbDlcig=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/xxh3 v1.0.2/go.mod h1:5NWz9Sef7zIDm2JHfFlcQvNekmcEl9ekUZQQKCYaDcA=
 github.com/zmap/rc2 v0.0.0-20131011165748-24b9757f5521/go.mod h1:3YZ9o3WnatTIZhuOtot4IcUfzoKVjUHqu6WALIyI0nE=

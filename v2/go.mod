@@ -23,7 +23,7 @@ require (
 	github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
-	github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64
+	github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc
 	google.golang.org/protobuf v1.31.0
@@ -76,6 +76,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tidwall/btree v1.4.3 // indirect
 	github.com/tidwall/buntdb v1.2.10 // indirect
 	github.com/tidwall/gjson v1.14.3 // indirect
@@ -87,7 +88,6 @@ require (
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/zan8in/fastdialer v0.0.0-20230318130117-360c8bf6e5bb // indirect
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 // indirect
-	github.com/zan8in/hunter v0.0.0-20231124141003-279f87adc68c // indirect
 	github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 // indirect
 	github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 // indirect
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30 // indirect
