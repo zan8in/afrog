@@ -2,6 +2,7 @@ package cyberspace
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/zan8in/afrog/v2/pkg/config"
 	zoom_eyes "github.com/zan8in/zoomeye/pkg/runner"
@@ -69,24 +70,30 @@ func (c *Cyberspace) GetTargets() ([]string, error) {
 			total = r.Total
 		}
 		for _, v := range r.Results {
-			var ip, service string
-			var port float64
+			var ip, port, service string
 			ip = v["ip"].(string)
 			portinfo := v["portinfo"].(map[string]any)
 			if portinfo != nil {
-				port = portinfo["port"].(float64)
+				switch portinfo["port"].(type) {
+				case float64:
+					port = fmt.Sprintf("%f", portinfo["port"].(float64))
+				case string:
+					port = portinfo["port"].(string)
+				default:
+					port = fmt.Sprintf("%v", portinfo["port"])
+				}
 				service = portinfo["service"].(string)
 			}
 
 			url := ""
-			strPort := ""
-			if int(port) != 0 {
-				strPort = fmt.Sprintf(":%d", int(port))
+			port = strings.TrimSuffix(port, ".000000")
+			if len(port) != 0 {
+				port = fmt.Sprintf(":%s", port)
 			}
 			if service == "http" || service == "https" {
-				url = fmt.Sprintf("%s://%s%s", service, ip, strPort)
+				url = fmt.Sprintf("%s://%s%s", service, ip, port)
 			} else {
-				url = fmt.Sprintf("%s%s", ip, strPort)
+				url = fmt.Sprintf("%s%s", ip, port)
 			}
 			results = append(results, url)
 			currentTotal++
@@ -94,7 +101,7 @@ func (c *Cyberspace) GetTargets() ([]string, error) {
 				break
 			}
 		}
-		fmt.Printf("\rZoomEye Searching... Total: %d, Count: %d, Current: %d", total, c.QueryCount, currentTotal)
+		fmt.Printf("\rZoomEye Searching... Total: %d, Query Count: %d, Current: %d", total, c.QueryCount, currentTotal)
 	}
 
 	fmt.Println("")

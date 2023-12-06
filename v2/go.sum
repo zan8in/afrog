@@ -1146,7 +1146,7 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
-github.com/stretchr/testify v1.8.2 h1:+h33VjcLVPDHtOdpUCuF+7gSuG3yGIftsP1YvFihtJ8=
+github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=
 github.com/syndtr/goleveldb v1.0.0/go.mod h1:ZVVdQEZoIme9iO1Ch2Jdy24qqXrMMOU6lpPAyBWyWuQ=
 github.com/tidwall/assert v0.1.0 h1:aWcKyRBUAdLoVebxo95N7+YZVTFF/ASTr7BN4sLP6XI=
@@ -1230,10 +1230,8 @@ github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7 h1:hso8sYwVmh
 github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7/go.mod h1:KPJ+327tfi0jnoLfzQL8nbBcO/BGP+sUU1inh4GrmDA=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
-github.com/zan8in/zoomeye v0.0.0-20231205075317-8307185692ae h1:0o8rqTjOW9qa+53B6gTPjASRyVRY48yaRMkoZwWV48M=
-github.com/zan8in/zoomeye v0.0.0-20231205075317-8307185692ae/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
-github.com/zan8in/zoomeye v0.0.0-20231205123808-a066c9ca8d2a h1:2NbpWTB/6K33VO/q88L4RI7h4h810lYvVZycR9oUUF0=
-github.com/zan8in/zoomeye v0.0.0-20231205123808-a066c9ca8d2a/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
+github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d h1:x33DOnRnwp5lPU+wxjjtGewu5G67tpVUIqSvglKN9c4=
+github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/xxh3 v1.0.2/go.mod h1:5NWz9Sef7zIDm2JHfFlcQvNekmcEl9ekUZQQKCYaDcA=
 github.com/zmap/rc2 v0.0.0-20131011165748-24b9757f5521/go.mod h1:3YZ9o3WnatTIZhuOtot4IcUfzoKVjUHqu6WALIyI0nE=
