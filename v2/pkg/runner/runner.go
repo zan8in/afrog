@@ -104,7 +104,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	// cyberspace search
 	if runner.Cyberspace != nil {
 		cyberTargets, err := runner.Cyberspace.GetTargets()
-		if err == nil && len(cyberTargets) > 0 {
+		if err != nil {
+			return runner, err
+		}
+		if len(cyberTargets) > 0 {
 			for _, t := range cyberTargets {
 				if len(strings.TrimSpace(t)) > 0 {
 					runner.options.Targets.Append(t)

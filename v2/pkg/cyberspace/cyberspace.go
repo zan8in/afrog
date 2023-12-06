@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/v2/pkg/config"
+	"github.com/zan8in/gologger"
 	zoom_eyes "github.com/zan8in/zoomeye/pkg/runner"
 )
 
@@ -47,6 +48,11 @@ func (c *Cyberspace) GetApiKey(engine string) string {
 
 func (c *Cyberspace) GetTargets() ([]string, error) {
 	results := []string{}
+
+	apikey := c.GetApiKey(c.Engine)
+	if len(apikey) == 0 {
+		return results, fmt.Errorf("engine %s api key is empty", c.Engine)
+	}
 
 	opt := zoom_eyes.Options{
 		Search: c.Query,
@@ -105,6 +111,10 @@ func (c *Cyberspace) GetTargets() ([]string, error) {
 	}
 
 	fmt.Println("")
+
+	if currentTotal == 0 {
+		gologger.Info().Msg("no result found")
+	}
 
 	return results, nil
 }

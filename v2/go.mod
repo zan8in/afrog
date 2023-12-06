@@ -23,7 +23,7 @@ require (
 	github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
-	github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d
+	github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc
 	google.golang.org/protobuf v1.31.0

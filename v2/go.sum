@@ -1232,6 +1232,8 @@ github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
 github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d h1:x33DOnRnwp5lPU+wxjjtGewu5G67tpVUIqSvglKN9c4=
 github.com/zan8in/zoomeye v0.0.0-20231206010358-799c53de737d/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
+github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64 h1:YFsoDncnPwJdO/zbmVamtpKzLg3bVARIqDDYHKguHI4=
+github.com/zan8in/zoomeye v0.0.0-20231206023224-ec259e816b64/go.mod h1:DAvO/K0HTPex0Si2/FwJ+VfGBva8vwPAHamAg+gXCaU=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/xxh3 v1.0.2/go.mod h1:5NWz9Sef7zIDm2JHfFlcQvNekmcEl9ekUZQQKCYaDcA=
 github.com/zmap/rc2 v0.0.0-20131011165748-24b9757f5521/go.mod h1:3YZ9o3WnatTIZhuOtot4IcUfzoKVjUHqu6WALIyI0nE=
