@@ -2,7 +2,7 @@ package raw
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -80,14 +80,14 @@ func (r *RawHttp) RawHttpRequest(request, cookie, baseurl string, variableMap ma
 		return fmt.Errorf("parse Failed, %s", err.Error())
 	}
 
-	resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), ioutil.NopCloser(strings.NewReader(rhttp.Data)))
+	resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), io.NopCloser(strings.NewReader(rhttp.Data)))
 	if err != nil {
 		//fmt.Println(err.Error())
 		return fmt.Errorf("doRaw Failed, %s", err.Error())
 	}
 	defer resp.Body.Close()
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("readAll Failed, %s", err.Error())
 	}
