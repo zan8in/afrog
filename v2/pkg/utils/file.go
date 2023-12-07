@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -42,7 +41,7 @@ func ReadFromFile(filename string) ([]byte, error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		log.Println("读取文件失败: ", err)
 		return nil, err
@@ -78,7 +77,7 @@ func Exists(path string) bool {
 
 func WriteFile(filename string, data []byte) error {
 	os.MkdirAll(path.Dir(filename), os.ModePerm)
-	return ioutil.WriteFile(filename, data, 0655)
+	return os.WriteFile(filename, data, 0655)
 }
 
 func BufferWriteAppend(filename string, param string) error {

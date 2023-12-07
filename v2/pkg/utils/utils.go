@@ -2,7 +2,7 @@ package utils
 
 import (
 	"encoding/hex"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -48,7 +48,7 @@ func ReadFromPathOrURL(templatePath string) (data []byte, err error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		data, err = ioutil.ReadAll(resp.Body)
+		data, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -58,7 +58,7 @@ func ReadFromPathOrURL(templatePath string) (data []byte, err error) {
 			return nil, err
 		}
 		defer f.Close()
-		data, err = ioutil.ReadAll(f)
+		data, err = io.ReadAll(f)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +202,7 @@ func Str2UTF8(str string) string {
 		return ""
 	}
 	if !utf8.ValidString(str) {
-		utf8Bytes, _ := ioutil.ReadAll(transform.NewReader(
+		utf8Bytes, _ := io.ReadAll(transform.NewReader(
 			strings.NewReader(str),
 			simplifiedchinese.GBK.NewDecoder(),
 		))

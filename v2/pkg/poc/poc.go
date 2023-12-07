@@ -2,7 +2,6 @@ package poc
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -180,7 +179,7 @@ func LocalReadContentByName(name string) ([]byte, error) {
 		if lastSlashIndex != -1 {
 			fname := file[lastSlashIndex+1:]
 			if name == fname || name+".yaml" == fname || name+".yml" == fname {
-				return ioutil.ReadFile(file)
+				return os.ReadFile(file)
 			}
 		}
 	}
@@ -195,7 +194,7 @@ func LocalReadContentByName(name string) ([]byte, error) {
 		if lastSlashIndex != -1 {
 			fname := file[lastSlashIndex+1:]
 			if name == fname || name+".yaml" == fname || name+".yml" == fname {
-				return ioutil.ReadFile(file)
+				return os.ReadFile(file)
 			}
 		}
 	}
