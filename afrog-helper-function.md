@@ -23,7 +23,7 @@ rules:
 expression: r0()
 
 ```
-正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](###md5)
+正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md#md5)
 
 内置函数源码位置：`v2\pkg\runner\celcompile.go`
 
