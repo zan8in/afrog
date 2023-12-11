@@ -245,15 +245,15 @@ Md5-3: e10adc3949ba59abbe56e057f20f883e
 ### base64
 对字符串或字节数组进行 Base64 编码
 
-加密一个字符串
+编码一个字符串
 ```
 admin: base64("admin:admin")
 ```
-加密一个字节数组
+编码一个字节数组
 ```
 user: base64(bytes("user:user"))
 ```
-加密一个变量
+编码一个变量
 ```
 rInt1: randomInt(800000000, 1000000000)
 rInt2: randomInt(800000000, 1000000000)
