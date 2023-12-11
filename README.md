@@ -17,7 +17,7 @@
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
   <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/tree/main/pocs/afrog-pocs">PoC</a>
+  <a href="https://github.com/zan8in/afrog/afrog-helper-function.md">Helper Function</a>
 
 </p>
 
