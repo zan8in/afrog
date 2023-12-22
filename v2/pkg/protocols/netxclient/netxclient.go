@@ -95,7 +95,8 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 	}
 
 	variableMap["response"] = &proto.Response{
-		Raw: body,
+		Raw:  []byte(hex.EncodeToString(body)),
+		Body: []byte(hex.EncodeToString(body)),
 	}
 
 	variableMap["fulltarget"] = nc.address

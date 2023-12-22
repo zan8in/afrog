@@ -1,0 +1,35 @@
+id: dameng-detect
+
+info:
+  name: 达梦数据库
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    默认端口 5236 默认密码  达梦数据库默认用户密码SYSDBA:SYSDBA
+    Fofa: protocol="dameng"
+    ZoomEye: app:"DMSQL"
+  reference:
+    - https://www.dameng.com/
+  tags: network,db,dameng
+  created: 2023/12/22
+
+set:
+  host: request.url.domain
+  hostname: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "00000000c8005100000000000000000000000099000000000000000001020000000000000000000000000000000000000000000000000000000000000000000008000000382e312e312e34390040000000068149bbe004a62fb45552831704c802d4d802b4579cb045b3c6100880725ececf148a7c9205047caccadfef5ff264460d11092a3b483bf9d24382dea1dc43e7"
+      data-type: hex
+    expression: response.body.bcontains(b'00000000e400') || response.body.bcontains(b'40000000')
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:5236"
+      data: "00000000c8005100000000000000000000000099000000000000000001020000000000000000000000000000000000000000000000000000000000000000000008000000382e312e312e34390040000000068149bbe004a62fb45552831704c802d4d802b4579cb045b3c6100880725ececf148a7c9205047caccadfef5ff264460d11092a3b483bf9d24382dea1dc43e7"
+      data-type: hex
+    expression: response.body.bcontains(b'00000000e400') || response.body.bcontains(b'40000000')
+expression: r0() || r1()
