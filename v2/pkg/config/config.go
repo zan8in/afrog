@@ -52,6 +52,7 @@ type Ceye struct {
 }
 
 type Eye struct {
+	Host   string `yaml:"host"`
 	Token  string `yaml:"token"`
 	Domain string `yaml:"domain"`
 }
@@ -77,6 +78,8 @@ func NewConfig() (*Config, error) {
 		reverse := c.Reverse
 		reverse.Ceye.ApiKey = ""
 		reverse.Ceye.Domain = ""
+		reverse.Eye.Host = "eyes.sh"
+
 		reverse.Jndi.JndiAddress = ""
 		reverse.Jndi.LdapPort = ""
 		reverse.Jndi.ApiPort = ""

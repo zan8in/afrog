@@ -24,6 +24,7 @@ import (
 var (
 	ReverseCeyeApiKey string
 	ReverseCeyeDomain string
+	ReverseEyeHost    string
 	ReverseEyeToken   string
 	ReverseEyeDomain  string
 	ReverseJndi       string
@@ -368,6 +369,7 @@ func (opt *Options) VerifyOptions() error {
 		ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
 		ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
 
+		ReverseEyeHost = opt.Config.Reverse.Eye.Host
 		ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
 		ReverseEyeToken = opt.Config.Reverse.Eye.Token
 
