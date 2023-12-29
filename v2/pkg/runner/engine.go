@@ -261,7 +261,7 @@ func EyeTest() bool {
 		domain = config.ReverseEyeDomain[:index]
 	}
 
-	url := fmt.Sprintf("http://eyes.sh/api/dns/%s/test/?token=%s", domain, config.ReverseEyeToken)
+	url := fmt.Sprintf("http://%s/api/dns/%s/test/?token=%s", config.ReverseEyeHost, domain, config.ReverseEyeToken)
 	resp, _, err := retryhttpclient.Get(url)
 	if err != nil {
 		return false
