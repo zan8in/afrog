@@ -370,6 +370,9 @@ func (opt *Options) VerifyOptions() error {
 		ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
 
 		ReverseEyeHost = opt.Config.Reverse.Eye.Host
+		if len(ReverseEyeHost) == 0 { // 向下兼容
+			ReverseEyeHost = "eyes.sh"
+		}
 		ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
 		ReverseEyeToken = opt.Config.Reverse.Eye.Token
 

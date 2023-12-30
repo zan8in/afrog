@@ -593,33 +593,56 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 
 	time.Sleep(time.Second * time.Duration(timeout))
 
-	urlStr := ""
+	// 使用反连平台优先权逻辑如下：
+	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
+	// @edit 2021.11.29 21:50
+	// 关联代码 checker.go line-345
 	sub := strings.Split(r.Domain, ".")[0]
-	if config.ReverseEyeShLive {
+	if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
+		// 自建eye反连平台
 		domain := strings.Split(r.Domain, ".")[1]
-		urlStr = fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
-		resp, err := retryhttpclient.ReverseGet(urlStr)
-		if err != nil {
-			return false
-		}
+		return eyeshCheck(domain, sub)
 
-		if bytes.Contains(resp, []byte("True")) {
-			return true
-		}
 	} else if config.ReverseCeyeLive {
-		urlStr = fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
-		resp, err := retryhttpclient.ReverseGet(urlStr)
-		// fmt.Println(string(resp))
-		if err != nil {
-			return false
-		}
-		if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
-			return true
-		}
+		// ceye反连平台
+		return ceyeioCheck(sub)
 
-		if bytes.Contains(resp, []byte(`<title>503`)) {
-			return false
-		}
+	} else if config.ReverseEyeShLive {
+		// eyes.sh反连平台
+		domain := strings.Split(r.Domain, ".")[1]
+		return eyeshCheck(domain, sub)
+	}
+
+	return false
+}
+
+func eyeshCheck(domain, sub string) bool {
+	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
+	resp, err := retryhttpclient.ReverseGet(urlStr)
+	if err != nil {
+		return false
+	}
+
+	if bytes.Contains(resp, []byte("True")) {
+		return true
+	}
+
+	return false
+}
+
+func ceyeioCheck(sub string) bool {
+	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
+	resp, err := retryhttpclient.ReverseGet(urlStr)
+	// fmt.Println(string(resp))
+	if err != nil {
+		return false
+	}
+	if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
+		return true
+	}
+
+	if bytes.Contains(resp, []byte(`<title>503`)) {
+		return false
 	}
 
 	return false

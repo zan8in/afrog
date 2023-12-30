@@ -342,10 +342,16 @@ func (c *Checker) newRerverse() *proto.Reverse {
 	urlStr := ""
 	sub := utils.CreateRandomString(12)
 
-	if config.ReverseEyeShLive {
+	// 使用反连平台优先权逻辑如下：
+	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
+	// @edit 2021.11.29 21:50
+	// 关联代码 celprogram.go line-596
+	if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
 		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
 	} else if config.ReverseCeyeLive {
 		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
+	} else if config.ReverseEyeShLive {
+		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
 	}
 
 	u, _ := url.Parse(urlStr)
