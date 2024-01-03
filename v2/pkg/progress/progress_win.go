@@ -8,6 +8,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func init() {
+	enableVirtualTerminalProcessing()
+}
+
 func enableVirtualTerminalProcessing() {
 	handle := windows.Handle(os.Stdout.Fd())
 

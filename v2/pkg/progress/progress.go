@@ -1,15 +1,8 @@
 package progress
 
 import (
-	"runtime"
 	"strings"
 )
-
-func init() {
-	if runtime.GOOS == "windows" {
-		enableVirtualTerminalProcessing()
-	}
-}
 
 // 进度条
 func CreateProgressBar(progress, length int, filled, empty rune) string {
