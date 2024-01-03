@@ -2,13 +2,14 @@ package config
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/zan8in/afrog/v2/pkg/log"
 	"github.com/zan8in/afrog/v2/pkg/utils"
 	"github.com/zan8in/gologger"
 )
 
-const Version = "2.9.6"
+const Version = "2.9.7"
 
 func InitBanner() {
 	fmt.Printf("\r\n|\tA F 🐸 O G\t|")
@@ -16,6 +17,18 @@ func InitBanner() {
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
 	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "We can do it")
+}
+
+func BannerAnimate(u *AfrogUpdate) {
+	animationChars := []rune{'|', '\\', '-', '/'}
+
+	for i := 0; i < 1000; i++ {
+		for _, char := range animationChars {
+			fmt.Printf("\r%c\tA F 🐸 O G\t%c", char, char)
+			fmt.Printf("\r\t\t\t\t%s/%s\t%c\t%s", EngineV(u), PocV(u), char, "We can do it")
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func ShowVersion() {
