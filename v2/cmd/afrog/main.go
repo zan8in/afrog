@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,19 +13,14 @@ import (
 
 	"github.com/zan8in/afrog/v2/pkg/config"
 	"github.com/zan8in/afrog/v2/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v2/pkg/progress"
 	"github.com/zan8in/afrog/v2/pkg/result"
 	"github.com/zan8in/afrog/v2/pkg/runner"
 	"github.com/zan8in/afrog/v2/pkg/utils"
 	"github.com/zan8in/gologger"
-	"golang.org/x/sys/windows"
 )
 
 func main() {
-	// 进度条兼容性优化(windows)
-	if runtime.GOOS == "windows" {
-		enableVirtualTerminalProcessing()
-	}
-
 	options, err := config.NewOptions()
 	if err != nil {
 		gologger.Error().Msg(err.Error())
@@ -57,9 +51,9 @@ func main() {
 				atomic.AddUint32(&options.CurrentCount, 1)
 				if !options.Silent {
 					// 花里胡哨的进度条，看起来炫，实际并没什么卵用！ @edit 2024/01/03
-					progress := int(options.CurrentCount) * 100 / options.Count
-					bar := createProgressBar(progress, 50, '▉', '░')
-					fmt.Printf("\r%s %d%% (%d/%d), %s", bar, progress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+					pgress := int(options.CurrentCount) * 100 / options.Count
+					bar := progress.CreateProgressBar(pgress, 50, '▉', '░')
+					fmt.Printf("\r%s %d%% (%d/%d), %s", bar, pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 					// fmt.Printf("\r%d%% (%d/%d), %s", int(options.CurrentCount)*100/int(options.Count), options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 					// fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/int(options.Count), strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 				}
@@ -140,20 +134,4 @@ func main() {
 	gologger.Print().Msg("")
 
 	sqlite.CloseX()
-}
-
-// 进度条
-func createProgressBar(progress, length int, filled, empty rune) string {
-	filledCount := progress * length / 100
-	emptyCount := length - filledCount
-	bar := strings.Repeat(string(filled), filledCount) + strings.Repeat(string(empty), emptyCount)
-	return bar
-}
-
-func enableVirtualTerminalProcessing() {
-	handle := windows.Handle(os.Stdout.Fd())
-
-	var mode uint32
-	windows.GetConsoleMode(handle, &mode)
-	windows.SetConsoleMode(handle, mode|windows.ENABLE_VIRTUAL_TERMINAL_PROCESSING)
 }
