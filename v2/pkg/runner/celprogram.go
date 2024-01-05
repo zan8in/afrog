@@ -601,7 +601,10 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 	if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
 		// 自建eye反连平台
 		domain := strings.Split(r.Domain, ".")[1]
-		return eyeshCheck(domain, sub)
+		if !eyeshDnsCheck(domain, sub) {
+			return eyesWebCheck(domain, sub)
+		}
+		return true
 
 	} else if config.ReverseCeyeLive {
 		// ceye反连平台
@@ -610,14 +613,31 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 	} else if config.ReverseEyeShLive {
 		// eyes.sh反连平台
 		domain := strings.Split(r.Domain, ".")[1]
-		return eyeshCheck(domain, sub)
+		if !eyeshDnsCheck(domain, sub) {
+			return eyesWebCheck(domain, sub)
+		}
+		return true
 	}
 
 	return false
 }
 
-func eyeshCheck(domain, sub string) bool {
-	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
+func eyeshDnsCheck(domain, sub string) bool {
+	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, strings.ToLower(sub), config.ReverseEyeToken)
+	resp, err := retryhttpclient.ReverseGet(urlStr)
+	if err != nil {
+		return false
+	}
+
+	if bytes.Contains(resp, []byte("True")) {
+		return true
+	}
+
+	return false
+}
+
+func eyesWebCheck(domain, sub string) bool {
+	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, strings.ToLower(sub), config.ReverseEyeToken)
 	resp, err := retryhttpclient.ReverseGet(urlStr)
 	if err != nil {
 		return false
@@ -631,7 +651,7 @@ func eyeshCheck(domain, sub string) bool {
 }
 
 func ceyeioCheck(sub string) bool {
-	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
+	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, strings.ToLower(sub))
 	resp, err := retryhttpclient.ReverseGet(urlStr)
 	// fmt.Println(string(resp))
 	if err != nil {

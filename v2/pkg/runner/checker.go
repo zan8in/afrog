@@ -340,7 +340,7 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 func (c *Checker) newRerverse() *proto.Reverse {
 
 	urlStr := ""
-	sub := utils.CreateRandomString(12)
+	sub := utils.CreateRandomString(20)
 
 	// 使用反连平台优先权逻辑如下：
 	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
