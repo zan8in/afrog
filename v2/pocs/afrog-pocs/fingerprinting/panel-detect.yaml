@@ -65,6 +65,7 @@ rules:
            - '"nexus-repository-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Nexus Repository Manager</title>")'
            - '"emqx-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>EMQX Dashboard</title>")'
            - '"portainer-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Portainer</title>")'
+           - '"kkfileview-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>kkFileView演示首页</title>")'
            
     r1:
         request:
@@ -125,5 +126,6 @@ rules:
            - '"nexus-repository-manager-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Nexus Repository Manager</title>")'
            - '"emqx-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>EMQX Dashboard</title>")'
            - '"portainer-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Portainer</title>")'
+           - '"kkfileview-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>kkFileView演示首页</title>")'
            
 expression: r0() || r1()

