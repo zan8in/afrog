@@ -2,6 +2,8 @@ package runner
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -494,6 +496,31 @@ var (
 						return types.ValOrErr(encodeType, "unexpected type '%v' passed to versionCompare", encodeType.Type())
 					}
 					return types.String(utils.GetYsoserial(string(payload), string(command), string(encodeType)))
+				},
+			},
+			&functions.Overload{
+				Operator: "aesCBC_string_string_string",
+				Function: func(values ...ref.Val) ref.Val {
+					text, ok := values[0].(types.String)
+					if !ok {
+						return types.ValOrErr(text, "unexpected type '%v' passed to versionCompare", text.Type())
+					}
+					key, ok := values[1].(types.String)
+					if !ok {
+						return types.ValOrErr(key, "unexpected type '%v' passed to versionCompare", key.Type())
+					}
+					iv, ok := values[2].(types.String)
+					if !ok {
+						return types.ValOrErr(iv, "unexpected type '%v' passed to versionCompare", iv.Type())
+					}
+
+					plainText := utils.Pkcs5padding([]byte(text), aes.BlockSize, len(text))
+					block, _ := aes.NewCipher([]byte(key))
+					ciphertext := make([]byte, len(plainText))
+					mode := cipher.NewCBCEncrypter(block, []byte(iv))
+					mode.CryptBlocks(ciphertext, plainText)
+
+					return types.String(ciphertext)
 				},
 			},
 		),

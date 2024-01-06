@@ -175,6 +175,11 @@ var (
 				decls.NewOverload("ysoserial_string_string_string",
 					[]*exprpb.Type{decls.String, decls.String, decls.String},
 					decls.String)),
+			// AesCBC
+			decls.NewFunction("aesCBC",
+				decls.NewOverload("aesCBC_string_string_string",
+					[]*exprpb.Type{decls.String, decls.String, decls.String},
+					decls.String)),
 		),
 	}
 )
