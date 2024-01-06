@@ -170,6 +170,11 @@ var (
 				decls.NewOverload("versionCompare_string_string_string",
 					[]*exprpb.Type{decls.String, decls.String, decls.String},
 					decls.Bool)),
+			// Ysoserial
+			decls.NewFunction("ysoserial",
+				decls.NewOverload("ysoserial_string_string_string",
+					[]*exprpb.Type{decls.String, decls.String, decls.String},
+					decls.String)),
 		),
 	}
 )

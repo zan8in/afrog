@@ -478,6 +478,24 @@ var (
 					return types.Bool(utils.Compare(string(v1), string(operator), string(v2)))
 				},
 			},
+			&functions.Overload{
+				Operator: "ysoserial_string_string_string",
+				Function: func(values ...ref.Val) ref.Val {
+					ysoserialType, ok := values[0].(types.String)
+					if !ok {
+						return types.ValOrErr(ysoserialType, "unexpected type '%v' passed to versionCompare", ysoserialType.Type())
+					}
+					command, ok := values[1].(types.String)
+					if !ok {
+						return types.ValOrErr(command, "unexpected type '%v' passed to versionCompare", command.Type())
+					}
+					encodeType, ok := values[2].(types.String)
+					if !ok {
+						return types.ValOrErr(encodeType, "unexpected type '%v' passed to versionCompare", encodeType.Type())
+					}
+					return types.String(utils.GetYsoserial(string(ysoserialType), string(command), string(encodeType)))
+				},
+			},
 		),
 	}
 )
@@ -623,7 +641,7 @@ func reverseCheck(r *proto.Reverse, timeout int64) bool {
 }
 
 func eyeshDnsCheck(domain, sub string) bool {
-	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, strings.ToLower(sub), config.ReverseEyeToken)
+	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
 	resp, err := retryhttpclient.ReverseGet(urlStr)
 	if err != nil {
 		return false
@@ -637,7 +655,7 @@ func eyeshDnsCheck(domain, sub string) bool {
 }
 
 func eyesWebCheck(domain, sub string) bool {
-	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, strings.ToLower(sub), config.ReverseEyeToken)
+	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
 	resp, err := retryhttpclient.ReverseGet(urlStr)
 	if err != nil {
 		return false
@@ -651,19 +669,24 @@ func eyesWebCheck(domain, sub string) bool {
 }
 
 func ceyeioCheck(sub string) bool {
-	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, strings.ToLower(sub))
+	// urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
+	// 解决 &filter=xxxx 经常显示 500 问题导致漏报问题 @2024/01/06
+	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns", config.ReverseCeyeApiKey)
 	resp, err := retryhttpclient.ReverseGet(urlStr)
-	// fmt.Println(string(resp))
 	if err != nil {
 		return false
 	}
-	if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
+
+	if strings.Contains(string(resp), sub+".") {
 		return true
 	}
+	// if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
+	// 	return true
+	// }
 
-	if bytes.Contains(resp, []byte(`<title>503`)) {
-		return false
-	}
+	// if bytes.Contains(resp, []byte(`<title>503`)) {
+	// 	return false
+	// }
 
 	return false
 }
