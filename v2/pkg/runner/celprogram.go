@@ -481,9 +481,9 @@ var (
 			&functions.Overload{
 				Operator: "ysoserial_string_string_string",
 				Function: func(values ...ref.Val) ref.Val {
-					ysoserialType, ok := values[0].(types.String)
+					payload, ok := values[0].(types.String)
 					if !ok {
-						return types.ValOrErr(ysoserialType, "unexpected type '%v' passed to versionCompare", ysoserialType.Type())
+						return types.ValOrErr(payload, "unexpected type '%v' passed to versionCompare", payload.Type())
 					}
 					command, ok := values[1].(types.String)
 					if !ok {
@@ -493,7 +493,7 @@ var (
 					if !ok {
 						return types.ValOrErr(encodeType, "unexpected type '%v' passed to versionCompare", encodeType.Type())
 					}
-					return types.String(utils.GetYsoserial(string(ysoserialType), string(command), string(encodeType)))
+					return types.String(utils.GetYsoserial(string(payload), string(command), string(encodeType)))
 				},
 			},
 		),

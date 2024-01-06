@@ -12,6 +12,7 @@ require (
 	github.com/karrick/godirwalk v1.16.1
 	github.com/logoove/sqlite v1.15.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/nu1r/GlangYsoserial v0.0.0-20230328012701-a4e955b25ab7
 	github.com/panjf2000/ants/v2 v2.6.0
 	github.com/pkg/errors v0.9.1
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -66,7 +67,6 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/nu1r/GlangYsoserial v0.0.0-20230328012701-a4e955b25ab7 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/onsi/ginkgo v1.15.0 // indirect
 	github.com/onsi/gomega v1.10.5 // indirect
@@ -131,7 +131,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/net v0.16.0
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.13.0
 	golang.org/x/text v0.13.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )

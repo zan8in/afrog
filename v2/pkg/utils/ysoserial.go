@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 
 	ysoserial "github.com/nu1r/GlangYsoserial/Gadget"
 )
@@ -68,12 +69,15 @@ const (
 	Spring2 = "Spring2"
 )
 
-const Base64Type = "base64"
+const (
+	Base64Type = "base64"
+	HexType    = "hex"
+)
 
-func GetYsoserial(ysoserialType, command, encodeType string) string {
+func GetYsoserial(payload, command, encodeType string) string {
 	result := []byte{}
 
-	switch ysoserialType {
+	switch payload {
 	case URLDNS:
 		result = ysoserial.URLDNS(command)
 	case Click1:
@@ -136,7 +140,10 @@ func GetYsoserial(ysoserialType, command, encodeType string) string {
 	}
 
 	if len(result) > 0 && encodeType == Base64Type {
-		return string(base64.StdEncoding.EncodeToString(result))
+		return base64.StdEncoding.EncodeToString(result)
+	}
+	if len(result) > 0 && encodeType == HexType {
+		return hex.EncodeToString(result)
 	}
 
 	return "ysoserial not found"
