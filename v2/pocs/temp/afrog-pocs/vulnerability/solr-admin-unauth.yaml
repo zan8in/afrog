@@ -1,0 +1,24 @@
+id: solr-admin-unauth
+
+info:
+  name: Solr Admin Unauth
+  author: zan8in
+  severity: medium
+  verified: true
+  description: |
+    app="APACHE-Solr"
+  tags: solr,unauth
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /solr/admin/cores?indexInfo=false&wt=json
+    expression: response.status == 200 && response.body.bcontains(b'"responseHeader":') && response.body.bcontains(b'"initFailures":')
+  r1:
+    request:
+      method: GET
+      path: /admin/cores?indexInfo=false&wt=json
+    expression: response.status == 200 && response.body.bcontains(b'"responseHeader":') && response.body.bcontains(b'"initFailures":')
+expression: r0() || r1()

