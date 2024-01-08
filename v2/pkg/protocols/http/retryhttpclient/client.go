@@ -181,14 +181,22 @@ func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) e
 	reader := io.LimitReader(resp.Body, maxDefaultBody)
 	respBody, err := io.ReadAll(reader)
 	if err != nil {
-		resp.Body.Close()
-		return err
+		// 解决 https 使用 proxy http 代理时，user canceled 导致 afrog 接收不到响应的问题
+		// @editor 2024/01/08
+		if !strings.Contains(err.Error(), "user canceled") {
+			resp.Body.Close()
+			return err
+		}
+
 	}
 	resp.Body.Close()
 
 	// respbody gbk to utf8 encoding
-	utf8RespBody := utils.Str2UTF8(string(respBody))
-	// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/issues/68
+	utf8RespBody := ""
+	if len(respBody) > 0 {
+		utf8RespBody = utils.Str2UTF8(string(respBody))
+		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/issues/68
+	}
 
 	// store the response
 	protoResp := &proto.Response{}
