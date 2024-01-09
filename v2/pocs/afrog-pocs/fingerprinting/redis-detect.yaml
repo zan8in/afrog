@@ -17,11 +17,11 @@ rules:
       type: tcp
       host: "{{hostname}}"
       data: "*1\r\n$4\r\ninfo\r\n"
-    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication')
+    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication') || response.raw.bcontains(b'72656469735f76657273696f6')
   r1:
     request:
       type: tcp
       host: "{{host}}:6379"
       data: "*1\r\n$4\r\ninfo\r\n"
-    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication')
+    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication') || response.raw.bcontains(b'72656469735f76657273696f6')
 expression: r0() || r1()
