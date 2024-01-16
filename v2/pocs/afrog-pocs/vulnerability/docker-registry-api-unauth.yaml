@@ -4,11 +4,8 @@ info:
   name: docker registry api 未经批准
   author: p0wd3r
   severity: critical
-  description: |
-    docker registry api 未经批准
-    fofa-query: title="锐捷网络-EWEB网管系统"
-  reference:
-    - http://www.polaris-lab.com/index.php/archives/253/
+  tags: docker,unauth
+  created: 2024/01/12
 
 rules:
     r0:

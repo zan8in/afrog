@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |
-    FOFA: title="nacos" &amp;&amp; title=="Nacos-Sync"
+    FOFA: title=="Nacos-Sync"
   reference:
     - https://mp.weixin.qq.com/s/SJf-ftbfni644diw_J94DA
   tags: nacos-sync,nacos,bypass
