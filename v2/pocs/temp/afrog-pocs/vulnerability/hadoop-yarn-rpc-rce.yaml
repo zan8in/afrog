@@ -1,0 +1,23 @@
+id: hadoop-yarn-rpc-rce
+
+info:
+  name: Hadoop Yarn RPC RCE
+  author: zan8in
+  severity: critical
+  verified: true
+  reference:
+    - https://blog.csdn.net/MrHatSec/article/details/126103268
+  tags: hadoop,yarn,rce
+  created: 2024/01/17
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ws/v1/cluster/apps/new-application
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b"<application-id>") && 
+      response.body.bcontains(b"<memory>")
+    # 进一步命令执行利用，参考 reference
+expression: r0()

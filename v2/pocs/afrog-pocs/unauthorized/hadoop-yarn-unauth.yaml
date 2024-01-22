@@ -1,23 +1,27 @@
 id: hadoop-yarn-unauth
 
 info:
-    name: Hadoop Yarn Unauth
-    author: p0wd3r,sharecast
-    severity: medium
-    verified: true
-    description: |
-        app="APACHE-hadoop-YARN"
+  name: Hadoop Yarn Unauth
+  author: p0wd3r,sharecast
+  severity: high
+  verified: true
+  description: |
+    app="APACHE-hadoop-YARN"
+  tags: hadoop,yarn,unauth
+  created: 2024/01/17
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /ws/v1/cluster/info
-        expression: response.status == 200 && response.body.bcontains(b"resourceManagerVersionBuiltOn") && response.body.bcontains(b"hadoopVersion")
-    r1:
-        request:
-            method: GET
-            path: /ws/v1/cluster/apps/new-application
-        expression: response.status == 200 && response.body.bcontains(b"javax.ws.rs.WebApplicationException")
+  r0:
+    request:
+      method: GET
+      path: /ws/v1/cluster/info
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b"resourceManagerVersionBuiltOn") && 
+      response.body.bcontains(b"hadoopVersion")
+  r1:
+    request:
+      method: GET
+      path: /ws/v1/cluster/apps/new-application
+    expression: response.status == 200 && response.body.bcontains(b"javax.ws.rs.WebApplicationException")
 expression: r0() || r1()
-

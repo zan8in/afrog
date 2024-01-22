@@ -1,0 +1,23 @@
+id: fastjson-version-disclosure
+
+info:
+  name: Fastjson 泄露版本号
+  author: zan8in
+  severity: info
+  tags: fastjson,disclosure
+  created: 2024/01/22
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      body: |
+        jsonStr={"@type": "java.lang.AutoCloseable"
+    expression: response.body.bcontains(b'fastjson-version') && "fastjson-version [0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}".bmatches(response.body)
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"fastjson-version (?P<fastjson>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.body)'
+          fastjson: ext1["fastjson"]
+expression: r0()
