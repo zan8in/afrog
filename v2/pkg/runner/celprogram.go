@@ -523,6 +523,21 @@ var (
 					return types.String(ciphertext)
 				},
 			},
+			&functions.Overload{
+				Operator: "repeat_string_int",
+				Binary: func(v1 ref.Val, v2 ref.Val) ref.Val {
+					str, ok := v1.(types.String)
+					if !ok {
+						return types.ValOrErr(v1, "unexpected type '%v' passed to randomLowercase", v1.Type())
+					}
+					count, ok := v2.(types.Int)
+					if !ok {
+						return types.ValOrErr(v2, "unexpected type '%v' passed to randomLowercase", v2.Type())
+					}
+
+					return types.String(strings.Repeat(string(str), int(count)))
+				},
+			},
 		),
 	}
 )

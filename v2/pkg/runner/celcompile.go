@@ -180,6 +180,11 @@ var (
 				decls.NewOverload("aesCBC_string_string_string",
 					[]*exprpb.Type{decls.String, decls.String, decls.String},
 					decls.String)),
+			// Repeat
+			decls.NewFunction("repeat",
+				decls.NewOverload("repeat_string_int",
+					[]*exprpb.Type{decls.String, decls.Int},
+					decls.String)),
 		),
 	}
 )
