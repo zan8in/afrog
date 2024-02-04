@@ -538,6 +538,26 @@ var (
 					return types.String(strings.Repeat(string(str), int(count)))
 				},
 			},
+			&functions.Overload{
+				Operator: "decimal_string_string",
+				Binary: func(v1 ref.Val, v2 ref.Val) ref.Val {
+					input, ok := v1.(types.String)
+					if !ok {
+						return types.ValOrErr(v1, "unexpected type '%v' passed to randomLowercase", v1.Type())
+					}
+					delimiter, ok := v2.(types.String)
+					if !ok {
+						return types.ValOrErr(v2, "unexpected type '%v' passed to randomLowercase", v2.Type())
+					}
+
+					var str []string
+					for _, char := range string(input) {
+						str = append(str, fmt.Sprintf("%d", char))
+					}
+
+					return types.String(strings.Join(str, string(delimiter)))
+				},
+			},
 		),
 	}
 )
@@ -718,17 +738,9 @@ func ceyeioCheck(sub string) bool {
 	if err != nil {
 		return false
 	}
-
-	if strings.Contains(string(resp), sub+".") {
+	if strings.Contains(strings.ToLower(string(resp)), strings.ToLower(sub+".")) {
 		return true
 	}
-	// if !bytes.Contains(resp, []byte(`"data": []`)) && bytes.Contains(resp, []byte(`{"code": 200`)) {
-	// 	return true
-	// }
-
-	// if bytes.Contains(resp, []byte(`<title>503`)) {
-	// 	return false
-	// }
 
 	return false
 }

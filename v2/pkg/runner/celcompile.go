@@ -185,6 +185,11 @@ var (
 				decls.NewOverload("repeat_string_int",
 					[]*exprpb.Type{decls.String, decls.Int},
 					decls.String)),
+			// decimal
+			decls.NewFunction("decimal",
+				decls.NewOverload("decimal_string_string",
+					[]*exprpb.Type{decls.String, decls.String},
+					decls.String)),
 		),
 	}
 )
