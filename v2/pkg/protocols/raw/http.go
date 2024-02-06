@@ -19,7 +19,8 @@ var (
 )
 
 type RawHttp struct {
-	RawhttpClient *rawhttp.Client
+	RawhttpClient   *rawhttp.Client
+	MaxRespBodySize int
 }
 
 func GetRawHTTP(proxy string, timeout int) *rawhttp.Client {
@@ -87,7 +88,11 @@ func (r *RawHttp) RawHttpRequest(request, cookie, baseurl string, variableMap ma
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	// 新增最大响应体限制
+	// @editor 2024/02/06
+	maxDefaultBody := int64(r.MaxRespBodySize * 1024 * 1024)
+	reader := io.LimitReader(resp.Body, maxDefaultBody)
+	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		return fmt.Errorf("readAll Failed, %s", err.Error())
 	}

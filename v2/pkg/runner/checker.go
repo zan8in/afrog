@@ -111,7 +111,12 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		} else {
 
 			if len(rule.Request.Raw) > 0 {
-				rt := raw.RawHttp{RawhttpClient: raw.GetRawHTTP(c.Options.Proxy, int(c.Options.Timeout))}
+				rt := raw.RawHttp{
+					RawhttpClient:   raw.GetRawHTTP(c.Options.Proxy, int(c.Options.Timeout)),
+					MaxRespBodySize: c.Options.MaxRespBodySize,
+					// 新增最大响应体限制
+					// @editor 2024/02/06
+				}
 				err = rt.RawHttpRequest(rule.Request.Raw, c.Options.Cookie, target, c.VariableMap)
 
 			} else {
