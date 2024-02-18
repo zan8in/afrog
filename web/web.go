@@ -10,7 +10,7 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-//go:embed template/List.html static/prism.js static/prism.css static/afrog-logo.svg
+//go:embed template/*.html static/*
 var templates embed.FS
 
 func StartServer(addr string) error {
