@@ -16,7 +16,7 @@ func InitBanner() {
 }
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "We can do it")
+	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Bring color to life")
 }
 
 func BannerAnimate(u *AfrogUpdate) {
@@ -25,7 +25,7 @@ func BannerAnimate(u *AfrogUpdate) {
 	for i := 0; i < 1000; i++ {
 		for _, char := range animationChars {
 			fmt.Printf("\r%c\tA F 🐸 O G\t%c", char, char)
-			fmt.Printf("\r\t\t\t\t%s/%s\t%c\t%s", EngineV(u), PocV(u), char, "We can do it")
+			fmt.Printf("\r\t\t\t\t%s/%s\t%c\t%s", EngineV(u), PocV(u), char, "Bring color to life")
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
