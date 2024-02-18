@@ -11,7 +11,7 @@ import (
 )
 
 //go:embed template/*.html static/*
-var templates embed.FS
+var temp embed.FS
 
 func StartServer(addr string) error {
 
@@ -22,7 +22,7 @@ func StartServer(addr string) error {
 
 	http.HandleFunc("/", listHandler)
 
-	http.Handle("/static/", http.FileServer(http.FS(templates)))
+	http.Handle("/static/", http.FileServer(http.FS(temp)))
 
 	// 启动HTTP服务器并监听端口
 	gologger.Info().Msg("Serving HTTP on :: port " + addr[1:] + " (http://[::]" + addr + "/) ...")
@@ -45,7 +45,7 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 	count := sqlite.Count()
 
 	// 解析模板文件
-	tmpl, err := template.ParseFS(templates, "template/List.html")
+	tmpl, err := template.ParseFS(temp, "template/List.html")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
