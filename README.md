@@ -447,7 +447,7 @@ you can install it with:
 
 **Binary**
 ```sh
-$ https://github.com/zan8in/afrog/releases
+$ https://github.com/zan8in/afrog/releases/latest
 ```
 
 **Github**
