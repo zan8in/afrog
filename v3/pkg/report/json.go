@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zan8in/afrog/v2/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/result"
 	fileutil "github.com/zan8in/pins/file"
 	timeutil "github.com/zan8in/pins/time"
 )

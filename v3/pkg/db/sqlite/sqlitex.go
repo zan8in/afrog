@@ -11,9 +11,9 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/logoove/sqlite"
-	db2 "github.com/zan8in/afrog/v2/pkg/db"
-	"github.com/zan8in/afrog/v2/pkg/poc"
-	"github.com/zan8in/afrog/v2/pkg/result"
+	db2 "github.com/zan8in/afrog/v3/pkg/db"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/gologger"
 	randutil "github.com/zan8in/pins/rand"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zan8in/afrog/v2/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/gologger"
 	zoom_eyes "github.com/zan8in/zoomeye/pkg/runner"
 )

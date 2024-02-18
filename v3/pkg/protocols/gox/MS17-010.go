@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zan8in/afrog/v2/pkg/protocols/netxclient"
+	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
 	"github.com/zan8in/pins/netx"
 	urlutil "github.com/zan8in/pins/url"
 )

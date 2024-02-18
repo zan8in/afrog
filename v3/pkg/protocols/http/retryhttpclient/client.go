@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zan8in/afrog/v2/pkg/poc"
-	"github.com/zan8in/afrog/v2/pkg/proto"
-	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/retryablehttp"
 	"golang.org/x/net/context"
 )

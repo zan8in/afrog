@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
-	"github.com/zan8in/afrog/v2/pkg/config"
-	"github.com/zan8in/afrog/v2/pkg/log"
-	"github.com/zan8in/afrog/v2/pkg/poc"
-	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/v2/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/gologger"
 )
 

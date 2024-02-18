@@ -5,10 +5,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zan8in/afrog/v2/pkg/log"
-	"github.com/zan8in/afrog/v2/pkg/poc"
-	"github.com/zan8in/afrog/v2/pkg/proto"
-	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	"gopkg.in/yaml.v2"
 )

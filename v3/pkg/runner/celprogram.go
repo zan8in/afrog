@@ -15,16 +15,16 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/zan8in/afrog/v2/pkg/config"
-	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 
 	"github.com/dlclark/regexp2"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/zan8in/afrog/v2/pkg/proto"
-	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 var (

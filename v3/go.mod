@@ -1,4 +1,4 @@
-module github.com/zan8in/afrog/v2
+module github.com/zan8in/afrog/v3
 
 go 1.20
 

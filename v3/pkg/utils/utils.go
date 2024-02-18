@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/zan8in/afrog/v2/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )

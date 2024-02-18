@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/remeh/sizedwaitgroup"
-	"github.com/zan8in/afrog/v2/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/v2/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	iputil "github.com/zan8in/pins/ip"
 	urlutil "github.com/zan8in/pins/url"

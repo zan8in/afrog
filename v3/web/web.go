@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"text/template"
 
-	"github.com/zan8in/afrog/v2/pkg/db"
-	"github.com/zan8in/afrog/v2/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/db"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/gologger"
 )
 
