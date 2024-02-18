@@ -3,7 +3,7 @@ name: 🎉 Release Binary
 on:
   push:
     tags:
-      - "v*"
+      - "*"
   workflow_dispatch:
 
 jobs:
@@ -12,6 +12,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v4
         with:
@@ -21,6 +23,5 @@ jobs:
         with:
           args: "release --rm-dist"
           version: latest
-          workdir: /
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
