@@ -513,11 +513,24 @@ Here is an example config file:
 reverse:
   ceye:
     api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    domain: "xxxxxx.ceye.io"
-  jndi:
-    jndi_address: "x.x.x.x"
-    ldap_port: "1389"
-    api_port: "34567"
+    domain: "xxxxxx.cey2e.io"
+  dnslogcn:
+    domain: dnslog.cn
+  jndi: (Deprecated)
+    jndi_address: ""
+    ldap_port: ""
+    api_port: ""
+  eye: (Deprecated)
+    host: ""
+    token: ""
+    domain: ""
+  alphalog:
+    domain: dnslogxx.sh
+    api_url: "http://dnslogxx.sh/"
+  xray:
+    x_token: "xraytest"
+    domain: dnslogxx.sh
+    api_url: "http://x.x.0.x:8777"
 ```
 
 `reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification. 
@@ -528,8 +541,19 @@ To obtain ceye, follow these steps:
 - Go to the [ceye.io](http://ceye.io/) website and register an account.
 - Log in and go to the personal settings page.
 - Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
+### Dnslogcn
+No configuration required, but unstable
+[dnslog.cn](http://dnslog.cn/)
 
-### JNDI Configuration
+### Alphalog
+Need to build services
+[alphalog](https://github.com/AlphabugX/Alphalog)
+
+### Xray
+Need to build services
+[xray](https://docs.xray.cool/tools/xray/advanced/reverse)
+
+### JNDI Configuration (Deprecated)
 
 The JNDI vulnerability refers to security vulnerabilities that exploit the JNDI (Java Naming and Directory Interface) functionality in Java applications. This type of vulnerability can lead to remote code execution or other security issues.
 
