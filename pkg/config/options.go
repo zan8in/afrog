@@ -259,7 +259,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("debug", "Debug",
 		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
-		flagSet.BoolVar(&options.Version, "version", false, "show afrog version"),
+		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
 	)
 
 	flagSet.CreateGroup("server", "Server",
@@ -286,6 +286,19 @@ func (opt *Options) VerifyOptions() error {
 		return err
 	}
 	opt.Config = config
+
+	// update afrog-pocs
+	au, err := NewAfrogUpdate(true)
+	if err != nil {
+		return err
+	}
+
+	if !opt.DisableUpdateCheck {
+		info, _ := au.AfrogUpdatePocs()
+		if len(info) > 0 && opt.UpdatePocs {
+			gologger.Info().Msg(info)
+		}
+	}
 
 	if opt.Dingtalk {
 		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
@@ -345,18 +358,6 @@ func (opt *Options) VerifyOptions() error {
 			gologger.Error().Msg(err.Error())
 		}
 		os.Exit(0)
-	}
-
-	au, err := NewAfrogUpdate(true)
-	if err != nil {
-		return err
-	}
-
-	if !opt.DisableUpdateCheck {
-		info, _ := au.AfrogUpdatePocs()
-		if len(info) > 0 && opt.UpdatePocs {
-			gologger.Info().Msg(info)
-		}
 	}
 
 	if len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0) {

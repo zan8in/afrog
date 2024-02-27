@@ -11,3 +11,15 @@ func CreateProgressBar(progress, length int, filled, empty rune) string {
 	bar := strings.Repeat(string(filled), filledCount) + strings.Repeat(string(empty), emptyCount)
 	return bar
 }
+
+// 进度条2
+func GetProgressBar(progress, width int) string {
+	if width == 0 {
+		width = 50
+	}
+	barLength := progress * width / 100
+	progressBar := strings.Repeat("=", barLength)
+	progressBar += ">"
+	progressBar += strings.Repeat("-", width-barLength)
+	return progressBar
+}

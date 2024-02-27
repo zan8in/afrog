@@ -32,8 +32,7 @@ func BannerAnimate(u *AfrogUpdate) {
 }
 
 func ShowVersion() {
-	InitBanner()
-	fmt.Printf("%s\n\n", Version)
+	fmt.Printf("\r\nafrog Version %s\n\n", Version)
 }
 
 func EngineV(u *AfrogUpdate) string {

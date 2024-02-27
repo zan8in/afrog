@@ -52,11 +52,12 @@ func main() {
 				if !options.Silent {
 					// 花里胡哨的进度条，看起来炫，实际并没什么卵用！ @edit 2024/01/03
 					pgress := int(options.CurrentCount) * 100 / options.Count
-					bar := progress.CreateProgressBar(pgress, 50, '|', '=')
+					// bar := progress.CreateProgressBar(pgress, 50, '|', '=')
 					// bar := progress.CreateProgressBar(pgress, 50, '▉', '░') 操蛋的 windows cmd 不兼容漂亮的进度条
-					fmt.Printf("\r%s %d%% (%d/%d), %s", bar, pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+					// fmt.Printf("\r%s %d%% (%d/%d), %s", bar, pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 					// fmt.Printf("\r%d%% (%d/%d), %s", int(options.CurrentCount)*100/int(options.Count), options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 					// fmt.Printf("\r%d/%d/%d%%/%s", options.CurrentCount, options.Count, int(options.CurrentCount)*100/int(options.Count), strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+					fmt.Printf("\r[%s] %d%% (%d/%d), %s", progress.GetProgressBar(pgress, 0), pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 				}
 			}()
 		}
