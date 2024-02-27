@@ -21,20 +21,20 @@ import (
 	sliceutil "github.com/zan8in/pins/slice"
 )
 
-var (
-	ReverseCeyeApiKey string
-	ReverseCeyeDomain string
-	ReverseEyeHost    string
-	ReverseEyeToken   string
-	ReverseEyeDomain  string
-	ReverseJndi       string
-	ReverseLdapPort   string
-	ReverseApiPort    string
+// var (
+// 	ReverseCeyeApiKey string
+// 	ReverseCeyeDomain string
+// 	ReverseEyeHost    string
+// 	ReverseEyeToken   string
+// 	ReverseEyeDomain  string
+// 	ReverseJndi       string
+// 	ReverseLdapPort   string
+// 	ReverseApiPort    string
 
-	ReverseCeyeLive  bool
-	ReverseEyeShLive bool
-	ReverseJndiLive  bool
-)
+// 	ReverseCeyeLive  bool
+// 	ReverseEyeShLive bool
+// 	ReverseJndiLive  bool
+// )
 
 type Options struct {
 	// afrog-config.yaml configuration file
@@ -181,6 +181,12 @@ type Options struct {
 
 	// query count
 	QueryCount int
+
+	// oobadapter, eg: `-oob ceyeio` or `-oob dnslogcn` or `-oob alphalog`
+	OOB       string
+	OOBKey    string
+	OOBDomain string
+	OOBApiUrl string
 }
 
 func NewOptions() (*Options, error) {
@@ -196,6 +202,7 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.Query, "query", "q", "", "cyberspace search keywords, eg: -q app:'tomcat'"),
 		flagSet.IntVarP(&options.QueryCount, "query-count", "qc", 100, "cyberspace search data count, eg: -qc 1000"),
 		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.cfg"),
+		flagSet.StringVar(&options.OOB, "oob", "", "set Out-of-Band (OOB) adapter, eg: -oob ceyeio or -oob dnslogcn or -oob alphalog"),
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",
@@ -356,29 +363,22 @@ func (opt *Options) VerifyOptions() error {
 
 		ShowBanner(au)
 
-		if len(opt.Config.Reverse.Ceye.Domain) == 0 && len(opt.Config.Reverse.Ceye.ApiKey) == 0 {
-			gologger.Info().Msg("API Key of CEYE is not configured")
-		}
-		if len(opt.Config.Reverse.Eye.Domain) == 0 && len(opt.Config.Reverse.Eye.Token) == 0 {
-			gologger.Info().Msg("API Key of EYE  is not configured")
-		}
-		if len(opt.Config.Reverse.Jndi.JndiAddress) == 0 && len(opt.Config.Reverse.Jndi.LdapPort) == 0 && len(opt.Config.Reverse.Jndi.ApiPort) == 0 {
-			gologger.Info().Msg("API Key of JNDI is not configured")
-		}
+		// oob setting
+		opt.SetOOBAdapter(opt.OOB)
 
-		ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
-		ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
+		// ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
+		// ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
 
-		ReverseEyeHost = opt.Config.Reverse.Eye.Host
-		if len(ReverseEyeHost) == 0 { // 向下兼容
-			ReverseEyeHost = "eyes.sh"
-		}
-		ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
-		ReverseEyeToken = opt.Config.Reverse.Eye.Token
+		// ReverseEyeHost = opt.Config.Reverse.Eye.Host
+		// if len(ReverseEyeHost) == 0 { // 向下兼容
+		// 	ReverseEyeHost = "eyes.sh"
+		// }
+		// ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
+		// ReverseEyeToken = opt.Config.Reverse.Eye.Token
 
-		ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
-		ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
-		ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
+		// ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
+		// ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
+		// ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 	} else {
 		return fmt.Errorf("target or cyberspace or query is empty")
 	}
@@ -532,7 +532,7 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 		flag := false
 		for _, item := range poc.Set {
 			key := item.Key.(string)
-			if key == "reverse" {
+			if key == "oob" || key == "reverse" {
 				flag = true
 				break
 			}

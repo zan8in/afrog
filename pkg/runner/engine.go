@@ -11,7 +11,6 @@ import (
 	"github.com/zan8in/afrog/pkg/config"
 	"github.com/zan8in/afrog/pkg/log"
 	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/pkg/result"
 	"github.com/zan8in/gologger"
 )
@@ -229,45 +228,45 @@ type TransData struct {
 	Poc    poc.Poc
 }
 
-func JndiTest() bool {
-	url := "http://" + config.ReverseJndi + ":" + config.ReverseApiPort + "/?api=test"
-	resp, _, err := retryhttpclient.Get(url)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(string(resp), "no") || strings.Contains(string(resp), "yes") {
-		return true
-	}
-	return false
-}
+// func JndiTest() bool {
+// 	url := "http://" + config.ReverseJndi + ":" + config.ReverseApiPort + "/?api=test"
+// 	resp, _, err := retryhttpclient.Get(url)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	if strings.Contains(string(resp), "no") || strings.Contains(string(resp), "yes") {
+// 		return true
+// 	}
+// 	return false
+// }
 
-func CeyeTest() bool {
-	url := fmt.Sprintf("http://%s.%s", "test", config.ReverseCeyeDomain)
-	resp, _, err := retryhttpclient.Get(url)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(string(resp), "\"meta\":") || strings.Contains(string(resp), "201") {
-		return true
-	}
-	return false
-}
+// func CeyeTest() bool {
+// 	url := fmt.Sprintf("http://%s.%s", "test", config.ReverseCeyeDomain)
+// 	resp, _, err := retryhttpclient.Get(url)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	if strings.Contains(string(resp), "\"meta\":") || strings.Contains(string(resp), "201") {
+// 		return true
+// 	}
+// 	return false
+// }
 
-func EyeTest() bool {
-	index := strings.Index(config.ReverseEyeDomain, ".")
-	domain := config.ReverseEyeDomain
+// func EyeTest() bool {
+// 	index := strings.Index(config.ReverseEyeDomain, ".")
+// 	domain := config.ReverseEyeDomain
 
-	if index != -1 {
-		domain = config.ReverseEyeDomain[:index]
-	}
+// 	if index != -1 {
+// 		domain = config.ReverseEyeDomain[:index]
+// 	}
 
-	url := fmt.Sprintf("http://%s/api/dns/%s/test/?token=%s", config.ReverseEyeHost, domain, config.ReverseEyeToken)
-	resp, _, err := retryhttpclient.Get(url)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(string(resp), "False") {
-		return true
-	}
-	return false
-}
+// 	url := fmt.Sprintf("http://%s/api/dns/%s/test/?token=%s", config.ReverseEyeHost, domain, config.ReverseEyeToken)
+// 	resp, _, err := retryhttpclient.Get(url)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	if strings.Contains(string(resp), "False") {
+// 		return true
+// 	}
+// 	return false
+// }

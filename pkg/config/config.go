@@ -41,9 +41,12 @@ type Dingtalk struct {
 }
 
 type Reverse struct {
-	Ceye Ceye `yaml:"ceye"`
-	Jndi Jndi `yaml:"jndi"`
-	Eye  Eye  `yaml:"eye"`
+	Alphalog Alphalog `yaml:"alphalog"`
+	Ceye     Ceye     `yaml:"ceye"`
+	Dnslogcn Dnslogcn `yaml:"dnslogcn"`
+	Eye      Eye      `yaml:"eye"`
+	Jndi     Jndi     `yaml:"jndi"`
+	Xray     Xray     `yaml:"xray"`
 }
 
 type Ceye struct {
@@ -51,10 +54,25 @@ type Ceye struct {
 	Domain string `yaml:"domain"`
 }
 
+type Dnslogcn struct {
+	Domain string `yaml:"domain"`
+}
+
 type Eye struct {
 	Host   string `yaml:"host"`
 	Token  string `yaml:"token"`
 	Domain string `yaml:"domain"`
+}
+
+type Alphalog struct {
+	Domain string `yaml:"domain"`
+	ApiUrl string `yaml:"api_url"`
+}
+
+type Xray struct {
+	XToken string `yaml:"x_token"`
+	Domain string `yaml:"domain"`
+	ApiUrl string `yaml:"api_url"`
 }
 
 type Jndi struct {
@@ -76,13 +94,33 @@ func NewConfig() (*Config, error) {
 		c.ServerAddress = ":16868"
 
 		reverse := c.Reverse
+
+		// alphalog
+		reverse.Alphalog.Domain = ""
+		reverse.Alphalog.ApiUrl = ""
+
+		// ceye
 		reverse.Ceye.ApiKey = ""
 		reverse.Ceye.Domain = ""
-		reverse.Eye.Host = "eyes.sh"
 
+		// dnslogcn
+		reverse.Dnslogcn.Domain = "dnslog.cn"
+
+		// eyes.sh
+		reverse.Eye.Host = ""
+		reverse.Eye.Domain = ""
+		reverse.Eye.Token = ""
+
+		// jndi
 		reverse.Jndi.JndiAddress = ""
 		reverse.Jndi.LdapPort = ""
 		reverse.Jndi.ApiPort = ""
+
+		// xray
+		reverse.Xray.XToken = ""
+		reverse.Xray.Domain = ""
+		reverse.Xray.ApiUrl = "http://x.x.x.x:8777"
+
 		c.Reverse = reverse
 
 		webhook := c.Webhook

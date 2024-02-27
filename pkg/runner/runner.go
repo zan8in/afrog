@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/zan8in/afrog/pkg/catalog"
 	"github.com/zan8in/afrog/pkg/config"
@@ -17,9 +16,15 @@ import (
 	"github.com/zan8in/afrog/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/pocs"
 	"github.com/zan8in/gologger"
+	"github.com/zan8in/oobadapter/pkg/oobadapter"
 )
 
 type OnResult func(*result.Result)
+
+var (
+	OOB      *oobadapter.OOBAdapter
+	OOBAlive bool
+)
 
 type Runner struct {
 	options       *config.Options
@@ -33,10 +38,18 @@ type Runner struct {
 	Ding          *dingtalk.Dingtalk
 	ScanProgress  *ScanProgress
 	Cyberspace    *cyberspace.Cyberspace
+	// OOB           *oobadapter.OOBAdapter
 }
 
 func NewRunner(options *config.Options) (*Runner, error) {
 	var err error
+
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           options.Proxy,
+		Timeout:         options.Timeout,
+		Retries:         options.Retries,
+		MaxRespBodySize: options.MaxRespBodySize,
+	})
 
 	runner := &Runner{options: options}
 
@@ -61,16 +74,25 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		runner.Cyberspace = cyberspace
 	}
 
+	// oobadapter
+	// fmt.Println(options.OOB, options.OOBKey, options.OOBDomain, options.OOBApiUrl)
+	if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
+		Key:    options.OOBKey,
+		Domain: options.OOBDomain,
+		ApiUrl: options.OOBApiUrl,
+	}); err == nil {
+		OOB = oobAdapter
+		OOBAlive = OOB.IsVaild()
+	} else {
+		OOBAlive = false
+	}
+	if !OOBAlive {
+		gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
+	}
+
 	if runner.ScanProgress, err = NewScanProgress(options.Resume); err != nil {
 		return nil, fmt.Errorf("%s %s", options.Resume, err.Error())
 	}
-
-	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:           options.Proxy,
-		Timeout:         options.Timeout,
-		Retries:         options.Retries,
-		MaxRespBodySize: options.MaxRespBodySize,
-	})
 
 	jr, err := report.NewJsonReport(options.Json, options.JsonAll)
 	if err != nil {
@@ -146,7 +168,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner.PocsYaml = allPocsYamlSlice
 	runner.PocsEmbedYaml = pocs.EmbedFileList
 
-	checkReversePlatform()
+	// checkReversePlatform()
 
 	return runner, nil
 }
@@ -162,60 +184,60 @@ func (runner *Runner) Run() error {
 	return nil
 }
 
-func checkReversePlatform() {
+// func checkReversePlatform() {
 
-	wg := sync.WaitGroup{}
-	if len(config.ReverseJndi) > 0 && len(config.ReverseLdapPort) > 0 && len(config.ReverseApiPort) > 0 {
-		wg.Add(1)
+// 	wg := sync.WaitGroup{}
+// 	if len(config.ReverseJndi) > 0 && len(config.ReverseLdapPort) > 0 && len(config.ReverseApiPort) > 0 {
+// 		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+// 		go func() {
+// 			defer wg.Done()
 
-			if !JndiTest() {
-				gologger.Info().Msg("Load of JNDI is failed")
-				config.ReverseJndiLive = false
-			} else {
-				config.ReverseJndiLive = true
-			}
+// 			if !JndiTest() {
+// 				gologger.Info().Msg("Load of JNDI is failed")
+// 				config.ReverseJndiLive = false
+// 			} else {
+// 				config.ReverseJndiLive = true
+// 			}
 
-		}()
-	}
+// 		}()
+// 	}
 
-	if len(config.ReverseCeyeDomain) > 0 && len(config.ReverseCeyeApiKey) > 0 {
-		wg.Add(1)
+// 	if len(config.ReverseCeyeDomain) > 0 && len(config.ReverseCeyeApiKey) > 0 {
+// 		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+// 		go func() {
+// 			defer wg.Done()
 
-			if !CeyeTest() {
-				gologger.Info().Msg("Load of CEYE is failed")
-				config.ReverseCeyeLive = false
-			} else {
-				config.ReverseCeyeLive = true
-			}
+// 			if !CeyeTest() {
+// 				gologger.Info().Msg("Load of CEYE is failed")
+// 				config.ReverseCeyeLive = false
+// 			} else {
+// 				config.ReverseCeyeLive = true
+// 			}
 
-		}()
+// 		}()
 
-	}
+// 	}
 
-	if len(config.ReverseEyeDomain) > 0 && len(config.ReverseEyeToken) > 0 {
-		wg.Add(1)
+// 	if len(config.ReverseEyeDomain) > 0 && len(config.ReverseEyeToken) > 0 {
+// 		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+// 		go func() {
+// 			defer wg.Done()
 
-			if !EyeTest() {
-				gologger.Info().Msg("Load of EYE  is failed")
-				config.ReverseEyeShLive = false
-			} else {
-				config.ReverseEyeShLive = true
-			}
+// 			if !EyeTest() {
+// 				gologger.Info().Msg("Load of EYE  is failed")
+// 				config.ReverseEyeShLive = false
+// 			} else {
+// 				config.ReverseEyeShLive = true
+// 			}
 
-		}()
+// 		}()
 
-	} //else {
-	// 	gologger.Info().Msg("Version 2.7.8 introduces the Eye.sh backlink configuration option. For more details, please refer to the afrog wiki.")
-	// }
+// 	} //else {
+// 	// 	gologger.Info().Msg("Version 2.7.8 introduces the Eye.sh backlink configuration option. For more details, please refer to the afrog wiki.")
+// 	// }
 
-	wg.Wait()
-}
+// 	wg.Wait()
+// }

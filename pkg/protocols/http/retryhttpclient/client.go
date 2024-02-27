@@ -23,9 +23,6 @@ var (
 	RtryRedirect   *retryablehttp.Client
 	RtryNoRedirect *retryablehttp.Client
 
-	RtryNoRedirectHttpClient *http.Client
-	RtryRedirectHttpClient   *http.Client
-
 	defaultTimeout = 20 * time.Second
 
 	maxDefaultBody int64

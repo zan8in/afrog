@@ -30,7 +30,7 @@ urls*
 *pocs/afrog-pocs/a-private/
 
 /afrog-pocs/
-v2/*.afg
+*.afg
 
 *pocs/deleted*
 *pocs/peiqi*

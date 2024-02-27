@@ -17,6 +17,7 @@ var (
 			&proto.Request{},
 			&proto.Response{},
 			&proto.Reverse{},
+			&proto.OOB{},
 			StrStrMapType,
 		),
 		cel.Declarations(
@@ -144,6 +145,10 @@ var (
 			decls.NewFunction("jndi",
 				decls.NewInstanceOverload("reverse_jndi_int",
 					[]*exprpb.Type{decls.Any, decls.Int},
+					decls.Bool)),
+			decls.NewFunction("oobCheck",
+				decls.NewOverload("oobCheck_oob_string_int",
+					[]*exprpb.Type{decls.Any, decls.String, decls.Int},
 					decls.Bool)),
 			// other
 			decls.NewFunction("sleep",

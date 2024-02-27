@@ -15,8 +15,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/oobadapter/pkg/oobadapter"
 
 	"github.com/dlclark/regexp2"
 	"github.com/google/cel-go/cel"
@@ -382,32 +381,50 @@ var (
 				},
 			},
 			// reverse
+			// &functions.Overload{
+			// 	Operator: "reverse_wait_int",
+			// 	Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+			// 		reverse, ok := lhs.Value().(*proto.Reverse)
+			// 		if !ok {
+			// 			return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+			// 		}
+			// 		timeout, ok := rhs.Value().(int64)
+			// 		if !ok {
+			// 			return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
+			// 		}
+			// 		return types.Bool(reverseCheck(reverse, timeout))
+			// 	},
+			// },
+			// &functions.Overload{
+			// 	Operator: "reverse_jndi_int",
+			// 	Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+			// 		reverse, ok := lhs.Value().(*proto.Reverse)
+			// 		if !ok {
+			// 			return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+			// 		}
+			// 		timeout, ok := rhs.Value().(int64)
+			// 		if !ok {
+			// 			return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
+			// 		}
+			// 		return types.Bool(jndiCheck(reverse, timeout))
+			// 	},
+			// },
 			&functions.Overload{
-				Operator: "reverse_wait_int",
-				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					reverse, ok := lhs.Value().(*proto.Reverse)
+				Operator: "oobCheck_oob_string_int",
+				Function: func(values ...ref.Val) ref.Val {
+					oob, ok := values[0].Value().(*proto.OOB)
 					if !ok {
-						return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+						return types.ValOrErr(values[0], "unexpected type '%v' passed to toUintString", values[0].Type())
 					}
-					timeout, ok := rhs.Value().(int64)
+					filterType, ok := values[1].(types.String)
 					if !ok {
-						return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
+						return types.ValOrErr(values[1], "unexpected type '%v' passed to toUintString", values[1].Type())
 					}
-					return types.Bool(reverseCheck(reverse, timeout))
-				},
-			},
-			&functions.Overload{
-				Operator: "reverse_jndi_int",
-				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					reverse, ok := lhs.Value().(*proto.Reverse)
+					timeout, ok := values[2].(types.Int)
 					if !ok {
-						return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
+						return types.ValOrErr(values[2], "unexpected type '%v' passed to toUintString", values[2].Type())
 					}
-					timeout, ok := rhs.Value().(int64)
-					if !ok {
-						return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
-					}
-					return types.Bool(jndiCheck(reverse, timeout))
+					return types.Bool(oobCheck(oob, string(filterType), int64(timeout)))
 				},
 			},
 			// other
@@ -666,107 +683,130 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 	return allProgramOpitons
 }
 
-func reverseCheck(r *proto.Reverse, timeout int64) bool {
-	if r == nil || (len(r.Domain) == 0 && len(r.Ip) == 0) {
+// func reverseCheck(r *proto.Reverse, timeout int64) bool {
+// 	if r == nil || (len(r.Domain) == 0 && len(r.Ip) == 0) {
+// 		return false
+// 	}
+
+// 	time.Sleep(time.Second * time.Duration(timeout))
+
+// 	// 使用反连平台优先权逻辑如下：
+// 	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
+// 	// @edit 2021.11.29 21:50
+// 	// 关联代码 checker.go line-345
+// 	// sub := strings.Split(r.Domain, ".")[0]
+// 	// if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
+// 	// 	// 自建eye反连平台
+// 	// 	domain := strings.Split(r.Domain, ".")[1]
+// 	// 	if !eyeshDnsCheck(domain, sub) {
+// 	// 		return eyesWebCheck(domain, sub)
+// 	// 	}
+// 	// 	return true
+
+// 	// } else if config.ReverseCeyeLive {
+// 	// 	// ceye反连平台
+// 	// 	return ceyeioCheck(sub)
+
+// 	// } else if config.ReverseEyeShLive {
+// 	// 	// eyes.sh反连平台
+// 	// 	domain := strings.Split(r.Domain, ".")[1]
+// 	// 	if !eyeshDnsCheck(domain, sub) {
+// 	// 		return eyesWebCheck(domain, sub)
+// 	// 	}
+// 	// 	return true
+// 	// }
+
+// 	return false
+// }
+
+// func eyeshDnsCheck(domain, sub string) bool {
+// 	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
+// 	resp, err := retryhttpclient.ReverseGet(urlStr)
+// 	if err != nil {
+// 		return false
+// 	}
+
+// 	if bytes.Contains(resp, []byte("True")) {
+// 		return true
+// 	}
+
+// 	return false
+// }
+
+// func eyesWebCheck(domain, sub string) bool {
+// 	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
+// 	resp, err := retryhttpclient.ReverseGet(urlStr)
+// 	if err != nil {
+// 		return false
+// 	}
+
+// 	if bytes.Contains(resp, []byte("True")) {
+// 		return true
+// 	}
+
+// 	return false
+// }
+
+// func ceyeioCheck(sub string) bool {
+// 	// urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
+// 	// 解决 &filter=xxxx 经常显示 500 问题导致漏报问题 @2024/01/06
+// 	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns", config.ReverseCeyeApiKey)
+// 	resp, err := retryhttpclient.ReverseGet(urlStr)
+// 	if err != nil {
+// 		return false
+// 	}
+// 	if strings.Contains(strings.ToLower(string(resp)), strings.ToLower(sub+".")) {
+// 		return true
+// 	}
+
+// 	return false
+// }
+
+func oobCheck(oob *proto.OOB, filterType string, timeout int64) bool {
+	if oob == nil || OOB == nil || !OOBAlive || len(oob.Filter) == 0 {
 		return false
+	}
+
+	if len(filterType) == 0 {
+		filterType = oobadapter.DnslogcnDNS
+	}
+
+	if timeout == 0 {
+		timeout = 3
 	}
 
 	time.Sleep(time.Second * time.Duration(timeout))
 
-	// 使用反连平台优先权逻辑如下：
-	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
-	// @edit 2021.11.29 21:50
-	// 关联代码 checker.go line-345
-	sub := strings.Split(r.Domain, ".")[0]
-	if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
-		// 自建eye反连平台
-		domain := strings.Split(r.Domain, ".")[1]
-		if !eyeshDnsCheck(domain, sub) {
-			return eyesWebCheck(domain, sub)
-		}
-		return true
+	result := OOB.ValidateResult(oobadapter.ValidateParams{
+		Filter:     oob.Filter,
+		FilterType: filterType,
+	})
 
-	} else if config.ReverseCeyeLive {
-		// ceye反连平台
-		return ceyeioCheck(sub)
-
-	} else if config.ReverseEyeShLive {
-		// eyes.sh反连平台
-		domain := strings.Split(r.Domain, ".")[1]
-		if !eyeshDnsCheck(domain, sub) {
-			return eyesWebCheck(domain, sub)
-		}
-		return true
-	}
-
-	return false
+	return result.IsVaild
 }
 
-func eyeshDnsCheck(domain, sub string) bool {
-	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
-	resp, err := retryhttpclient.ReverseGet(urlStr)
-	if err != nil {
-		return false
-	}
+// func jndiCheck(reverse *proto.Reverse, timeout int64) bool {
+// 	// if len(config.ReverseJndi) == 0 && len(config.ReverseApiPort) == 0 {
+// 	// 	return false
+// 	// }
 
-	if bytes.Contains(resp, []byte("True")) {
-		return true
-	}
+// 	// if !config.ReverseJndiLive {
+// 	// 	return false
+// 	// }
 
-	return false
-}
+// 	// time.Sleep(time.Second * time.Duration(timeout))
 
-func eyesWebCheck(domain, sub string) bool {
-	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
-	resp, err := retryhttpclient.ReverseGet(urlStr)
-	if err != nil {
-		return false
-	}
+// 	// urlStr := fmt.Sprintf("http://%s:%s/?api=%s", reverse.Url.Domain, config.ReverseApiPort, reverse.Url.Path[1:])
 
-	if bytes.Contains(resp, []byte("True")) {
-		return true
-	}
+// 	// resp, err := retryhttpclient.ReverseGet(urlStr)
+// 	// if err != nil {
+// 	// 	return false
+// 	// }
 
-	return false
-}
+// 	// if strings.Contains(string(resp), "yes") {
 
-func ceyeioCheck(sub string) bool {
-	// urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
-	// 解决 &filter=xxxx 经常显示 500 问题导致漏报问题 @2024/01/06
-	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns", config.ReverseCeyeApiKey)
-	resp, err := retryhttpclient.ReverseGet(urlStr)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(strings.ToLower(string(resp)), strings.ToLower(sub+".")) {
-		return true
-	}
+// 	// 	return true
+// 	// }
 
-	return false
-}
-
-func jndiCheck(reverse *proto.Reverse, timeout int64) bool {
-	if len(config.ReverseJndi) == 0 && len(config.ReverseApiPort) == 0 {
-		return false
-	}
-
-	if !config.ReverseJndiLive {
-		return false
-	}
-
-	time.Sleep(time.Second * time.Duration(timeout))
-
-	urlStr := fmt.Sprintf("http://%s:%s/?api=%s", reverse.Url.Domain, config.ReverseApiPort, reverse.Url.Path[1:])
-
-	resp, err := retryhttpclient.ReverseGet(urlStr)
-	if err != nil {
-		return false
-	}
-
-	if strings.Contains(string(resp), "yes") {
-
-		return true
-	}
-
-	return false
-}
+// 	return false
+// }

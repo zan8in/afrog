@@ -3,7 +3,6 @@ package runner
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -265,17 +264,23 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 		key := item.Key.(string)
 		value := item.Value.(string)
 
-		if value == "newReverse()" {
-			c.VariableMap[key] = c.newRerverse()
-			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+		// if value == "newReverse()" {
+		// 	c.VariableMap[key] = c.newRerverse()
+		// 	c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+		// 	continue
+		// }
+
+		if value == "oob()" {
+			c.VariableMap[key] = c.oob()
+			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.OOB"))
 			continue
 		}
 
-		if value == "newJNDI()" {
-			c.VariableMap[key] = c.newJNDI()
-			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
-			continue
-		}
+		// if value == "newJNDI()" {
+		// 	c.VariableMap[key] = c.newJNDI()
+		// 	c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
+		// 	continue
+		// }
 
 		out, err := c.CustomLib.RunEval(value, c.VariableMap)
 		if err != nil {
@@ -342,44 +347,61 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 
 }
 
-func (c *Checker) newRerverse() *proto.Reverse {
-
-	urlStr := ""
-	sub := utils.CreateRandomString(20)
-
-	// 使用反连平台优先权逻辑如下：
-	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
-	// @edit 2021.11.29 21:50
-	// 关联代码 celprogram.go line-596
-	if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
-		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
-	} else if config.ReverseCeyeLive {
-		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
-	} else if config.ReverseEyeShLive {
-		urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
+func (c *Checker) oob() *proto.OOB {
+	if OOB == nil {
+		return &proto.OOB{}
 	}
 
-	u, _ := url.Parse(urlStr)
-	return &proto.Reverse{
-		Url:                utils.ParseUrl(u),
-		Domain:             u.Hostname(),
-		Ip:                 u.Host,
-		IsDomainNameServer: false,
+	vdomains := OOB.GetValidationDomain()
+
+	return &proto.OOB{
+		Filter:       vdomains.Filter,
+		HTTP:         vdomains.HTTP,
+		DNS:          vdomains.DNS,
+		ProtocolHTTP: "http",
+		ProtocolDNS:  "dns",
 	}
 }
 
-func (c *Checker) newJNDI() *proto.Reverse {
-	randomstr := utils.CreateRandomString(22)
-	urlStr := fmt.Sprintf("http://%s:%s/%s", config.ReverseJndi, config.ReverseLdapPort, randomstr)
-	u, _ := url.Parse(urlStr)
-	url := utils.ParseUrl(u)
-	return &proto.Reverse{
-		Url:                url,
-		Domain:             u.Hostname(),
-		Ip:                 config.ReverseJndi,
-		IsDomainNameServer: false,
-	}
-}
+// func (c *Checker) newRerverse() *proto.Reverse {
+
+// 	urlStr := ""
+// 	// sub := utils.CreateRandomString(20)
+
+// 	// 使用反连平台优先权逻辑如下：
+// 	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
+// 	// @edit 2021.11.29 21:50
+// 	// 关联代码 celprogram.go line-596
+// 	// if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
+// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
+// 	// } else if config.ReverseCeyeLive {
+// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
+// 	// } else if config.ReverseEyeShLive {
+// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
+// 	// }
+
+// 	u, _ := url.Parse(urlStr)
+// 	return &proto.Reverse{
+// 		Url:                utils.ParseUrl(u),
+// 		Domain:             u.Hostname(),
+// 		Ip:                 u.Host,
+// 		IsDomainNameServer: false,
+// 	}
+// }
+
+// func (c *Checker) newJNDI() *proto.Reverse {
+// 	// randomstr := utils.CreateRandomString(22)
+// 	// urlStr := fmt.Sprintf("http://%s:%s/%s", config.ReverseJndi, config.ReverseLdapPort, randomstr)
+// 	// u, _ := url.Parse(urlStr)
+// 	// url := utils.ParseUrl(u)
+// 	// return &proto.Reverse{
+// 	// 	Url:                url,
+// 	// 	Domain:             u.Hostname(),
+// 	// 	Ip:                 config.ReverseJndi,
+// 	// 	IsDomainNameServer: false,
+// 	// }
+// 	return &proto.Reverse{}
+// }
 
 func checkExpression(expression string) string {
 	if strings.Contains(expression, "!= \"\"") {

