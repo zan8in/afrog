@@ -21,21 +21,6 @@ import (
 	sliceutil "github.com/zan8in/pins/slice"
 )
 
-// var (
-// 	ReverseCeyeApiKey string
-// 	ReverseCeyeDomain string
-// 	ReverseEyeHost    string
-// 	ReverseEyeToken   string
-// 	ReverseEyeDomain  string
-// 	ReverseJndi       string
-// 	ReverseLdapPort   string
-// 	ReverseApiPort    string
-
-// 	ReverseCeyeLive  bool
-// 	ReverseEyeShLive bool
-// 	ReverseJndiLive  bool
-// )
-
 type Options struct {
 	// afrog-config.yaml configuration file
 	Config *Config
@@ -281,12 +266,6 @@ func NewOptions() (*Options, error) {
 
 func (opt *Options) VerifyOptions() error {
 
-	config, err := NewConfig()
-	if err != nil {
-		return err
-	}
-	opt.Config = config
-
 	// update afrog-pocs
 	au, err := NewAfrogUpdate(true)
 	if err != nil {
@@ -299,6 +278,12 @@ func (opt *Options) VerifyOptions() error {
 			gologger.Info().Msg(info)
 		}
 	}
+
+	config, err := NewConfig()
+	if err != nil {
+		return err
+	}
+	opt.Config = config
 
 	if opt.Dingtalk {
 		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
@@ -367,19 +352,6 @@ func (opt *Options) VerifyOptions() error {
 		// oob setting
 		opt.SetOOBAdapter(opt.OOB)
 
-		// ReverseCeyeApiKey = opt.Config.Reverse.Ceye.ApiKey
-		// ReverseCeyeDomain = opt.Config.Reverse.Ceye.Domain
-
-		// ReverseEyeHost = opt.Config.Reverse.Eye.Host
-		// if len(ReverseEyeHost) == 0 { // 向下兼容
-		// 	ReverseEyeHost = "eyes.sh"
-		// }
-		// ReverseEyeDomain = opt.Config.Reverse.Eye.Domain
-		// ReverseEyeToken = opt.Config.Reverse.Eye.Token
-
-		// ReverseJndi = opt.Config.Reverse.Jndi.JndiAddress
-		// ReverseLdapPort = opt.Config.Reverse.Jndi.LdapPort
-		// ReverseApiPort = opt.Config.Reverse.Jndi.ApiPort
 	} else {
 		return fmt.Errorf("target or cyberspace or query is empty")
 	}
