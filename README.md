@@ -212,11 +212,11 @@
             <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
         </td>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/27.png&mask=circle&w=60&h=60"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/55.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                  />
             <br>
-            <a href="https://github.com/Lay0us1"><sub>Lay0us</sub></a>
+            <a href="javascript:void(0);"><sub>free2e</sub></a>
         </td>
     </tr>	
     <tr>
@@ -414,15 +414,7 @@
             <a href="javascript:void(0);"><sub>Wen</sub></a>
         </td>
         </tr>
-        <tr>
-        <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/55.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
-                 />
-            <br>
-            <a href="javascript:void(0);"><sub>free2e</sub></a>
-        </td>
-    </tr>
+        
 </table></div>
 
 
