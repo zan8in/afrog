@@ -496,6 +496,10 @@ You can scan multiple URLs at the same time as well.
 ```sh
 afrog -T urls.txt
 ```
+## -web Command
+The `-web` command allows for persistently storing vulnerabilities scanned by afrog into an SQLite3 database. Accessing http://x.x.x.x:16868 via a browser provides access to the vulnerability report webpage, where users can conduct simple keyword searches and filter results by vulnerability severity.
+<img src="https://github.com/zan8in/afrog/blob/main/images/webcommand.png" >
+
 
 ## Configuration file
 
@@ -547,21 +551,6 @@ Need to build services
 Need to build services
 [xray](https://docs.xray.cool/tools/xray/advanced/reverse)
 
-### JNDI Configuration (Deprecated)
-
-The JNDI vulnerability refers to security vulnerabilities that exploit the JNDI (Java Naming and Directory Interface) functionality in Java applications. This type of vulnerability can lead to remote code execution or other security issues.
-
-To obtain JNDI, follow these steps:
-
-- To obtain the source code and compile the JAR file, please visit the official website [github.com/r00tSe7en/JNDIMonitor](https://github.com/r00tSe7en/JNDIMonitor). Alternatively, you can go to the official afrog website [afrog/helper/jndi](https://github.com/zan8in/afrog/v3/tree/main/helper/jndi) to download the pre-compiled JAR file
-- Upload the `JNDIMonitor-2.0.1-SNAPSHOT.jar` file to the server (such as a VPS server), and execute the following startup command:
-
-```sh
-java -jar ./JNDIMonitor-2.0.1-SNAPSHOT.jar -i 0.0.0.0 -l 1389 -p 3456
-```
-
-Below are example methods for writing POCs. [Please click to view](https://github.com/zan8in/afrog/v3/wiki/Examples#solr-log4j-rce).
-
 ## Json Output (For developers)
 
 ### Json
@@ -587,9 +576,9 @@ afrog -t https://example.com -ja result.json
 
 ## Screenshot
 
-![](https://github.com/zan8in/afrog/v3/blob/main/images/1.png)
+![](https://github.com/zan8in/afrog/blob/main/images/1.png)
 
-<!-- ![](https://github.com/zan8in/afrog/v3/blob/main/images/report-new.png) -->
+<!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
 
 ## As Library
 
