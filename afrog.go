@@ -48,6 +48,7 @@ func NewScanner(target []string, opt Scanner) error {
 	s.PocExecutionDurationMonitor = opt.WithPocExecutionDurationMonitor()
 	s.VulnerabilityScannerBreakpoint = opt.WithVulnerabilityScannerBreakpoint()
 	s.AppendPoc = opt.WithAppendPoc()
+	s.ConfigFile = opt.WithConfigFile()
 
 	options := &config.Options{
 		Target:                         s.Target,
@@ -76,9 +77,10 @@ func NewScanner(target []string, opt Scanner) error {
 		PocExecutionDurationMonitor:    s.PocExecutionDurationMonitor,
 		VulnerabilityScannerBreakpoint: s.VulnerabilityScannerBreakpoint,
 		AppendPoc:                      s.AppendPoc,
+		ConfigFile:                     s.ConfigFile,
 	}
 
-	config, err := config.NewConfig()
+	config, err := config.NewConfig(options.ConfigFile)
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		os.Exit(0)
@@ -288,4 +290,10 @@ func (s *Scanner) WithAppendPoc() goflags.StringSlice {
 		return s.AppendPoc
 	}
 	return goflags.StringSlice{}
+}
+func (s *Scanner) WithConfigFile() string {
+	if len(s.ConfigFile) > 0 {
+		return s.ConfigFile
+	}
+	return ""
 }
