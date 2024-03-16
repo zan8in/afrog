@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/zan8in/afrog/v3/pkg/utils"
@@ -88,8 +89,11 @@ type Cyberspace struct {
 const afrogConfigFilename = "afrog-config.yaml"
 
 // Create and initialize afrog-config.yaml configuration info
-func NewConfig() (*Config, error) {
-	if isExistConfigFile() != nil {
+func NewConfig(configFile string) (*Config, error) {
+	if len(configFile) > 0 && !strings.HasSuffix(configFile, ".yml") && !strings.HasSuffix(configFile, ".yaml") {
+		return nil, errors.New("afrog config file must be yaml format")
+	}
+	if isExistConfigFile(configFile) != nil {
 		c := Config{}
 		c.ServerAddress = ":16868"
 
@@ -134,18 +138,25 @@ func NewConfig() (*Config, error) {
 		cyberspace.ZoomEyes = []string{""}
 		c.Cyberspace = cyberspace
 
-		WriteConfiguration(&c)
+		WriteConfiguration(&c, configFile)
 	}
-	return ReadConfiguration()
+	return ReadConfiguration(configFile)
 }
 
-func isExistConfigFile() error {
+func isExistConfigFile(configFile string) error {
+	if len(configFile) > 0 {
+		if utils.Exists(configFile) {
+			return nil
+		}
+		return errors.New("could not get config file")
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return errors.Wrap(err, "could not get home directory")
 	}
 
-	configFile := filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
+	configFile = filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
 	if utils.Exists(configFile) {
 		return nil
 	}
@@ -180,10 +191,16 @@ func getConfigFile() (string, error) {
 }
 
 // ReadConfiguration reads the afrog configuration file from disk.
-func ReadConfiguration() (*Config, error) {
-	afrogConfigFile, err := getConfigFile()
-	if err != nil {
-		return nil, err
+func ReadConfiguration(configFile string) (*Config, error) {
+	var afrogConfigFile string
+	var err error
+	if len(configFile) > 0 {
+		afrogConfigFile = configFile
+	} else {
+		afrogConfigFile, err = getConfigFile()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	file, err := os.Open(afrogConfigFile)
@@ -200,16 +217,27 @@ func ReadConfiguration() (*Config, error) {
 }
 
 // WriteConfiguration writes the updated afrog configuration to disk
-func WriteConfiguration(config *Config) error {
+func WriteConfiguration(config *Config, configFile string) error {
+	var afrogConfigFile string
+	var err error
+	if len(configFile) > 0 {
+		afrogConfigFile = configFile
+	} else {
+		afrogConfigFile, err = getConfigFile()
+		if err != nil {
+			return err
+		}
+	}
+
 	afrogConfigYAML, err := yaml.Marshal(&config)
 	if err != nil {
 		return err
 	}
 
-	afrogConfigFile, err := getConfigFile()
-	if err != nil {
-		return err
-	}
+	// afrogConfigFile, err = getConfigFile()
+	// if err != nil {
+	// 	return err
+	// }
 
 	file, err := os.OpenFile(afrogConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {

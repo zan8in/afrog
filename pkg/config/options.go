@@ -172,6 +172,9 @@ type Options struct {
 	OOBKey    string
 	OOBDomain string
 	OOBApiUrl string
+
+	// path to the afrog configuration file
+	ConfigFile string
 }
 
 func NewOptions() (*Options, error) {
@@ -255,6 +258,10 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.Dingtalk, "dingtalk", false, "Start a dingtalk webhook."),
 	)
 
+	flagSet.CreateGroup("configurations", "Configurations",
+		flagSet.StringVar(&options.ConfigFile, "config", "", "path to the afrog configuration file"),
+	)
+
 	_ = flagSet.Parse()
 
 	if err := options.VerifyOptions(); err != nil {
@@ -279,7 +286,7 @@ func (opt *Options) VerifyOptions() error {
 		}
 	}
 
-	config, err := NewConfig()
+	config, err := NewConfig(opt.ConfigFile)
 	if err != nil {
 		return err
 	}
