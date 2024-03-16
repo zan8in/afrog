@@ -498,6 +498,11 @@ afrog -T urls.txt
 ```
 ## -web Command
 The `-web` command allows for persistently storing vulnerabilities scanned by afrog into an SQLite3 database. Accessing http://x.x.x.x:16868 via a browser provides access to the vulnerability report webpage, where users can conduct simple keyword searches and filter results by vulnerability severity.
+
+```shell
+afrog -web
+
+```
 <img src="https://github.com/zan8in/afrog/blob/main/images/webcommand.png" >
 
 
