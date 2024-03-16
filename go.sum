@@ -1222,8 +1222,6 @@ github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauu
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/goupdate v1.0.0 h1:H3ZVndassN6jNkJROAEkGFHbiyax0yG1RSKXMhzvgLY=
 github.com/zan8in/goupdate v1.0.0/go.mod h1:lB3IFGNY/wLFj1qfPOyee2m7lplg/mSDpsng+ax7sc8=
-github.com/zan8in/oobadapter v0.0.0-20240228064213-611d47d14009 h1:WH7mV3GXvh8PRzevq/p0o6oRpw2Q6j0WbU2xLdZpa6Q=
-github.com/zan8in/oobadapter v0.0.0-20240228064213-611d47d14009/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/oobadapter v0.0.0-20240316010032-90d51fe61219 h1:oDGMh0SoiUYMOyKUrJ6i+mBu+MQs0cY0uLacdlosogM=
 github.com/zan8in/oobadapter v0.0.0-20240316010032-90d51fe61219/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86 h1:sAwnml3XSZlSYr0yMUvGUgtNQ1fJoU6AdwyMh1mKHwc=

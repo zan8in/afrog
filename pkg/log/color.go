@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gookit/color"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 type Color struct {

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 )
 

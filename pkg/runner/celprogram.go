@@ -22,8 +22,8 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/zan8in/afrog/pkg/proto"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 var (

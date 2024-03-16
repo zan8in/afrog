@@ -7,17 +7,17 @@
 
 <p align="center">
 <img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod">
-<a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
-<a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/v3/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
+<a href="https://github.com/zan8in/afrog/v3/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/v3/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/v3/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/v3/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
 </p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
-  <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md">Helper Function</a>
+  <a href="https://github.com/zan8in/afrog/v3/releases">Download</a> •
+  <a href="https://github.com/zan8in/afrog/v3/wiki">Wiki</a> •
+  <a href="https://github.com/zan8in/afrog/v3/blob/main/afrog-helper-function.md">Helper Function</a>
 
 </p>
 
@@ -441,7 +441,7 @@ you can install it with:
 
 **Binary**
 ```sh
-$ https://github.com/zan8in/afrog/releases/latest
+$ https://github.com/zan8in/afrog/v3/releases/latest
 ```
 
 **Github**
@@ -454,7 +454,7 @@ $ ./afrog -h
 
 **Go**
 ```sh
-$ go install -v github.com/zan8in/afrog/cmd/afrog@latest
+$ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
 ```
 
 ## Running afrog
@@ -553,14 +553,14 @@ The JNDI vulnerability refers to security vulnerabilities that exploit the JNDI 
 
 To obtain JNDI, follow these steps:
 
-- To obtain the source code and compile the JAR file, please visit the official website [github.com/r00tSe7en/JNDIMonitor](https://github.com/r00tSe7en/JNDIMonitor). Alternatively, you can go to the official afrog website [afrog/helper/jndi](https://github.com/zan8in/afrog/tree/main/helper/jndi) to download the pre-compiled JAR file
+- To obtain the source code and compile the JAR file, please visit the official website [github.com/r00tSe7en/JNDIMonitor](https://github.com/r00tSe7en/JNDIMonitor). Alternatively, you can go to the official afrog website [afrog/helper/jndi](https://github.com/zan8in/afrog/v3/tree/main/helper/jndi) to download the pre-compiled JAR file
 - Upload the `JNDIMonitor-2.0.1-SNAPSHOT.jar` file to the server (such as a VPS server), and execute the following startup command:
 
 ```sh
 java -jar ./JNDIMonitor-2.0.1-SNAPSHOT.jar -i 0.0.0.0 -l 1389 -p 3456
 ```
 
-Below are example methods for writing POCs. [Please click to view](https://github.com/zan8in/afrog/wiki/Examples#solr-log4j-rce).
+Below are example methods for writing POCs. [Please click to view](https://github.com/zan8in/afrog/v3/wiki/Examples#solr-log4j-rce).
 
 ## Json Output (For developers)
 
@@ -587,9 +587,9 @@ afrog -t https://example.com -ja result.json
 
 ## Screenshot
 
-![](https://github.com/zan8in/afrog/blob/main/images/1.png)
+![](https://github.com/zan8in/afrog/v3/blob/main/images/1.png)
 
-<!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
+<!-- ![](https://github.com/zan8in/afrog/v3/blob/main/images/report-new.png) -->
 
 ## As Library
 
@@ -623,7 +623,7 @@ More examples:
 
 To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
 
-<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" />
+<img src="https://github.com/zan8in/afrog/v3/blob/main/images/discussion.jpg" width="33%" />
 
 ## 404Starlink
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">

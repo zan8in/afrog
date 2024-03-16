@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/proto"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/retryablehttp"
 	"golang.org/x/net/context"
 )
@@ -192,7 +192,7 @@ func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) e
 	utf8RespBody := ""
 	if len(respBody) > 0 {
 		utf8RespBody = utils.Str2UTF8(string(respBody))
-		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/issues/68
+		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
 	}
 
 	// store the response

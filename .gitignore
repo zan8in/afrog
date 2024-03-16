@@ -14,7 +14,7 @@
 logs
 urls*
 *.txt
-*.html
+*/reports/*.html
 *.json
 
 # Dependency directories (remove the comment below to include it)

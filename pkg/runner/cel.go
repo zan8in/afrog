@@ -11,7 +11,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
-	"github.com/zan8in/afrog/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/log"
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 	"gopkg.in/yaml.v2"
 )

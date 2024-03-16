@@ -5,7 +5,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/zan8in/afrog/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 )
 
 func main() {

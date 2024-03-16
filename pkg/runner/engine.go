@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
-	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/log"
-	"github.com/zan8in/afrog/pkg/poc"
-	"github.com/zan8in/afrog/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/gologger"
 )
 
@@ -208,7 +208,7 @@ func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 	defer runner.engine.ReleaseChecker(c)
 
 	defer func() {
-		// https://github.com/zan8in/afrog/issues/7
+		// https://github.com/zan8in/afrog/v3/issues/7
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
 			runner.OnResult(c.Result)

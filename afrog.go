@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/zan8in/afrog/pkg/config"
-	"github.com/zan8in/afrog/pkg/result"
-	"github.com/zan8in/afrog/pkg/runner"
-	"github.com/zan8in/afrog/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/runner"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 )
