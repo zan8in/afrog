@@ -136,5 +136,3 @@ require (
 	golang.org/x/text v0.13.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )
-
-retract v3.0.1
