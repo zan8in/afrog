@@ -1,0 +1,27 @@
+id: circarlife-installer
+
+info:
+  name: CirCarLife - Installer
+  author: geeknik
+  severity: critical
+  verified: true
+  description: |-
+    A CirCarLife admin panel was accessed. CirCarLife is an internet-connected electric vehicle charging station
+    shodan: title:"- setup" html:"Modem setup"
+  reference:
+    - https://circontrol.com/
+  tags: scada,circontrol,circarlife,setup,exposure,panel,installer,misconfig
+  created: 2024/03/18
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /html/setup.html
+    expression: |
+      response.raw_header.ibcontains(b'CirCarLife Scada') && 
+      response.body.bcontains(b'<title>- setup</title>') &&
+      response.body.bcontains(b'Network setup') &&
+      response.body.bcontains(b'Modem setup') &&
+      response.body.bcontains(b'Security setup')
+expression: r0()
