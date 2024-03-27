@@ -1,0 +1,117 @@
+id: graphql-detect
+
+info:
+  name: GraphQL API Detection
+  author: nkxxkn,elsfa7110,ofjaaah,exceed
+  severity: info
+  verified: true
+  description: |-
+    fofa:  product="GraphQL"
+  tags: tech,graphql
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /HyperGraphQL
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r1:
+    request:
+      method: POST
+      path: /___graphql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r2:
+    request:
+      method: POST
+      path: /altair
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r3:
+    request:
+      method: POST
+      path: /api/cask/graphql-playground
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r4:
+    request:
+      method: POST
+      path: /api/graphql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r5:
+    request:
+      method: POST
+      path: /api/graphql/v1
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r6:
+    request:
+      method: POST
+      path: /explorer
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r7:
+    request:
+      method: POST
+      path: /express-graphql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r8:
+    request:
+      method: POST
+      path: /gql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r9:
+    request:
+      method: POST
+      path: /graph
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r10:
+    request:
+      method: POST
+      path: /graph_cms
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r11:
+    request:
+      method: POST
+      path: /graphiql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+  r12:
+    request:
+      method: POST
+      path: /graphql
+      headers:
+        Content-Type: application/json
+      body: '{"query":"query IntrospectionQuery{__schema {queryType { name }}}"}'
+    expression: response.status == 200 && response.headers['content-type'].contains('application/json') && (response.body.bcontains(b'__schema') || "(Introspection|INTROSPECTION|introspection).*?".bmatches(response.body) || ".*?operation not found.*?".bmatches(response.body))
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() || r10() || r11() || r12()
