@@ -59,7 +59,7 @@ func Init(opt *Options) (err error) {
 	return nil
 }
 
-func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) error {
+func Request(target string, header []string, rule poc.Rule, variableMap map[string]any) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
@@ -147,10 +147,24 @@ func Request(target, cookie string, rule poc.Rule, variableMap map[string]any) e
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
 
-	ck := convertCookie(req.Header.Get("Cookie"), cookie)
-	if len(ck) > 0 {
-		req.Header.Set("Cookie", ck)
+	// 自定义 header，2024.04.13
+	if len(header) > 0 {
+		for _, va := range header {
+			arr := strings.Split(va, ":")
+			key := strings.TrimSpace(arr[0])
+			value := strings.TrimLeft(arr[1], " ")
+
+			if len(arr) == 2 && len(key) > 0 {
+				req.Header.Add(key, value)
+			}
+		}
 	}
+
+	// 自定义 cookie 被废弃，2024.04.13
+	// ck := convertCookie(req.Header.Get("Cookie"), cookie)
+	// if len(ck) > 0 {
+	// 	req.Header.Set("Cookie", ck)
+	// }
 
 	// latency
 	var milliseconds int64

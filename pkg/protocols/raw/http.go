@@ -43,28 +43,64 @@ func GetRawHTTP(proxy string, timeout int) *rawhttp.Client {
 	return rawHttpClient
 }
 
-func addCookie(request, cookie string) string {
-	if len(cookie) == 0 {
+// 自定义 cookie 已弃用 2024.04.13
+// func addCookie(request, cookie string) string {
+// 	if len(cookie) == 0 {
+// 		return request
+// 	}
+
+// 	list := strings.Split(request, "\n")
+// 	isCookie := false
+// 	for k, l := range list {
+// 		if strings.HasPrefix(strings.ToLower(l), "cookie:") {
+// 			list[k] = strings.TrimSuffix(l, ";") + "; " + cookie
+// 			isCookie = true
+// 		}
+// 	}
+
+// 	if !isCookie && len(list) > 2 {
+// 		list = append(list[:2], append([]string{"Cookie: " + cookie}, list[2:]...)...)
+// 	}
+
+// 	return strings.Join(list, "\n")
+// }
+
+// 自定义 header 代替 自定义 cookie 2024.04.13
+func addHeader(request, key, value string) string {
+	if len(key) == 0 {
 		return request
 	}
 
 	list := strings.Split(request, "\n")
-	isCookie := false
+
 	for k, l := range list {
-		if strings.HasPrefix(strings.ToLower(l), "cookie:") {
-			list[k] = strings.TrimSuffix(l, ";") + "; " + cookie
-			isCookie = true
+		if strings.HasPrefix(strings.ToLower(l), strings.ToLower(key)+":") {
+			list[k] = strings.TrimSuffix(l, ";") + "; " + strings.TrimLeft(value, " ")
+			return strings.Join(list, "\n")
 		}
 	}
 
-	if !isCookie && len(list) > 2 {
-		list = append(list[:2], append([]string{"Cookie: " + cookie}, list[2:]...)...)
+	if len(list) > 1 {
+		list = append(list[:2], append([]string{key + ": " + strings.TrimLeft(value, " ")}, list[2:]...)...)
 	}
 
 	return strings.Join(list, "\n")
 }
 
-func (r *RawHttp) RawHttpRequest(request, cookie, baseurl string, variableMap map[string]any) error {
+func appendHeader(request string, header []string) string {
+	if len(header) == 0 {
+		return request
+	}
+	for _, v := range header {
+		arr := strings.Split(v, ":")
+		if len(arr) == 2 && len(arr[0]) > 0 {
+			request = addHeader(request, arr[0], arr[1])
+		}
+	}
+	return request
+}
+
+func (r *RawHttp) RawHttpRequest(request, baseurl string, header []string, variableMap map[string]any) error {
 	var err error
 	var resp *http.Response
 
@@ -73,10 +109,9 @@ func (r *RawHttp) RawHttpRequest(request, cookie, baseurl string, variableMap ma
 
 	request = AssignVariableRaw(request, variableMap)
 
-	ckrequest := addCookie(request, cookie)
-	// fmt.Println(ckrequest)
+	newheader := appendHeader(request, header)
 
-	rhttp, err := Parse(ckrequest, baseurl, true)
+	rhttp, err := Parse(newheader, baseurl, true)
 	if err != nil {
 		return fmt.Errorf("parse Failed, %s", err.Error())
 	}

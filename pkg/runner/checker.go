@@ -116,11 +116,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					// 新增最大响应体限制
 					// @editor 2024/02/06
 				}
-				err = rt.RawHttpRequest(rule.Request.Raw, c.Options.Cookie, target, c.VariableMap)
+				err = rt.RawHttpRequest(rule.Request.Raw, target, c.Options.Header, c.VariableMap)
 
 			} else {
 
-				err = retryhttpclient.Request(target, c.Options.Cookie, rule, c.VariableMap)
+				err = retryhttpclient.Request(target, c.Options.Header, rule, c.VariableMap)
 			}
 		}
 
