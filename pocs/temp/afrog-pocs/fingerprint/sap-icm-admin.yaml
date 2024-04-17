@@ -1,0 +1,24 @@
+id: sap-icm-admin
+
+info:
+  name: SAP ICM Admin Web Interface
+  author: t3l3machus
+  severity: info
+  description: The SAP ICM (Internet Communication Manager) admin monitor interface is often set to public and can be accessed without authentication. The interface discloses version information about the underlying operating system, a brief SAP patch level overview, running services including their corresponding ports and more.
+  reference:
+    - https://www.saptechnicalguru.com/information-disclosure-sap-web-administration-interface/
+  tags: sap,misconfig,admin,dashboard
+  created: 2024/04/15
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sap/admin/public/index.html
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Administration</title>')
+  r1:
+    request:
+      method: GET
+      path: /sap/admin/public/session_logon.html
+    expression: response.status == 200 && response.body.ibcontains(b'<TITLE>ICM Administration</TITLE>')
+expression: r0() || r1()

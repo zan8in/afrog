@@ -1,0 +1,16 @@
+id: sap-web-dispatcher-administration
+
+info:
+  name: SAP Web Dispatcher Administration
+  author: zan8in
+  severity: info
+  tags: sap,misconfig,admin,dashboard
+  created: 2024/04/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sap/wdisp/admin/public/session_logon.html
+    expression: response.status == 200 && response.body.ibcontains(b'<TITLE>Web Dispatcher Administration</TITLE>')
+expression: r0()

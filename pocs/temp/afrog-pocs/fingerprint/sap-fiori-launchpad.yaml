@@ -1,0 +1,23 @@
+id: sap-fiori-launchpad
+
+info:
+  name: SAP Fiori Launchpad Login Panel - Detect
+  author: DhiyaneshDk
+  severity: info
+  description: Fiori Launchpad login panel was detected.
+  reference:
+    - https://www.exploit-db.com/ghdb/7941
+  tags: sap,fiori,edb,panel
+  created: 2024/04/15
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sap/bc/ui5_ui5/ui2/ushell/shells/abap/FioriLaunchpad.html
+    expression: |
+      response.status == 200 &&
+      (response.body.bcontains(b'<title>登录</title>') || response.body.bcontains(b'<title>Logon</title>')) &&
+      response.body.bcontains(b'SAP SE') &&
+      response.headers['content-type'].contains("text/html")
+expression: r0()
