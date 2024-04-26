@@ -79,31 +79,31 @@ func main() {
 	//     for(var i=0;i<2;i++){
 	//         newNode.insertCell();
 	// 	`
-	v2 := "Location: ./zipkin/ xxxx"
+	v2 := "uid=33(www-data) gid=33(www-data) groups=33(www-data)"
 
-	// v11 := ".*infoPicSaveName\\.value\\+=\";\"\\+\"(\\d+)\\.jsp\".*"
-	// re2 := regexp2.MustCompile(string(v11), 0)
+	v11 := "((u|g)id|groups)=[0-9]{1,4}\\(.+\\)"
+	re2 := regexp2.MustCompile(string(v11), 0)
 
-	// isMatch, err := re2.MatchString(string([]byte(v2)))
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// } else {
-	// 	fmt.Println(isMatch)
-	// }
-
-	v1 := "Location: \\./(?P<path>.+?)/"
-	resultMap := make(map[string]string)
-	re := regexp2.MustCompile(string(v1), regexp2.RE2)
-	if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {
-		gps := m.Groups()
-		for n, gp := range gps {
-			if n == 0 {
-				continue
-			}
-			resultMap[gp.Name] = gp.String()
-		}
+	isMatch, err := re2.MatchString(string([]byte(v2)))
+	if err != nil {
+		fmt.Println(err.Error())
+	} else {
+		fmt.Println(isMatch)
 	}
-	fmt.Println(resultMap)
+
+	// v1 := "Location: \\./(?P<path>.+?)/"
+	// resultMap := make(map[string]string)
+	// re := regexp2.MustCompile(string(v1), regexp2.RE2)
+	// if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {
+	// 	gps := m.Groups()
+	// 	for n, gp := range gps {
+	// 		if n == 0 {
+	// 			continue
+	// 		}
+	// 		resultMap[gp.Name] = gp.String()
+	// 	}
+	// }
+	// fmt.Println(resultMap)
 }
 
 func main3() {
