@@ -7,17 +7,17 @@
 
 <p align="center">
 <img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod">
-<a href="https://github.com/zan8in/afrog/v3/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
-<a href="https://github.com/zan8in/afrog/v3/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/v3/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/v3/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/v3/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
+<a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
+<a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
 </p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/v3/releases">Download</a> •
-  <a href="https://github.com/zan8in/afrog/v3/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/v3/blob/main/afrog-helper-function.md">Helper Function</a>
+  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
+  <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
+  <a href="https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md">Helper Function</a>
 
 </p>
 
@@ -454,7 +454,7 @@ $ ./afrog -h
 
 **Go**
 ```sh
-$ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+$ go install -v github.com/zan8in/afrog/cmd/afrog@latest
 ```
 
 ## Running afrog
@@ -617,7 +617,7 @@ More examples:
 
 To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
 
-<img src="https://github.com/zan8in/afrog/v3/blob/main/images/discussion.jpg" width="33%" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" />
 
 ## 404Starlink
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
