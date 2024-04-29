@@ -23,7 +23,7 @@ rules:
 expression: r0()
 
 ```
-正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](https://github.com/zan8in/afrog/v3/blob/main/afrog-helper-function.md#md5)
+正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md#md5)
 
 内置函数源码位置：`v2\pkg\runner\celcompile.go`
 
@@ -829,7 +829,7 @@ User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 ysoserial(payload, command, encode)
 ```
 
-payload: 攻击载荷，[支持payload列表](https://github.com/zan8in/afrog/v3/blob/main/v2/pkg/utils/ysoserial.go)
+payload: 攻击载荷，[支持payload列表](https://github.com/zan8in/afrog/blob/main/pkg/utils/ysoserial.go)
 
 command: 执行的命令，比如 xxx.dnslog.cn
 
@@ -837,7 +837,7 @@ encode: 加密方法，目前支持：base64 和 hex
 
 参考示例
 
-[CVE-2023-49070](https://github.com/zan8in/afrog/v3/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2023/CVE-2023-49070.yaml#L2)、[CVE-2021-29200](https://github.com/zan8in/afrog/v3/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2021/CVE-2021-29200.yaml)
+[CVE-2023-49070](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2023/CVE-2023-49070.yaml#L2)、[CVE-2021-29200](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2021/CVE-2021-29200.yaml)
 
 ### AesCBC
 用于 aes cbc 加密的 PoC
@@ -856,4 +856,4 @@ iv: 加密 iv
 
 参考示例 
 
-[CVE-2023-20888](https://github.com/zan8in/afrog/v3/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/v2/pocs/afrog-pocs/CVE/2023/CVE-2023-20888.yaml)
+[CVE-2023-20888](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2023/CVE-2023-20888.yaml)
