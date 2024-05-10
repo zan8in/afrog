@@ -1,0 +1,25 @@
+id: huawei-esight-detect
+
+info:
+  name: Huawei ESight Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |
+    Huawei ESight api接口存在漏洞，攻击者通过泄漏的信息可以获得账号密码登录后台。
+    ------------ SerialNumber 后8位即为初始密码------------
+    fofa: app="ESight-ESight-ESight"
+  references:
+    - https://www.exploit-db.com/exploits/50047
+  tags: huawei,esight,panel
+  created: 2024/05/10
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /sso/login.action
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'src="/sso/themes/default/images/esight_frontground.png"')
+expression: r0()
