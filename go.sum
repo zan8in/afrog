@@ -1224,6 +1224,8 @@ github.com/zan8in/goupdate v1.0.0 h1:H3ZVndassN6jNkJROAEkGFHbiyax0yG1RSKXMhzvgLY
 github.com/zan8in/goupdate v1.0.0/go.mod h1:lB3IFGNY/wLFj1qfPOyee2m7lplg/mSDpsng+ax7sc8=
 github.com/zan8in/oobadapter v0.0.0-20240316010032-90d51fe61219 h1:oDGMh0SoiUYMOyKUrJ6i+mBu+MQs0cY0uLacdlosogM=
 github.com/zan8in/oobadapter v0.0.0-20240316010032-90d51fe61219/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v0.0.0-20240511071018-860c57c0d7fc h1:za8Iy0bIwDdU9c9blOoMcp/FsaaWHk9lb94pxoo8ToY=
+github.com/zan8in/oobadapter v0.0.0-20240511071018-860c57c0d7fc/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86 h1:sAwnml3XSZlSYr0yMUvGUgtNQ1fJoU6AdwyMh1mKHwc=
 github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
