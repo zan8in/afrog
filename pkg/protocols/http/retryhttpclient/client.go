@@ -131,10 +131,13 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	// created: 2023/07/25
 	if len(rule.Request.Host) > 0 {
 		req.Request.Host = setVariableMap(rule.Request.Host, variableMap)
-		req.URL.Host = setVariableMap(rule.Request.Host, variableMap)
 	}
 
 	for k, v := range rule.Request.Headers {
+		if !strings.HasPrefix(strings.ToLower(k), "host") {
+			req.Header.Set(k, setVariableMap(v, variableMap))
+			continue
+		}
 		req.Header.Add(k, setVariableMap(v, variableMap))
 	}
 
