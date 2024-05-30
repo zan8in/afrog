@@ -454,7 +454,7 @@ $ ./afrog -h
 
 **Go**
 ```sh
-$ go install -v github.com/zan8in/afrog/cmd/afrog@latest
+$ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
 ```
 
 ## Running afrog
