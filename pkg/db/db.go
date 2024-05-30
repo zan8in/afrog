@@ -9,6 +9,8 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/gologger"
+	snowflake "github.com/zan8in/pins/snowflake"
 	"gopkg.in/yaml.v2"
 )
 
@@ -100,8 +102,13 @@ var (
 	TaskID string
 )
 
+var SnowFlake *snowflake.Snowflake
+
 func init() {
 	TaskID = createTaskID()
+	if err := NewSnowFlake(); err != nil {
+		gologger.Fatal().Msgf("New SnowFlake failed: %v", err)
+	}
 }
 
 func createTaskID() string {
@@ -124,4 +131,13 @@ func GetSqliteFullDBName() string {
 		return configFile
 	}
 	return configFile
+}
+
+func NewSnowFlake() error {
+	if node, err := snowflake.NewSnowflake(1); err != nil {
+		return err
+	} else {
+		SnowFlake = node
+		return nil
+	}
 }

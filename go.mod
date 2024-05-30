@@ -22,7 +22,7 @@ require (
 	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
 	github.com/zan8in/goupdate v1.0.0
 	github.com/zan8in/oobadapter v0.0.0-20240511071018-860c57c0d7fc
-	github.com/zan8in/pins v0.0.0-20231009082442-920437d7fa86
+	github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
 	github.com/zan8in/retryablehttp v0.0.0-20230424151727-99fdd3c661d7
 	github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a

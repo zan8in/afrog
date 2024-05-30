@@ -108,7 +108,7 @@ func CloseX() {
 }
 
 func addx(r *result.Result) error {
-	insertSQL := "INSERT INTO result(taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	insertSQL := "INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
 	currentTime := time.Now()
 	createdTime := currentTime.Format("2006-01-02 15:04:05")
@@ -139,7 +139,7 @@ func addx(r *result.Result) error {
 
 	finger, _ := json.Marshal(r.FingerResult)
 
-	_, err := dbx.Exec(insertSQL, db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
+	_, err := dbx.Exec(insertSQL, db2.SnowFlake.NextID(), db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
 	return err
 }
 
