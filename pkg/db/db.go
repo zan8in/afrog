@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/poc"
-	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	snowflake "github.com/zan8in/pins/snowflake"
 	"gopkg.in/yaml.v2"
@@ -120,17 +120,18 @@ func createTaskID() string {
 	return taskID
 }
 
-func GetSqliteFullDBName() string {
+func DbName() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
 
-	configFile := filepath.Join(homeDir, ".config", "afrog", DBName+".db")
-	if !utils.Exists(configFile) {
-		return configFile
+	path := path.Join(homeDir, ".config", "afrog")
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		return ""
 	}
-	return configFile
+
+	return filepath.Join(path, DBName+".db")
 }
 
 func NewSnowFlake() error {

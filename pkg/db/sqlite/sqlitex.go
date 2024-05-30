@@ -24,11 +24,6 @@ var wg sync.WaitGroup
 
 func InitX() error {
 
-	err := initDBX()
-	if err != nil || dbx == nil {
-		return fmt.Errorf("error initializing databasex: %v", err)
-	}
-
 	insertChannel = make(chan *result.Result)
 
 	wg.Add(1)
@@ -71,8 +66,9 @@ func saveToDatabaseX() {
 	wgAddx.Wait()
 }
 
-func initDBX() error {
-	dbx = sqlx.MustConnect("sqlite3", "file:"+db2.GetSqliteFullDBName()+"?cache=shared&mode=rwc&_journal_mode=WAL")
+func NewWebSqliteDB() error {
+	// 初始化数据库连接
+	dbx = sqlx.MustConnect("sqlite3", "file:"+db2.DbName()+"?cache=shared&mode=rwc&_journal_mode=WAL")
 
 	// 设置连接池参数（可选）
 	dbx.SetMaxOpenConns(50) // 设置最大打开连接数

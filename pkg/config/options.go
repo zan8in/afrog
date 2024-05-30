@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/output"
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -294,6 +295,10 @@ func (opt *Options) VerifyOptions() error {
 		return err
 	}
 	opt.Config = config
+
+	if err := sqlite.NewWebSqliteDB(); err != nil {
+		return fmt.Errorf("init sqlite db error: %v", err)
+	}
 
 	if opt.Dingtalk {
 		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
