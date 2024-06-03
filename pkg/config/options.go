@@ -110,10 +110,10 @@ type Options struct {
 	Concurrency int
 
 	// maximum number of requests to send per second (default 150)
-	ReverseRateLimit int
+	OOBRateLimit int
 
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
-	ReverseConcurrency int
+	OOBConcurrency int
 
 	// Smart Control Concurrency
 	Smart bool
@@ -221,8 +221,8 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
-		flagSet.IntVarP(&options.ReverseRateLimit, "reverse-rate-limit", "rrl", 50, "reverse poc maximum number of requests to send per second"),
-		flagSet.IntVarP(&options.ReverseConcurrency, "reverse-concurrency", "rc", 20, "reverse poc maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.OOBConcurrency, "oob-concurrency", "oc", 25, "oob poc maximum number of afrog-pocs to be executed in parallel"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",

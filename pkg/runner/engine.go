@@ -2,8 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -70,46 +68,8 @@ func (runner *Runner) Execute() {
 		options.SmartControl()
 	}
 
+	// 开始 普通POC 扫描 @edit 2024/05/30
 	rwg := sync.WaitGroup{}
-
-	rwg.Add(1)
-	go func() {
-		defer rwg.Done()
-
-		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(options.ReverseRateLimit))
-		var wg sync.WaitGroup
-
-		p, _ := ants.NewPoolWithFunc(options.ReverseConcurrency, func(p any) {
-
-			defer wg.Done()
-			<-runner.engine.ticker.C
-
-			tap := p.(*TransData)
-			runner.exec(tap)
-
-		})
-		defer p.Release()
-
-		for _, poc := range reversePocs {
-			for _, t := range runner.options.Targets.List() {
-				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
-					runner.NotVulCallback()
-					continue
-				}
-
-				wg.Add(1)
-				p.Invoke(&TransData{Target: t.(string), Poc: poc})
-			}
-			// Record PoC completion progress
-			runner.ScanProgress.Increment(poc.Id)
-		}
-
-		wg.Wait()
-
-	}()
-
-	// fmt.Println("----------------------------------------------------------------")
-
 	rwg.Add(1)
 	go func() {
 		defer rwg.Done()
@@ -145,7 +105,44 @@ func (runner *Runner) Execute() {
 
 		wg.Wait()
 	}()
+	rwg.Wait()
 
+	// 开始 OOB POC 扫描  @edit 2024/05/30
+	rwg = sync.WaitGroup{}
+	rwg.Add(1)
+	go func() {
+		defer rwg.Done()
+
+		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(options.OOBRateLimit))
+		var wg sync.WaitGroup
+
+		p, _ := ants.NewPoolWithFunc(options.OOBConcurrency, func(p any) {
+
+			defer wg.Done()
+			<-runner.engine.ticker.C
+
+			tap := p.(*TransData)
+			runner.exec(tap)
+
+		})
+		defer p.Release()
+
+		for _, poc := range reversePocs {
+			for _, t := range runner.options.Targets.List() {
+				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
+					runner.NotVulCallback()
+					continue
+				}
+
+				wg.Add(1)
+				p.Invoke(&TransData{Target: t.(string), Poc: poc})
+			}
+			// Record PoC completion progress
+			runner.ScanProgress.Increment(poc.Id)
+		}
+		wg.Wait()
+
+	}()
 	rwg.Wait()
 }
 
@@ -183,26 +180,6 @@ func (runner *Runner) exec(tap *TransData) {
 	}
 }
 
-func parseElaspsedTime(time time.Duration) string {
-	s := fmt.Sprintf("%v", time)
-	if len(s) > 0 {
-		if strings.HasSuffix(s, "s") && !strings.HasSuffix(s, "ms") {
-			t := strings.Replace(s, "s", "", -1)
-			ts, err := strconv.ParseFloat(t, 64)
-			if err != nil {
-				return s
-			}
-			if ts >= 40 {
-				return log.LogColor.Midium(s)
-			}
-		}
-		if strings.HasSuffix(s, "m") {
-			return log.LogColor.Red(s)
-		}
-	}
-	return log.LogColor.Green(s)
-}
-
 func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 	c := runner.engine.AcquireChecker()
 	defer runner.engine.ReleaseChecker(c)
@@ -227,6 +204,26 @@ type TransData struct {
 	Target string
 	Poc    poc.Poc
 }
+
+// func parseElaspsedTime(time time.Duration) string {
+// 	s := fmt.Sprintf("%v", time)
+// 	if len(s) > 0 {
+// 		if strings.HasSuffix(s, "s") && !strings.HasSuffix(s, "ms") {
+// 			t := strings.Replace(s, "s", "", -1)
+// 			ts, err := strconv.ParseFloat(t, 64)
+// 			if err != nil {
+// 				return s
+// 			}
+// 			if ts >= 40 {
+// 				return log.LogColor.Midium(s)
+// 			}
+// 		}
+// 		if strings.HasSuffix(s, "m") {
+// 			return log.LogColor.Red(s)
+// 		}
+// 	}
+// 	return log.LogColor.Green(s)
+// }
 
 // func JndiTest() bool {
 // 	url := "http://" + config.ReverseJndi + ":" + config.ReverseApiPort + "/?api=test"

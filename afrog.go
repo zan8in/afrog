@@ -42,8 +42,8 @@ func NewScanner(target []string, opt Scanner) error {
 	s.Proxy = opt.WithProxy()
 	s.MaxRespBodySize = opt.WithMaxRespBodySize()
 	s.DisableOutputHtml = opt.WithDisableOutputHtml()
-	s.ReverseConcurrency = opt.WithReverseConcurrency()
-	s.ReverseRateLimit = opt.WithReverseRateLimit()
+	s.OOBConcurrency = opt.WithOOBConcurrency()
+	s.OOBRateLimit = opt.WithOOBConcurrency()
 	s.Smart = opt.WithSmart()
 	s.PocExecutionDurationMonitor = opt.WithPocExecutionDurationMonitor()
 	s.VulnerabilityScannerBreakpoint = opt.WithVulnerabilityScannerBreakpoint()
@@ -71,8 +71,8 @@ func NewScanner(target []string, opt Scanner) error {
 		Proxy:                          s.Proxy,
 		MaxRespBodySize:                s.MaxRespBodySize,
 		DisableOutputHtml:              s.DisableOutputHtml,
-		ReverseRateLimit:               s.ReverseRateLimit,
-		ReverseConcurrency:             s.ReverseConcurrency,
+		OOBRateLimit:                   s.OOBRateLimit,
+		OOBConcurrency:                 s.OOBConcurrency,
 		Smart:                          s.Smart,
 		PocExecutionDurationMonitor:    s.PocExecutionDurationMonitor,
 		VulnerabilityScannerBreakpoint: s.VulnerabilityScannerBreakpoint,
@@ -264,15 +264,15 @@ func (s *Scanner) WithMaxRespBodySize() int {
 func (s *Scanner) WithDisableOutputHtml() bool {
 	return s.DisableOutputHtml
 }
-func (s *Scanner) WithReverseRateLimit() int {
-	if s.ReverseRateLimit > 0 {
-		return s.ReverseRateLimit
+func (s *Scanner) WithOOBRateLimit() int {
+	if s.OOBRateLimit > 0 {
+		return s.OOBRateLimit
 	}
 	return 50
 }
-func (s *Scanner) WithReverseConcurrency() int {
-	if s.ReverseConcurrency > 0 {
-		return s.ReverseConcurrency
+func (s *Scanner) WithOOBConcurrency() int {
+	if s.OOBConcurrency > 0 {
+		return s.OOBConcurrency
 	}
 	return 20
 }
