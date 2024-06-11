@@ -519,14 +519,6 @@ reverse:
     domain: "xxxxxx.cey2e.io"
   dnslogcn:
     domain: dnslog.cn
-  jndi: (Deprecated)
-    jndi_address: ""
-    ldap_port: ""
-    api_port: ""
-  eye: (Deprecated)
-    host: ""
-    token: ""
-    domain: ""
   alphalog:
     domain: dnslogxx.sh
     api_url: "http://dnslogxx.sh/"
@@ -534,6 +526,11 @@ reverse:
     x_token: "xraytest"
     domain: dnslogxx.sh
     api_url: "http://x.x.0.x:8777"
+  revsuit:
+    token: "xx"
+    dns_domain: "log.xx.com"
+    http_url: "http://x.x.x.x/log/"
+    api_url: "http://x.x.x.x/helplog"
 ```
 
 `reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification. 
@@ -555,6 +552,11 @@ Need to build services
 ### Xray
 Need to build services
 [xray](https://docs.xray.cool/tools/xray/advanced/reverse)
+
+### Revsuit
+Need to build services
+[Revsuit](https://github.com/Li4n0/revsuit)、
+[Tutorial](https://mp.weixin.qq.com/s/hGwcMz8sh7BImBjI3wHqnQ)
 
 ## Json Output (For developers)
 
