@@ -48,7 +48,7 @@ type Reverse struct {
 	Eye      Eye      `yaml:"eye"`
 	Jndi     Jndi     `yaml:"jndi"`
 	Xray     Xray     `yaml:"xray"`
-	Recvsuit Recvsuit `yaml:"recvsuit"`
+	Revsuit  Revsuit  `yaml:"revsuit"`
 }
 
 type Ceye struct {
@@ -77,7 +77,7 @@ type Xray struct {
 	ApiUrl string `yaml:"api_url"`
 }
 
-type Recvsuit struct {
+type Revsuit struct {
 	Token     string `yaml:"token"`
 	DnsDomain string `yaml:"dns_domain"`
 	HttpUrl   string `yaml:"http_url"`
@@ -133,11 +133,11 @@ func NewConfig(configFile string) (*Config, error) {
 		reverse.Xray.Domain = ""
 		reverse.Xray.ApiUrl = "http://x.x.x.x:8777"
 
-		// recvsuit
-		reverse.Recvsuit.Token = ""
-		reverse.Recvsuit.DnsDomain = ""
-		reverse.Recvsuit.HttpUrl = ""
-		reverse.Recvsuit.ApiUrl = ""
+		// revsuit
+		reverse.Revsuit.Token = ""
+		reverse.Revsuit.DnsDomain = ""
+		reverse.Revsuit.HttpUrl = ""
+		reverse.Revsuit.ApiUrl = ""
 
 		c.Reverse = reverse
 

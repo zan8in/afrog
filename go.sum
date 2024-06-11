@@ -1228,6 +1228,8 @@ github.com/zan8in/oobadapter v0.0.0-20240609135501-eb0660a41a8a h1:pIbBpyzxQcIUh
 github.com/zan8in/oobadapter v0.0.0-20240609135501-eb0660a41a8a/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/oobadapter v0.0.0-20240609140910-00592f7da081 h1:8ZMwMDe9grjUi/GKuVkthqB5+6uZkVzfHVJ9ifm3er0=
 github.com/zan8in/oobadapter v0.0.0-20240609140910-00592f7da081/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v0.0.0-20240611013553-c79cb5eec939 h1:3ARQ+mnJ4MZKFJZUayUymMJiJ5hXpHiDv1PI7nxaRaA=
+github.com/zan8in/oobadapter v0.0.0-20240611013553-c79cb5eec939/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a h1:VyIgWXlK5oEr/azRm/iHJjV6urHqwTIiJYxGKOnSIgg=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
