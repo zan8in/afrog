@@ -171,10 +171,11 @@ type Options struct {
 	QueryCount int
 
 	// oobadapter, eg: `-oob ceyeio` or `-oob dnslogcn` or `-oob alphalog`
-	OOB       string
-	OOBKey    string
-	OOBDomain string
-	OOBApiUrl string
+	OOB        string
+	OOBKey     string
+	OOBDomain  string
+	OOBHttpUrl string
+	OOBApiUrl  string
 
 	// path to the afrog configuration file
 	ConfigFile string

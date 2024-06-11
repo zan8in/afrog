@@ -9,14 +9,14 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-const Version = "3.0.6"
+const Version = "3.0.7"
 
 func InitBanner() {
 	fmt.Printf("\r\n|\tA F 🐸 O G\t|")
 }
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Bring color to life")
+	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Dream a dream for you")
 }
 
 func BannerAnimate(u *AfrogUpdate) {
@@ -25,7 +25,7 @@ func BannerAnimate(u *AfrogUpdate) {
 	for i := 0; i < 1000; i++ {
 		for _, char := range animationChars {
 			fmt.Printf("\r%c\tA F 🐸 O G\t%c", char, char)
-			fmt.Printf("\r\t\t\t\t%s/%s\t%c\t%s", EngineV(u), PocV(u), char, "Bring color to life")
+			fmt.Printf("\r\t\t\t\t%s/%s\t%c\t%s", EngineV(u), PocV(u), char, "Dream a dream for you")
 			time.Sleep(100 * time.Millisecond)
 		}
 	}

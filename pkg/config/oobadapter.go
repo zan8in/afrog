@@ -9,6 +9,7 @@ var (
 	OOBDnslogcn = "dnslogcn"
 	OOBAlphalog = "alphalog"
 	OOBXray     = "xray"
+	OOBRecvsuit = "recvsuit"
 )
 
 func IsOOBAdapter(oob string) bool {
@@ -20,6 +21,8 @@ func IsOOBAdapter(oob string) bool {
 	case OOBAlphalog:
 		return true
 	case OOBXray:
+		return true
+	case OOBRecvsuit:
 		return true
 	default:
 		return false
@@ -63,6 +66,17 @@ func (opt *Options) SetOOBAdapter(oob string) {
 		opt.OOBKey = reverse.Xray.XToken
 		if len(opt.OOBDomain) == 0 && len(opt.OOBApiUrl) == 0 && len(opt.OOBKey) == 0 {
 			gologger.Info().Msg("Xray is not configured")
+			return
+		}
+	case OOBRecvsuit:
+		// recvsuit setting
+		opt.OOB = OOBRecvsuit
+		opt.OOBKey = reverse.Recvsuit.Token
+		opt.OOBDomain = reverse.Recvsuit.DnsDomain
+		opt.OOBHttpUrl = reverse.Recvsuit.HttpUrl
+		opt.OOBApiUrl = reverse.Recvsuit.ApiUrl
+		if len(opt.OOBKey) == 0 && len(opt.OOBDomain) == 0 && len(opt.OOBHttpUrl) == 0 && len(opt.OOBApiUrl) == 0 {
+			gologger.Info().Msg("Recvsuit is not configured")
 			return
 		}
 	default:

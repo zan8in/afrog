@@ -77,9 +77,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	// oobadapter
 	// fmt.Println(options.OOB, options.OOBKey, options.OOBDomain, options.OOBApiUrl)
 	if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
-		Key:    options.OOBKey,
-		Domain: options.OOBDomain,
-		ApiUrl: options.OOBApiUrl,
+		Key:     options.OOBKey,
+		Domain:  options.OOBDomain,
+		HTTPUrl: options.OOBHttpUrl,
+		ApiUrl:  options.OOBApiUrl,
 	}); err == nil {
 		OOB = oobAdapter
 		OOBAlive = OOB.IsVaild()

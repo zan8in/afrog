@@ -1222,8 +1222,12 @@ github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauu
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/goupdate v1.0.0 h1:H3ZVndassN6jNkJROAEkGFHbiyax0yG1RSKXMhzvgLY=
 github.com/zan8in/goupdate v1.0.0/go.mod h1:lB3IFGNY/wLFj1qfPOyee2m7lplg/mSDpsng+ax7sc8=
-github.com/zan8in/oobadapter v0.0.0-20240511071018-860c57c0d7fc h1:za8Iy0bIwDdU9c9blOoMcp/FsaaWHk9lb94pxoo8ToY=
-github.com/zan8in/oobadapter v0.0.0-20240511071018-860c57c0d7fc/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v0.0.0-20240609130915-66df0c01cd44 h1:nk1YHsXZ5NzMoKKZpPTQstv+Z1V7A37qTyAuFXpd6HI=
+github.com/zan8in/oobadapter v0.0.0-20240609130915-66df0c01cd44/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v0.0.0-20240609135501-eb0660a41a8a h1:pIbBpyzxQcIUh+UgtCfeMdbaK5QeLZysc7pJSfVuQ94=
+github.com/zan8in/oobadapter v0.0.0-20240609135501-eb0660a41a8a/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v0.0.0-20240609140910-00592f7da081 h1:8ZMwMDe9grjUi/GKuVkthqB5+6uZkVzfHVJ9ifm3er0=
+github.com/zan8in/oobadapter v0.0.0-20240609140910-00592f7da081/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a h1:VyIgWXlK5oEr/azRm/iHJjV6urHqwTIiJYxGKOnSIgg=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
