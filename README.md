@@ -416,7 +416,7 @@
         </tr>
         <tr>
         <td align="center">
-            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/55.jpg&mask=circle&w=60&h=60"
+            <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/56.jpg&mask=circle&w=60&h=60"
                    alt="Typora-Logo"
                  />
             <br>
