@@ -977,4 +977,4 @@ iv: 加密 iv
 
 ### 需要人工验证
 
-<img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/verification-is-needed.png" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/verification-is-needed.png" >
