@@ -62,6 +62,10 @@ func main() {
 			}()
 		}
 
+		if options.Debug {
+			result.Debug()
+		}
+
 		if result.IsVul {
 			lock.Lock()
 
@@ -89,10 +93,6 @@ func main() {
 			}
 
 			lock.Unlock()
-		}
-
-		if options.Debug {
-			result.Debug()
 		}
 
 	}
