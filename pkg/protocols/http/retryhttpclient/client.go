@@ -151,10 +151,8 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 		for _, va := range header {
 			arr := strings.Split(va, ":")
 			key := strings.TrimSpace(arr[0])
-			value := strings.TrimLeft(arr[1], " ")
-
-			if len(arr) == 2 && len(key) > 0 {
-				req.Header.Add(key, value)
+			if found, ok := strings.CutPrefix(va, key+":"); ok && len(key) > 0 {
+				req.Header.Add(key, strings.TrimSpace(found))
 			}
 		}
 	}

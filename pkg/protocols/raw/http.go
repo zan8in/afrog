@@ -91,10 +91,11 @@ func appendHeader(request string, header []string) string {
 	if len(header) == 0 {
 		return request
 	}
-	for _, v := range header {
-		arr := strings.Split(v, ":")
-		if len(arr) == 2 && len(arr[0]) > 0 {
-			request = addHeader(request, arr[0], arr[1])
+	for _, va := range header {
+		arr := strings.Split(va, ":")
+		key := strings.TrimSpace(arr[0])
+		if found, ok := strings.CutPrefix(va, key+":"); ok && len(key) > 0 {
+			request = addHeader(request, key, strings.TrimSpace(found))
 		}
 	}
 	return request
