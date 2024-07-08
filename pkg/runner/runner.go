@@ -109,7 +109,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 
 	if len(runner.options.Target) > 0 {
 		for _, t := range runner.options.Target {
-			runner.options.Targets.Append(t)
+			runner.options.Targets.Append(strings.TrimSpace(t))
 		}
 
 	}
@@ -120,7 +120,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		}
 		for _, t := range allTargets {
 			if len(strings.TrimSpace(t)) > 0 {
-				runner.options.Targets.Append(t)
+				runner.options.Targets.Append(strings.TrimSpace(t))
 			}
 		}
 	}
@@ -133,7 +133,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if len(cyberTargets) > 0 {
 			for _, t := range cyberTargets {
 				if len(strings.TrimSpace(t)) > 0 {
-					runner.options.Targets.Append(t)
+					runner.options.Targets.Append(strings.TrimSpace(t))
 				}
 			}
 		}
