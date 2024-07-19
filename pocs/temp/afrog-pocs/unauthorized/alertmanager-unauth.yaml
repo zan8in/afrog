@@ -1,0 +1,18 @@
+id: alertmanager-unauth
+
+info:
+  name: Alertmanager 未授权访问
+  author: zan8in
+  severity: high
+  verified: true
+  tags: alertmanager,unauth
+  created: 2024/07/18
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Alertmanager</title>')
+expression: r0()
