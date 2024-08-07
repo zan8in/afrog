@@ -91,7 +91,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		isMatch := false
 		reqType := strings.ToLower(rule.Request.Type)
 
-		if len(reqType) > 0 && reqType != string(poc.HTTP_Type) {
+		if len(reqType) > 0 && reqType != string(poc.HTTP_Type) && reqType != string(poc.HTTPS_Type) {
 			if reqType == poc.TCP_Type || reqType == poc.UDP_Type {
 				if nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
 					Network:     rule.Request.Type,
@@ -119,8 +119,20 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				err = rt.RawHttpRequest(rule.Request.Raw, target, c.Options.Header, c.VariableMap)
 
 			} else {
-
-				err = retryhttpclient.Request(target, c.Options.Header, rule, c.VariableMap)
+				targetTmp := target
+				if len(reqType) > 0 {
+					if reqType == poc.HTTPS_Type {
+						if strings.HasPrefix(targetTmp, "http://") {
+							targetTmp = strings.Replace(targetTmp, "http://", "https://", 1)
+						}
+					}
+					if reqType == poc.HTTP_Type {
+						if strings.HasPrefix(targetTmp, "https://") {
+							targetTmp = strings.Replace(targetTmp, "https://", "http://", 1)
+						}
+					}
+				}
+				err = retryhttpclient.Request(targetTmp, c.Options.Header, rule, c.VariableMap)
 			}
 		}
 
