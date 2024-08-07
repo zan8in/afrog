@@ -119,6 +119,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				err = rt.RawHttpRequest(rule.Request.Raw, target, c.Options.Header, c.VariableMap)
 
 			} else {
+				// 自定义type类型：http、https
+				// @editor 2024/08/07
 				targetTmp := target
 				if len(reqType) > 0 {
 					if reqType == poc.HTTPS_Type {
