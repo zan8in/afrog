@@ -96,11 +96,12 @@ type RuleRequest struct {
 }
 
 const (
-	HTTP_Type = "http"
-	TCP_Type  = "tcp"
-	UDP_Type  = "udp"
-	SSL_Type  = "ssl"
-	GO_Type   = "go"
+	HTTP_Type  = "http"
+	HTTPS_Type = "https"
+	TCP_Type   = "tcp"
+	UDP_Type   = "udp"
+	SSL_Type   = "ssl"
+	GO_Type    = "go"
 )
 
 // 以下开始是 信息部分
@@ -319,7 +320,7 @@ func (poc *Poc) Reset() {
 func (poc *Poc) IsHTTPType() bool {
 	for _, rule := range poc.Rules {
 		reqType := rule.Value.Request.Type
-		if len(reqType) == 0 || reqType == HTTP_Type {
+		if len(reqType) == 0 || reqType == HTTP_Type || reqType == HTTPS_Type {
 			return true
 		}
 	}
