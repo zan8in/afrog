@@ -80,12 +80,13 @@ func (report *Report) defaultHmtl(line string) string {
 				</div>
 				<div class="response w50">
 				<div class="toggleL" onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">←</div>
+				<div style="position: absolute;right: 0;">%d ms</div>
 <xmp>%s</xmp>
 				</div>
 			</div>
 			</td>
 		</tr>
-	`, fullurl, fullurl, reqraw, respraw)
+	`, fullurl, fullurl, reqraw, v.ResultResponse.GetLatency(), respraw)
 	}
 
 	footer := "</tbody></table>"

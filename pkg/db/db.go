@@ -32,6 +32,11 @@ type PocResult struct {
 	FullTarget string `json:"fulltarget,omitempty"`
 	Request    string `json:"request,omitempty"`
 	Response   string `json:"response,omitempty"`
+	Other      Other  `json:"other,omitempty"`
+}
+
+type Other struct {
+	Latency int64 `json:"latency,omitempty"`
 }
 
 type ResultData struct {

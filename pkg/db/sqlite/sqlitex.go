@@ -126,6 +126,7 @@ func addx(r *result.Result) error {
 				FullTarget: pocResult.FullTarget,
 				Request:    string(reqRaw),
 				Response:   string(respRaw),
+				Other:      db2.Other{Latency: pocResult.ResultResponse.GetLatency()},
 			})
 		}
 	}
