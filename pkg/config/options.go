@@ -366,7 +366,7 @@ func (opt *Options) VerifyOptions() error {
 		ShowBanner(au)
 
 		// oob setting
-		opt.SetOOBAdapter(opt.OOB)
+		// opt.SetOOBAdapter()
 
 	} else {
 		return fmt.Errorf("target or cyberspace or query is empty")

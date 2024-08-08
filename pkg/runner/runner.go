@@ -15,7 +15,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v3/pocs"
-	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
 )
 
@@ -76,20 +75,6 @@ func NewRunner(options *config.Options) (*Runner, error) {
 
 	// oobadapter
 	// fmt.Println(options.OOB, options.OOBKey, options.OOBDomain, options.OOBApiUrl)
-	if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
-		Key:     options.OOBKey,
-		Domain:  options.OOBDomain,
-		HTTPUrl: options.OOBHttpUrl,
-		ApiUrl:  options.OOBApiUrl,
-	}); err == nil {
-		OOB = oobAdapter
-		OOBAlive = OOB.IsVaild()
-	} else {
-		OOBAlive = false
-	}
-	if !OOBAlive {
-		gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
-	}
 
 	if runner.ScanProgress, err = NewScanProgress(options.Resume); err != nil {
 		return nil, fmt.Errorf("%s %s", options.Resume, err.Error())

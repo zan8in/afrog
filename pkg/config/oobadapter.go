@@ -29,9 +29,9 @@ func IsOOBAdapter(oob string) bool {
 	}
 }
 
-func (opt *Options) SetOOBAdapter(oob string) {
+func (opt *Options) SetOOBAdapter() {
 	reverse := opt.Config.Reverse
-	switch oob {
+	switch opt.OOB {
 	case OOBCeyeio:
 		// ceyeio setting
 		opt.OOB = OOBCeyeio

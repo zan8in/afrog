@@ -11,6 +11,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/gologger"
+	"github.com/zan8in/oobadapter/pkg/oobadapter"
 )
 
 var CheckerPool = sync.Pool{
@@ -61,6 +62,24 @@ func (runner *Runner) Execute() {
 	reversePocs, otherPocs := options.ReversePoCs(pocSlice)
 
 	// fmt.Println(len(reversePocs), len(otherPocs), len(pocSlice))
+	// 如果无 OOB PoC 将跳过 OOB 存活检测
+	if len(reversePocs) > 0 {
+		runner.options.SetOOBAdapter()
+		if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
+			Key:     options.OOBKey,
+			Domain:  options.OOBDomain,
+			HTTPUrl: options.OOBHttpUrl,
+			ApiUrl:  options.OOBApiUrl,
+		}); err == nil {
+			OOB = oobAdapter
+			OOBAlive = OOB.IsVaild()
+		} else {
+			OOBAlive = false
+		}
+		if !OOBAlive {
+			gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
+		}
+	}
 
 	options.Count += options.Targets.Len() * len(pocSlice)
 
