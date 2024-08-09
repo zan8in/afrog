@@ -423,7 +423,54 @@
         .scroll-top-button.active span {
             transform: rotate(180deg);
         }
+
+        .copy-button {
+            display: inline-block;
+            /* 使按钮成为一个块级元素，但可以和其他元素并排显示 */
+            padding: 3px 5px;
+            /* 按钮内部的内边距 */
+            background-color: #00b8d4;
+            /* 按钮的背景颜色 */
+            color: white;
+            /* 文本颜色 */
+            border: none;
+            /* 去除边框 */
+            /* border-radius: 2px; */
+            /* 圆角边框 */
+            cursor: pointer;
+            /* 鼠标悬停时显示指针形状 */
+            transition: background-color 0.3s;
+            right: 20px;
+            position: absolute;
+            font-size: smaller;
+        }
+
+        .copy-button:hover {
+            background-color: #008ca6;
+            /* 鼠标悬停时的背景颜色 */
+        }
     </style>
+    <script>
+        function copyXmpContent(that) {
+
+            var xmpElement = that.nextAll('xmp').first()
+            xmpElement.select();
+            document.execCommand('copy'); // 仅作为后备，实际不依赖于它  
+            xmpElement.blur(); // 取消选择  
+
+            // 使用 Clipboard API  
+            navigator.clipboard.writeText(xmpElement.text()).then(function () {
+                that.text('Copy Success');
+
+                // 设置3秒后恢复按钮文本  
+                setTimeout(function () {
+                    that.text('Copy');
+                }, 3000); // 3000毫秒后执行  
+            }, function (err) {
+                console.error('Could not copy text: ', err);
+            });
+        }
+    </script>
 </head>
 
 <body>
@@ -541,6 +588,7 @@
                             <div class="toggleR"
                                 onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">
                                 →</div>
+                            <div class="copy-button" onclick="copyXmpContent($(this));">Copy</div>
                             <xmp>{{.Request}}</xmp>
                         </div>
                         <div class="response w50">
