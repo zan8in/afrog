@@ -332,7 +332,11 @@ func (opt *Options) VerifyOptions() error {
 	// init test poc
 	if len(opt.PocFile) > 0 {
 		poc.InitLocalTestList([]string{opt.PocFile})
-
+		// 修复 afrog 工具中使用 -P 命令指定不存在的YAML文件时，会错误地扫描所有PoC文件的问题 @edit 2024/08/09
+		if len(poc.LocalTestList) == 0 {
+			gologger.Error().Msg("Unable to locate a valid afrog PoC YAML file.")
+			os.Exit(0)
+		}
 	}
 
 	// initialized embed poc、local poc and append poc
