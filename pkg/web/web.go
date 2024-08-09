@@ -20,6 +20,7 @@ func StartServer(addr string) error {
 		return err
 	}
 
+	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/", listHandler)
 
 	http.Handle("/static/", http.FileServer(http.FS(temp)))
@@ -28,6 +29,29 @@ func StartServer(addr string) error {
 	gologger.Info().Msg("Serving HTTP on :: port " + addr[1:] + " (http://[::]" + addr + "/) ...")
 	return http.ListenAndServe(addr, nil)
 
+}
+
+type User struct {
+	Password string
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	password := r.PostFormValue("password")
+	if len(password) == 0 {
+		http.Error(w, "login failed", http.StatusBadRequest)
+		return
+	}
+
+	tmpl, err := template.ParseFiles("template/Login.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
