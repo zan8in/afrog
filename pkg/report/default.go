@@ -119,20 +119,24 @@ func defaultHeader() string {
 			ol,ul{list-style:none}
 			table{border-collapse:collapse;border-spacing:0}
 			xmp {     
-				whitewhite-space: pre-wrap; /* css-3 */
-				whitewhite-space: -moz-pre-wrap; /* Mozilla, since 1999 */
-				whitewhite-space: -pre-wrap; /* Opera 4-6 */
-				whitewhite-space: -o-pre-wrap; /* Opera 7 */
-				word-wrap: break-word; /* Internet Explorer 5.5+ */
-				white-space: pre-wrap; /* Firefox */
+				font-family: 'Consolas', 'Menlo', 'Liberation Mono', 'DejaVu Sans Mono', monospace;
+				white-space: pre-wrap;
+				/* 标准的CSS3属性，适用于大多数现代浏览器 */
+				word-wrap: break-word;
+				font-size: x-small;
+				line-height: 1.6;
 			}
 			body{
-				font-family: 0.3em/1em -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,"Microsoft Yahei",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
+				// font-family: 0.3em/1em -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,"Microsoft Yahei",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";
 				color: #233B46;
 				background-color: #C3CAC4;
 				padding: 5px 5px;
 				min-width: 1220px;
 				overflow: scroll;
+
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+				font-size: 16px;
+            	line-height: 1.6;
 			}
 			img{border:none}
 			.top {
@@ -161,6 +165,7 @@ func defaultHeader() string {
 				top:-5px;
 				left:50%;
 				cursor: pointer;
+				line-height: 1.1;
 			}
 			.w50 {
 				width: 50%
@@ -184,6 +189,7 @@ func defaultHeader() string {
 				top:-5px;
 				left:50%;
 				cursor: pointer;
+				line-height: 1.1;
 			}
 			.vuln {
 				text-align: left;
@@ -238,9 +244,10 @@ func defaultHeader() string {
 			.copy-button {
 				display: inline-block;
 				/* 使按钮成为一个块级元素，但可以和其他元素并排显示 */
-				padding: 3px 5px;
+				padding: 2px 2px;
 				/* 按钮内部的内边距 */
-				background-color: #00b8d4;
+				background-color: rgba(92, 184, 92, 0.7);
+				;
 				/* 按钮的背景颜色 */
 				color: white;
 				/* 文本颜色 */
@@ -250,14 +257,14 @@ func defaultHeader() string {
 				/* 圆角边框 */
 				cursor: pointer;
 				/* 鼠标悬停时显示指针形状 */
-				transition: background-color 0.3s;
+				transition: background-color 0.3s ease;
 				right: 20px;
 				position: absolute;
-				font-size: smaller;
+				font-size: xx-small;
 			}
 
 			.copy-button:hover {
-				background-color: #008ca6;
+				background-color: rgba(92, 184, 92, 0.9);
 				/* 鼠标悬停时的背景颜色 */
 			}
 		</style>

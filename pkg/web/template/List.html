@@ -77,18 +77,12 @@
         }
 
         xmp {
-            whitewhite-space: pre-wrap;
-            /* css-3 */
-            whitewhite-space: -moz-pre-wrap;
-            /* Mozilla, since 1999 */
-            whitewhite-space: -pre-wrap;
-            /* Opera 4-6 */
-            whitewhite-space: -o-pre-wrap;
-            /* Opera 7 */
-            word-wrap: break-word;
-            /* Internet Explorer 5.5+ */
+            font-family: 'Consolas', 'Menlo', 'Liberation Mono', 'DejaVu Sans Mono', monospace;
             white-space: pre-wrap;
-            /* Firefox */
+            /* 标准的CSS3属性，适用于大多数现代浏览器 */
+            word-wrap: break-word;
+            font-size: x-small;
+            line-height: 1.6;
         }
 
         body {
@@ -99,9 +93,10 @@
             min-width: 1220px;
             overflow: scroll;
 
-            font-family: Arial, Helvetica, sans-serif;
+            /* font-family: Arial, Helvetica, sans-serif; */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-size: 16px;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         img {
@@ -139,6 +134,7 @@
             top: -5px;
             left: 50%;
             cursor: pointer;
+            line-height: 1.1;
         }
 
         .w50 {
@@ -166,11 +162,12 @@
             top: -5px;
             left: 50%;
             cursor: pointer;
+            line-height: 1.1;
         }
 
         .vuln {
             text-align: left;
-            font-weight: bold;
+            font-weight: 600;
         }
 
         .security {
@@ -179,7 +176,7 @@
 
         .url {
             text-align: left;
-            font-weight: bold;
+            font-weight: 300;
         }
 
         table {
@@ -427,9 +424,10 @@
         .copy-button {
             display: inline-block;
             /* 使按钮成为一个块级元素，但可以和其他元素并排显示 */
-            padding: 3px 5px;
+            padding: 2px 2px;
             /* 按钮内部的内边距 */
-            background-color: #00b8d4;
+            background-color: rgba(92, 184, 92, 0.7);
+            ;
             /* 按钮的背景颜色 */
             color: white;
             /* 文本颜色 */
@@ -439,14 +437,14 @@
             /* 圆角边框 */
             cursor: pointer;
             /* 鼠标悬停时显示指针形状 */
-            transition: background-color 0.3s;
+            transition: background-color 0.3s ease;
             right: 20px;
             position: absolute;
-            font-size: smaller;
+            font-size: xx-small;
         }
 
         .copy-button:hover {
-            background-color: #008ca6;
+            background-color: rgba(92, 184, 92, 0.9);
             /* 鼠标悬停时的背景颜色 */
         }
     </style>
@@ -460,7 +458,7 @@
 
             // 使用 Clipboard API  
             navigator.clipboard.writeText(xmpElement.text()).then(function () {
-                that.text('Copy Success');
+                that.text('Copied');
 
                 // 设置3秒后恢复按钮文本  
                 setTimeout(function () {
@@ -586,16 +584,14 @@
                     <div class="clr">
                         <div class="request w50">
                             <div class="toggleR"
-                                onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">
-                                →</div>
+                                onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">→</div>
                             <div class="copy-button" onclick="copyXmpContent($(this));">Copy</div>
                             <xmp>{{.Request}}</xmp>
                         </div>
                         <div class="response w50">
                             <div class="toggleL"
-                                onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">
-                                ←</div>
-                            <div style="position: absolute;right: 0;">{{ .Other.Latency }} ms</div>
+                                onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">←</div>
+                            <div style="position: absolute;right: 0;font-size: xx-small;">{{ .Other.Latency }} ms</div>
                             <xmp>{{.Response}}</xmp>
                         </div>
                     </div>
