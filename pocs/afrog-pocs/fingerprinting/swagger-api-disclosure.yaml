@@ -169,9 +169,9 @@ rules:
       path: /v2/api-docs
     expression: |
       response.status == 200 && 
-      response.body.bconains(b'"info":') &&
+      response.body.bcontains(b'"info":') &&
       response.body.bcontains(b'"description":')  &&
       response.body.bcontains(b'"version":') &&
       response.body.bcontains(b'"title":')
- 
+
 expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() || r10() || r11() || r12() || r13() || r14()

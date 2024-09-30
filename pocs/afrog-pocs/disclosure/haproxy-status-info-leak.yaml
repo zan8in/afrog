@@ -18,7 +18,6 @@ rules:
       method: GET
       path: /haproxy-status
     expression: response.status == 200 && response.body.bcontains(b'General process information')
-rules:
   r1:
     request:
       method: GET

