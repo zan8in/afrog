@@ -9,7 +9,7 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-const Version = "3.1.1"
+const Version = "3.1.2"
 
 func InitBanner() {
 	fmt.Printf("\r\n|\tA F 🐸 O G\t|")
