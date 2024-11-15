@@ -509,7 +509,7 @@ func checkTarget(target string) (string, error) {
 
 	req.Header.Add("User-Agent", utils.RandomUA())
 
-	resp, err := RtryRedirect.Do(req)
+	resp, err := RtryNoRedirect.Do(req)
 	if err != nil {
 		if resp != nil {
 			resp.Body.Close()
