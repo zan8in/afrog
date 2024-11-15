@@ -92,9 +92,15 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	}
 	runner.Report = report
 
+	seen := make(map[string]struct{}) // 避免重复添加
+
 	if len(runner.options.Target) > 0 {
-		for _, t := range runner.options.Target {
-			runner.options.Targets.Append(strings.TrimSpace(t))
+		for _, rawTarget := range runner.options.Target {
+			trimmedTarget := strings.TrimSpace(rawTarget)
+			if _, ok := seen[trimmedTarget]; !ok {
+				seen[trimmedTarget] = struct{}{}
+				runner.options.Targets.Append(trimmedTarget)
+			}
 		}
 
 	}
@@ -103,9 +109,13 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if err != nil {
 			return runner, err
 		}
-		for _, t := range allTargets {
-			if len(strings.TrimSpace(t)) > 0 {
-				runner.options.Targets.Append(strings.TrimSpace(t))
+		for _, rawTarget := range allTargets {
+			trimmedTarget := strings.TrimSpace(rawTarget)
+			if len(trimmedTarget) > 0 {
+				if _, ok := seen[trimmedTarget]; !ok {
+					seen[trimmedTarget] = struct{}{}
+					runner.options.Targets.Append(trimmedTarget)
+				}
 			}
 		}
 	}
@@ -116,9 +126,13 @@ func NewRunner(options *config.Options) (*Runner, error) {
 			return runner, err
 		}
 		if len(cyberTargets) > 0 {
-			for _, t := range cyberTargets {
-				if len(strings.TrimSpace(t)) > 0 {
-					runner.options.Targets.Append(strings.TrimSpace(t))
+			for _, rawTarget := range cyberTargets {
+				trimmedTarget := strings.TrimSpace(rawTarget)
+				if len(trimmedTarget) > 0 {
+					if _, ok := seen[trimmedTarget]; !ok {
+						seen[trimmedTarget] = struct{}{}
+						runner.options.Targets.Append(trimmedTarget)
+					}
 				}
 			}
 		}
