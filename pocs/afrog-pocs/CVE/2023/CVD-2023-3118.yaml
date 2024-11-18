@@ -5,7 +5,8 @@ info:
   author: Superhero
   severity: critical
   verified: true
-  description: |
+  description: |-
+    用友 UFIDA ActionHandlerServlet 反序列化漏洞
   tags: yongyou,cve,cve2023,deserialization,rce
   created: 2024/11/15
 
