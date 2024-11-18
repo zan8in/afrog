@@ -72,6 +72,7 @@ rules:
       - '"kibana-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Kibana</title>")'
       - '"default-glassfish-server-page" != "" && response.status == 200 && (response.body.ibcontains(b"glassfish server - server running") || response.body.ibcontains(b"glassfish server with premier support") || response.body.ibcontains(b"<b>glassfish server</b>") || response.body.ibcontains(b"glassfish server installation directory"))'
       - '"nsqadmin-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>nsqadmin</title>")'
+      - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
 
   r1:
     request:
@@ -139,5 +140,6 @@ rules:
       - '"kibana-detect" != "" && response.status == 200 && response.body.ibcontains(b"<title>Kibana</title>")'
       - '"default-glassfish-server-page" != "" && response.status == 200 && (response.body.ibcontains(b"glassfish server - server running") || response.body.ibcontains(b"glassfish server with premier support") || response.body.ibcontains(b"<b>glassfish server</b>") || response.body.ibcontains(b"glassfish server installation directory"))'
       - '"nsqadmin-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>nsqadmin</title>")'
+      - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
 
 expression: r0() || r1()
