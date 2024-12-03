@@ -23,7 +23,7 @@ var (
 	RtryRedirect   *retryablehttp.Client
 	RtryNoRedirect *retryablehttp.Client
 
-	defaultTimeout = 20 * time.Second
+	defaultTimeout = 50 * time.Second
 
 	maxDefaultBody int64
 )
@@ -41,6 +41,9 @@ func Init(opt *Options) (err error) {
 	po.Timeout = opt.Timeout
 	po.Retries = opt.Retries
 	po.DisableRedirects = true
+
+	// -timeout 参数默认是 50s @editor 2024/11/03
+	defaultTimeout = time.Duration(opt.Timeout) * time.Second
 
 	retryablehttp.InitClientPool(po)
 	if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
