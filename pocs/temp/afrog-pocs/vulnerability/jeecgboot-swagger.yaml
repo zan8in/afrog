@@ -1,0 +1,19 @@
+id: jeecgboot-swagger
+
+info:
+  name: JeecgBoot 后台服务 API 接口文档
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Jeecg-Boot 后台服务API接口文档
+  tags: jeecgboot,swagger
+  created: 2024/12/24
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /novat-boot
+    expression: response.status == 200 && response.body.ibcontains(b'<title>Swagger-Bootstrap-UI</title>')
+expression: r0()
