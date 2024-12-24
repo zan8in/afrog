@@ -74,6 +74,7 @@ rules:
       - '"nsqadmin-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>nsqadmin</title>")'
       - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
       - '"yonyou-youbin-detect" != "" && response.status == 200 && (response.body.bcontains(b"YonBIP") || response.body.bcontains(b"数字化工作台"))'
+      - '"jeecgboot-detect" != "" && response.status == 200 && response.body.bcontains(b"/sys/common/pdf/pdfPreviewIframe")'
 
   r1:
     request:
@@ -143,5 +144,6 @@ rules:
       - '"nsqadmin-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>nsqadmin</title>")'
       - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
       - '"yonyou-youbin-detect" != "" && response.status == 200 && (response.body.bcontains(b"YonBIP") || response.body.bcontains(b"数字化工作台"))'
+      - '"jeecgboot-detect" != "" && response.status == 200 && response.body.bcontains(b"/sys/common/pdf/pdfPreviewIframe")'
 
 expression: r0() || r1()
