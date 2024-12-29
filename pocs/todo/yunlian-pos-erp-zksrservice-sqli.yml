@@ -1,8 +1,8 @@
 id: yunlian-pos-erp-zksrservice-sqli
 info:
   name: Yunlian POS-ERP ZksrService SQL Injection
-  author: nu1r
-  severity: ZacharyZcR
+  author: ZacharyZcR
+  severity: high
   description: |
     Yunlian POS-ERP Management System ZksrService interface has a SQL injection vulnerability.
     An attacker can execute arbitrary SQL commands through the getItemInfo method.
