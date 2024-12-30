@@ -25,7 +25,6 @@ rules:
         Content-Type: multipart/related; boundary=----{{rboundary}}
         SOAPAction: ""
         Accept-Encoding: gzip, deflate
-        Content-Length: 528
 
         ------{{rboundary}}
         Content-Disposition: form-data; name="a"
