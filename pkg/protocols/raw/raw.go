@@ -140,6 +140,8 @@ func Parse(request, baseURL string, unsafe bool) (*Request, error) {
 	rawRequest.Data = string(b)
 	if !multiPartRequest {
 		rawRequest.Data = strings.TrimSuffix(rawRequest.Data, "\r\n")
+	} else {
+		rawRequest.Headers["Content-Length"] = fmt.Sprintf("%d", len(rawRequest.Data))
 	}
 	return rawRequest, nil
 }
