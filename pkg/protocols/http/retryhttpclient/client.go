@@ -103,12 +103,14 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	target = target + newpath
 
 	// body
-	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/form-Data") && strings.Contains(rule.Request.Body, "\n\n") {
-		multipartBody, err := dealMultipart(rule.Request.Headers["Content-Type"], rule.Request.Body)
-		if err != nil {
-			return err
+	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/") && !strings.Contains(rule.Request.Body, "\r\n") && (strings.Contains(rule.Request.Body, "\n") || strings.Contains(rule.Request.Body, "\n\n")) {
+		rule.Request.Body = setVariableMap(strings.TrimSpace(rule.Request.Body), variableMap)
+		splitstr := "\n"
+		if splitstr == "\n\n" {
+			splitstr = "\n\n"
 		}
-		rule.Request.Body = setVariableMap(strings.TrimSpace(multipartBody), variableMap)
+		rule.Request.Body = strings.ReplaceAll(rule.Request.Body, splitstr, "\r\n")
+		rule.Request.Body = strings.TrimRight(rule.Request.Body, "\r\n") + "\r\n"
 	} else {
 		rule.Request.Body = setVariableMap(strings.TrimSpace(rule.Request.Body), variableMap)
 	}
@@ -308,6 +310,7 @@ func setVariableMap(find string, variableMap map[string]any) string {
 	return find
 }
 
+// 处理multipart（已过期）
 func dealMultipart(contentType string, ruleBody string) (result string, err error) {
 	// 处理multipart的/n
 	re := regexp.MustCompile(`(?m)multipart\/form-Data; boundary=(.*)`)
