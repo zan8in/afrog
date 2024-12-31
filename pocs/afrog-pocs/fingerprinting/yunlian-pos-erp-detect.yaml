@@ -1,0 +1,17 @@
+id: yunlian-pos-erp-detect
+
+info:
+  name: 云连 POS-ERP 管理系统
+  author: zan8in
+  severity: info
+  verified: true
+  tags: yunlian,detect,panel
+  created: 2024/12/31
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /admin/index.jsp
+    expression: response.status == 200 && response.body.ibcontains(b"<title>管理中心 - Powered By chaosZ</title>")
+expression: r0()

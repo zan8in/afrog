@@ -75,6 +75,11 @@ rules:
       - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
       - '"yonyou-youbin-detect" != "" && response.status == 200 && (response.body.bcontains(b"YonBIP") || response.body.bcontains(b"数字化工作台"))'
       - '"jeecgboot-detect" != "" && response.status == 200 && response.body.bcontains(b"/sys/common/pdf/pdfPreviewIframe")'
+      - '"secondbest-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>云供应链管理系统-登录</title>")'
+      - '"tutorsoft-erp-panel" != "" && response.status == 200 && response.body.ibcontains(b"欢迎登陆到网上订单系统") && response.body.ibcontains(b"http://www.fstutor.com")'
+      - '"cnoa-panel" != "" && response.status == 200 && response.body.ibcontains(b"- Powered by 协众OA - www.cnoa.cn</title>")'
+      - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
+      - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
 
   r1:
     request:
@@ -145,5 +150,10 @@ rules:
       - '"palo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Expedition Project</title>")'
       - '"yonyou-youbin-detect" != "" && response.status == 200 && (response.body.bcontains(b"YonBIP") || response.body.bcontains(b"数字化工作台"))'
       - '"jeecgboot-detect" != "" && response.status == 200 && response.body.bcontains(b"/sys/common/pdf/pdfPreviewIframe")'
+      - '"secondbest-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>云供应链管理系统-登录</title>")'
+      - '"tutorsoft-erp-panel" != "" && response.status == 200 && response.body.ibcontains(b"欢迎登陆到网上订单系统") && response.body.ibcontains(b"http://www.fstutor.com")'
+      - '"cnoa-panel" != "" && response.status == 200 && response.body.ibcontains(b"- Powered by 协众OA - www.cnoa.cn</title>")'
+      - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
+      - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
 
 expression: r0() || r1()
