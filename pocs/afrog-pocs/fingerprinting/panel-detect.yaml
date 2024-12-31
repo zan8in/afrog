@@ -80,6 +80,7 @@ rules:
       - '"cnoa-panel" != "" && response.status == 200 && response.body.ibcontains(b"- Powered by 协众OA - www.cnoa.cn</title>")'
       - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
       - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
+      - '"sibo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>欢迎使用 博斯软件")'
 
   r1:
     request:
@@ -155,5 +156,6 @@ rules:
       - '"cnoa-panel" != "" && response.status == 200 && response.body.ibcontains(b"- Powered by 协众OA - www.cnoa.cn</title>")'
       - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
       - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
+      - '"sibo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>欢迎使用 博斯软件")'
 
 expression: r0() || r1()

