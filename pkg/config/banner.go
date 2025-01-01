@@ -16,7 +16,7 @@ func InitBanner() {
 }
 func ShowBanner(u *AfrogUpdate) {
 	InitBanner()
-	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Dream a dream for you")
+	fmt.Printf("\r\t\t\t\t%s/%s\t|\t%s\n\n", EngineV(u), PocV(u), "Happy New Year 2025!")
 }
 
 func BannerAnimate(u *AfrogUpdate) {
