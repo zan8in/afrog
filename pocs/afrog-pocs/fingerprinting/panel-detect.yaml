@@ -81,6 +81,8 @@ rules:
       - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
       - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
       - '"sibo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>欢迎使用 博斯软件")'
+      - '"cleo-panel" != "" && response.status == 200 && response.headers["server"].icontains("Cleo")'
+      - '"hjsoft-panel" != "" && response.status == 200 && response.body.bcontains(b"class=\"hj-wzm-copyright\"") && response.body.bcontains(b"宏景软件  版权所有")'
 
   r1:
     request:
@@ -157,5 +159,7 @@ rules:
       - '"guowei-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>Login page</title>") && response.body.ibcontains(b"themes/tenant/css/login.css")'
       - '"totolink-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>TOTOLINK</title>")'
       - '"sibo-panel" != "" && response.status == 200 && response.body.ibcontains(b"<title>欢迎使用 博斯软件")'
+      - '"cleo-panel" != "" && response.status == 200 && response.headers["server"].icontains("Cleo")'
+      - '"hjsoft-panel" != "" && response.status == 200 && response.body.bcontains(b"class=\"hj-wzm-copyright\"") && response.body.bcontains(b"宏景软件  版权所有")'
 
 expression: r0() || r1()
