@@ -3,7 +3,7 @@ info:
   name: Shanghai Hanta Network Technology Internet Behavior Management System RCE
   author: ZacharyZcR
   severity: critical
-  verified: true
+  verified: false
   description: |
     Shanghai Hanta Network Technology Internet Behavior Management System has a remote code execution vulnerability.
     An attacker can execute arbitrary commands through parameter injection in ping.php.

