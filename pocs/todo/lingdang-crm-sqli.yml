@@ -3,7 +3,7 @@ info:
   name: LingDang CRM getMyAmbassador SQL Injection
   author: ZacharyZcR
   severity: critical
-  verified: true
+  verified: false
   description: |
     LingDang CRM system's getMyAmbassador interface is vulnerable to SQL injection.
     An unauthenticated attacker can exploit this vulnerability to read sensitive data or manipulate the database.

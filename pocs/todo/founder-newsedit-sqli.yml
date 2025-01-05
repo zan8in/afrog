@@ -3,7 +3,7 @@ info:
   name: Founder Media News Editing System SQL Injection
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     Founder Media News Editing System screen.do interface has a SQL injection vulnerability.
     An unauthorized attacker can exploit this vulnerability to obtain information from the database.

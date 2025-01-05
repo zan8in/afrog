@@ -3,7 +3,7 @@ info:
   name: CPAS Audit Management System Arbitrary File Read
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     CPAS Audit Management System has an arbitrary file read vulnerability.
     An attacker can read arbitrary files by accessing the downPlugs interface with path traversal.

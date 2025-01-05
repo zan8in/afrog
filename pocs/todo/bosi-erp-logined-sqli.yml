@@ -3,7 +3,7 @@ info:
   name: Bosi Foreign Trade Management Software logined.jsp SQL Injection
   author: ZacharyZcR
   severity: critical
-  verified: true
+  verified: false
   description: |
     Bosi Foreign Trade Management Software V6.0 logined.jsp has a SQL injection vulnerability.
     An unauthenticated attacker can exploit this SQL injection vulnerability to obtain database information 

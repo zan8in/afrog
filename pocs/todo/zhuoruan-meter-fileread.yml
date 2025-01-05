@@ -3,7 +3,7 @@ info:
   name: ZhuoRuan Metering Business Management Platform Arbitrary File Read
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     ZhuoRuan Metering Business Management Platform image.ashx interface has an arbitrary file read vulnerability.
     An unauthenticated attacker can read important system files like web.config and database configuration through path traversal.

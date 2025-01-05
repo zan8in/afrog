@@ -3,7 +3,7 @@ info:
   name: LingDang CRM Uploadfile Remote Code Execution
   author: ZacharyZcR
   severity: critical
-  verified: true
+  verified: false
   description: |
     LingDang CRM system's uploadfile interface has a file upload vulnerability.
     An unauthenticated attacker can upload malicious PHP files to achieve remote code execution.

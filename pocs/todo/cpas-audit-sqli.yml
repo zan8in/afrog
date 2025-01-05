@@ -3,7 +3,7 @@ info:
   name: CPAS Audit Management System SQL Injection
   author: ZacharyZcR
   severity: critical
-  verified: true
+  verified: false
   description: |
     CPAS Audit Management System V4 has a SQL injection vulnerability in getCurserIfAllowLogin interface.
     Unauthenticated remote attackers can exploit this vulnerability to obtain database information 
