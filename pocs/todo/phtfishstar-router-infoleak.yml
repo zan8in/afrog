@@ -3,7 +3,7 @@ info:
   name: PhxFishStar Router Sensitive Information Disclosure
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     Chengdu PhxFishStar Technology Co., Ltd.'s router has a sensitive information disclosure vulnerability.
     The vulnerability allows attackers to access the .htpasswd file through path traversal.

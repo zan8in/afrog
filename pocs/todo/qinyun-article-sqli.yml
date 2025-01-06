@@ -3,7 +3,7 @@ info:
   name: QinYun Remote Article Processing System SQL Injection
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     QinYun Remote Article Processing System has an unauthenticated SQL injection vulnerability.
     Attackers can leverage this vulnerability to extract sensitive information from the database.

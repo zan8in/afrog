@@ -3,7 +3,7 @@ info:
   name: AcrelCloud-3000 Environmental Electricity Monitoring Cloud Platform SQL Injection
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     AcrelCloud-3000 Environmental Electricity Monitoring Cloud Platform has a SQL injection vulnerability in the GetEnterpriseInfoY interface.
     An attacker can exploit this vulnerability to extract sensitive information from the database.

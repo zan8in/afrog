@@ -3,7 +3,7 @@ info:
   name: WordPress RTW PDF File Generator Path Traversal
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     PDF Generator Addon for Elementor Page Builder WordPress plugin before version 1.7.5 is susceptible to path traversal attacks.
     The vulnerability in rtw_pgaepb_dwnld_pdf() function allows unauthenticated attackers to read arbitrary files on the server.

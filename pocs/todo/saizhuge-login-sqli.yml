@@ -3,7 +3,7 @@ info:
   name: SaiZhuge Digital Intelligence Platform Login SQL Injection
   author: ZacharyZcR
   severity: high
-  verified: true
+  verified: false
   description: |
     SaiZhuge Digital Intelligence Platform System has an unauthenticated SQL injection vulnerability in the login interface.
     Attackers can leverage this vulnerability to extract sensitive information from the database.
