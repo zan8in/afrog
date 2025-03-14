@@ -1,0 +1,23 @@
+id: founder-newsedit-syslogin-detect
+
+info:
+  name: 方正全媒体采编系统管理后台
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    方正全媒体采编系统管理后台
+  tags: 方正,采编,founder
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /newsedit/e5sys/SysLogin.jsp
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'<title>login</title>') &&
+      response.body.bcontains(b'/e5workspace/script/security.js') &&
+      response.body.bcontains(b'type="hidden" id="Super" name="Super" value="-1"')
+expression: r0()

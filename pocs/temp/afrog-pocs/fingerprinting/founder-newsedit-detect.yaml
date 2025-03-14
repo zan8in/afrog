@@ -1,0 +1,19 @@
+id: founder-newsedit-detect
+
+info:
+  name: 方正全媒体采编系统
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    方正全媒体采编系统
+  tags: 方正,采编,founder
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /newsedit/e5workspace/Login.jsp
+    expression: response.status == 200 && response.body.bcontains(b'<title>全媒体采编') && response.body.bcontains(b'/e5workspace/security/pubkey.do')
+expression: r0()
