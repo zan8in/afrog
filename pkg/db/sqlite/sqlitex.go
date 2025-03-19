@@ -224,7 +224,10 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 
 		po := poc.Poc{}
 		json.Unmarshal([]byte(item.Poc), &po)
+
+		po.Info.Description = strings.TrimSpace(po.Info.Description)
 		data[key].PocInfo = po
+
 	}
 
 	return data, nil

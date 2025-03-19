@@ -552,11 +552,14 @@
                     {{end}}
 
                     {{if .PocInfo.Info.Description}}
-                    <br /><b>description:</b> {{.PocInfo.Info.Description}}
+                    <br /><b>description:</b>
+                    <span style="white-space: pre-line;">
+                        {{.PocInfo.Info.Description}}
+                    </span>
                     {{end}}
 
                     {{if .PocInfo.Info.Reference}}
-                    <br /><b>reference:</b>
+                    <b>reference:</b>
                     {{range $key, $value := .PocInfo.Info.Reference}}
                     <br />&nbsp;&nbsp;- <a href='{{$value}}' target='_blank'>{{$value}}</a>
                     {{end}}
@@ -584,13 +587,15 @@
                     <div class="clr">
                         <div class="request w50">
                             <div class="toggleR"
-                                onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">→</div>
+                                onclick="$(this).parent().next('.response').toggle();if($(this).text()=='→'){$(this).text('←');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('→');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">
+                                →</div>
                             <div class="copy-button" onclick="copyXmpContent($(this));">Copy</div>
                             <xmp>{{.Request}}</xmp>
                         </div>
                         <div class="response w50">
                             <div class="toggleL"
-                                onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">←</div>
+                                onclick="$(this).parent().prev('.request').toggle();if($(this).text()=='←'){$(this).text('→');$(this).css('background','red');$(this).parent().removeClass('w50').addClass('w100')}else{$(this).text('←');$(this).css('background','black');$(this).parent().removeClass('w100').addClass('w50')}">
+                                ←</div>
                             <div style="position: absolute;right: 0;font-size: xx-small;">{{ .Other.Latency }} ms</div>
                             <xmp>{{.Response}}</xmp>
                         </div>
