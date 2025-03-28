@@ -210,3 +210,66 @@ func Str2UTF8(str string) string {
 	}
 	return str
 }
+
+// 增强版URL特征提取
+func ExtractHost(target string) string {
+	// 预处理特殊格式
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+
+	// 处理没有协议的URL
+	if !strings.Contains(target, "://") {
+		target = "tcp://" + target
+	}
+
+	u, err := url.Parse(target)
+	if err != nil {
+		// 降级处理非法URL
+		if strings.Contains(target, ":") {
+			return strings.Split(target, ":")[0]
+		}
+		return target
+	}
+
+	// 处理包含用户信息的host
+	host := u.Hostname()
+
+	// 处理IPv6地址
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		host = "[" + host + "]"
+	}
+
+	return host
+}
+
+// 新增函数：清理非法文件名字符
+func SanitizeFilename(s string) string {
+	// 保留常见安全字符：字母、数字、下划线、连字符、点号
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '_' || r == '.':
+			return r
+		default:
+			return '_'
+		}
+	}, s)
+
+	// 限制最大长度（保留扩展名部分的完整性）
+	maxLength := 50
+	if len(s) > maxLength {
+		s = s[:maxLength]
+	}
+
+	// 去除前后多余的点号
+	s = strings.Trim(s, ".")
+
+	return s
+}

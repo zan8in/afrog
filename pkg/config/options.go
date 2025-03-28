@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rs/xid"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/output"
@@ -675,4 +676,32 @@ func isExcludePoc(poc poc.Poc, excludePocs []string) bool {
 		}
 	}
 	return false
+}
+
+// 新增函数：获取基础文件名
+func GetFileBaseName(options *Options) string {
+	// 优先使用-T参数的文件名作为基础
+	if options.TargetsFile != "" {
+		// 去除路径和扩展名
+		base := utils.GetFilename(options.TargetsFile)
+		// 去除特殊字符
+		base = utils.SanitizeFilename(base)
+		if base != "" {
+			return base
+		}
+	}
+
+	// 次选使用第一个-t参数的特征
+	if len(options.Target) > 0 && options.Target[0] != "" {
+		// 尝试从URL中提取特征
+		host := utils.ExtractHost(options.Target[0])
+		// 去除特殊字符
+		host = utils.SanitizeFilename(host)
+		if host != "" {
+			return host
+		}
+	}
+
+	// 最终兜底方案使用xid
+	return xid.New().String()
 }

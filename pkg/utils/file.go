@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime/debug"
 )
 
@@ -118,4 +119,20 @@ func AppendString(filename, content string) error {
 		// fmt.Println(err)
 	}
 	return err
+}
+
+// 获取基础文件名（去除路径和扩展名）
+func GetFilename(path string) string {
+	// 获取系统兼容的文件名
+	filename := filepath.Base(path)
+
+	// 处理多扩展名情况
+	for {
+		ext := filepath.Ext(filename)
+		if ext == "" {
+			break
+		}
+		filename = filename[:len(filename)-len(ext)]
+	}
+	return filename
 }

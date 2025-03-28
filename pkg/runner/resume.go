@@ -1,12 +1,10 @@
 package runner
 
 import (
-	"fmt"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/rs/xid"
 	fileutil "github.com/zan8in/pins/file"
 )
 
@@ -16,6 +14,7 @@ type ScanProgress struct {
 	progress       []string
 	resumeProgress []string
 	mutex          sync.Mutex
+	saveMutex      sync.Mutex // 新增文件保存专用锁
 }
 
 func NewScanProgress(resume string) (*ScanProgress, error) {
@@ -58,12 +57,28 @@ func (p *ScanProgress) String() string {
 	return strings.Join(p.progress, ",")
 }
 
-func (p *ScanProgress) SaveScanProgress() (string, error) {
-	resumeFileName := fmt.Sprintf("afrog-resume-%s.afg", xid.New().String())
+// 新增方法：原子化保存到指定文件
+func (p *ScanProgress) AtomicSave(filename string) error {
+	// 获取进度数据快照
+	p.mutex.Lock()
+	data := strings.Join(p.progress, ",")
+	p.mutex.Unlock()
 
-	if len(p.progress) > 0 {
-		return resumeFileName, os.WriteFile(resumeFileName, []byte(strings.Join(p.progress, ",")), 0666)
+	// 空数据不保存
+	if len(data) == 0 {
+		return nil
 	}
 
-	return "", nil
+	// 文件操作专用锁
+	p.saveMutex.Lock()
+	defer p.saveMutex.Unlock()
+
+	// 使用临时文件保证原子性
+	tmpFile := filename + ".tmp"
+	if err := os.WriteFile(tmpFile, []byte(data), 0666); err != nil {
+		return err
+	}
+
+	// 原子替换文件
+	return os.Rename(tmpFile, filename)
 }
