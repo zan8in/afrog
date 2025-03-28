@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	_ "net/http/pprof"
@@ -27,7 +28,20 @@ func main() {
 		os.Exit(0)
 	}
 
-	r, err := runner.NewRunner(options)
+	// 创建runner之后立即定义panic恢复
+	var r *runner.Runner
+	defer func() {
+		if rec := recover(); rec != nil {
+			gologger.Print().Msg("")
+			gologger.Error().Msgf("Critical error occurred: %v", rec)
+			if r != nil {
+				saveProgressAndExit(r)
+			}
+			os.Exit(1)
+		}
+	}()
+
+	r, err = runner.NewRunner(options)
 	if err != nil {
 		gologger.Error().Msgf("Could not create runner: %s\n", err)
 		os.Exit(0)
@@ -101,22 +115,13 @@ func main() {
 	// resumeFileName := types.DefaultResumeFilePath()
 	c := make(chan os.Signal, 1)
 	defer close(c)
-	signal.Notify(c, os.Interrupt)
+	// 捕获更多信号
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
 	go func(runner *runner.Runner) {
 		for range c {
 			gologger.Print().Msg("")
-			gologger.Info().Msg("CTRL+C pressed: Exiting")
-			// gologger.Info().Msgf("Current scan progress: %s\n", runner.ScanProgress.String())
-
-			resumeFileName, err := runner.ScanProgress.SaveScanProgress()
-			if len(resumeFileName) > 0 {
-				gologger.Info().Msgf("Creating resume file: %s\n", resumeFileName)
-				gologger.Info().Msgf("Resume Example: afrog -resume %s\n", resumeFileName)
-			}
-			if err != nil {
-				gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
-			}
-			os.Exit(0)
+			gologger.Info().Msg("Received termination signal: Exiting")
+			saveProgressAndExit(runner)
 		}
 	}(r)
 
@@ -136,4 +141,20 @@ func main() {
 	gologger.Print().Msg("")
 
 	sqlite.CloseX()
+}
+
+// 封装保存进度和退出逻辑
+func saveProgressAndExit(r *runner.Runner) {
+	resumeFileName, err := r.ScanProgress.SaveScanProgress()
+	if len(resumeFileName) > 0 {
+		gologger.Info().Msgf("Creating resume file: %s", resumeFileName)
+		gologger.Info().Msgf("Resume Example: afrog -T urls.txt -resume %s", resumeFileName)
+	}
+	if err != nil {
+		gologger.Error().Msgf("Couldn't create resume file: %s", err)
+	}
+
+	// 确保数据库关闭
+	sqlite.CloseX()
+	os.Exit(0)
 }
