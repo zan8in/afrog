@@ -11,58 +11,63 @@ import (
 var PoCScanProgress []string
 
 type ScanProgress struct {
-	progress       []string
-	resumeProgress []string
-	mutex          sync.Mutex
-	saveMutex      sync.Mutex // 新增文件保存专用锁
+	mergedProgress  map[string]struct{} // 合并后的完整进度
+	resumeProgress  []string            // 原始恢复文件中的进度
+	currentProgress []string            // 当前扫描新增进度
+	mutex           sync.Mutex
+	saveMutex       sync.Mutex
 }
 
 func NewScanProgress(resume string) (*ScanProgress, error) {
-	progress := make([]string, 0)
-	resumeProgress := make([]string, 0)
+	sp := &ScanProgress{
+		mergedProgress:  make(map[string]struct{}),
+		resumeProgress:  make([]string, 0),
+		currentProgress: make([]string, 0),
+	}
 
 	if len(resume) > 0 {
-		if rsChan, err := fileutil.ReadFile(resume); err != nil {
-			return nil, err
-		} else {
+		if rsChan, err := fileutil.ReadFile(resume); err == nil {
 			for r := range rsChan {
 				list := strings.Split(r, ",")
-				resumeProgress = append(resumeProgress, list...)
+				for _, id := range list {
+					sp.mergedProgress[id] = struct{}{}
+					sp.resumeProgress = append(sp.resumeProgress, id)
+				}
 			}
 		}
 	}
 
-	return &ScanProgress{
-		progress:       progress,
-		resumeProgress: resumeProgress,
-	}, nil
+	return sp, nil
 }
 
 func (p *ScanProgress) Increment(id string) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	p.progress = append(p.progress, id)
+	if _, exists := p.mergedProgress[id]; !exists {
+		p.mergedProgress[id] = struct{}{}
+		p.currentProgress = append(p.currentProgress, id)
+	}
 }
 
 func (p *ScanProgress) Contains(id string) bool {
-	for _, item := range p.resumeProgress {
-		if item == id {
-			return true
-		}
-	}
-	return false
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	_, exists := p.mergedProgress[id]
+	return exists
 }
 
-func (p *ScanProgress) String() string {
-	return strings.Join(p.progress, ",")
-}
+// func (p *ScanProgress) String() string {
+// 	return strings.Join(p.progress, ",")
+// }
 
 // 新增方法：原子化保存到指定文件
 func (p *ScanProgress) AtomicSave(filename string) error {
-	// 获取进度数据快照
 	p.mutex.Lock()
-	data := strings.Join(p.progress, ",")
-	p.mutex.Unlock()
+	defer p.mutex.Unlock()
+
+	// 合并历史进度和当前进度
+	fullProgress := append(p.resumeProgress, p.currentProgress...)
+	data := strings.Join(fullProgress, ",")
 
 	// 空数据不保存
 	if len(data) == 0 {

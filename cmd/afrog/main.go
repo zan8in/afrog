@@ -37,7 +37,6 @@ func main() {
 		// 新扫描任务才生成新文件名
 		baseName := config.GetFileBaseName(options)
 		autoSaveFile = fmt.Sprintf("afrog-resume-%s-%s.afg", baseName, time.Now().Format("20060102-150405"))
-		fmt.Println("自动保存文件路径: ", autoSaveFile)
 	}
 
 	// 添加正常退出标记
