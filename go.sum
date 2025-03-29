@@ -1228,7 +1228,6 @@ github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9 h1:WwIlLuTbEEzJHh0
 github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9/go.mod h1:IMXMxKc8XnbwVGoe2cie8JYP2rF4R6DIJh4mMniInUQ=
 github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a h1:kgpEfiv4FDkAthNB5RQHAZ/fJEVitbcrLOJDeUCRVyY=
 github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
-github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauupyJqrwMdFSKkLbVeOylYA1ViNrg0=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/gologger v0.0.0-20250329061145-d1614c9062d6 h1:HJXpibyggxYxCqydZpFxk7lyBdHKUJ+nHN0EORcWzCQ=
 github.com/zan8in/gologger v0.0.0-20250329061145-d1614c9062d6/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
