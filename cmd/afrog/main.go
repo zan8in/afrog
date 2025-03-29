@@ -126,19 +126,19 @@ func main() {
 	go func(runner *runner.Runner) {
 		for range c {
 			gologger.Print().Msg("")
-			gologger.Info().Msg("CTRL+C / Termination signal received")
+			gologger.Info().Msg("Scan termination signal received")
 
 			// 立即保存进度
 			if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
 				gologger.Error().Msgf("Could not preserve scan state: %s", err)
 			} else {
 				gologger.Info().Msgf("Scan state archived: %s\n", autoSaveFile)
-				gologger.Info().Msgf("Resume command: afrog -T urls.txt -resume %s\n", autoSaveFile)
+				// gologger.Info().Msgf("Resume command: afrog -T urls.txt -resume %s\n", autoSaveFile)
 			}
 
 			// 直接退出不触发正常清理
 			sqlite.CloseX()
-			gologger.Info().Msg("Process terminated")
+			// gologger.Info().Msg("Process terminated (exit code 1)")
 			os.Exit(1)
 		}
 	}(r)
