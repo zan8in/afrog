@@ -28,6 +28,7 @@ type Color struct {
 	Green     func(a ...any) string
 	Extractor func(a ...any) string
 	DarkGray  func(a ...any) string
+	Reverse   func(a ...any) string
 }
 
 var LogColor *Color
@@ -56,6 +57,7 @@ func NewColor() *Color {
 		Green:     color.FgLightGreen.Render,
 		Extractor: color.Yellow.Render,
 		DarkGray:  color.FgDarkGray.Render,
+		Reverse:   color.OpReverse.Render,
 	}
 }
 
