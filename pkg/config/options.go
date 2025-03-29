@@ -292,6 +292,11 @@ func (opt *Options) VerifyOptions() error {
 		}
 	}
 
+	if opt.Version {
+		ShowVersion(au)
+		os.Exit(0)
+	}
+
 	config, err := NewConfig(opt.ConfigFile)
 	if err != nil {
 		return err
@@ -306,11 +311,6 @@ func (opt *Options) VerifyOptions() error {
 		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
 			return fmt.Errorf("Dingtalk webhook token is required")
 		}
-	}
-
-	if opt.Version {
-		ShowVersion()
-		os.Exit(0)
 	}
 
 	if opt.Web {

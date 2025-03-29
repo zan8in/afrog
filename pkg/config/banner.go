@@ -33,8 +33,8 @@ func ShowBanner(u *AfrogUpdate) {
 	fmt.Println("─", strings.Repeat("─", 58), "─")
 }
 
-func ShowVersion() {
-	fmt.Printf("%s v%s (%s)\n", ProjectName, Version, Codename)
+func ShowVersion(u *AfrogUpdate) {
+	fmt.Printf("%s v%s (%s)\n", ProjectName, EngineV(u), Codename)
 }
 
 func EngineV(u *AfrogUpdate) string {
