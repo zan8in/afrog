@@ -194,7 +194,7 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.Cyberspace, "cyberspace", "cs", "", "cyberspace search, eg: -cs zoomeye"),
 		flagSet.StringVarP(&options.Query, "query", "q", "", "cyberspace search keywords, eg: -q app:'tomcat'"),
 		flagSet.IntVarP(&options.QueryCount, "query-count", "qc", 100, "cyberspace search data count, eg: -qc 1000"),
-		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.cfg"),
+		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.afg"),
 		flagSet.StringVar(&options.OOB, "oob", "", "set Out-of-Band (OOB) adapter, eg: -oob ceyeio or -oob dnslogcn or -oob alphalog"),
 	)
 
