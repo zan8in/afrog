@@ -50,10 +50,10 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 
 	// 第一行标题
 	title := fmt.Sprintf("%s/%s | %s | %s",
-		log.Blue(ProjectName),
-		log.Cyan(Version),
-		log.Yellow("Security Toolkit"),
-		log.Magenta(Codename),
+		log.LogColor.Info(ProjectName),
+		log.LogColor.Low(Version),
+		log.LogColor.Extractor("Security Toolkit"),
+		log.LogColor.Critical(Codename),
 	)
 	fmt.Println("\n" + title)
 
@@ -62,7 +62,7 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 
 	// 核心信息行
 	PrintStatusLine(
-		log.Blue(okSymbol),
+		log.LogColor.Low(okSymbol),
 		"Core:",
 		EngineV(u),
 		"",
@@ -71,10 +71,10 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 	// POC信息行
 	pocLine := PocV(u)
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
-		pocLine += " " + log.Yellow("(update available)")
+		pocLine += " " + log.LogColor.Extractor("(update available)")
 	}
 	PrintStatusLine(
-		log.Blue(okSymbol),
+		log.LogColor.Low(okSymbol),
 		"POC: ",
 		pocLine,
 		"",
@@ -82,7 +82,7 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 }
 
 func PrintSeparator() {
-	fmt.Println(log.Dim(strings.Repeat("═", LineWidth)))
+	fmt.Println(log.LogColor.DarkGray(strings.Repeat("═", LineWidth)))
 }
 
 func PrintStatusLine(symbol, label, value, note string) {
@@ -92,15 +92,15 @@ func PrintStatusLine(symbol, label, value, note string) {
 func EngineV(u *AfrogUpdate) string {
 	version := Version
 	if utils.Compare(u.LastestAfrogVersion, ">", Version) {
-		return version + log.Red(updateSymbol) + log.Dim(" (up to date)")
+		return version + log.LogColor.Red(updateSymbol) + log.LogColor.DarkGray(" (up to date)")
 	}
-	return log.Green(version)
+	return log.LogColor.Green(version)
 }
 
 func PocV(u *AfrogUpdate) string {
 	base := u.CurrVersion
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
-		return fmt.Sprintf("%s → %s", base, log.Red(u.LastestVersion))
+		return fmt.Sprintf("%s → %s", base, log.LogColor.Red(u.LastestVersion))
 	}
-	return log.Green(base)
+	return log.LogColor.Green(base)
 }

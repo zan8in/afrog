@@ -255,9 +255,9 @@ func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
 
 	if !status {
 		config.PrintStatusLine(
-			log.Red(config.GetErrorSymbol()),
+			log.LogColor.Red(config.GetErrorSymbol()),
 			"OOB: ",
-			log.Red(msg),
+			log.LogColor.Red(msg),
 			"",
 		)
 		config.PrintSeparator()
@@ -265,9 +265,9 @@ func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
 		return
 	}
 	config.PrintStatusLine(
-		log.Blue(config.GetOkSymbol()),
+		log.LogColor.Info(config.GetOkSymbol()),
 		"OOB: ",
-		log.Green(msg),
+		log.LogColor.Green(msg),
 		"",
 	)
 
