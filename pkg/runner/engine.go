@@ -236,7 +236,7 @@ func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	runner.options.SetOOBAdapter()
 
 	// 从配置中获取当前OOB服务名称
-	serviceName := strings.ToUpper(runner.options.OOB)
+	serviceName := strings.ToLower(runner.options.OOB)
 
 	if OOB == nil {
 		return false, fmt.Sprintf("%s (Not configured)", serviceName)
@@ -254,10 +254,24 @@ func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
 	status, msg := runner.getOOBStatus(reversePocs)
 
 	if !status {
-		gologger.Error().Msg("OOB: " + log.LogColor.Red(msg))
+		config.PrintStatusLine(
+			log.Red(config.GetErrorSymbol()),
+			"OOB: ",
+			log.Red(msg),
+			"",
+		)
+		config.PrintSeparator()
+
 		return
 	}
-	gologger.Info().Msg("OOB: " + log.LogColor.Green(msg))
+	config.PrintStatusLine(
+		log.Blue(config.GetOkSymbol()),
+		"OOB: ",
+		log.Green(msg),
+		"",
+	)
+
+	config.PrintSeparator()
 }
 
 // func parseElaspsedTime(time time.Duration) string {

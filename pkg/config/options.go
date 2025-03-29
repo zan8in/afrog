@@ -293,7 +293,7 @@ func (opt *Options) VerifyOptions() error {
 	}
 
 	if opt.Version {
-		ShowVersion(au)
+		// ShowVersion(au, "")
 		os.Exit(0)
 	}
 
@@ -368,7 +368,7 @@ func (opt *Options) VerifyOptions() error {
 
 	if len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0) {
 
-		ShowBanner(au)
+		ShowBanner(au, "")
 
 		// oob setting
 		// opt.SetOOBAdapter()
