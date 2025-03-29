@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gookit/color"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
@@ -50,10 +51,10 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 
 	// 第一行标题
 	title := fmt.Sprintf("%s/%s | %s | %s",
-		log.LogColor.Info(ProjectName),
-		log.LogColor.Low(Version),
-		log.LogColor.Extractor("Security Toolkit"),
-		log.LogColor.Critical(Codename),
+		color.FgLightBlue.Render(ProjectName),
+		Version,
+		color.FgYellow.Render("Security Toolkit"),
+		color.FgLightMagenta.Render(Codename),
 	)
 	fmt.Println("\n" + title)
 
