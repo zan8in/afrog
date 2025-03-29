@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -76,10 +77,12 @@ func (runner *Runner) Execute() {
 		} else {
 			OOBAlive = false
 		}
-		if !OOBAlive {
-			gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
-		}
+		// if !OOBAlive {
+		// 	gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
+		// }
 	}
+
+	runner.printOOBStatus(reversePocs)
 
 	options.Count += options.Targets.Len() * len(pocSlice)
 
@@ -222,6 +225,39 @@ func (runner *Runner) NotVulCallback() {
 type TransData struct {
 	Target string
 	Poc    poc.Poc
+}
+
+// 获取OOB状态信息
+func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
+	if len(reversePocs) == 0 {
+		return false, "Not required (no OOB PoCs)"
+	}
+
+	runner.options.SetOOBAdapter()
+
+	// 从配置中获取当前OOB服务名称
+	serviceName := strings.ToUpper(runner.options.OOB)
+
+	if OOB == nil {
+		return false, fmt.Sprintf("%s (Not configured)", serviceName)
+	}
+
+	if !OOB.IsVaild() {
+		return false, fmt.Sprintf("%s (Connection failed)", serviceName)
+	}
+
+	return true, fmt.Sprintf("%s (Active)", serviceName)
+}
+
+// 新增OOB状态显示函数
+func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
+	status, msg := runner.getOOBStatus(reversePocs)
+
+	if !status {
+		gologger.Error().Msg("OOB: " + log.LogColor.Red(msg))
+		return
+	}
+	gologger.Info().Msg("OOB: " + log.LogColor.Green(msg))
 }
 
 // func parseElaspsedTime(time time.Duration) string {

@@ -1,9 +1,5 @@
 package config
 
-import (
-	"github.com/zan8in/gologger"
-)
-
 var (
 	OOBCeyeio   = "ceyeio"
 	OOBDnslogcn = "dnslogcn"
@@ -38,7 +34,7 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOBKey = reverse.Ceye.ApiKey
 		opt.OOBDomain = reverse.Ceye.Domain
 		if len(opt.OOBKey) == 0 && len(opt.OOBDomain) == 0 {
-			gologger.Info().Msg("Ceyeio is not configured")
+			// gologger.Info().Msg("Ceyeio is not configured")
 			return
 		}
 	case OOBDnslogcn:
@@ -46,7 +42,7 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOB = OOBDnslogcn
 		opt.OOBDomain = reverse.Dnslogcn.Domain
 		if len(opt.OOBDomain) == 0 {
-			gologger.Info().Msg("Dnslogcn is not configured")
+			// gologger.Info().Msg("Dnslogcn is not configured")
 			return
 		}
 	case OOBAlphalog:
@@ -55,7 +51,7 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOBDomain = reverse.Alphalog.Domain
 		opt.OOBApiUrl = reverse.Alphalog.ApiUrl
 		if len(opt.OOBDomain) == 0 && len(opt.OOBApiUrl) == 0 {
-			gologger.Info().Msg("Alphalog is not configured")
+			// gologger.Info().Msg("Alphalog is not configured")
 			return
 		}
 	case OOBXray:
@@ -65,7 +61,7 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOBApiUrl = reverse.Xray.ApiUrl
 		opt.OOBKey = reverse.Xray.XToken
 		if len(opt.OOBDomain) == 0 && len(opt.OOBApiUrl) == 0 && len(opt.OOBKey) == 0 {
-			gologger.Info().Msg("Xray is not configured")
+			// gologger.Info().Msg("Xray is not configured")
 			return
 		}
 	case OOBRevsuit:
@@ -76,7 +72,7 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOBHttpUrl = reverse.Revsuit.HttpUrl
 		opt.OOBApiUrl = reverse.Revsuit.ApiUrl
 		if len(opt.OOBKey) == 0 && len(opt.OOBDomain) == 0 && len(opt.OOBHttpUrl) == 0 && len(opt.OOBApiUrl) == 0 {
-			gologger.Info().Msg("Revsuit is not configured")
+			// gologger.Info().Msg("Revsuit is not configured")
 			return
 		}
 	default:
@@ -85,10 +81,10 @@ func (opt *Options) SetOOBAdapter() {
 		opt.OOBKey = reverse.Ceye.ApiKey
 		opt.OOBDomain = reverse.Ceye.Domain
 		if len(opt.OOBKey) == 0 && len(opt.OOBDomain) == 0 {
-			gologger.Info().Msg("Ceyeio is not configured")
+			// gologger.Info().Msg("Ceyeio is not configured")
 			return
 		}
 	}
-	gologger.Info().Msg("Using OOB Server: " + opt.OOB)
+	// gologger.Info().Msg("Using OOB Server: " + opt.OOB)
 
 }

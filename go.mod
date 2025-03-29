@@ -22,7 +22,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9
 	github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a
-	github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373
+	github.com/zan8in/gologger v0.0.0-20250329061145-d1614c9062d6
 	github.com/zan8in/goupdate v1.0.0
 	github.com/zan8in/oobadapter v0.0.0-20240611013553-c79cb5eec939
 	github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a
@@ -30,7 +30,6 @@ require (
 	github.com/zan8in/retryablehttp v0.0.0-20250328031451-21b2f964eafd
 	github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a
 	go.uber.org/zap v1.21.0
-	golang.org/x/term v0.30.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v2 v2.4.0

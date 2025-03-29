@@ -1230,6 +1230,8 @@ github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a h1:kgpEfiv4FDkAthNB
 github.com/zan8in/goflags v0.0.0-20230204144650-0745934af58a/go.mod h1:SU2BjeuADHecx3khPTkSgkYMvd89YFJnu8YhFDGRIdM=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373 h1:T2YD/hp647jDauupyJqrwMdFSKkLbVeOylYA1ViNrg0=
 github.com/zan8in/gologger v0.0.0-20220917062627-c34a83c0a373/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
+github.com/zan8in/gologger v0.0.0-20250329061145-d1614c9062d6 h1:HJXpibyggxYxCqydZpFxk7lyBdHKUJ+nHN0EORcWzCQ=
+github.com/zan8in/gologger v0.0.0-20250329061145-d1614c9062d6/go.mod h1:z3Zn3+DLpcfFKNqhAdYECiFeFK+o1EW3Gh0DEhFZ+v4=
 github.com/zan8in/goupdate v1.0.0 h1:H3ZVndassN6jNkJROAEkGFHbiyax0yG1RSKXMhzvgLY=
 github.com/zan8in/goupdate v1.0.0/go.mod h1:lB3IFGNY/wLFj1qfPOyee2m7lplg/mSDpsng+ax7sc8=
 github.com/zan8in/oobadapter v0.0.0-20240611013553-c79cb5eec939 h1:3ARQ+mnJ4MZKFJZUayUymMJiJ5hXpHiDv1PI7nxaRaA=
@@ -1600,8 +1602,6 @@ golang.org/x/term v0.6.0/go.mod h1:m6U89DPEgQRMq3DNkDClhWw02AUbt2daBVO4cn4Hv9U=
 golang.org/x/term v0.7.0/go.mod h1:P32HKFT3hSsZrRxla30E9HqToFYAQPCMs/zFMBUFqPY=
 golang.org/x/term v0.8.0/go.mod h1:xPskH00ivmX89bAKVGSKKtLOWNx2+17Eiy94tnKShWo=
 golang.org/x/term v0.13.0/go.mod h1:LTmsnFJwVN6bCy1rVCoS+qHT1HhALEFxKncY3WNNh4U=
-golang.org/x/term v0.30.0 h1:PQ39fJZ+mfadBm0y5WlL4vlM7Sx1Hgf13sMIY2+QS9Y=
-golang.org/x/term v0.30.0/go.mod h1:NYYFdzHoI5wRh/h5tDMdMqCqPJZEuNqVR5xJLd/n67g=
 golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.1-0.20180807135948-17ff2d5776d2/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=

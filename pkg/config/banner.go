@@ -8,6 +8,21 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
+var (
+	updateSymbol string
+	okSymbol     string
+)
+
+func initSymbols() {
+	if utils.IsUnicodeSupported() {
+		updateSymbol = "↑"
+		okSymbol = "✓"
+	} else {
+		updateSymbol = "^"
+		okSymbol = "√"
+	}
+}
+
 const (
 	Version     = "3.1.6"
 	ProjectName = "afrog"
@@ -24,6 +39,7 @@ func InitBanner() {
 }
 
 func ShowBanner(u *AfrogUpdate) {
+	initSymbols()
 	InitBanner()
 	fmt.Printf("\n%s | %s%s\n",
 		fmt.Sprintf("core:%s", EngineV(u)),
@@ -39,16 +55,16 @@ func ShowVersion(u *AfrogUpdate) {
 
 func EngineV(u *AfrogUpdate) string {
 	if utils.Compare(u.LastestAfrogVersion, ">", Version) {
-		return Version + log.LogColor.Red("↑")
+		return Version + log.LogColor.Red(updateSymbol)
 	}
-	return Version + log.LogColor.Info("✓")
+	return Version + log.LogColor.Info(okSymbol)
 }
 
 func PocV(u *AfrogUpdate) string {
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
-		return u.CurrVersion + log.LogColor.Red("↑")
+		return u.CurrVersion + log.LogColor.Red(updateSymbol)
 	}
-	return u.CurrVersion
+	return u.CurrVersion + log.LogColor.Info(okSymbol)
 }
 
 func updateIndicator(u *AfrogUpdate) string {

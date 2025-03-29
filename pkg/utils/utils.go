@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -272,4 +273,17 @@ func SanitizeFilename(s string) string {
 	s = strings.Trim(s, ".")
 
 	return s
+}
+
+func IsUnicodeSupported() bool {
+	// Windows 特殊处理
+	if runtime.GOOS == "windows" {
+		// 检测是否为 Windows Terminal 或配置了 UTF-8 的终端
+		if os.Getenv("WT_SESSION") != "" || os.Getenv("ConEmuANSI") == "ON" {
+			return true
+		}
+		return false
+	}
+	// Linux/macOS 默认支持
+	return true
 }
