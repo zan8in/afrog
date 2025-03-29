@@ -566,13 +566,18 @@
                     {{end}}
 
                     {{if .PocInfo.Info.Affected}}
-                    <br /><b>affected:</b> {{.PocInfo.Info.Affected}}
+                    <br /><b>affected:</b>
+                    <span style="white-space: pre-line;">
+                        {{.PocInfo.Info.Affected}}
+                    </span>
                     {{end}}
 
                     {{if .PocInfo.Info.Solutions}}
-                    <br /><b>solutions:</b> {{.PocInfo.Info.Solutions}}
+                    <br /><b>solutions:</b>
+                    <span style="white-space: pre-line;">
+                        {{.PocInfo.Info.Solutions}}
+                    </span>
                     {{end}}
-
 
                 </td>
             </tr>
