@@ -1,34 +1,27 @@
-# Terraform Provider release workflow.
-name: Release
+name: 🎉 Release Binary
 
-# This GitHub action creates a release when a tag that matches the pattern
-# "v*" (e.g. v0.1.0) is created.
 on:
   push:
     tags:
-      - "v*"
-
-# Releases need permissions to read and write the repository contents.
-# GitHub considers creating releases and uploading assets as writing contents.
-permissions:
-  contents: write
+      - "*"
+  workflow_dispatch:
 
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
-          # Allow goreleaser to access older tag information.
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+
+      - uses: actions/setup-go@v4
         with:
-          go-version: "1.23.0"
-          cache: true
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+          go-version: 1.20.x
+
+      - uses: goreleaser/goreleaser-action@v4
         with:
-          args: release --clean
+          args: "release --rm-dist"
+          version: 1.23.0
         env:
-          # GitHub sets the GITHUB_TOKEN secret automatically.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

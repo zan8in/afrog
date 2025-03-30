@@ -1,6 +1,6 @@
 module github.com/zan8in/afrog/v3
 
-go 1.23
+go 1.20
 
 require (
 	github.com/blinkbean/dingtalk v0.0.0-20230927120905-796332ac4ba1
