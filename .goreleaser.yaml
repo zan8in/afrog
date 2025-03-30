@@ -1,20 +1,25 @@
+version: 2
+
 before:
   hooks:
-    - go mod tidy
+    - go mod download
+    - go mod verify
 
 builds:
   - main: cmd/afrog/main.go
     binary: afrog
     id: afrog
-
     env:
       - CGO_ENABLED=0
-
     goos: [windows, linux, darwin]
     goarch: [amd64, arm64]
 
     flags:
       - -trimpath
+      - -pgo=auto
+    ldflags:
+      - -s
+      - -w
 
 archives:
   - format: zip
