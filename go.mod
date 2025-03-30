@@ -1,8 +1,6 @@
 module github.com/zan8in/afrog/v3
 
-go 1.23.0
-
-toolchain go1.23.6
+go 1.23.6
 
 // toolchain go1.23.6
 

@@ -1,3 +1,5 @@
+version: 2
+
 before:
   hooks:
     - go mod tidy
@@ -15,6 +17,9 @@ builds:
 
     flags:
       - -trimpath
+
+    ldflags:
+      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}}"
 
 archives:
   - format: zip
