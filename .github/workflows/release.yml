@@ -22,6 +22,6 @@ jobs:
       - uses: goreleaser/goreleaser-action@v4
         with:
           args: "release --rm-dist"
-          version: 1.23
+          version: 1.23.0
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
