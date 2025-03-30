@@ -40,7 +40,7 @@ func NewColor() *Color {
 		Low:       color.Cyan.Render,
 		Midium:    color.Yellow.Render,
 		High:      color.LightRed.Render,
-		Critical:  color.Red.Render,
+		Critical:  color.FgLightMagenta.Render,
 		Vulner:    color.FgLightGreen.Render,
 		Time:      color.Gray.Render,
 		Title:     color.FgLightBlue.Render,

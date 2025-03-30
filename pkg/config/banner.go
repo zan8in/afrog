@@ -13,14 +13,13 @@ import (
 const (
 	Version     = "3.1.7"
 	ProjectName = "Afrog"
-	Codename    = "Ne Zha II"
+	Codename    = "Life is fantastic. Enjoy life."
 	LineWidth   = 56
 )
 
 var (
 	updateSymbol string
 	okSymbol     string
-	warnSymbol   string
 	errorSymbol  string
 )
 
@@ -36,12 +35,10 @@ func initSymbols() {
 	if utils.IsUnicodeSupported() {
 		updateSymbol = "↑"
 		okSymbol = "✓"
-		warnSymbol = "!"
 		errorSymbol = "✖"
 	} else {
 		updateSymbol = "^"
 		okSymbol = "√"
-		warnSymbol = "!"
 		errorSymbol = "X"
 	}
 }
