@@ -1,27 +1,19 @@
-name: 🎉 Release Binary
-
+name: Release
 on:
   push:
     tags:
-      - "*"
-  workflow_dispatch:
+      - "v*"
 
 jobs:
-  release:
+  goreleaser:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v4
         with:
-          go-version: 1.23.x
-
-      - uses: goreleaser/goreleaser-action@v4
+          go-version: "1.21" # 与 go.mod 一致
+      - uses: goreleaser/goreleaser-action@v5
         with:
-          args: "release --rm-dist"
-          version: 1.23.0
+          version: latest
         env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

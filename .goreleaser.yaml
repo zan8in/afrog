@@ -3,24 +3,24 @@ before:
     - go mod tidy
 
 builds:
-- main: cmd/afrog/main.go
-  binary: afrog
-  id: afrog
+  - main: cmd/afrog/main.go
+    binary: afrog
+    id: afrog
 
-  env:
-  - CGO_ENABLED=0
+    env:
+      - CGO_ENABLED=0
 
-  goos: [windows,linux,darwin]
-  goarch: [amd64,arm64]
+    goos: [windows, linux, darwin]
+    goarch: [amd64, arm64]
 
-  flags:
-    - -trimpath
+    flags:
+      - -trimpath
 
 archives:
-- format: zip
-  id: afrog
-  builds: [afrog]
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
+  - format: zip
+    id: afrog
+    builds: [afrog]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
 checksum:
   algorithm: sha256
