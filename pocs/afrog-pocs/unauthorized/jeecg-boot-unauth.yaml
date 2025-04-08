@@ -14,4 +14,14 @@ rules:
       method: GET
       path: /jeecg-boot/
     expression: response.status == 200 && response.body.bcontains(b'<title>Swagger-Bootstrap-UI</title>')
-expression: r0()
+  r1:
+    request:
+      method: GET
+      path: /jeecg-boot/swagger-resources
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"name":') &&
+      response.body.bcontains(b'"url":') &&
+      response.body.bcontains(b'"swaggerVersion":') &&
+      response.body.bcontains(b'"location":')
+expression: r0() || r1()
