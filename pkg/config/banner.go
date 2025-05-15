@@ -79,6 +79,10 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 	)
 }
 
+func ShowVersion() {
+	fmt.Printf("%s %s\n", ProjectName, Version)
+}
+
 func PrintSeparator() {
 	fmt.Println(log.LogColor.DarkGray(strings.Repeat("═", LineWidth)))
 }

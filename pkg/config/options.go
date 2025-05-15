@@ -293,7 +293,7 @@ func (opt *Options) VerifyOptions() error {
 	}
 
 	if opt.Version {
-		// ShowVersion(au, "")
+		ShowVersion()
 		os.Exit(0)
 	}
 

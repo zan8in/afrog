@@ -1,0 +1,56 @@
+id: waf-detect
+
+info:
+  name: WAF Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |
+    WAF detection by afrog
+  tags: waf
+  created: 2025/05/15
+
+# from https://github.com/chainreactors/templates/blob/f9a28ba2bdac49c3670871d8800f80a873bbc4e5/fingers/http/waf.yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expressions:
+      - '"阿里WAF" != "" && response.raw_header.bcontains(b"acw_tc")'
+      - '"360waf" != "" && (response.raw_header.ibcontains(b"WZWS-RAY")|| response.raw_header.ibcontains(b"360waf"))'
+      - '"Safe3" != "" && response.raw_header.ibcontains(b"Safe3 Web Firewall")'
+      - '"ArmorLogic" != "" && response.raw_header.bcontains(b"Profense")'
+      - '"Safedog" != "" && response.raw_header.bcontains("Safedog")'
+      - '"长亭WAF" != "" && "<!\\-\\- event_id: [0-9a-f]{32} \\-\\->".bmatches(response.body)'
+      - '"SonicWALL" != "" && response.raw_header.bcontains("SonicWALL")'
+      - '"IBMWAF" != "" && response.raw_header.bcontains(b"WebSEAL")'
+      - '"YunsuoWAF" != "" && response.raw_header.bcontains(b"yunsuo_session")'
+      - '"anzuwaf" != "" && response.raw_header.bcontains(b"AnZuWAF")'
+      - '"fortiweb waf" != "" && response.raw_header.bcontains(b"FORTIWAFSID=")'
+      - '"safe3waf" != "" && response.raw_header.bcontains(b"safe3waf")'
+      - '"websecurity_waf" != "" && response.raw_header.bcontains(b"Websecurity: WAF")'
+      - '"安全狗WAF" != "" && response.raw_header.bcontains(b"WAF/2.0")'
+
+  r1:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expressions:
+      - '"阿里WAF" != "" && response.raw_header.bcontains(b"acw_tc")'
+      - '"360waf" != "" && (response.raw_header.ibcontains(b"WZWS-RAY")|| response.raw_header.ibcontains(b"360waf"))'
+      - '"Safe3" != "" && response.raw_header.ibcontains(b"Safe3 Web Firewall")'
+      - '"ArmorLogic" != "" && response.raw_header.bcontains(b"Profense")'
+      - '"Safedog" != "" && response.raw_header.bcontains("Safedog")'
+      - '"长亭WAF" != "" && "<!\\-\\- event_id: [0-9a-f]{32} \\-\\->".bmatches(response.body)'
+      - '"SonicWALL" != "" && response.raw_header.bcontains("SonicWALL")'
+      - '"IBMWAF" != "" && response.raw_header.bcontains(b"WebSEAL")'
+      - '"YunsuoWAF" != "" && response.raw_header.bcontains(b"yunsuo_session")'
+      - '"anzuwaf" != "" && response.raw_header.bcontains(b"AnZuWAF")'
+      - '"fortiweb waf" != "" && response.raw_header.bcontains(b"FORTIWAFSID=")'
+      - '"safe3waf" != "" && response.raw_header.bcontains(b"safe3waf")'
+      - '"websecurity_waf" != "" && response.raw_header.bcontains(b"Websecurity: WAF")'
+      - '"安全狗WAF" != "" && response.raw_header.bcontains(b"WAF/2.0")'
+
+expression: r0() || r1()

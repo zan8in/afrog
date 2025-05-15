@@ -1,0 +1,52 @@
+id: cdn-detect
+
+info:
+  name: CDN Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |
+    CDN detection by afrog
+  tags: cdn
+  created: 2025/05/15
+
+# from https://github.com/chainreactors/templates/blob/f9a28ba2bdac49c3670871d8800f80a873bbc4e5/fingers/http/cdn.yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expressions:
+      - '"网宿" != "" && response.raw_header.bcontains(b"WS CDN Server")'
+      - '"gocdn" != "" && response.raw_header.ibcontains(b"GOCDN")'
+      - '"cdn-cache-server" != "" && response.raw_header.ibcontains(b"Cdn Cache Server")'
+      - '"阿里云cdn" != "" && (response.raw_header.bcontains(b"cdn.aliyuncs.com") || response.raw_header.bcontains(b"x-swift-cachetime"))'
+      - '"加速乐CDN" != "" && response.raw_header.bcontains("jiasule")'
+      - '"百度cdn" != "" && response.raw_header.bcontains(b"libs.baidu.com")'
+      - '"powercdn" != "" && response.raw_header.bcontains("Powercdn")'
+      - '"七牛cdn" != "" && (response.raw_header.bcontains(b"cdn.staticfile.org") || response.raw_header.bcontains(b"X-Qiniu-Zone"))'
+      - '"maxcdn" != "" && response.raw_header.bcontains(b"NetDNA")'
+      - '"加速乐" != "" && response.raw_header.bcontains(b"__jsluid")'
+      - '"腾讯云CDN" != "" && response.raw_header.bcontains(b"X-NWS-LOG-UUID")'
+      - '"天翼云cdn" != "" && response.raw_header.bcontains(b"hotload rechange server uri format error")'
+
+  r1:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expressions:
+      - '"网宿" != "" && response.raw_header.bcontains(b"WS CDN Server")'
+      - '"gocdn" != "" && response.raw_header.ibcontains(b"GOCDN")'
+      - '"cdn-cache-server" != "" && response.raw_header.ibcontains(b"Cdn Cache Server")'
+      - '"阿里云cdn" != "" && (response.raw_header.bcontains(b"cdn.aliyuncs.com") || response.raw_header.bcontains(b"x-swift-cachetime"))'
+      - '"加速乐CDN" != "" && response.raw_header.bcontains("jiasule")'
+      - '"百度cdn" != "" && response.raw_header.bcontains(b"libs.baidu.com")'
+      - '"powercdn" != "" && response.raw_header.bcontains("Powercdn")'
+      - '"七牛cdn" != "" && (response.raw_header.bcontains(b"cdn.staticfile.org") || response.raw_header.bcontains(b"X-Qiniu-Zone"))'
+      - '"maxcdn" != "" && response.raw_header.bcontains(b"NetDNA")'
+      - '"加速乐" != "" && response.raw_header.bcontains(b"__jsluid")'
+      - '"腾讯云CDN" != "" && response.raw_header.bcontains(b"X-NWS-LOG-UUID")'
+      - '"天翼云cdn" != "" && response.raw_header.bcontains(b"hotload rechange server uri format error")'
+
+expression: r0() || r1()
