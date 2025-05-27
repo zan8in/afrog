@@ -230,7 +230,7 @@ type TransData struct {
 // 获取OOB状态信息
 func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	if len(reversePocs) == 0 {
-		return false, "Not required (no OOB PoCs)"
+		return true, "Not required (no OOB PoCs)"
 	}
 
 	runner.options.SetOOBAdapter()
