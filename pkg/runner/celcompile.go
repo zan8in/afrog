@@ -195,6 +195,15 @@ var (
 				decls.NewOverload("decimal_string_string",
 					[]*exprpb.Type{decls.String, decls.String},
 					decls.String)),
+			// length
+			decls.NewFunction("length",
+				decls.NewOverload("length_string",
+					[]*exprpb.Type{decls.String},
+					decls.Int)),
+			decls.NewFunction("length",
+				decls.NewOverload("length_bytes",
+					[]*exprpb.Type{decls.Bytes},
+					decls.Int)),
 		),
 	}
 )

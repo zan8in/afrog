@@ -575,6 +575,28 @@ var (
 					return types.String(strings.Join(str, string(delimiter)))
 				},
 			},
+			&functions.Overload{
+				Operator: "length_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to length_string", value.Type())
+					}
+					return types.Int(len(v))
+				},
+			},
+			&functions.Overload{
+				Operator: "length_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to length_bytes", value.Type())
+					}
+					return types.Int(len(v))
+				},
+			},
 		),
 	}
 )
