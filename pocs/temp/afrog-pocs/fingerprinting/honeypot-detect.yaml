@@ -1,0 +1,43 @@
+id: honeypot-detect
+
+info:
+  name: Honeypot Detect
+  author: zan8in
+  severity: info
+  verified: true
+  reference:
+    - https://mp.weixin.qq.com/s/FrpE2doSoa3AmKjPv-ikNw
+  tags: honeypot,detect
+  created: 2025/05/29
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expressions:
+      - '"honeypot-glastopf" != "" && response.body.bcontains(b"<h2>Blog Comments</h2>") && response.body.bcontains(b"Please post your comments for the blog")'
+      - '"honeypot-amun" != "" && response.body.bcontains(b"tim.bohn@gmx.net") && response.body.bcontains(b"johan83@freenet.de")'
+      - '"honeypot-hfish" != "" && response.body.bcontains(b"w-logo-blue.png?ver=20131202") && response.body.bcontains(b"static/x.js") && response.body.bcontains(b"ver=5.2.2") && !response.body.bcontains(b"bcd")'
+      - '"honeypot-weblogic" != "" && response.status == 404 && length(response.body) == 1165 && response.raw_header.bcontains(b"WebLogic Server 10.3.6.0.171017 PSU Patch for") && response.raw_header.bcontains(b"BUG26519424 TUE SEP 12 18:34:42 IST 2017") && response.raw_header.bcontains(b"WebLogic Server 10.3.6.0 Tue Nov 15") && response.raw_header.bcontains(b"08:52:36 PST 2011 1441050 Oracle") && response.raw_header.bcontains(b"WebLogic Server Module Dependencies")'
+      - '"honeypot-honeything物联网蜜罐" != "" && response.body.bcontains(b"body.style.left=(bodywidth-760)/2;")'
+      - '"honeypot-conpot-http蜜罐" != "" && response.body.bcontains(b"Last-Modified Tue, 19 May 1993 09:00:00 GMT")'
+      - '"honeypot-citrix-detect"!= "" && response.body.ibcontains(b"<title>Citrix Login</title>") && response.body.bcontains(b"n order to use our services, you must agree to Citrix''s Terms of Service.")'
+      - '"honeypot-honeyd"!= "" && response.headers["server"].ibcontains(b"Honeyd")'
+
+  r1:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+    expressions:
+      - '"honeypot-glastopf" != "" && response.body.bcontains(b"<h2>Blog Comments</h2>") && response.body.bcontains(b"Please post your comments for the blog")'
+      - '"honeypot-amun" != "" && response.body.bcontains(b"tim.bohn@gmx.net") && response.body.bcontains(b"johan83@freenet.de")'
+      - '"honeypot-hfish" != "" && response.body.bcontains(b"w-logo-blue.png?ver=20131202") && response.body.bcontains(b"static/x.js") && response.body.bcontains(b"ver=5.2.2") && !response.body.bcontains(b"bcd")'
+      - '"honeypot-weblogic" != "" && response.status == 404 && length(response.body) == 1165 && response.raw_header.bcontains(b"WebLogic Server 10.3.6.0.171017 PSU Patch for") && response.raw_header.bcontains(b"BUG26519424 TUE SEP 12 18:34:42 IST 2017") && response.raw_header.bcontains(b"WebLogic Server 10.3.6.0 Tue Nov 15") && response.raw_header.bcontains(b"08:52:36 PST 2011 1441050 Oracle") && response.raw_header.bcontains(b"WebLogic Server Module Dependencies")'
+      - '"honeypot-honeything物联网蜜罐" != "" && response.body.bcontains(b"body.style.left=(bodywidth-760)/2;")'
+      - '"honeypot-conpot-http蜜罐" != "" && response.body.bcontains(b"Last-Modified Tue, 19 May 1993 09:00:00 GMT")'
+      - '"honeypot-citrix-detect"!= "" && response.body.ibcontains(b"<title>Citrix Login</title>") && response.body.bcontains(b"n order to use our services, you must agree to Citrix''s Terms of Service.")'
+      - '"honeypot-honeyd"!= "" && response.headers["server"].ibcontains(b"Honeyd")'
+
+expression: r0() || r1()
