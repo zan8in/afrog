@@ -11,5 +11,5 @@ rules:
     request:
       method: GET
       path: /.svn/entries
-    expression: response.status == 200 && ("file\n".bmatches(response.body) || "dir\n".bmatches(response.body)) && "([0-9]){4}-([0-9]){2}-([0-9]){2}(.*)Z\n".bmatches(response.body)
+    expression: response.status == 200 && response.headers["content-type"].contains("application/octet-stream")
 expression: r0()
