@@ -71,6 +71,12 @@ func main() {
 		number    uint32
 	)
 	r.OnResult = func(result *result.Result) {
+		// add recover @edit 2025/06/12
+		defer func() {
+			if err := recover(); err != nil {
+				gologger.Error().Msgf("OnResult panic: %v", err)
+			}
+		}()
 
 		if !options.Silent {
 			defer func() {
