@@ -1,0 +1,27 @@
+id: roundcube-webmail
+
+info:
+  name: Roundcube webmail
+  author: ritikchaddha
+  severity: info
+  description: |-
+    Roundcube webmail was detected.
+    shodan-query: http.component:"RoundCube"
+  tags: roundcube,portal,tech
+  created: 2025/06/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webmail/
+    expression: |
+      response.status == 200 &&
+      response.body.ibcontains(b'<title>Roundcube Webmail') &&
+      response.body.bcontains(b'"rcversion":')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"\"rcversion\":(?P<webmail>[0-9]{5}),".bsubmatch(response.body)'
+          webmail: ext1["webmail"]
+expression: r0()
