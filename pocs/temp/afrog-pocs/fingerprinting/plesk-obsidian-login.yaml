@@ -1,0 +1,33 @@
+id: plesk-obsidian-login
+
+info:
+  name: Plesk Obsidian Login Panel - Detect
+  author: dhiyaneshDK,daffainfo
+  severity: info
+  description: |-
+    Plesk Obsidian login panel was detected.
+    shodan-query:
+      - http.html:"Plesk Obsidian"
+      - http.html:"plesk obsidian"
+      - http.title:"plesk obsidian"
+    fofa-query:
+      - body="plesk obsidian"
+      - title="plesk obsidian"
+    google-query: intitle:"plesk obsidian"
+  tags: panel,plesk,login,edb
+  created: 2025/06/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /login_up.php
+    expression: |
+      response.status == 200 && 
+      "<title>Plesk Obsidian [0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2}</title>".bmatches(response.body)
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"<title>Plesk Obsidian (?P<Obsidian>[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2})</title>".bsubmatch(response.body)'
+          Plesk-Obsidian: ext1["Obsidian"]
+expression: r0()
