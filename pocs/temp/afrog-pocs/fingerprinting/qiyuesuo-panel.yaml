@@ -1,0 +1,41 @@
+id: qiyuesuo-panel
+
+info:
+  name: 契约锁
+  author: zan8in
+  severity: info
+  reference:
+    - https://www.qiyuesuo.com
+  tags: qiyuesuo,panel
+  created: 2025/06/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /version/info
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"result":') &&
+      response.body.bcontains(b'"code":0') &&
+      response.body.bcontains(b'"message":"\\u8BF7\\u6C42\\u6210\\u529F"')
+    extractors:
+      - type: regex
+        extractor:
+          ext1: '"\"result\":\"(?P<version>[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,8})\"".bsubmatch(response.body)'
+          qiyuesuo: ext1["version"]
+  r1:
+    request:
+      method: GET
+      path: /api/version/info
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"result":') &&
+      response.body.bcontains(b'"code":0') &&
+      response.body.bcontains(b'"message":"\\u8BF7\\u6C42\\u6210\\u529F"')
+    extractors:
+      - type: regex
+        extractor:
+          ext2: '"\"result\":\"(?P<version>[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,8})\"".bsubmatch(response.body)'
+          qiyuesuo: ext2["version"]
+expression: r0() || r1()

