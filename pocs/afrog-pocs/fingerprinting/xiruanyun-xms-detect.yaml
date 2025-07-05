@@ -1,0 +1,20 @@
+id: xiruanyun-xms-detect
+
+info:
+  name: 西软云XMS
+  author: zan8in
+  severity: info
+  description: |-
+    fofa: app="shiji-西软云XMS"
+    西软云XMS /fox-invoker/FoxLookupInvoker接口处存在反序列化漏洞，未经身份认证的攻击者可利用此漏洞执行任意代码，获取服务器权限。
+  tags: xiranyun,xxe,shiji
+  created: 2025/07/03
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /WebXMS
+      follow_redirects: true
+    expression: response.status == 200 && response.body.ibcontains(b'<title>西软云XMS</title>')
+expression: r0()

