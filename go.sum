@@ -1242,6 +1242,8 @@ github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521 h1:NChaJHUwxfG
 github.com/zan8in/retryabledns v0.0.0-20230317092826-5ad665eb2521/go.mod h1:cfXB+E8BywqKbD6sLLQaQFP95gASuxZY+ma3JPby2i0=
 github.com/zan8in/retryablehttp v0.0.0-20250705093051-2d01d9a1f3dc h1:YhPEgJmHHDamul69m6Trz9sJScizfZDzC6TisyA8w1E=
 github.com/zan8in/retryablehttp v0.0.0-20250705093051-2d01d9a1f3dc/go.mod h1:KPJ+327tfi0jnoLfzQL8nbBcO/BGP+sUU1inh4GrmDA=
+github.com/zan8in/retryablehttp v0.0.0-20250708033333-22f47dd0b7df h1:16f40UBCw6RkXPBKndY5Lt61u8EzmV1q+Z5z1yh0y2c=
+github.com/zan8in/retryablehttp v0.0.0-20250708033333-22f47dd0b7df/go.mod h1:KPJ+327tfi0jnoLfzQL8nbBcO/BGP+sUU1inh4GrmDA=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
 github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a h1:0FJgwyL9TXasVoqtFFju3LW50jk86wL7QTX+Jt8RmKA=

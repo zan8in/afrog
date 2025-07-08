@@ -25,7 +25,7 @@ require (
 	github.com/zan8in/oobadapter v0.0.0-20240611013553-c79cb5eec939
 	github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a
 	github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af
-	github.com/zan8in/retryablehttp v0.0.0-20250705093051-2d01d9a1f3dc
+	github.com/zan8in/retryablehttp v0.0.0-20250708033333-22f47dd0b7df
 	github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a
 	go.uber.org/zap v1.21.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc
