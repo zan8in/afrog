@@ -1,0 +1,25 @@
+id: consul-api-discosure
+
+info:
+  name: Consul API publicly exposed
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Consul is a service networking solution to automate network configurations, discover services, and enable secure connectivity across any cloud or runtime.
+    Consul API is designed to be accessed inside trusted environments. It's not recommended to have Consul API publicly accessible.
+  tags: consul,api,disclosure
+  created: 2025/07/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /v1/agent/self
+    expression: |
+      response.status == 200 && 
+      response.headers["content-type"].contains("application/json") &&
+      response.body.bcontains(b'"Config":') &&
+      response.body.bcontains(b'"DebugConfig":') &&
+      response.body.bcontains(b'"Telemetry":')
+expression: r0()
