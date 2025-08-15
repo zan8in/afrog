@@ -26,6 +26,7 @@ type TemplateStyle int
 
 const (
 	DefaultTemplate TemplateStyle = iota
+	MinimalTemplate
 )
 
 const OutputDirectory = "./reports"
@@ -133,6 +134,8 @@ func (report *Report) header() string {
 	switch report.Template {
 	case DefaultTemplate:
 		return defaultHeader()
+	case MinimalTemplate:
+		return minimalHeader()
 	}
 	return ""
 }
@@ -141,6 +144,8 @@ func (report *Report) html(number string) string {
 	switch report.Template {
 	case DefaultTemplate:
 		return report.defaultHmtl(number)
+	case MinimalTemplate:
+		return report.minimalHtml(number)
 	}
 	return ""
 }

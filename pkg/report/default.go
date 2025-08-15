@@ -29,7 +29,7 @@ func (report *Report) defaultHmtl(line string) string {
 		htResult.PocInfo.Info.Name, htResult.PocInfo.Info.Author, htResult.PocInfo.Info.Severity,
 	)
 	if len(htResult.PocInfo.Info.Description) > 0 {
-		info += "<br/><b>description:</b> " + htResult.PocInfo.Info.Description
+		info += "<br/><b>description:</b> " + strings.ReplaceAll(htResult.PocInfo.Info.Description, "\n", "<br/>")
 	}
 	if len(htResult.PocInfo.Info.Reference) > 0 {
 		info += "<br/><b>reference:</b> "
@@ -38,11 +38,10 @@ func (report *Report) defaultHmtl(line string) string {
 		}
 	}
 	if len(htResult.PocInfo.Info.Affected) > 0 {
-		info += "<br/><b>affected:</b> " + htResult.PocInfo.Info.Affected
-
+		info += "<br/><b>affected:</b> " + strings.ReplaceAll(htResult.PocInfo.Info.Affected, "\n", "<br/>")
 	}
 	if len(htResult.PocInfo.Info.Solutions) > 0 {
-		info += "<br/><b>solutions:</b> " + htResult.PocInfo.Info.Solutions
+		info += "<br/><b>solutions:</b> " + strings.ReplaceAll(htResult.PocInfo.Info.Solutions, "\n", "<br/>")
 	}
 	if len(htResult.PocInfo.Info.Created) > 0 {
 		info += "<br/><b>created:</b> " + htResult.PocInfo.Info.Created
