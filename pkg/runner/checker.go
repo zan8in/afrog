@@ -442,12 +442,3 @@ func setVariableMap(find string, variableMap map[string]any) string {
 	}
 	return find
 }
-
-func (c *Checker) Reset() {
-	// 清空所有字段，避免内存泄漏
-	for k := range c.VariableMap {
-		delete(c.VariableMap, k)
-	}
-	c.Result.Reset()
-	c.CustomLib.Reset()
-}

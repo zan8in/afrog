@@ -36,7 +36,9 @@ func (e *Engine) AcquireChecker() *Checker {
 
 func (e *Engine) ReleaseChecker(c *Checker) {
 	// *c.OriginalRequest = http.Request{}
-	c.Reset()
+	c.VariableMap = make(map[string]any)
+	c.Result = &result.Result{}
+	c.CustomLib = NewCustomLib()
 	CheckerPool.Put(c)
 }
 
