@@ -1066,3 +1066,25 @@ extractors:
       latency2: "10s"
 expression: r0() && r1() && r2() && r3()
 ```
+
+### -validate 参数
+验证 PoC 文件的有效性和语法正确性
+
+基本用法
+
+```
+afrog -validate /path/to/poc/file.yaml
+```
+
+验证单个 PoC 文件
+
+```
+afrog -validate pocs/cve-2024-1061.yaml
+```
+
+验证整个目录下的所有 PoC 文件
+```
+afrog -validate pocs/
+```
+
+
