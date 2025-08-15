@@ -22,7 +22,7 @@ rules:
         Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryFfJZ4PlAZBixjELj
         Accept-Encoding: gzip, deflate
         Connection: close
-        Accept: */*
+        Accept: "*/*"
       body: |
         ------WebKitFormBoundaryFfJZ4PlAZBixjELj
         Content-Disposition: form-data; name="file"; filename="test.aspx"

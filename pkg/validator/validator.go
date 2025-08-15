@@ -75,7 +75,22 @@ func ValidatePocFiles(target string) error {
 	}
 
 	if hasErrors {
-		return fmt.Errorf("validation failed for some files")
+		// 统计失败和成功的文件数量
+		var failedCount, passedCount int
+		for _, result := range results {
+			if result.Passed {
+				passedCount++
+			} else {
+				failedCount++
+			}
+		}
+		
+		fmt.Printf("\n❌ Validation completed with errors:\n")
+		fmt.Printf("   Total files: %d\n", len(files))
+		fmt.Printf("   Passed: %d\n", passedCount)
+		fmt.Printf("   Failed: %d\n", failedCount)
+		
+		return fmt.Errorf("validation failed for %d out of %d files", failedCount, len(files))
 	}
 
 	fmt.Printf("\n🎉 All %d files validated successfully!\n", len(files))
@@ -173,7 +188,7 @@ func validatePocStructure(pocData *poc.Poc, filePath string) []ValidationError {
 	if pocData.Info.Severity != "" {
 		found := false
 		for _, severity := range validSeverities {
-			if pocData.Info.Severity == severity {
+			if strings.EqualFold(pocData.Info.Severity, severity) {
 				found = true
 				break
 			}
@@ -499,9 +514,12 @@ func validateFunctionCalls(expr string) error {
 
 // 新增验证函数
 func validateResponseProperties(expr string) error {
+	// 先移除字符串字面量，避免误判字符串内容为response属性
+	cleanExpr := removeStringLiterals(expr)
+	
 	// 检查response对象的属性使用
 	responsePattern := regexp.MustCompile(`response\.(\w+)`)
-	matches := responsePattern.FindAllStringSubmatch(expr, -1)
+	matches := responsePattern.FindAllStringSubmatch(cleanExpr, -1)
 
 	validProperties := []string{
 		"status", "body", "headers", "header", "content_type",
