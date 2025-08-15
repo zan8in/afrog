@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/output"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/validator"
 	"github.com/zan8in/afrog/v3/pkg/web"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v3/pocs"
@@ -22,7 +22,6 @@ import (
 	"github.com/zan8in/gologger"
 	fileutil "github.com/zan8in/pins/file"
 	sliceutil "github.com/zan8in/pins/slice"
-	"gopkg.in/yaml.v2"
 )
 
 type Options struct {
@@ -286,9 +285,7 @@ func NewOptions() (*Options, error) {
 func (opt *Options) VerifyOptions() error {
 
 	if len(opt.Validate) > 0 {
-		if err := opt.ValidatePocFiles(); err != nil {
-			return err
-		}
+		validator.ValidatePocFiles(opt.Validate)
 		os.Exit(0)
 	}
 
@@ -717,108 +714,4 @@ func GetFileBaseName(options *Options) string {
 
 	// 最终兜底方案使用xid
 	return xid.New().String()
-}
-
-func (opt *Options) ValidatePocFiles() error {
-	var files []string
-
-	// 检查是文件还是目录
-	info, err := os.Stat(opt.Validate)
-	if err != nil {
-		return fmt.Errorf("无法访问路径 %s: %v", opt.Validate, err)
-	}
-
-	if info.IsDir() {
-		// 遍历目录获取所有 .yaml 文件
-		err := filepath.Walk(opt.Validate, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() && (strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) {
-				files = append(files, path)
-			}
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("遍历目录失败: %v", err)
-		}
-	} else {
-		// 单个文件
-		files = append(files, opt.Validate)
-	}
-
-	if len(files) == 0 {
-		gologger.Info().Msg("未找到 YAML 文件")
-		return nil
-	}
-
-	var validCount, invalidCount int
-	for _, file := range files {
-		if err := opt.validateSinglePocFile(file); err != nil {
-			gologger.Error().Msgf("[%s] %v", filepath.Base(file), err)
-			invalidCount++
-		} else {
-			gologger.Info().Msgf("[%s] ✓ 语法正确", filepath.Base(file))
-			validCount++
-		}
-	}
-
-	gologger.Info().Msgf("验证完成: %d 个文件正确, %d 个文件有错误", validCount, invalidCount)
-	return nil
-}
-
-func (opt *Options) validateSinglePocFile(filePath string) error {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return fmt.Errorf("无法打开文件: %v", err)
-	}
-	defer file.Close()
-
-	// 使用 yaml.NewDecoder 来获取详细的错误信息
-	decoder := yaml.NewDecoder(file)
-	var poc poc.Poc
-	if err := decoder.Decode(&poc); err != nil {
-		// 解析 YAML 错误，提取行号信息
-		if yamlErr, ok := err.(*yaml.TypeError); ok {
-			return fmt.Errorf("YAML 语法错误: %s", strings.Join(yamlErr.Errors, "; "))
-		}
-		return fmt.Errorf("YAML 解析失败: %v", err)
-	}
-
-	// 基本字段验证
-	if poc.Id == "" {
-		return fmt.Errorf("缺少必需字段: id")
-	}
-	if poc.Info.Name == "" {
-		return fmt.Errorf("缺少必需字段: info.name")
-	}
-	if poc.Info.Author == "" {
-		return fmt.Errorf("缺少必需字段: info.author")
-	}
-	if poc.Info.Severity == "" {
-		return fmt.Errorf("缺少必需字段: info.severity")
-	}
-
-	// 验证 severity 值
-	validSeverities := []string{"info", "low", "medium", "high", "critical", "unknown"}
-	validSeverity := false
-	for _, s := range validSeverities {
-		if poc.Info.Severity == s {
-			validSeverity = true
-			break
-		}
-	}
-	if !validSeverity {
-		return fmt.Errorf("无效的 severity 值: %s (支持: %s)", poc.Info.Severity, strings.Join(validSeverities, ", "))
-	}
-
-	// 验证 rules
-	if len(poc.Rules) == 0 {
-		return fmt.Errorf("缺少必需字段: rules")
-	}
-	if poc.Expression == "" {
-		return fmt.Errorf("缺少必需字段: expression")
-	}
-
-	return nil
 }
