@@ -5,10 +5,121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Afrog A Security Tool for Bug Bounty, Pentest and Red Teaming.</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .logo h1 {
+            color: #333;
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 300;
+        }
+        .logo p {
+            color: #666;
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #c33;
+        }
+        .info {
+            background: #e8f4fd;
+            color: #31708f;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #31708f;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 
 <body>
-
+    <div class="login-container">
+        <div class="logo">
+            <h1>Afrog</h1>
+            <p>Security Tool for Bug Bounty, Pentest and Red Teaming</p>
+        </div>
+        
+        {{if .Error}}
+        <div class="error">
+            {{.Error}}
+        </div>
+        {{end}}
+        
+        <div class="info">
+            请输入访问密码。密码已在启动时显示在控制台中。
+        </div>
+        
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label for="password">访问密码</label>
+                <input type="password" id="password" name="password" required placeholder="请输入32位访问密码">
+            </div>
+            <button type="submit" class="btn">登录</button>
+        </form>
+    </div>
 </body>
 
 </html>
