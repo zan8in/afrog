@@ -1,9 +1,11 @@
 package web
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -267,7 +269,7 @@ func StartServer(addr string) error {
 	// 初始化
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
-	gologger.Info().Str(" ", generatedPassword).Msg("Web访问密码")
+	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
 
 	// 创建文件系统
 	buildRoot, err := fs.Sub(buildFS, "build")
@@ -284,9 +286,30 @@ func StartServer(addr string) error {
 	mux.HandleFunc("/api/vulns", withCORS(jwtAuthMiddleware(vulnsHandler)))
 
 	// 静态文件服务
-	staticFileServer := http.FileServer(http.FS(buildRoot))
+	// staticFileServer := http.FileServer(http.FS(buildRoot))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		staticFileServer.ServeHTTP(w, r)
+		reqPath := strings.TrimPrefix(r.URL.Path, "/")
+		if reqPath == "" {
+			reqPath = "index.html"
+		}
+		f, err := buildRoot.Open(reqPath)
+		if err == nil {
+			defer f.Close()
+			data, _ := io.ReadAll(f)
+			// 自动识别Content-Type
+			http.ServeContent(w, r, reqPath, time.Now(), bytes.NewReader(data))
+			return
+		}
+		// SPA路由兼容，找不到文件时返回index.html
+		indexFile, err := buildRoot.Open("index.html")
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer indexFile.Close()
+		data, _ := io.ReadAll(indexFile)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
 	})
 
 	// 启动服务器
