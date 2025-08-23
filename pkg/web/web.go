@@ -2,6 +2,7 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"net/http"
 	"text/template"
 	"time"
@@ -109,9 +110,36 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == "POST" {
-		// 处理登录请求
-		password := r.FormValue("password")
-		if password == generatedPassword {
+		// 设置响应头为JSON
+		w.Header().Set("Content-Type", "application/json")
+		
+		// 检查Content-Type是否为JSON
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "application/json" {
+			w.WriteHeader(http.StatusBadRequest)
+			response := APIResponse{
+				Success: false,
+				Message: "Content-Type必须为application/json",
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// 解析JSON请求体
+		var loginReq LoginRequest
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&loginReq); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			response := APIResponse{
+				Success: false,
+				Message: "无效的JSON格式",
+			}
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		// 验证密码
+		if loginReq.Password == generatedPassword {
 			// 密码正确，创建会话
 			sessionID := generateSessionID()
 			loggedInSessions[sessionID] = time.Now().Add(30 * 24 * time.Hour)
@@ -125,21 +153,22 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 				HttpOnly: true,
 			})
 
-			// 重定向到漏洞列表页面
-			http.Redirect(w, r, "/vulns", http.StatusFound)
+			// 返回成功的JSON响应
+			response := APIResponse{
+				Success:  true,
+				Message:  "登录成功",
+				Redirect: "/vulns",
+			}
+			json.NewEncoder(w).Encode(response)
 			return
 		} else {
-			// 密码错误，重新显示登录页面并显示错误信息
-			tmpl, err := template.ParseFS(temp, "template/Login.html")
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+			// 密码错误，返回错误的JSON响应
+			w.WriteHeader(http.StatusUnauthorized)
+			response := APIResponse{
+				Success: false,
+				Message: "密码错误，请重试",
 			}
-			err = tmpl.Execute(w, map[string]string{"Error": "密码错误，请重试"})
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			json.NewEncoder(w).Encode(response)
 			return
 		}
 	}
@@ -147,6 +176,9 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 // 登出处理器
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	// 设置响应头为JSON
+	w.Header().Set("Content-Type", "application/json")
+	
 	// 删除会话
 	cookie, err := r.Cookie("afrog_session")
 	if err == nil {
@@ -161,8 +193,13 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		MaxAge: -1,
 	})
 
-	// 重定向到登录页面
-	http.Redirect(w, r, "/login", http.StatusFound)
+	// 返回成功的JSON响应
+	response := APIResponse{
+		Success:  true,
+		Message:  "退出成功",
+		Redirect: "/login",
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 type User struct {
@@ -206,4 +243,17 @@ func listHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// 登录请求结构体
+type LoginRequest struct {
+	Password string `json:"password"`
+}
+
+// 通用响应结构体
+type APIResponse struct {
+	Success  bool        `json:"success"`
+	Message  string      `json:"message"`
+	Redirect string      `json:"redirect,omitempty"`
+	Data     interface{} `json:"data,omitempty"`
 }
