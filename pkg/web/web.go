@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -268,14 +269,29 @@ func StartServer(addr string) error {
 	initJWTSecret()
 	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
 
-	// 公开接口
-	http.HandleFunc("/login", loginHandler)
+	// 创建文件系统
+	buildRoot, err := fs.Sub(buildFS, "build")
+	if err != nil {
+		return fmt.Errorf("无法加载静态文件: %v", err)
+	}
 
-	// 受保护的接口
-	http.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler))
-	http.HandleFunc("/vulns", jwtAuthMiddleware(vulnsHandler))
+	// 创建路由复用器
+	mux := http.NewServeMux()
 
-	return http.ListenAndServe(addr, nil)
+	// API 路由
+	mux.HandleFunc("/api/login", loginHandler)
+	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
+	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
+
+	// 静态文件服务
+	staticFileServer := http.FileServer(http.FS(buildRoot))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		staticFileServer.ServeHTTP(w, r)
+	})
+
+	// 启动服务器
+	gologger.Info().Msgf("Web服务器启动于: http://%s", addr)
+	return http.ListenAndServe(addr, mux)
 }
 
 // 获取客户端IP
