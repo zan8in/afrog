@@ -6,6 +6,7 @@ require (
 	github.com/blinkbean/dingtalk v0.0.0-20230927120905-796332ac4ba1
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/dlclark/regexp2 v1.8.1
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/cel-go v0.9.0
 	github.com/gookit/color v1.5.0
 	github.com/jmoiron/sqlx v1.3.5

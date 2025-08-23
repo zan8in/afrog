@@ -1,259 +1,298 @@
 package web
 
 import (
-	"embed"
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"text/template"
+	"strings"
 	"time"
 
-	"github.com/zan8in/afrog/v3/pkg/db"
-	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 )
 
-//go:embed template/*.html static/*
-var temp embed.FS
-
-// 全局变量存储生成的密码和会话
+// JWT配置
 var (
+	jwtSecret         []byte
 	generatedPassword string
-	loggedInSessions  = make(map[string]time.Time)
 )
 
-// 生成32位随机密码
-func generateRandomPassword() string {
-	return utils.CreateRandomString(32)
+// JWT Claims结构
+type Claims struct {
+	UserID    string `json:"user_id"`
+	LoginTime int64  `json:"login_time"`
+	jwt.RegisteredClaims
 }
 
-// 验证会话是否有效
-func isValidSession(sessionID string) bool {
-	if sessionID == "" {
-		return false
-	}
-	expireTime, exists := loggedInSessions[sessionID]
-	if !exists {
-		return false
-	}
-	// 会话24小时后过期
-	return time.Now().Before(expireTime)
-}
-
-// 生成会话ID
-func generateSessionID() string {
-	return utils.CreateRandomString(16)
-}
-
-// 权限验证中间件
-func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// 检查会话cookie
-		cookie, err := r.Cookie("afrog_session")
-		if err != nil || !isValidSession(cookie.Value) {
-			// 未登录，重定向到登录页面
-			http.Redirect(w, r, "/login", http.StatusFound)
-			return
-		}
-		// 已登录，继续处理请求
-		next(w, r)
-	}
-}
-
-func StartServer(addr string) error {
-	// 生成随机密码
-	generatedPassword = generateRandomPassword()
-	gologger.Info().Msgf("Web UI Password: %s", generatedPassword)
-	gologger.Info().Msg("Please save this password, it will be required for login.")
-
-	err := sqlite.InitX()
-	if err != nil {
-		return err
-	}
-
-	// 注册路由
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/logout", logoutHandler)
-	// 使用认证中间件保护敏感页面
-	http.HandleFunc("/vulns", authMiddleware(listHandler))
-	http.HandleFunc("/", authMiddleware(indexHandler))
-
-	// 处理静态资源
-	http.Handle("/static/", http.FileServer(http.FS(temp)))
-
-	// 启动HTTP服务器并监听端口
-	gologger.Info().Msg("Serving HTTP on :: port " + addr[1:] + " (http://[::]" + addr + "/) ...")
-	return http.ListenAndServe(addr, nil)
-}
-
-// 首页处理器
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	// 重定向到漏洞列表页面
-	http.Redirect(w, r, "/vulns", http.StatusFound)
-}
-
-// 登录处理器
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		// 显示登录页面
-		tmpl, err := template.ParseFS(temp, "template/Login.html")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		err = tmpl.Execute(w, nil)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		return
-	}
-
-	if r.Method == "POST" {
-		// 设置响应头为JSON
-		w.Header().Set("Content-Type", "application/json")
-		
-		// 检查Content-Type是否为JSON
-		contentType := r.Header.Get("Content-Type")
-		if contentType != "application/json" {
-			w.WriteHeader(http.StatusBadRequest)
-			response := APIResponse{
-				Success: false,
-				Message: "Content-Type必须为application/json",
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		// 解析JSON请求体
-		var loginReq LoginRequest
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&loginReq); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			response := APIResponse{
-				Success: false,
-				Message: "无效的JSON格式",
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		// 验证密码
-		if loginReq.Password == generatedPassword {
-			// 密码正确，创建会话
-			sessionID := generateSessionID()
-			loggedInSessions[sessionID] = time.Now().Add(30 * 24 * time.Hour)
-
-			// 设置会话cookie
-			http.SetCookie(w, &http.Cookie{
-				Name:     "afrog_session",
-				Value:    sessionID,
-				Path:     "/",
-				MaxAge:   86400 * 30, // 30天
-				HttpOnly: true,
-			})
-
-			// 返回成功的JSON响应
-			response := APIResponse{
-				Success:  true,
-				Message:  "登录成功",
-				Redirect: "/vulns",
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		} else {
-			// 密码错误，返回错误的JSON响应
-			w.WriteHeader(http.StatusUnauthorized)
-			response := APIResponse{
-				Success: false,
-				Message: "密码错误，请重试",
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-	}
-}
-
-// 登出处理器
-func logoutHandler(w http.ResponseWriter, r *http.Request) {
-	// 设置响应头为JSON
-	w.Header().Set("Content-Type", "application/json")
-	
-	// 删除会话
-	cookie, err := r.Cookie("afrog_session")
-	if err == nil {
-		delete(loggedInSessions, cookie.Value)
-	}
-
-	// 清除cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:   "afrog_session",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
-	})
-
-	// 返回成功的JSON响应
-	response := APIResponse{
-		Success:  true,
-		Message:  "退出成功",
-		Redirect: "/login",
-	}
-	json.NewEncoder(w).Encode(response)
-}
-
-type User struct {
-	Password string
-}
-
-func listHandler(w http.ResponseWriter, r *http.Request) {
-	// 获取查询参数
-	keyword := r.URL.Query().Get("keyword")
-	severity := r.URL.Query().Get("severity")
-	page := r.URL.Query().Get("page")
-
-	data, err := sqlite.SelectX(severity, keyword, page)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	count := sqlite.Count()
-
-	// 解析模板文件
-	tmpl, err := template.ParseFS(temp, "template/List.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	respData := struct {
-		DataList         []db.ResultData
-		CurrentDataCount int
-		TotalDataCount   int64
-	}{
-		DataList:         data,
-		CurrentDataCount: len(data),
-		TotalDataCount:   count,
-	}
-
-	// 渲染模板并将结果写入响应
-	err = tmpl.Execute(w, respData)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-// 登录请求结构体
+// 登录请求结构
 type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// 通用响应结构体
+// 登录响应结构
+type LoginResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Token   string `json:"token,omitempty"`
+	Expires int64  `json:"expires,omitempty"`
+}
+
+// 通用API响应
 type APIResponse struct {
-	Success  bool        `json:"success"`
-	Message  string      `json:"message"`
-	Redirect string      `json:"redirect,omitempty"`
-	Data     interface{} `json:"data,omitempty"`
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// 初始化JWT密钥
+func initJWTSecret() {
+	jwtSecret = make([]byte, 32)
+	rand.Read(jwtSecret)
+	gologger.Info().Msg("JWT密钥已生成")
+}
+
+// 生成JWT Token
+func generateJWTToken(userID string) (string, int64, error) {
+	expires := time.Now().Add(1 * time.Minute)
+	// expires := time.Now().Add(24 * time.Hour)
+	claims := &Claims{
+		UserID:    userID,
+		LoginTime: time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expires),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "afrog-security-scanner",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtSecret)
+	return tokenString, expires.Unix(), err
+}
+
+// 验证JWT Token
+func validateJWTToken(tokenString string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("意外的签名方法: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("无效的token")
+}
+
+// 登录处理器
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(APIResponse{
+			Success: false,
+			Message: "仅支持POST方法",
+		})
+		return
+	}
+
+	// 验证Content-Type
+	if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{
+			Success: false,
+			Message: "Content-Type必须为application/json",
+		})
+		return
+	}
+
+	// 解析请求
+	var loginReq LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{
+			Success: false,
+			Message: "无效的JSON格式",
+		})
+		return
+	}
+
+	// 验证密码
+	if loginReq.Password != generatedPassword {
+		// 记录失败尝试
+		gologger.Warning().Str("ip", getClientIP(r)).Msg("登录失败尝试")
+
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(LoginResponse{
+			Success: false,
+			Message: "密码错误",
+		})
+		return
+	}
+
+	// 生成JWT Token
+	userID := "admin" // 固定用户ID
+	token, expires, err := generateJWTToken(userID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(APIResponse{
+			Success: false,
+			Message: "生成token失败",
+		})
+		return
+	}
+
+	// 记录成功登录
+	gologger.Info().Str("ip", getClientIP(r)).Msg("用户登录成功")
+
+	// 返回成功响应
+	json.NewEncoder(w).Encode(LoginResponse{
+		Success: true,
+		Message: "登录成功",
+		Token:   token,
+		Expires: expires,
+	})
+}
+
+// JWT认证中间件
+func jwtAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// 从Authorization header获取token
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(APIResponse{
+				Success: false,
+				Message: "缺少Authorization header",
+			})
+			return
+		}
+
+		// 验证Bearer格式
+		tokenParts := strings.Split(authHeader, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(APIResponse{
+				Success: false,
+				Message: "无效的Authorization格式，应为: Bearer <token>",
+			})
+			return
+		}
+
+		// 验证JWT Token
+		claims, err := validateJWTToken(tokenParts[1])
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(APIResponse{
+				Success: false,
+				Message: "无效或过期的token",
+			})
+			return
+		}
+
+		// 将用户信息添加到请求上下文
+		r.Header.Set("X-User-ID", claims.UserID)
+		r.Header.Set("X-Login-Time", fmt.Sprintf("%d", claims.LoginTime))
+
+		// 继续处理请求
+		next.ServeHTTP(w, r)
+	}
+}
+
+// 退出处理器
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(APIResponse{
+			Success: false,
+			Message: "仅支持POST方法",
+		})
+		return
+	}
+
+	// JWT是无状态的，客户端删除token即可
+	// 这里可以记录退出日志
+	userID := r.Header.Get("X-User-ID")
+	if userID != "" {
+		gologger.Info().Str("user_id", userID).Str("ip", getClientIP(r)).Msg("用户退出")
+	}
+
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "退出成功",
+	})
+}
+
+// 漏洞列表处理器（受JWT保护）
+func vulnsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// 获取用户信息（由中间件设置）
+	userID := r.Header.Get("X-User-ID")
+	gologger.Info().Str("user_id", userID).Msg("访问漏洞列表")
+
+	// 这里实现原有的listHandler逻辑
+	// 返回漏洞数据的JSON格式
+	vulnData := map[string]interface{}{
+		"total": 0,
+		"vulns": []interface{}{},
+		"page":  1,
+	}
+
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "获取成功",
+		Data:    vulnData,
+	})
+}
+
+func StartServer(addr string) error {
+	// 初始化
+	generatedPassword = generateRandomPassword()
+	initJWTSecret()
+	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
+
+	// 公开接口
+	http.HandleFunc("/login", loginHandler)
+
+	// 受保护的接口
+	http.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler))
+	http.HandleFunc("/vulns", jwtAuthMiddleware(vulnsHandler))
+
+	return http.ListenAndServe(addr, nil)
+}
+
+// 获取客户端IP
+func getClientIP(r *http.Request) string {
+	// 检查X-Forwarded-For header
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.Split(xff, ",")[0]
+	}
+	// 检查X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	// 使用RemoteAddr
+	return strings.Split(r.RemoteAddr, ":")[0]
+}
+
+// 生成随机密码
+func generateRandomPassword() string {
+	return utils.CreateRandomString(32)
 }
