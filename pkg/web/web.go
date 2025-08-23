@@ -267,7 +267,7 @@ func StartServer(addr string) error {
 	// 初始化
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
-	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
+	gologger.Info().Str(" ", generatedPassword).Msg("Web访问密码")
 
 	// 创建文件系统
 	buildRoot, err := fs.Sub(buildFS, "build")
@@ -279,9 +279,9 @@ func StartServer(addr string) error {
 	mux := http.NewServeMux()
 
 	// API 路由
-	mux.HandleFunc("/api/login", loginHandler)
-	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
-	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
+	mux.HandleFunc("/api/login", withCORS(loginHandler))
+	mux.HandleFunc("/api/logout", withCORS(jwtAuthMiddleware(logoutHandler)))
+	mux.HandleFunc("/api/vulns", withCORS(jwtAuthMiddleware(vulnsHandler)))
 
 	// 静态文件服务
 	staticFileServer := http.FileServer(http.FS(buildRoot))
@@ -311,4 +311,17 @@ func getClientIP(r *http.Request) string {
 // 生成随机密码
 func generateRandomPassword() string {
 	return utils.CreateRandomString(32)
+}
+
+func withCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next(w, r)
+	}
 }
