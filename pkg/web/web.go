@@ -137,6 +137,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// 记录失败尝试
 		gologger.Warning().Str("ip", getClientIP(r)).Msg("登录失败尝试")
 
+		time.Sleep(3 * time.Second)
+
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(LoginResponse{
 			Success: false,
@@ -159,6 +161,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 记录成功登录
 	gologger.Info().Str("ip", getClientIP(r)).Msg("用户登录成功")
+
+	time.Sleep(3 * time.Second)
 
 	// 返回成功响应
 	json.NewEncoder(w).Encode(LoginResponse{

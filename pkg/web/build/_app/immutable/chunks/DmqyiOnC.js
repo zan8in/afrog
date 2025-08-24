@@ -1,1 +1,0 @@
-import{e as a,g as c,d as n,r as f,h as u,i as s,q as o}from"./BCRwuSkr.js";function d(i){let e=0,r=n(0),t;return()=>{a()&&(c(r),f(()=>(e===0&&(t=u(()=>i(()=>s(r)))),e+=1,()=>{o(()=>{e-=1,e===0&&(t?.(),t=void 0,s(r))})})))}}export{d as c};
