@@ -33,8 +33,8 @@ var (
 
 func loginRateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	const (
-		window   = 1 * time.Minute
-		maxTries = 5 // 5分钟最多10次
+		window   = 30 * time.Minute
+		maxTries = 10 // 30分钟最多10次
 	)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip := getClientIP(r)
