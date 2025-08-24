@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -14,12 +15,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
+	w.Header().Set("Cache-Control", "no-store")
 
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
 		return
 	}
+
+	// 限制请求体大小，防止大包体DoS
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024) // 64KB 上限
 
 	// 验证Content-Type
 	if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
@@ -35,7 +40,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if loginReq.Password != generatedPassword {
+	// 常量时间比较，避免侧信道
+	if subtle.ConstantTimeCompare([]byte(loginReq.Password), []byte(generatedPassword)) != 1 {
 		gologger.Warning().Str("ip", getClientIP(r)).Msg("登录失败尝试")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(LoginResponse{Success: false, Message: "密码错误"})
@@ -63,7 +69,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// JWT无状态，客户端删除即可，这里仅做审计
-	userID := r.Header.Get("X-User-ID")
+	userID := GetUserIDFromContext(r)
 	if userID != "" {
 		gologger.Info().Str("user_id", userID).Str("ip", getClientIP(r)).Msg("用户退出")
 	}
@@ -73,7 +79,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 func vulnsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userID := r.Header.Get("X-User-ID")
+	userID := GetUserIDFromContext(r)
 	gologger.Info().Str("user_id", userID).Msg("访问漏洞列表")
 
 	vulnData := map[string]interface{}{

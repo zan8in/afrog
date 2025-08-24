@@ -16,7 +16,7 @@ func setupHandler() (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	// API 路由（全部返回JSON）
-	mux.HandleFunc("/api/login", loginHandler)
+	mux.HandleFunc("/api/login", loginRateLimitMiddleware(loginHandler))
 	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
 	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
 
@@ -26,5 +26,6 @@ func setupHandler() (http.Handler, error) {
 		staticFileServer.ServeHTTP(w, r)
 	})
 
-	return mux, nil
+	// 为所有路由增加全局安全响应头
+	return secureHeadersMiddleware(mux), nil
 }

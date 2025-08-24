@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -31,14 +32,20 @@ func initJWTSecret() {
 
 // 生成JWT Token
 func generateJWTToken(userID string) (string, int64, error) {
-	expires := time.Now().Add(24 * time.Hour)
+	// 短期有效（建议10-15分钟），提升被窃取后的风险控制能力
+	expires := time.Now().Add(15 * time.Minute)
+	jti := generateJTI()
+
 	claims := &Claims{
 		UserID:    userID,
 		LoginTime: time.Now().Unix(),
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,                               // jti
+			Subject:   userID,                            // sub
+			Audience:  jwt.ClaimStrings{"afrog-web-api"}, // aud
 			ExpiresAt: jwt.NewNumericDate(expires),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "afrog-security-scanner",
+			Issuer:    "afrog-security-scanner", // iss
 		},
 	}
 
@@ -55,13 +62,34 @@ func validateJWTToken(tokenString string) (*Claims, error) {
 		}
 		return jwtSecret, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
 	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		// 强化校验：issuer 与 audience
+		if claims.Issuer != "afrog-security-scanner" {
+			return nil, fmt.Errorf("issuer不匹配")
+		}
+		// 修改这里：不要使用 VerifyAudience，手动校验 audience
+		audOK := false
+		for _, aud := range claims.Audience {
+			if aud == "afrog-web-api" {
+				audOK = true
+				break
+			}
+		}
+		if !audOK {
+			return nil, fmt.Errorf("audience不匹配")
+		}
 		return claims, nil
 	}
 	return nil, fmt.Errorf("无效的token")
+}
+
+// 生成 jti
+func generateJTI() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
