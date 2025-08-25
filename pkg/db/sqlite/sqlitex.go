@@ -22,12 +22,19 @@ var dbx *sqlx.DB
 var insertChannel chan *result.Result
 var wg sync.WaitGroup
 
+// 可根据实际负载调整
+var workerCount = 4
+
 func InitX() error {
 
-	insertChannel = make(chan *result.Result)
+	// 使用带缓冲通道，避免生产者阻塞
+	insertChannel = make(chan *result.Result, 1024)
 
-	wg.Add(1)
-	go saveToDatabaseX()
+	// 启动固定数量的 worker，避免无界并发写入导致 database is locked
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go saveToDatabaseX()
+	}
 
 	return nil
 }
@@ -39,42 +46,38 @@ func SetResultX(result *result.Result) {
 func saveToDatabaseX() {
 	defer wg.Done()
 
-	var wgAddx sync.WaitGroup
 	for r := range insertChannel {
-		wgAddx.Add(1)
-
-		go func(r *result.Result) {
-			defer wgAddx.Done()
-
-			// @date 2023/10/12 added insert sqlite failed repeat 5 time.
-			c := 0
-			for {
-				if err := addx(r); err != nil {
-					if strings.Contains(err.Error(), "database is locked") && c < 5 {
-						c++
-						randutil.RandSleep(1000)
-						continue
-					}
-					gologger.Error().Msgf("Error inserting result into database: %v\n", err)
-					break
+		// @date 2023/10/12 added insert sqlite failed repeat 5 time.
+		c := 0
+		for {
+			if err := addx(r); err != nil {
+				if strings.Contains(err.Error(), "database is locked") && c < 5 {
+					c++
+					randutil.RandSleep(1000)
+					continue
 				}
-				break
+				gologger.Error().Msgf("Error inserting result into database: %v\n", err)
 			}
-
-		}(r)
+			break
+		}
 	}
-	wgAddx.Wait()
 }
 
 func NewWebSqliteDB() error {
-	// 初始化数据库连接
-	dbx = sqlx.MustConnect("sqlite3", "file:"+db2.DbName()+"?cache=shared&mode=rwc&_journal_mode=WAL")
+	// 初始化数据库连接（增加 busy_timeout，开启 WAL）
+	// 备注：logoove/sqlite 驱动使用名为 sqlite3 的驱动注册
+	dsn := "file:" + db2.DbName() + "?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000"
+	db, err := sqlx.Connect("sqlite3", dsn)
+	if err != nil {
+		return err
+	}
+	dbx = db
 
-	// 设置连接池参数（可选）
-	dbx.SetMaxOpenConns(50) // 设置最大打开连接数
-	dbx.SetMaxIdleConns(25) // 设置最大空闲连接数
+	// sqlite 通常建议较小的连接数；WAL 下单连接最稳妥
+	dbx.SetMaxOpenConns(1)
+	dbx.SetMaxIdleConns(1)
 
-	_, err := dbx.Exec(db2.SqliteCreate)
+	_, err = dbx.Exec(db2.SqliteCreate)
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating table: %v", err)
 	}
@@ -83,17 +86,10 @@ func NewWebSqliteDB() error {
 }
 
 func CloseX() {
-	select {
-	case r, ok := <-insertChannel:
-		if ok {
-			if err := addx(r); err != nil {
-				gologger.Error().Msgf("Error inserting result into database: %v\n", err)
-			}
-		}
-	default:
-		if insertChannel != nil {
-			close(insertChannel)
-		}
+	// 安全关闭任务通道并等待 worker 退出
+	if insertChannel != nil {
+		close(insertChannel)
+		insertChannel = nil
 	}
 
 	wg.Wait()
@@ -104,6 +100,10 @@ func CloseX() {
 }
 
 func addx(r *result.Result) error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+
 	insertSQL := "INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
 	currentTime := time.Now()
@@ -136,7 +136,11 @@ func addx(r *result.Result) error {
 
 	finger, _ := json.Marshal(r.FingerResult)
 
-	_, err := dbx.Exec(insertSQL, db2.SnowFlake.NextID(), db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
+	// 为单次写入设置整体超时，防止长期阻塞
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := dbx.ExecContext(ctx, insertSQL, db2.SnowFlake.NextID(), db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
 	return err
 }
 
@@ -157,7 +161,9 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 	}
 	offset := (pageInt - 1) * pageSize
 
-	ctx := context.Background() // 使用默认上下文
+	// 查询设置超时，避免慢查阻塞
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
 	if len(keyword) == 0 && len(severity) == 0 {
 		query := "SELECT * FROM " + db2.TableName + " ORDER BY id DESC LIMIT " + db2.LIMIT + " OFFSET ?"
@@ -218,7 +224,6 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 	for key, item := range data {
 		data[key].Severity = strings.ToUpper(item.Severity)
 
-		// item.Result = strings.ReplaceAll(item.Result, "\n", "<br>")
 		json.Unmarshal([]byte(item.Result), &data[key].ResultList)
 		data[key].Result = ""
 
@@ -233,10 +238,138 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 	return data, nil
 }
 
+// 新增：分页查询（支持 page/pageSize、大小写不敏感的 severity）
+func SelectPage(severity, keyword string, page, pageSize int) ([]db2.ResultData, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 500 {
+		pageSize = 500
+	}
+	offset := (page - 1) * pageSize
+
+	// 构建过滤条件
+	var where []string
+	var args []interface{}
+
+	kw := strings.TrimSpace(keyword)
+	if kw != "" {
+		where = append(where, "(vulid LIKE ? OR vulname LIKE ?)")
+		args = append(args, "%"+kw+"%", "%"+kw+"%")
+	}
+
+	sev := strings.TrimSpace(severity)
+	if sev != "" {
+		list := strings.Split(sev, ",")
+		var holders []string
+		for _, s := range list {
+			t := strings.ToLower(strings.TrimSpace(s))
+			if t == "" {
+				continue
+			}
+			holders = append(holders, "?")
+			args = append(args, t)
+		}
+		if len(holders) > 0 && len(holders) < 5 {
+			where = append(where, "LOWER(severity) IN ("+strings.Join(holders, ",")+")")
+		}
+		// 如果传入5个或以上值，视为不过滤（等价于全选）
+	}
+
+	query := "SELECT * FROM " + db2.TableName
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	// 采用拼接 LIMIT/OFFSET 的方式，避免某些驱动不支持绑定 LIMIT 的问题
+	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
+
+	// 查询设置超时
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var data []db2.ResultData
+	if err := dbx.SelectContext(ctx, &data, query, args...); err != nil {
+		return nil, err
+	}
+
+	// 与 SelectX 保持一致的输出处理：Severity 大写、ResultList/PocInfo 填充
+	for key, item := range data {
+		data[key].Severity = strings.ToUpper(item.Severity)
+
+		_ = json.Unmarshal([]byte(item.Result), &data[key].ResultList)
+		data[key].Result = ""
+
+		var po poc.Poc
+		_ = json.Unmarshal([]byte(item.Poc), &po)
+		po.Info.Description = strings.TrimSpace(po.Info.Description)
+		data[key].PocInfo = po
+	}
+
+	return data, nil
+}
+
+// 新增：统计筛选后的总数
+func CountFiltered(severity, keyword string) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+
+	var where []string
+	var args []interface{}
+
+	kw := strings.TrimSpace(keyword)
+	if kw != "" {
+		where = append(where, "(vulid LIKE ? OR vulname LIKE ?)")
+		args = append(args, "%"+kw+"%", "%"+kw+"%")
+	}
+
+	sev := strings.TrimSpace(severity)
+	if sev != "" {
+		list := strings.Split(sev, ",")
+		var holders []string
+		for _, s := range list {
+			t := strings.ToLower(strings.TrimSpace(s))
+			if t == "" {
+				continue
+			}
+			holders = append(holders, "?")
+			args = append(args, t)
+		}
+		if len(holders) > 0 && len(holders) < 5 {
+			where = append(where, "LOWER(severity) IN ("+strings.Join(holders, ",")+")")
+		}
+		// 5个或以上视为全选，不加条件
+	}
+
+	q := "SELECT COUNT(*) FROM " + db2.TableName
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var count int64
+	if err := dbx.GetContext(ctx, &count, q, args...); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func Count() int64 {
 	var count int64
 	query := "SELECT COUNT(*) FROM " + db2.TableName
-	err := dbx.Get(&count, query)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := dbx.GetContext(ctx, &count, query)
 	if err != nil {
 		return 0
 	}

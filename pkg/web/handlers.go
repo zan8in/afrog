@@ -4,14 +4,16 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/zan8in/gologger"
-	"github.com/zan8in/afrog/v3/pocs"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pocs"
+	"github.com/zan8in/gologger"
 )
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +235,7 @@ func incrSeverity(m map[string]int, sev string) {
 	if _, ok := m[sev]; ok {
 		m[sev]++
 	} else {
-		 // 兜底
+		// 兜底
 		m["other"]++
 	}
 }
@@ -260,13 +262,13 @@ func parseCreated(s string) time.Time {
 	}
 	// 兼容多种常见时间格式
 	layouts := []string{
-		time.RFC3339,                // 2006-01-02T15:04:05Z07:00
-		"2006-01-02 15:04:05",       // 2006-01-02 15:04:05
-		"2006-01-02",                // 2006-01-02
-		"2006/01/02 15:04:05",       // 2006/01/02 15:04:05
-		"2006/01/02",                // 2006/01/02
-		"2006-1-2",                  // 2006-1-2
-		"2006/1/2",                  // 2006/1/2
+		time.RFC3339,          // 2006-01-02T15:04:05Z07:00
+		"2006-01-02 15:04:05", // 2006-01-02 15:04:05
+		"2006-01-02",          // 2006-01-02
+		"2006/01/02 15:04:05", // 2006/01/02 15:04:05
+		"2006/01/02",          // 2006/01/02
+		"2006-1-2",            // 2006-1-2
+		"2006/1/2",            // 2006/1/2
 	}
 	for _, layout := range layouts {
 		if t, err := time.Parse(layout, s); err == nil {
@@ -274,4 +276,106 @@ func parseCreated(s string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func reportsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// 支持 GET
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	q := r.URL.Query()
+	keyword := strings.TrimSpace(q.Get("keyword"))
+	severityRaw := strings.TrimSpace(q.Get("severity"))
+	pageStr := strings.TrimSpace(q.Get("page"))
+	pageSizeStr := strings.TrimSpace(q.Get("page_size"))
+
+	// 解析分页参数
+	page := 1
+	if pageStr != "" {
+		if v, err := strconv.Atoi(pageStr); err == nil && v > 0 {
+			page = v
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "参数错误: page"})
+			return
+		}
+	}
+	pageSize := 50
+	if pageSizeStr != "" {
+		if v, err := strconv.Atoi(pageSizeStr); err == nil && v > 0 && v <= 500 {
+			pageSize = v
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "参数错误: page_size(1-500)"})
+			return
+		}
+	}
+
+	// severity 多值拆分并标准化为小写
+	var severityList []string
+	if severityRaw != "" {
+		for _, s := range strings.Split(severityRaw, ",") {
+			t := strings.ToLower(strings.TrimSpace(s))
+			if t != "" {
+				severityList = append(severityList, t)
+			}
+		}
+	}
+	// 仍然传递原始字符串给底层，底层会做小写匹配；当传入5个或以上值视为全选
+	severityParam := strings.Join(severityList, ",")
+
+	// 查询数据（分页）
+	itemsRaw, err := sqlite.SelectPage(severityParam, keyword, page, pageSize)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "查询失败: " + err.Error()})
+		return
+	}
+
+	// 统计筛选后的总数
+	total, err := sqlite.CountFiltered(severityParam, keyword)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "统计失败: " + err.Error()})
+		return
+	}
+
+	// 组装响应 items
+	respItems := make([]ReportItem, 0, len(itemsRaw))
+	for _, it := range itemsRaw {
+		respItems = append(respItems, ReportItem{
+			ID:         it.ID,
+			TaskID:     it.TaskID,
+			VulID:      it.VulID,
+			VulName:    it.VulName,
+			Target:     it.Target,
+			FullTarget: it.FullTarget,
+			Severity:   it.Severity, // 已在底层转大写
+			Created:    it.Created,
+			PocInfo:    it.PocInfo,
+			ResultList: it.ResultList,
+		})
+	}
+
+	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	data := ReportListResponse{
+		Items:      respItems,
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+		Keyword:    keyword,
+		Severity:   severityList,
+	}
+
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "ok",
+		Data:    data,
+	})
 }

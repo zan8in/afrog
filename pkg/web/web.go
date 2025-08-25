@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/zan8in/gologger"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 )
 
 func StartServer(addr string) error {
@@ -12,6 +13,15 @@ func StartServer(addr string) error {
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
 	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
+
+	// 初始化数据库（连接 + 写入worker）
+	if err := sqlite.NewWebSqliteDB(); err != nil {
+		return err
+	}
+	if err := sqlite.InitX(); err != nil {
+		return err
+	}
+	defer sqlite.CloseX()
 
 	// 构建路由与静态文件服务
 	handler, err := setupHandler()

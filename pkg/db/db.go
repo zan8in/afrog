@@ -76,7 +76,7 @@ var (
 		PRIMARY KEY ("id")
 	  );
 
-	  CREATE INDEX "idx_search"
+	  CREATE INDEX IF NOT EXISTS "idx_search"
 		ON "result" (
 		"taskid",
 		"vulid",
@@ -84,22 +84,22 @@ var (
 		"severity"
 		);
 	  
-	  CREATE INDEX "idx_severity"
+	  CREATE INDEX IF NOT EXISTS "idx_severity"
 	  ON "result" (
 		"severity" ASC
 	  );
 	  
-	  CREATE INDEX "idx_taskid"
+	  CREATE INDEX IF NOT EXISTS "idx_taskid"
 	  ON "result" (
 		"taskid" ASC
 	  );
 
-	  CREATE INDEX "idx_vulname"
+	  CREATE INDEX IF NOT EXISTS "idx_vulname"
 	  ON "result" (
 		"vulname"
 	  );
 	  
-	  CREATE INDEX "idx_vulid"
+	  CREATE INDEX IF NOT EXISTS "idx_vulid"
 	  ON "result" (
 		"vulid"
 	  );`
@@ -132,9 +132,10 @@ func DbName() string {
 	}
 
 	path := path.Join(homeDir, ".config", "afrog")
-	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return ""
-	}
+	// 权限收紧为 0700，避免其它系统用户读取数据库
+	// if err := os.MkdirAll(path, 0o700); err != nil {
+	// 	return ""
+	// }
 
 	return filepath.Join(path, DBName+".db")
 }

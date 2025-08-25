@@ -19,6 +19,7 @@ func setupHandler() (http.Handler, error) {
 	mux.HandleFunc("/api/login", loginRateLimitMiddleware(loginHandler))
 	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
 	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
+	mux.HandleFunc("/api/reports", jwtAuthMiddleware(reportsHandler))
 	mux.HandleFunc("/api/pocs/stats", jwtAuthMiddleware(pocsStatsHandler))
 
 	// 静态文件服务（包含 _app 目录、index.html 等）

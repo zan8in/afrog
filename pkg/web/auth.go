@@ -33,7 +33,7 @@ func initJWTSecret() {
 // 生成JWT Token
 func generateJWTToken(userID string) (string, int64, error) {
 	// 短期有效（建议10-15分钟），提升被窃取后的风险控制能力
-	expires := time.Now().Add(1 * time.Minute)
+	expires := time.Now().Add(3600 * time.Minute)
 	jti := generateJTI()
 
 	claims := &Claims{
