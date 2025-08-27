@@ -30,7 +30,7 @@ type ReportListRequest struct {
 
 // 报告列表 - 单条记录
 type ReportItem struct {
-	ID         int64       `json:"id"`
+	ID         string      `json:"id"`
 	TaskID     string      `json:"taskId"`
 	VulID      string      `json:"vulId"`
 	VulName    string      `json:"vulName"`
@@ -38,8 +38,8 @@ type ReportItem struct {
 	FullTarget string      `json:"fullTarget,omitempty"`
 	Severity   string      `json:"severity"`
 	Created    string      `json:"created"`
-	PocInfo    interface{} `json:"pocInfo,omitempty"`   // 展开后的 POC 信息（与前端展示一致）
-	ResultList interface{} `json:"resultList,omitempty"`// 解析后的请求响应列表
+	PocInfo    interface{} `json:"pocInfo,omitempty"`    // 展开后的 POC 信息（与前端展示一致）
+	ResultList interface{} `json:"resultList,omitempty"` // 解析后的请求响应列表
 }
 
 // 报告列表 - 响应

@@ -238,8 +238,8 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 	return data, nil
 }
 
-// 新增：分页查询（支持 page/pageSize、大小写不敏感的 severity）
-func SelectPage(severity, keyword string, page, pageSize int) ([]db2.ResultData, error) {
+// 调整：分页查询（支持 page/pageSize、大小写不敏感的 severity；按需展开大字段）
+func SelectPage(severity, keyword string, page, pageSize int, expandPoc, expandResult bool) ([]db2.ResultData, error) {
 	if dbx == nil {
 		return nil, fmt.Errorf("sqlite not initialized")
 	}
@@ -279,14 +279,13 @@ func SelectPage(severity, keyword string, page, pageSize int) ([]db2.ResultData,
 		if len(holders) > 0 && len(holders) < 5 {
 			where = append(where, "LOWER(severity) IN ("+strings.Join(holders, ",")+")")
 		}
-		// 如果传入5个或以上值，视为不过滤（等价于全选）
+		// 5个或以上视为全选
 	}
 
 	query := "SELECT * FROM " + db2.TableName
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
-	// 采用拼接 LIMIT/OFFSET 的方式，避免某些驱动不支持绑定 LIMIT 的问题
 	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
 
 	// 查询设置超时
@@ -298,23 +297,80 @@ func SelectPage(severity, keyword string, page, pageSize int) ([]db2.ResultData,
 		return nil, err
 	}
 
-	// 与 SelectX 保持一致的输出处理：Severity 大写、ResultList/PocInfo 填充
+	// 统一处理：Severity 大写；按需展开 JSON
 	for key, item := range data {
 		data[key].Severity = strings.ToUpper(item.Severity)
 
-		_ = json.Unmarshal([]byte(item.Result), &data[key].ResultList)
+		if expandResult {
+			_ = json.Unmarshal([]byte(item.Result), &data[key].ResultList)
+		}
 		data[key].Result = ""
 
-		var po poc.Poc
-		_ = json.Unmarshal([]byte(item.Poc), &po)
-		po.Info.Description = strings.TrimSpace(po.Info.Description)
-		data[key].PocInfo = po
+		if expandPoc {
+			var po poc.Poc
+			_ = json.Unmarshal([]byte(item.Poc), &po)
+			po.Info.Description = strings.TrimSpace(po.Info.Description)
+			data[key].PocInfo = po
+		}
 	}
 
 	return data, nil
 }
 
-// 新增：统计筛选后的总数
+// 新增：统计筛选后的总数（保持不变）
+// func CountFiltered(...) 已存在
+
+// 新增：按ID查询报告详情，按需展开
+func GetByID(id string, expandPoc, expandResult bool) (db2.ResultData, error) {
+	var row db2.ResultData
+	if dbx == nil {
+		return row, fmt.Errorf("sqlite not initialized")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	q := "SELECT * FROM " + db2.TableName + " WHERE id = ?"
+	fmt.Println(q, id)
+
+	if err := dbx.GetContext(ctx, &row, q, id); err != nil {
+		fmt.Println(err, row)
+		return row, err
+	} else {
+		fmt.Println(err, row)
+	}
+
+	row.Severity = strings.ToUpper(row.Severity)
+
+	if expandResult {
+		_ = json.Unmarshal([]byte(row.Result), &row.ResultList)
+	}
+	row.Result = ""
+
+	if expandPoc {
+		var po poc.Poc
+		_ = json.Unmarshal([]byte(row.Poc), &po)
+		po.Info.Description = strings.TrimSpace(po.Info.Description)
+		row.PocInfo = po
+	}
+
+	return row, nil
+}
+
+func Count() int64 {
+	var count int64
+	query := "SELECT COUNT(*) FROM " + db2.TableName
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := dbx.GetContext(ctx, &count, query)
+	if err != nil {
+		return 0
+	}
+	return count
+}
+
 func CountFiltered(severity, keyword string) (int64, error) {
 	if dbx == nil {
 		return 0, fmt.Errorf("sqlite not initialized")
@@ -341,10 +397,10 @@ func CountFiltered(severity, keyword string) (int64, error) {
 			holders = append(holders, "?")
 			args = append(args, t)
 		}
+		// 如果传入的 severity 值数量在 1~4 个之间，则做 IN 过滤；5 个或以上视为全选（不过滤）
 		if len(holders) > 0 && len(holders) < 5 {
 			where = append(where, "LOWER(severity) IN ("+strings.Join(holders, ",")+")")
 		}
-		// 5个或以上视为全选，不加条件
 	}
 
 	q := "SELECT COUNT(*) FROM " + db2.TableName
@@ -360,18 +416,4 @@ func CountFiltered(severity, keyword string) (int64, error) {
 		return 0, err
 	}
 	return count, nil
-}
-
-func Count() int64 {
-	var count int64
-	query := "SELECT COUNT(*) FROM " + db2.TableName
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	err := dbx.GetContext(ctx, &count, query)
-	if err != nil {
-		return 0
-	}
-	return count
 }

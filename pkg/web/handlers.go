@@ -293,6 +293,7 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	severityRaw := strings.TrimSpace(q.Get("severity"))
 	pageStr := strings.TrimSpace(q.Get("page"))
 	pageSizeStr := strings.TrimSpace(q.Get("page_size"))
+	expandRaw := strings.TrimSpace(q.Get("expand")) // 可选：pocInfo,resultList,all
 
 	// 解析分页参数
 	page := 1
@@ -326,11 +327,26 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// 仍然传递原始字符串给底层，底层会做小写匹配；当传入5个或以上值视为全选
 	severityParam := strings.Join(severityList, ",")
 
-	// 查询数据（分页）
-	itemsRaw, err := sqlite.SelectPage(severityParam, keyword, page, pageSize)
+	// expand 解析（默认不展开任何大字段）
+	var expandPoc, expandResult bool
+	if expandRaw != "" {
+		for _, e := range strings.Split(expandRaw, ",") {
+			switch strings.ToLower(strings.TrimSpace(e)) {
+			case "pocinfo":
+				expandPoc = true
+			case "resultlist":
+				expandResult = true
+			case "all":
+				expandPoc = true
+				expandResult = true
+			}
+		}
+	}
+
+	// 查询数据（分页），按需展开
+	itemsRaw, err := sqlite.SelectPage(severityParam, keyword, page, pageSize, expandPoc, expandResult)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "查询失败: " + err.Error()})
@@ -348,8 +364,8 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	// 组装响应 items
 	respItems := make([]ReportItem, 0, len(itemsRaw))
 	for _, it := range itemsRaw {
-		respItems = append(respItems, ReportItem{
-			ID:         it.ID,
+		item := ReportItem{
+			ID:         strconv.FormatInt(it.ID, 10),
 			TaskID:     it.TaskID,
 			VulID:      it.VulID,
 			VulName:    it.VulName,
@@ -357,9 +373,14 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 			FullTarget: it.FullTarget,
 			Severity:   it.Severity, // 已在底层转大写
 			Created:    it.Created,
-			PocInfo:    it.PocInfo,
-			ResultList: it.ResultList,
-		})
+		}
+		if expandPoc {
+			item.PocInfo = it.PocInfo
+		}
+		if expandResult {
+			item.ResultList = it.ResultList
+		}
+		respItems = append(respItems, item)
 	}
 
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
@@ -377,5 +398,79 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 		Success: true,
 		Message: "ok",
 		Data:    data,
+	})
+}
+
+// 新增：报告详情接口 GET /api/reports/{id}?expand=all|pocInfo|resultList
+func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	// 从路径中提取 id
+	path := strings.TrimPrefix(r.URL.Path, "/api/reports/")
+	if path == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少报告ID"})
+		return
+	}
+	// id, err := strconv.ParseInt(path, 10, 64)
+	id := path
+	if len(id) <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的报告ID"})
+		return
+	}
+
+	// expand 解析（详情默认全展开）
+	expandRaw := strings.TrimSpace(r.URL.Query().Get("expand"))
+	expandPoc, expandResult := true, true
+	if expandRaw != "" {
+		expandPoc, expandResult = false, false
+		for _, e := range strings.Split(expandRaw, ",") {
+			switch strings.ToLower(strings.TrimSpace(e)) {
+			case "pocinfo":
+				expandPoc = true
+			case "resultlist":
+				expandResult = true
+			case "all":
+				expandPoc = true
+				expandResult = true
+			}
+		}
+	}
+
+	row, err := sqlite.GetByID(id, expandPoc, expandResult)
+	if err != nil {
+		// 未找到或数据库错误
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "未找到报告"})
+		return
+	}
+
+	item := ReportItem{
+		ID:         strconv.FormatInt(row.ID, 10),
+		TaskID:     row.TaskID,
+		VulID:      row.VulID,
+		VulName:    row.VulName,
+		Target:     row.Target,
+		FullTarget: row.FullTarget,
+		Severity:   row.Severity,
+		Created:    row.Created,
+	}
+	if expandPoc {
+		item.PocInfo = row.PocInfo
+	}
+	if expandResult {
+		item.ResultList = row.ResultList
+	}
+
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "ok",
+		Data:    item,
 	})
 }

@@ -1,0 +1,1 @@
+import"../chunks/DsnmJJEf.js";import"../chunks/rJXfOMTy.js";import{f as e,b as a}from"../chunks/DTlqaqqF.js";var r=e('<div class="flex flex-1 flex-col"><div class="container-wrapper section-soft flex-1 pb-6"><div class="container overflow-hidden"><h1>This is Pocs Page.</h1></div></div></div>');function p(o){var i=r();a(o,i)}export{p as component};
