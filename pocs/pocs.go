@@ -16,6 +16,8 @@ var EmbedFileList []string
 
 func init() {
 	EmbedFileList, _ = EmbedFile()
+	// 设置embed poc查找函数
+	poc.SetEmbedPocFinder(EmbedReadContentByName)
 }
 
 func EmbedFile() ([]string, error) {

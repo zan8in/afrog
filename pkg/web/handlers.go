@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -473,4 +474,48 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "ok",
 		Data:    item,
 	})
+}
+
+// pocDetailHandler 处理获取POC YAML源码的请求
+// GET /api/reports/{id}/poc
+func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从URL路径中提取report ID
+	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(pathParts) < 3 || pathParts[2] == "" {
+		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		return
+	}
+
+	reportId := pathParts[3]
+
+	// 从数据库查询report记录，获取pocInfo.Id
+	report, err := sqlite.GetByID(reportId, true, false) // 只展开POC信息
+	if err != nil {
+		http.Error(w, "Report not found", http.StatusNotFound)
+		return
+	}
+
+	pocId := report.PocInfo.Id
+	if pocId == "" {
+		http.Error(w, "POC ID not found in report", http.StatusNotFound)
+		return
+	}
+
+	// 通过POC ID查找原始YAML内容
+	yamlContent, err := poc.FindPocYamlById(pocId)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("POC YAML not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	// 返回YAML内容
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s.yaml\"", pocId))
+	w.WriteHeader(http.StatusOK)
+	w.Write(yamlContent)
 }

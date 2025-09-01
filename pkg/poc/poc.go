@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	// 移除对pocs包的导入
 	"gopkg.in/yaml.v2"
 )
 
@@ -345,4 +346,60 @@ func (poc *Poc) IsReverse() bool {
 type Extractors struct {
 	Type      string        `yaml:"type"`      // regex,str
 	Extractor yaml.MapSlice `yaml:"extractor"` //
+}
+
+// FindPocYamlById 通过POC ID查找原始YAML内容
+// 优先从embed POC中查找，然后从local POC中查找
+// 添加函数类型定义用于回调
+type EmbedPocFinderFunc func(pocId string) ([]byte, error)
+
+// 全局变量存储embed poc查找函数
+var embedPocFinder EmbedPocFinderFunc
+
+// 设置embed poc查找函数
+func SetEmbedPocFinder(finder EmbedPocFinderFunc) {
+	embedPocFinder = finder
+}
+
+func FindPocYamlById(pocId string) ([]byte, error) {
+	// 首先尝试从embed POC中查找
+	if embedPocFinder != nil {
+		if content, err := embedPocFinder(pocId); err == nil {
+			return content, nil
+		}
+	}
+
+	// 然后尝试从本地POC中查找
+	return findLocalPocById(pocId)
+}
+
+func findLocalPocById(pocId string) ([]byte, error) {
+	// 搜索LocalFileList
+	for _, filePath := range LocalFileList {
+		if poc, err := LocalReadPocByPath(filePath); err == nil {
+			if poc.Id == pocId {
+				return os.ReadFile(filePath)
+			}
+		}
+	}
+
+	// 搜索LocalAppendList
+	for _, filePath := range LocalAppendList {
+		if poc, err := LocalReadPocByPath(filePath); err == nil {
+			if poc.Id == pocId {
+				return os.ReadFile(filePath)
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("local poc with id '%s' not found", pocId)
+}
+
+// getFileNameFromPath 从文件路径中提取文件名
+func getFileNameFromPath(filePath string) string {
+	lastSlashIndex := strings.LastIndex(filePath, "/")
+	if lastSlashIndex != -1 {
+		return filePath[lastSlashIndex+1:]
+	}
+	return filePath
 }

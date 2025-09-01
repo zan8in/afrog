@@ -331,13 +331,9 @@ func GetByID(id string, expandPoc, expandResult bool) (db2.ResultData, error) {
 	defer cancel()
 
 	q := "SELECT * FROM " + db2.TableName + " WHERE id = ?"
-	fmt.Println(q, id)
 
 	if err := dbx.GetContext(ctx, &row, q, id); err != nil {
-		fmt.Println(err, row)
 		return row, err
-	} else {
-		fmt.Println(err, row)
 	}
 
 	row.Severity = strings.ToUpper(row.Severity)

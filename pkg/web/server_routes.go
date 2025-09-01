@@ -20,7 +20,11 @@ func setupHandler() (http.Handler, error) {
 	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
 	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
 	mux.HandleFunc("/api/reports", jwtAuthMiddleware(reportsHandler))
+	// 报告详情接口
 	mux.HandleFunc("/api/reports/", jwtAuthMiddleware(reportsDetailHandler))
+	
+	// 新增：POC YAML源码接口
+	mux.HandleFunc("/api/reports/poc/", jwtAuthMiddleware(pocDetailHandler))
 	mux.HandleFunc("/api/pocs/stats", jwtAuthMiddleware(pocsStatsHandler))
 
 	// 静态文件服务（包含 _app 目录、index.html 等）

