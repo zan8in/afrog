@@ -5,7 +5,7 @@
 </p>
 <!-- </a> <h1 align="center">afrog</h1> -->
 
-<h4 align="center">漏洞赏金、渗透测试和红队的安全工具</h4>
+<h4 align="center">用于漏洞赏金、测试和红队的安全工具</h4>
 
 <p align="center">
   <a href="../README.md">English</a> •
