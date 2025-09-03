@@ -80,17 +80,20 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		return nil, fmt.Errorf("%s %s", options.Resume, err.Error())
 	}
 
-	jr, err := report.NewJsonReport(options.Json, options.JsonAll)
-	if err != nil {
-		return runner, fmt.Errorf("%s", err.Error())
-	}
-	runner.JsonReport = jr
+	// 在SDK模式下，不创建任何报告实例，避免自动创建reports目录
+	if !options.SDKMode {
+		jr, err := report.NewJsonReport(options.Json, options.JsonAll)
+		if err != nil {
+			return runner, fmt.Errorf("%s", err.Error())
+		}
+		runner.JsonReport = jr
 
-	report, err := report.NewReport(options.Output, report.DefaultTemplate)
-	if err != nil {
-		return runner, fmt.Errorf("%s", err.Error())
+		report, err := report.NewReport(options.Output, report.DefaultTemplate)
+		if err != nil {
+			return runner, fmt.Errorf("%s", err.Error())
+		}
+		runner.Report = report
 	}
-	runner.Report = report
 
 	seen := make(map[string]struct{}) // 避免重复添加
 
