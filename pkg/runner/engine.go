@@ -64,18 +64,27 @@ func (runner *Runner) Execute() {
 
 	// fmt.Println(len(reversePocs), len(otherPocs), len(pocSlice))
 	// 如果无 OOB PoC 将跳过 OOB 存活检测
+	// 在SDK模式下，只有明确启用OOB时才进行连接检测
 	if len(reversePocs) > 0 {
-		runner.options.SetOOBAdapter()
-		if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
-			Key:     options.OOBKey,
-			Domain:  options.OOBDomain,
-			HTTPUrl: options.OOBHttpUrl,
-			ApiUrl:  options.OOBApiUrl,
-		}); err == nil {
-			OOB = oobAdapter
-			OOBAlive = OOB.IsVaild()
-		} else {
+		// 检查是否是SDK模式且未启用OOB
+		if options.SDKMode && !options.EnableOOB {
+			// SDK模式下未启用OOB，跳过连接检测
+			OOB = nil
 			OOBAlive = false
+		} else {
+			// 非SDK模式或已启用OOB，执行正常的连接检测
+			runner.options.SetOOBAdapter()
+			if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
+				Key:     options.OOBKey,
+				Domain:  options.OOBDomain,
+				HTTPUrl: options.OOBHttpUrl,
+				ApiUrl:  options.OOBApiUrl,
+			}); err == nil {
+				OOB = oobAdapter
+				OOBAlive = OOB.IsVaild()
+			} else {
+				OOBAlive = false
+			}
 		}
 		// if !OOBAlive {
 		// 	gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
@@ -251,6 +260,11 @@ func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 
 // 新增OOB状态显示函数
 func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
+	// 在SDK模式下，不显示OOB状态信息，由SDK自己控制显示
+	if runner.options.SDKMode {
+		return
+	}
+
 	status, msg := runner.getOOBStatus(reversePocs)
 
 	if !status {
