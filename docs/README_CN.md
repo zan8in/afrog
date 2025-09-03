@@ -1,13 +1,15 @@
+# afrog
+
 <p align="center">
-  <a href="http://afrog.net"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
+  <a href="http://afrog.net"><img src="../images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
 <!-- </a> <h1 align="center">afrog</h1> -->
 
-<h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
+<h4 align="center">漏洞赏金、渗透测试和红队的安全工具</h4>
 
 <p align="center">
-  <a href="README.md">English</a> •
-  <a href="docs/README_CN.md">中文</a>
+  <a href="../README.md">English</a> •
+  <a href="README_CN.md">中文</a>
 </p>
 
 <p align="center">
@@ -20,13 +22,12 @@
 </p>
 
 <p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
+  <a href="https://github.com/zan8in/afrog/releases">下载</a> •
   <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md">Helper Function</a>
-
+  <a href="https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md">辅助函数</a>
 </p>
 
-## PoC Contributors
+## PoC 贡献者
 
 <div><table frame=void>
 	<tr>
@@ -445,27 +446,27 @@
         
 </table></div>
 
-## What is afrog
+## 什么是 afrog
 
-afrog is a high-performance vulnerability scanner that is fast and stable. It supports user-defined PoC and comes with several built-in types, such as CVE, CNVD, default passwords, information disclosure, fingerprint identification, unauthorized access, arbitrary file reading, and command execution. With afrog, network security professionals can quickly validate and remediate vulnerabilities, which helps to enhance their security defense capabilities.
+afrog 是一个高性能的漏洞扫描器，具有快速稳定的特点。它支持用户自定义 PoC，并内置了多种类型，如 CVE、CNVD、默认密码、信息泄露、指纹识别、未授权访问、任意文件读取和命令执行。使用 afrog，网络安全专业人员可以快速验证和修复漏洞，从而提升安全防护能力。
 
-## Features
+## 功能特性
 
-- [x] Open source
-- [x] Fast, stable, with low false positives
-- [x] Detailed HTML vulnerability reports
-- [x] Customizable and stably updatable PoCs
-- [x] Active community exchange group
+- [x] 开源
+- [x] 快速、稳定、误报率低
+- [x] 详细的 HTML 漏洞报告
+- [x] 可自定义且稳定更新的 PoCs
+- [x] 活跃的社区交流群
 
-## Installation
+## 安装
 
-### Prerequisites
+### 前置要求
 
-- [Go](https://go.dev/) version 1.19 or higher.
+- [Go](https://go.dev/) 版本 1.19 或更高版本。
 
-you can install it with:
+您可以通过以下方式安装：
 
-**Binary**
+**二进制文件**
 
 ```sh
 $ https://github.com/zan8in/afrog/releases/latest
@@ -486,51 +487,51 @@ $ ./afrog -h
 $ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
 ```
 
-## Running afrog
+## 运行 afrog
 
-By default, afrog scans all built-in PoCs, and if it finds any vulnerabilities, it automatically creates an HTML report with the date of the scan as the filename.
+默认情况下，afrog 会扫描所有内置的 PoCs，如果发现任何漏洞，它会自动创建一个以扫描日期为文件名的 HTML 报告。
 
 ```sh
 afrog -t https://example.com
 ```
 
-**Warning occurs when running afrog**
+**运行 afrog 时的警告**
 
-If you see an error message saying:
+如果您看到错误消息：
 
 ```
 [ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
 ```
 
-it means you need to modify the [configuration file](#configuration-file).
+这意味着您需要修改[配置文件](#配置文件)。
 
-To execute a custom PoC directory, you can use the following command:
+要执行自定义 PoC 目录，您可以使用以下命令：
 
 ```sh
 afrog -t https://example.com -P mypocs/
 ```
 
-Use the command `-s keyword` to perform a fuzzy search on all PoCs and scan the search results. Multiple keywords can be used, separated by commas. For example: `-s weblogic,jboss`.
+使用命令 `-s keyword` 对所有 PoCs 进行模糊搜索并扫描搜索结果。可以使用多个关键词，用逗号分隔。例如：`-s weblogic,jboss`。
 
 ```sh
 afrog -t https://example.com -s weblogic,jboss
 ```
 
-Use the command `-S keyword` to scan vulnerabilities based on their severity level. Severity levels include: `info`, `low`, `medium`, `high`, and `critical`. For example, to only scan high and critical vulnerabilities, use the command `-S high,critical`.
+使用命令 `-S keyword` 根据严重程度级别扫描漏洞。严重程度级别包括：`info`、`low`、`medium`、`high` 和 `critical`。例如，要仅扫描高危和严重漏洞，请使用命令 `-S high,critical`。
 
 ```sh
 afrog -t https://example.com -S high,critical
 ```
 
-You can scan multiple URLs at the same time as well.
+您也可以同时扫描多个 URL。
 
 ```sh
 afrog -T urls.txt
 ```
 
-## -web Command
+## -web 命令
 
-The `-web` command allows for persistently storing vulnerabilities scanned by afrog into an SQLite3 database. Accessing http://x.x.x.x:16868 via a browser provides access to the vulnerability report webpage, where users can conduct simple keyword searches and filter results by vulnerability severity.
+`-web` 命令允许将 afrog 扫描的漏洞持久存储到 SQLite3 数据库中。通过浏览器访问 http://x.x.x.x:16868 可以访问漏洞报告网页，用户可以进行简单的关键词搜索并按漏洞严重程度过滤结果。
 
 ```shell
 afrog -web
@@ -539,11 +540,11 @@ afrog -web
 
 <img src="https://github.com/zan8in/afrog/blob/main/images/webcommand.png" >
 
-## Configuration file
+## 配置文件
 
-The first time you start afrog, it will automatically create a configuration file called `afrog-config.yaml`, which will be saved in the current user directory under `$HOME/.config/afrog/afrog-config.yaml`.
+第一次启动 afrog 时，它会自动创建一个名为 `afrog-config.yaml` 的配置文件，该文件将保存在当前用户目录下的 `$HOME/.config/afrog/afrog-config.yaml`。
 
-Here is an example config file:
+以下是示例配置文件：
 
 ```yaml
 reverse:
@@ -566,88 +567,88 @@ reverse:
     api_url: "http://x.x.x.x/helplog"
 ```
 
-`reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification.
+`reverse` 是一个反向连接平台，用于验证无法回显的命令执行漏洞。目前只有 ceye 可以用于验证。
 
-### Ceye Configuration
+### Ceye 配置
 
-To obtain ceye, follow these steps:
+要获取 ceye，请按照以下步骤操作：
 
-- Go to the [ceye.io](http://ceye.io/) website and register an account.
-- Log in and go to the personal settings page.
-- Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
+- 前往 [ceye.io](http://ceye.io/) 网站并注册账户。
+- 登录并进入个人设置页面。
+- 复制 `domain` 和 `api-key` 并在 `afrog-config.yaml` 文件中正确配置它们。
 
 ### Dnslogcn
 
-No configuration required, but unstable
+无需配置，但不稳定
 [dnslog.cn](http://dnslog.cn/)
 
 ### Alphalog
 
-Need to build services
+需要构建服务
 [alphalog](https://github.com/AlphabugX/Alphalog)
 
 ### Xray
 
-Need to build services
+需要构建服务
 [xray](https://docs.xray.cool/tools/xray/advanced/reverse)
 
 ### Revsuit
 
-Need to build services
+需要构建服务
 [Revsuit](https://github.com/Li4n0/revsuit)、
-[Tutorial](https://mp.weixin.qq.com/s/hGwcMz8sh7BImBjI3wHqnQ)
+[教程](https://mp.weixin.qq.com/s/hGwcMz8sh7BImBjI3wHqnQ)
 
-## Json Output (For developers)
+## Json 输出（面向开发者）
 
 ### Json
 
-Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the [-json-all](#jsonall) command parameter.
+可选命令：`-json` `-j`，将扫描结果保存到 JSON 文件。JSON 文件默认包含以下内容：`target`、`fulltarget`、`id` 和 `info`。info 字段包含以下子字段：`name`、`author`、`severity`、`description` 和 `reference`。如果您想保存 `request` 和 `response` 内容，请使用 [-json-all](#jsonall) 命令参数。
 
 ```sh
 afrog  -t https://example.com -json result.json
 afrog  -t https://example.com -j result.json
 ```
 
-### Warning
+### 警告
 
-The content of the JSON file is updated in real time. However, there is an important note to keep in mind: before the scan is completed, if developers want to parse the file content, they need to add a '`]`' symbol to the end of the file by themselves, otherwise it will cause parsing errors. Of course, if you wait for the scan to complete before parsing the file, this issue will not occur.
+JSON 文件的内容会实时更新。但是有一个重要的注意事项：在扫描完成之前，如果开发者想要解析文件内容，他们需要自己在文件末尾添加一个 '`]`' 符号，否则会导致解析错误。当然，如果您等待扫描完成后再解析文件，就不会出现这个问题。
 
 ### JsonAll
 
-Optional command: `-json-all` `-ja`, The only difference between the `-json-all` and `-json` commands is that `-json-all` writes all vulnerability results, including `request` and `response`, to a JSON file.
+可选命令：`-json-all` `-ja`，`-json-all` 和 `-json` 命令之间的唯一区别是 `-json-all` 将所有漏洞结果（包括 `request` 和 `response`）写入 JSON 文件。
 
 ```sh
 afrog -t https://example.com -json-all result.json
 afrog -t https://example.com -ja result.json
 ```
 
-## Screenshot
+## 截图
 
 ![](https://github.com/zan8in/afrog/blob/main/images/1.png)
 
 <!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
 
-## As Library
+## 作为库使用
 
-### Simple Example
+### 简单示例
 
-For comprehensive SDK documentation:
+详细的 SDK 使用指南：
 
-- [SDK Usage Guide (English)](docs/SDK_Usage_Guide_English.md)
-- [SDK使用指南 (中文)](docs/SDK使用指南_中文.md)
+- [SDK 使用指南（中文）](SDK使用指南_中文.md)
+- [SDK Usage Guide (English)](SDK_Usage_Guide_English.md)
+```
 
-### More Examples & Documentation
+更多示例：
 
-- [Basic scanner](examples/basic_scan/main.go)
-- [Async scanner](examples/async_scan/main.go)  
-- [OOB scanner](examples/oob_scan/main.go)
-- [Progress scanner](examples/progress_scan/main.go)
+- [基础扫描器](../examples/basic_scan/main.go)
+- [异步扫描器](../examples/async_scan/main.go)
+- [OOB 扫描器](../examples/oob_scan/main.go)
+- [进度扫描器](../examples/progress_scan/main.go)
 
 
+## 讨论群
 
-## Discussion group
-
-To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
+要加入微信上的 afrog 交流群，请先添加 afrog 个人账户并标记为 **afrog**。然后，管理员会将您添加到群中。
 
 <img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" />
 
@@ -655,16 +656,16 @@ To join the afrog communication group on WeChat, please first add the afrog pers
 
 <img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
 
-afrog has joined [404Starlink](https://github.com/knownsec/404StarLink)
+afrog 已加入 [404Starlink](https://github.com/knownsec/404StarLink)
 
-## Disclaimer
+## 免责声明
 
-This tool is intended only for **legally authorized** enterprise security construction purposes. If you want to test the functionality of this tool, you should build a target environment by yourself.
+此工具仅用于**合法授权**的企业安全建设目的。如果您想测试此工具的功能，您应该自己构建目标环境。
 
-To prevent malicious use, all PoCs included in this project are theoretical assessments of vulnerabilities. The tool does not exploit vulnerabilities, launch real attacks or exploits on targets.
+为了防止恶意使用，此项目中包含的所有 PoCs 都是漏洞的理论评估。该工具不会利用漏洞、对目标发起真正的攻击或利用。
 
-When using this tool for vulnerability scanning, it is important to ensure that your behavior complies with local laws and regulations, and that you have obtained sufficient authorization. **Do not scan unauthorized targets**.
+在使用此工具进行漏洞扫描时，重要的是确保您的行为符合当地法律法规，并且您已获得充分的授权。**请勿扫描未经授权的目标**。
 
-If you engage in any illegal behavior while using this tool, you will be solely responsible for any corresponding consequences, and we will not bear any legal or joint responsibility.
+如果您在使用此工具时从事任何非法行为，您将对任何相应的后果承担全部责任，我们不会承担任何法律或连带责任。
 
-Before installing and using this tool, please **read each clause carefully and thoroughly**. Restrictions, disclaimers, or other clauses that may significantly affect your rights and interests may be highlighted in bold or underlined to draw your attention. Unless you have fully read, fully understood, and agreed to all the terms of this agreement, do not install or use this tool. Your use of the tool or your acceptance of this agreement in any other express or implied manner will be deemed as your acknowledgment and agreement to be bound by this agreement.
+在安装和使用此工具之前，请**仔细彻底地阅读每个条款**。可能会以粗体或下划线突出显示可能显著影响您的权利和利益的限制、免责声明或其他条款，以引起您的注意。除非您已完全阅读、完全理解并同意本协议的所有条款，否则请勿安装或使用此工具。您使用该工具或以任何其他明示或暗示的方式接受本协议将被视为您承认并同意受本协议约束。

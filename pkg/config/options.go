@@ -179,6 +179,10 @@ type Options struct {
 	OOBHttpUrl string
 	OOBApiUrl  string
 
+	// SDK模式标志，用于控制OOB检测行为
+	SDKMode   bool
+	EnableOOB bool
+
 	// path to the afrog configuration file
 	ConfigFile string
 
