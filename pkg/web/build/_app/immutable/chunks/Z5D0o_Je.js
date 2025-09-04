@@ -1,1 +1,0 @@
-import{G as c,g as i,H as n,I as f,k as u,J as s,K as o}from"./gImXwFS5.js";function k(a){let e=0,r=n(0),t;return()=>{c()&&(i(r),f(()=>(e===0&&(t=u(()=>a(()=>s(r)))),e+=1,()=>{o(()=>{e-=1,e===0&&(t?.(),t=void 0,s(r))})})))}}export{k as c};

@@ -52,7 +52,7 @@ func EmbedReadContentByName(name string) ([]byte, error) {
 		if lastSlashIndex != -1 {
 			fname := file[lastSlashIndex+1:]
 			if name == fname || name+".yaml" == fname || name+".yml" == fname {
-				fmt.Println(fname)
+				// fmt.Println(fname)
 				return f.ReadFile(file)
 			}
 		}

