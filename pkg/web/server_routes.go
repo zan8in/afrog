@@ -18,7 +18,7 @@ func setupHandler() (http.Handler, error) {
 
 	mux := http.NewServeMux()
 
-	// API 路由（全部返回JSON）
+	// API 路由（全部返回JSON）- 确保这些路由优先匹配
 	mux.HandleFunc("/api/login", loginRateLimitMiddleware(loginHandler))
 	mux.HandleFunc("/api/logout", jwtAuthMiddleware(logoutHandler))
 	mux.HandleFunc("/api/vulns", jwtAuthMiddleware(vulnsHandler))
@@ -29,6 +29,13 @@ func setupHandler() (http.Handler, error) {
 	// 新增：POC YAML源码接口
 	mux.HandleFunc("/api/reports/poc/", jwtAuthMiddleware(pocDetailHandler))
 	mux.HandleFunc("/api/pocs/stats", jwtAuthMiddleware(pocsStatsHandler))
+
+	// 添加API路径的404处理器，防止被SPA处理器拦截
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"API endpoint not found","status":404}`))
+	})
 
 	// 创建支持SPA的静态文件处理器
 	spaHandler := &spaHandler{
