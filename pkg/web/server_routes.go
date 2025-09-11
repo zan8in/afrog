@@ -40,7 +40,8 @@ func setupHandler() (http.Handler, error) {
 	}
 	mux.Handle("/", spaHandler)
 
-	return secureHeadersMiddleware(loggingMiddleware(mux)), nil
+	return secureHeadersMiddleware(mux), nil
+	// return secureHeadersMiddleware(loggingMiddleware(mux)), nil
 }
 
 // API 专用中间件
