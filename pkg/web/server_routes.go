@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"path"
-	"strings"
 )
 
 func setupHandler() (http.Handler, error) {
@@ -30,33 +28,8 @@ func setupHandler() (http.Handler, error) {
 	mux.HandleFunc("/api/pocs/stats", jwtAuthMiddleware(pocsStatsHandler))
 
 	staticHandler := http.FileServer(http.FS(buildRoot))
-	// 定义需要重定向的路径集合
-	var spaPaths = map[string]bool{
-		"/login":   true,
-		"/reports": true,
-		"/docs":    true,
-		"/pocs":    true,
-	}
+	mux.Handle("/", staticHandler)
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// 动态路径匹配
-		if spaPaths[r.URL.Path] {
-			http.Redirect(w, r, "/", http.StatusPermanentRedirect)
-			return
-		}
-
-		// 原有静态资源处理逻辑
-		cleanPath := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
-		if _, err := buildRoot.Open(cleanPath); err == nil {
-			staticHandler.ServeHTTP(w, r)
-			return
-		}
-
-		// SPA回退逻辑
-		fileContent, _ := fs.ReadFile(buildRoot, "index.html")
-		w.Header().Set("Content-Type", "text/html")
-		w.Write(fileContent)
-	})
 	// 为所有路由增加全局安全响应头
 	return secureHeadersMiddleware(mux), nil
 }
