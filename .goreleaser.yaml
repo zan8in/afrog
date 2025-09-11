@@ -23,7 +23,7 @@ builds:
 
 archives:
   - formats:
-    - zip
+      - zip
     id: afrog
     ids: [afrog]
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
