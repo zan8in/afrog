@@ -402,7 +402,7 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// 新增：报告详情接口 GET /api/reports/{id}?expand=all|pocInfo|resultList
+// 新增：报告详情接口 GET /api/reports/detail/{id}?expand=all|pocInfo|resultList
 func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "GET" {
@@ -411,15 +411,18 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 从路径中提取 id
-	path := strings.TrimPrefix(r.URL.Path, "/api/reports/")
-	if path == "" {
+	// 从路径中提取 id - 适配新的路由 /api/reports/detail/{id}
+	path := strings.TrimPrefix(r.URL.Path, "/reports/detail/")
+	if path == "" || path == r.URL.Path {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少报告ID"})
 		return
 	}
-	// id, err := strconv.ParseInt(path, 10, 64)
-	id := path
+	
+	// 清理路径，移除可能的查询参数和多余的斜杠
+	id := strings.TrimSpace(strings.Split(path, "?")[0])
+	id = strings.Trim(id, "/")
+	
 	if len(id) <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的报告ID"})
