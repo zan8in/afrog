@@ -480,21 +480,28 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // pocDetailHandler 处理获取POC YAML源码的请求
-// GET /api/reports/{id}/poc
+// GET /api/reports/poc/{id}
 func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 从URL路径中提取report ID
-	pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(pathParts) < 3 || pathParts[2] == "" {
+	// 从URL路径中提取report ID - 适配新的路由 /reports/poc/{id}
+	path := strings.TrimPrefix(r.URL.Path, "/reports/poc/")
+	if path == "" || path == r.URL.Path {
 		http.Error(w, "Invalid report ID", http.StatusBadRequest)
 		return
 	}
-
-	reportId := pathParts[3]
+	
+	// 清理路径，获取 report ID
+	reportId := strings.TrimSpace(strings.Split(path, "?")[0])
+	reportId = strings.Trim(reportId, "/")
+	
+	if reportId == "" {
+		http.Error(w, "Invalid report ID", http.StatusBadRequest)
+		return
+	}
 
 	// 从数据库查询report记录，获取pocInfo.Id
 	report, err := sqlite.GetByID(reportId, true, false) // 只展开POC信息
