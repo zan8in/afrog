@@ -76,6 +76,12 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 临时解决方案：根路径重定向到 reports.html
+	if r.URL.Path == "/" {
+		http.Redirect(w, r, "/reports.html", http.StatusTemporaryRedirect)
+		return
+	}
+
 	// 清理路径
 	path := filepath.Clean(r.URL.Path)
 	if path == "/" {
