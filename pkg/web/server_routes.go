@@ -36,7 +36,7 @@ func setupHandler() (http.Handler, error) {
 	// 使用优化的 SPA Handler
 	spaHandler := &spaHandler{
 		staticFS:  buildRoot,
-		indexPath: "index.html",
+		indexPath: GetWebpathIndexPath(),
 	}
 	mux.Handle("/", spaHandler)
 
