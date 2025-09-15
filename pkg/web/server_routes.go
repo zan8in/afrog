@@ -28,7 +28,7 @@ func setupHandler() (http.Handler, error) {
 	mux.Handle("/api/", http.StripPrefix("/api", apiMiddleware(apiMux)))
 
 	// 静态文件和 SPA 处理
-	buildRoot, err := fs.Sub(buildFS, "build")
+	buildRoot, err := fs.Sub(GetWebpathFS(), "webpath")
 	if err != nil {
 		return nil, fmt.Errorf("无法加载静态文件: %v", err)
 	}
@@ -73,12 +73,6 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 如果是 API 请求，直接返回 404（不应该到达这里）
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		http.NotFound(w, r)
-		return
-	}
-
-	// 临时解决方案：根路径重定向到 reports.html
-	if r.URL.Path == "/" {
-		http.Redirect(w, r, "/reports.html", http.StatusTemporaryRedirect)
 		return
 	}
 
