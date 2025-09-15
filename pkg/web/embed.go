@@ -10,5 +10,5 @@ func GetWebpathFS() embed.FS {
 }
 
 func GetWebpathIndexPath() string {
-	return "webpath/index.html"
+	return "index.html"
 }
