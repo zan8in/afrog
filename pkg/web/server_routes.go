@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -8,159 +9,188 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/gorilla/mux"
 )
 
+// setupHandler 构建并返回主 HTTP 路由
 func setupHandler() (http.Handler, error) {
-	mux := http.NewServeMux()
+	// 主路由
+	r := mux.NewRouter()
 
-	// API 路由组 - 使用子路由器确保精确匹配
-	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("/login", loginRateLimitMiddleware(loginHandler))
-	apiMux.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler))
-	apiMux.HandleFunc("/vulns", jwtAuthMiddleware(vulnsHandler))
-	apiMux.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler))
-	apiMux.HandleFunc("/reports/detail/", jwtAuthMiddleware(reportsDetailHandler)) // 修改路径避免冲突
-	apiMux.HandleFunc("/reports/poc/", jwtAuthMiddleware(pocDetailHandler))
-	apiMux.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler))
-	apiMux.HandleFunc("/health", healthCheckHandler)
+	// 全局中间件（安全与访问日志）
+	r.Use(secureHeadersMiddleware)
+	// r.Use(loggingMiddleware)
 
-	// 将 API 路由挂载到 /api/ 下，并应用 API 专用中间件
-	mux.Handle("/api/", http.StripPrefix("/api", apiMiddleware(apiMux)))
+	// -----------------------
+	// API 子路由（严格分离）
+	// -----------------------
+	api := r.PathPrefix("/api").Subrouter()
+	api.Use(apiMiddleware)
+	api.StrictSlash(true)
 
-	// 静态文件和 SPA 处理
+	registerAPIRoutes(api)
+	api.NotFoundHandler = http.HandlerFunc(apiNotFoundHandler)
+
+	// -----------------------
+	// 静态网站（SvelteKit 打包内容）
+	// -----------------------
 	buildRoot, err := fs.Sub(GetWebpathFS(), "webpath")
 	if err != nil {
-		return nil, fmt.Errorf("无法加载静态文件: %v", err)
+		return nil, fmt.Errorf("unable to load embedded web assets: %w", err)
 	}
 
-	// 使用优化的 SPA Handler
-	spaHandler := &spaHandler{
-		staticFS:  buildRoot,
-		indexPath: GetWebpathIndexPath(),
-	}
-	mux.Handle("/", spaHandler)
+	spa := newSPAHandler(buildRoot, GetWebpathIndexPath())
 
-	return secureHeadersMiddleware(mux), nil
-	// return secureHeadersMiddleware(loggingMiddleware(mux)), nil
+	// 常见特殊文件（可选，直出便于日志与缓存控制）
+	r.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r, buildRoot, "favicon.ico")
+	})
+	r.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r, buildRoot, "robots.txt")
+	})
+	r.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
+		serveStaticFile(w, r, buildRoot, "manifest.json")
+	})
+
+	// Catch-all 静态处理（放在 /api 之后，确保优先匹配 API）
+	// 说明：PathPrefix("/") 会匹配所有非 /api/* 的请求；若 /api 子路由已匹配，则不会降级到此处。
+	r.PathPrefix("/").Handler(spa)
+
+	return r, nil
 }
 
-// API 专用中间件
+// -----------------------
+// API 注册与中间件
+// -----------------------
+
+// 仅用于 /api/* 的中间件：统一设置 JSON 响应头、校验 Content-Type
 func apiMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 确保 API 响应始终为 JSON
+		// API 响应统一 JSON + 不缓存
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
+
+		// 仅对写操作校验 Content-Type
+		if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
+			if ct := r.Header.Get("Content-Type"); !strings.Contains(ct, "application/json") {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"success": false,
+					"message": "Content-Type必须为application/json",
+				})
+				return
+			}
+		}
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-// 健康检查处理器
+// API 路由集中注册，避免与静态路由混淆
+func registerAPIRoutes(api *mux.Router) {
+	api.HandleFunc("/health", healthCheckHandler).Methods(http.MethodGet)
+
+	// 认证与业务 API（复用现有处理器）
+	api.HandleFunc("/login", loginRateLimitMiddleware(loginHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/vulns", jwtAuthMiddleware(vulnsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/detail/{id}", jwtAuthMiddleware(reportsDetailHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/poc/{id}", jwtAuthMiddleware(pocDetailHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
+}
+
+// API 未匹配路由 -> JSON 404
+func apiNotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"success": false,
+		"message": "API endpoint not found",
+		"path":    r.URL.Path,
+		"method":  r.Method,
+	})
+}
+
+// 健康检查（API）
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok","service":"afrog-web"}`))
+	_, _ = w.Write([]byte(`{"status":"ok","service":"afrog-web"}`))
 }
 
-// 优化的 SPA Handler
+// -----------------------
+// 静态网站（SvelteKit）
+// -----------------------
+
 type spaHandler struct {
 	staticFS  fs.FS
 	indexPath string
 }
 
+func newSPAHandler(staticFS fs.FS, indexPath string) http.Handler {
+	return &spaHandler{staticFS: staticFS, indexPath: indexPath}
+}
+
 func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// 如果是 API 请求，直接返回 404（不应该到达这里）
+	// 安全兜底：若误落入静态处理但路径是 /api/*，仍返回 JSON 404，避免混淆
 	if strings.HasPrefix(r.URL.Path, "/api/") {
-		http.NotFound(w, r)
+		apiNotFoundHandler(w, r)
 		return
 	}
 
-	// 清理路径
-	path := filepath.Clean(r.URL.Path)
-	if path == "/" {
+	// 去除前导斜线
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	if path == "" {
 		path = "index.html"
-	} else {
-		path = strings.TrimPrefix(path, "/")
 	}
 
-	// 尝试打开文件
-	file, err := h.staticFS.Open(path)
-	if err != nil {
-		// 文件不存在，检查是否为前端路由
-		if h.isFrontendRoute(r.URL.Path) {
-			h.serveIndex(w, r)
-			return
+	// 调整：SvelteKit __data.json 专用处理
+	// 存在文件 -> 按 JSON 返回；不存在 -> 返回 200 空数据 JSON，避免触发页面 404
+	if strings.Contains(path, "__data.json") {
+		if file, err := h.staticFS.Open(path); err == nil {
+			defer file.Close()
+			if stat, err2 := file.Stat(); err2 == nil && !stat.IsDir() {
+				if rs, ok := file.(io.ReadSeeker); ok {
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					w.Header().Set("Cache-Control", "no-store")
+					http.ServeContent(w, r, path, stat.ModTime(), rs)
+					return
+				}
+			}
 		}
-		http.NotFound(w, r)
-		return
-	}
-	defer file.Close()
-
-	// 检查是否为目录
-	stat, err := file.Stat()
-	if err != nil {
-		http.Error(w, "Unable to stat file", http.StatusInternalServerError)
-		return
-	}
-
-	// 如果是目录，返回 index.html 让前端路由处理
-	if stat.IsDir() {
-		h.serveIndex(w, r)
+		// 返回最小合法数据，保证客户端路由/无效化流程正常
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"type":  "data",
+			"nodes": []any{}, // 空节点，表示无可更新数据
+		})
 		return
 	}
 
-	// 设置缓存策略
-	h.setCacheHeaders(w, path)
+	// 尝试真实文件
+	if file, err := h.staticFS.Open(path); err == nil {
+		defer file.Close()
 
-	// 确保文件实现了 io.ReadSeeker 接口
-	readSeeker, ok := file.(io.ReadSeeker)
-	if !ok {
-		http.Error(w, "File does not support seeking", http.StatusInternalServerError)
-		return
-	}
-
-	// 使用标准的文件服务器处理
-	http.ServeContent(w, r, path, stat.ModTime(), readSeeker)
-}
-
-// 判断是否为前端路由
-func (h *spaHandler) isFrontendRoute(path string) bool {
-	// SvelteKit 的前端路由路径
-	frontendRoutes := []string{"/login", "/reports", "/pocs", "/docs"}
-	for _, route := range frontendRoutes {
-		if strings.HasPrefix(path, route) {
-			return true
+		if stat, err := file.Stat(); err == nil && !stat.IsDir() {
+			if rs, ok := file.(io.ReadSeeker); ok {
+				// 差异化缓存策略
+				setStaticCacheHeaders(w, path)
+				http.ServeContent(w, r, path, stat.ModTime(), rs)
+				return
+			}
 		}
 	}
-	return false
+
+	// 未找到文件或为目录 -> 返回 index.html（支持前端路由）
+	h.serveIndex(w, r)
 }
 
-// 设置差异化缓存策略
-func (h *spaHandler) setCacheHeaders(w http.ResponseWriter, path string) {
-	ext := filepath.Ext(path)
-	switch ext {
-	case ".html":
-		// HTML 文件不缓存，确保路由更新
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Pragma", "no-cache")
-		w.Header().Set("Expires", "0")
-	case ".js", ".css":
-		// JS/CSS 文件长期缓存（SvelteKit 会生成带 hash 的文件名）
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp":
-		// 图片资源长期缓存
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
-	case ".woff", ".woff2", ".ttf", ".eot":
-		// 字体文件长期缓存
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
-	default:
-		// 其他文件短期缓存
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-	}
-}
-
-// serveIndex 提供 index.html 文件
 func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 	indexFile, err := h.staticFS.Open(h.indexPath)
 	if err != nil {
@@ -174,24 +204,74 @@ func (h *spaHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to stat index file", http.StatusInternalServerError)
 		return
 	}
-
-	readSeeker, ok := indexFile.(io.ReadSeeker)
+	rs, ok := indexFile.(io.ReadSeeker)
 	if !ok {
 		http.Error(w, "Index file does not support seeking", http.StatusInternalServerError)
 		return
 	}
 
-	// HTML 不缓存
+	// HTML 不缓存，确保前端路由更新
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Expires", "0")
-	http.ServeContent(w, r, h.indexPath, stat.ModTime(), readSeeker)
+
+	http.ServeContent(w, r, h.indexPath, stat.ModTime(), rs)
 }
 
+// 按后缀设置缓存策略（SvelteKit 打包文件名带 hash，可使用 immutable）
+func setStaticCacheHeaders(w http.ResponseWriter, path string) {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".html":
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+	case ".js", ".css":
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	case ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp":
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	case ".woff", ".woff2", ".ttf", ".eot":
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	default:
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
+}
+
+// serveStaticFile 直接按文件名服务静态文件（用于 favicon/robots 等）
+// 自动带上缓存策略
+func serveStaticFile(w http.ResponseWriter, r *http.Request, fsys fs.FS, filename string) {
+	f, err := fsys.Open(filename)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		http.Error(w, "Unable to stat file", http.StatusInternalServerError)
+		return
+	}
+	rs, ok := f.(io.ReadSeeker)
+	if !ok {
+		http.Error(w, "File does not support seeking", http.StatusInternalServerError)
+		return
+	}
+
+	setStaticCacheHeaders(w, filename)
+	http.ServeContent(w, r, filename, stat.ModTime(), rs)
+}
+
+// -----------------------
+// 通用中间件
+// -----------------------
+
+// 访问日志（与 API/静态无关，单独保留）
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Request: %s %s", r.Method, r.URL.Path)
+		start := time.Now()
 		next.ServeHTTP(w, r)
+		log.Printf("Request: %s %s - Duration: %v", r.Method, r.URL.Path, time.Since(start))
 	})
 }

@@ -4,15 +4,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zan8in/gologger"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/gologger"
 )
 
 func StartServer(addr string) error {
 	// 初始化安全组件
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
-	gologger.Info().Str("password", generatedPassword).Msg("Web访问密码")
+	gologger.Info().Msgf("Web访问密码: %s", generatedPassword)
 
 	// 初始化数据库（连接 + 写入worker）
 	if err := sqlite.NewWebSqliteDB(); err != nil {

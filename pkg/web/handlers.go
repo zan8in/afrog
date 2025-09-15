@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pocs"
@@ -402,7 +403,6 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// 新增：报告详情接口 GET /api/reports/detail/{id}?expand=all|pocInfo|resultList
 func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != "GET" {
@@ -411,24 +411,14 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 从路径中提取 id - 适配新的路由 /api/reports/detail/{id}
-	path := strings.TrimPrefix(r.URL.Path, "/reports/detail/")
-	if path == "" || path == r.URL.Path {
+	// 从路径变量中获取 id（路由：/api/reports/detail/{id}）
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	if id == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少报告ID"})
 		return
 	}
-	
-	// 清理路径，移除可能的查询参数和多余的斜杠
-	id := strings.TrimSpace(strings.Split(path, "?")[0])
-	id = strings.Trim(id, "/")
-	
-	if len(id) <= 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的报告ID"})
-		return
-	}
-
 	// expand 解析（详情默认全展开）
 	expandRaw := strings.TrimSpace(r.URL.Query().Get("expand"))
 	expandPoc, expandResult := true, true
@@ -479,8 +469,6 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// pocDetailHandler 处理获取POC YAML源码的请求
-// GET /api/reports/poc/{id}
 func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -488,23 +476,25 @@ func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 从URL路径中提取report ID - 适配新的路由 /reports/poc/{id}
-	path := strings.TrimPrefix(r.URL.Path, "/reports/poc/")
-	if path == "" || path == r.URL.Path {
-		http.Error(w, "Invalid report ID", http.StatusBadRequest)
-		return
-	}
-	
+	// path := strings.TrimPrefix(r.URL.Path, "/reports/poc/")
+	// if path == "" || path == r.URL.Path {
+	// 	http.Error(w, "Invalid report ID", http.StatusBadRequest)
+	// 	return
+	// }
+
 	// 清理路径，获取 report ID
-	reportId := strings.TrimSpace(strings.Split(path, "?")[0])
-	reportId = strings.Trim(reportId, "/")
-	
+	// reportId := strings.TrimSpace(strings.Split(path, "?")[0])
+	// reportId = strings.Trim(reportId, "/")
+
+	// 从路由变量中提取 report ID（路由：/api/reports/poc/{id}）
+	vars := mux.Vars(r)
+	reportId := strings.TrimSpace(vars["id"])
 	if reportId == "" {
 		http.Error(w, "Invalid report ID", http.StatusBadRequest)
 		return
 	}
-
 	// 从数据库查询report记录，获取pocInfo.Id
-	report, err := sqlite.GetByID(reportId, true, false) // 只展开POC信息
+	report, err := sqlite.GetByID(reportId, true, false)
 	if err != nil {
 		http.Error(w, "Report not found", http.StatusNotFound)
 		return
