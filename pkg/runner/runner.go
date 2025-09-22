@@ -102,7 +102,13 @@ func NewRunner(options *config.Options) (*Runner, error) {
 			trimmedTarget := strings.TrimSpace(rawTarget)
 			if _, ok := seen[trimmedTarget]; !ok {
 				seen[trimmedTarget] = struct{}{}
-				runner.options.Targets.Append(trimmedTarget)
+				if options.RestrictLocalNetworkAccess {
+					if !utils.IsRestrictIP(trimmedTarget) {
+						runner.options.Targets.Append(trimmedTarget)
+					}
+				} else {
+					runner.options.Targets.Append(trimmedTarget)
+				}
 			}
 		}
 
@@ -117,7 +123,13 @@ func NewRunner(options *config.Options) (*Runner, error) {
 			if len(trimmedTarget) > 0 {
 				if _, ok := seen[trimmedTarget]; !ok {
 					seen[trimmedTarget] = struct{}{}
-					runner.options.Targets.Append(trimmedTarget)
+					if options.RestrictLocalNetworkAccess {
+						if !utils.IsRestrictIP(trimmedTarget) {
+							runner.options.Targets.Append(trimmedTarget)
+						}
+					} else {
+						runner.options.Targets.Append(trimmedTarget)
+					}
 				}
 			}
 		}
@@ -134,13 +146,18 @@ func NewRunner(options *config.Options) (*Runner, error) {
 				if len(trimmedTarget) > 0 {
 					if _, ok := seen[trimmedTarget]; !ok {
 						seen[trimmedTarget] = struct{}{}
-						runner.options.Targets.Append(trimmedTarget)
+						if options.RestrictLocalNetworkAccess {
+							if !utils.IsRestrictIP(trimmedTarget) {
+								runner.options.Targets.Append(trimmedTarget)
+							}
+						} else {
+							runner.options.Targets.Append(trimmedTarget)
+						}
 					}
 				}
 			}
 		}
 	}
-
 	if runner.options.Targets.Len() == 0 && runner.Cyberspace == nil {
 		return runner, errors.New("target not found")
 	}

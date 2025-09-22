@@ -1,6 +1,10 @@
 package utils
 
-import "net"
+import (
+	"fmt"
+	"net"
+	"net/url"
+)
 
 var DefaultIPv4DenylistRanges = []string{
 	"0.0.0.0/8",       // Current network (only valid as source address)
@@ -34,8 +38,12 @@ var DefaultIPv6DenylistRanges = []string{
 	"ff00::/8",      // Multicast
 }
 
-func IsRestrictIP(ipStr string) bool {
-	ip := net.ParseIP(ipStr)
+func IsRestrictIP(raw string) bool {
+	data, err := parseToIP(raw)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(data)
 	if ip == nil {
 		return false
 	}
@@ -61,4 +69,33 @@ func IsRestrictIP(ipStr string) bool {
 		return true
 	}
 	return false
+}
+
+func parseToIP(raw string) (string, error) {
+	var host string
+
+	// 1.try with URL
+	if u, err := url.Parse(raw); err == nil && u.Scheme != "" && u.Host != "" {
+		host = u.Hostname()
+	} else {
+		host = raw
+	}
+
+	// 2. try with IP
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.String(), nil
+	}
+
+	// 3. try with CIDR
+	if ip, _, err := net.ParseCIDR(host); err == nil {
+		return ip.String(), nil // return the first IP of CIDR
+	}
+
+	// 4. try with domain
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return "", fmt.Errorf("Can Not Resolve The Host: %s, %v", host, err)
+	}
+
+	return ips[0].String(), nil
 }
