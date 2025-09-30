@@ -14,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
+	"github.com/zan8in/afrog/v3/pkg/webhook/wecom"
 	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
 )
@@ -35,6 +36,7 @@ type Runner struct {
 	PocsEmbedYaml utils.StringSlice
 	engine        *Engine
 	Ding          *dingtalk.Dingtalk
+	Wecom         *wecom.Wecom
 	ScanProgress  *ScanProgress
 	Cyberspace    *cyberspace.Cyberspace
 	// OOB           *oobadapter.OOBAdapter
@@ -62,6 +64,14 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if options.Wecom {
+		runner.Wecom, err = wecom.New(
+			options.Config.Webhook.Wecom.Tokens,
+			options.Config.Webhook.Wecom.AtMobiles,
+			options.Config.Webhook.Wecom.Range,
+			options.Config.Webhook.Wecom.AtAll,
+			options.Config.Webhook.Wecom.Markdown)
 	}
 
 	// cyberspace

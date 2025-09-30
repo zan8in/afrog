@@ -106,6 +106,9 @@ func main() {
 			if options.Dingtalk {
 				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget))
 			}
+			if options.Wecom {
+				go r.Wecom.SendVulMessage(result, r.Wecom.Markdown)
+			}
 
 			if !options.DisableOutputHtml {
 				r.Report.SetResult(result)
