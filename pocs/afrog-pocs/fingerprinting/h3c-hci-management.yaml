@@ -3,7 +3,7 @@ id: h3c-hci-management
 info:
   name: H3C 超融合管理平台
   author: zan8in
-  sevierty: info
+  severity: info
   verified: true
   tags: h3c,hci-management,panel
   created: 2023/07/21

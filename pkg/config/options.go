@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -464,61 +465,22 @@ func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, severity string) b
 }
 
 func (o *Options) PrintPocList() error {
+	// 统一通过 CreatePocList 获取最终去重/过滤/排除/排序后的列表，确保与扫描一致
+	finalList := o.CreatePocList()
 
-	var number = 1
-
-	if len(pocs.EmbedFileList) > 0 {
-		gologger.Print().Msg("---------- Embed PoCs -----------------")
-		for _, v := range pocs.EmbedFileList {
-			if poc, err := pocs.EmbedReadPocByPath(v); err == nil {
-				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
-					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-						log.LogColor.Time(number),
-						log.LogColor.Title(poc.Id),
-						log.LogColor.Green(poc.Info.Name),
-						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-					number++
-				}
-			}
-		}
+	gologger.Print().Msg("---------- PoCs -----------------")
+	number := 1
+	for _, p := range finalList {
+		gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
+			log.LogColor.Time(number),
+			log.LogColor.Title(p.Id),
+			log.LogColor.Green(p.Info.Name),
+			log.LogColor.GetColor(p.Info.Severity, p.Info.Severity),
+			p.Info.Author,
+		)
+		number++
 	}
-
-	// init LocalPocsDirectory
-	if len(poc.LocalFileList) > 0 {
-		gologger.Print().Msg("---------- Local afrog-pocs -----------------")
-		for _, v := range poc.LocalFileList {
-			if poc, err := poc.LocalReadPocByPath(v); err == nil {
-				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
-					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-						log.LogColor.Time(number),
-						log.LogColor.Title(poc.Id),
-						log.LogColor.Green(poc.Info.Name),
-						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-					number++
-				}
-			}
-		}
-	}
-
-	// append pocs
-	if len(poc.LocalAppendList) > 0 {
-		gologger.Print().Msg("---------- Local append-pocs -----------------")
-		for _, v := range poc.LocalAppendList {
-			if poc, err := poc.LocalReadPocByPath(v); err == nil {
-				if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
-					gologger.Print().Msgf("%s [%s][%s][%s] author:%s\n",
-						log.LogColor.Time(number),
-						log.LogColor.Title(poc.Id),
-						log.LogColor.Green(poc.Info.Name),
-						log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-					number++
-				}
-			}
-		}
-	}
-
-	gologger.Print().Msgf("--------------------------------\r\nTotal: %d\n", number-1)
-
+	gologger.Print().Msgf("--------------------------------\r\nTotal: %d\n", len(finalList))
 	return nil
 }
 
@@ -561,66 +523,135 @@ func (o *Options) CreatePocList() []poc.Poc {
 		for _, pocYaml := range poc.LocalTestList {
 			if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
 				pocSlice = append(pocSlice, p)
+			} else {
+				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", pocYaml, err)
 			}
 		}
 		return pocSlice
 	}
 
-	for _, pocYaml := range poc.LocalAppendList {
-		if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
-			pocSlice = append(pocSlice, p)
-		}
+	// 删除以下三段“直接追加”，以避免与下面的优先级整合重复读取导致数量翻倍
+	// for _, pocYaml := range poc.LocalAppendList {
+	// 	if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+	// 		pocSlice = append(pocSlice, p)
+	// 	}
+	// }
+	// for _, pocYaml := range poc.LocalFileList {
+	// 	if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+	// 		pocSlice = append(pocSlice, p)
+	// 	}
+	// }
+	// for _, pocEmbedYaml := range pocs.EmbedFileList {
+	// 	if p, err := pocs.EmbedReadPocByPath(pocEmbedYaml); err == nil {
+	// 		pocSlice = append(pocSlice, p)
+	// 	}
+	// }
+
+	// 优先级去重：afrog-curated-pocs > afrog-my-pocs > Append(附加) > afrog-pocs(本地) > /pocs/afrog-pocs(嵌入)
+	type selectedItem struct {
+		name   string
+		source string // "curated" / "my" / "append" / "local" / "embed"
+		path   string
 	}
+	selectedMap := make(map[string]bool)
+	ordered := make([]selectedItem, 0, 1024)
 
-	for _, pocYaml := range poc.LocalFileList {
-		if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
-			pocSlice = append(pocSlice, p)
-
-		}
-	}
-
-	for _, pocEmbedYaml := range pocs.EmbedFileList {
-		if p, err := pocs.EmbedReadPocByPath(pocEmbedYaml); err == nil {
-			pocSlice = append(pocSlice, p)
-		}
-	}
-
-	newPocSlice := []poc.Poc{}
-	for _, poc := range pocSlice {
-		if o.FilterPocSeveritySearch(poc.Id, poc.Info.Name, poc.Info.Severity) {
-			newPocSlice = append(newPocSlice, poc)
-		}
-	}
-
-	latestPocSlice := []poc.Poc{}
-	order := []string{"info", "low", "medium", "high", "critical"}
-	for _, o := range order {
-		for _, s := range newPocSlice {
-			if o == strings.ToLower(s.Info.Severity) {
-				latestPocSlice = append(latestPocSlice, s)
+	add := func(paths []string, source string) {
+		for _, p := range paths {
+			base := filepath.Base(strings.ReplaceAll(p, "\\", "/"))
+			name := strings.TrimSuffix(base, ".yaml")
+			name = strings.TrimSuffix(name, ".yml")
+			if _, exists := selectedMap[name]; !exists {
+				selectedMap[name] = true
+				ordered = append(ordered, selectedItem{name: name, source: source, path: p})
 			}
 		}
 	}
 
-	// exclude pocs
+	// 扫描用户目录 curated/MY
+	if home, err := os.UserHomeDir(); err == nil {
+		curatedDir := filepath.Join(home, "afrog-curated-pocs")
+		if curatedFiles, err := poc.LocalWalkFiles(curatedDir); err == nil && len(curatedFiles) > 0 {
+			add(curatedFiles, "curated")
+		}
+		myDir := filepath.Join(home, "afrog-my-pocs")
+		if myFiles, err := poc.LocalWalkFiles(myDir); err == nil && len(myFiles) > 0 {
+			add(myFiles, "my")
+		}
+	}
+
+	// 追加 POC（命令行指定的附加目录）
+	if len(poc.LocalAppendList) > 0 {
+		add(poc.LocalAppendList, "append")
+	}
+
+	// 本地 ~/afrog-pocs
+	if len(poc.LocalFileList) > 0 {
+		add(poc.LocalFileList, "local")
+	}
+
+	// 嵌入式 /pocs/afrog-pocs
+	if len(pocs.EmbedFileList) > 0 {
+		add(pocs.EmbedFileList, "embed")
+	}
+
+	// 读取并校验：格式错误的 POC 剔除并输出错误
+	for _, item := range ordered {
+		switch item.source {
+		case "embed":
+			if p, err := pocs.EmbedReadPocByPath(item.path); err == nil {
+				pocSlice = append(pocSlice, p)
+			} else {
+				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", item.path, err)
+			}
+		default: // "curated"/"my"/"append"/"local" 均按本地文件读取
+			if p, err := poc.LocalReadPocByPath(item.path); err == nil {
+				pocSlice = append(pocSlice, p)
+			} else {
+				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", item.path, err)
+			}
+		}
+	}
+
+	// 保留原有过滤逻辑
+	newPocSlice := []poc.Poc{}
+	for _, pp := range pocSlice {
+		if o.FilterPocSeveritySearch(pp.Id, pp.Info.Name, pp.Info.Severity) {
+			newPocSlice = append(newPocSlice, pp)
+		}
+	}
+
+	// 修复：按严重级别排序但不要丢失未设置 severity 的 POC
+	latestPocSlice := []poc.Poc{}
+	included := make(map[int]struct{})
+	order := []string{"info", "low", "medium", "high", "critical"}
+	for _, sev := range order {
+		for i, s := range newPocSlice {
+			if sev == strings.ToLower(s.Info.Severity) {
+				latestPocSlice = append(latestPocSlice, s)
+				included[i] = struct{}{}
+			}
+		}
+	}
+	// 追加未在上述严重级别中的 POC（例如 severity 为空或不在枚举中）
+	for i, s := range newPocSlice {
+		if _, ok := included[i]; !ok {
+			latestPocSlice = append(latestPocSlice, s)
+		}
+	}
+
+	// 排除列表（与 -pl 保持一致）
 	excludePocs, _ := o.parseExcludePocs()
 	finalPocSlice := []poc.Poc{}
-	for _, poc := range latestPocSlice {
-		if !isExcludePoc(poc, excludePocs) {
-			finalPocSlice = append(finalPocSlice, poc)
+	for _, pp := range latestPocSlice {
+		if !isExcludePoc(pp, excludePocs) {
+			finalPocSlice = append(finalPocSlice, pp)
 		}
 	}
 
 	if o.Sort == "a-z" {
 		sort.Sort(POCSlices(finalPocSlice))
 	}
-
-	// for _, poc := range finalPocSlice {
-	// 	gologger.Print().Msgf("[%s][%s][%s] author:%s\n",
-	// 		log.LogColor.Title(poc.Id),
-	// 		log.LogColor.Green(poc.Info.Name),
-	// 		log.LogColor.GetColor(poc.Info.Severity, poc.Info.Severity), poc.Info.Author)
-	// }
 
 	return finalPocSlice
 }
