@@ -139,6 +139,9 @@ var LocalPocDirectory string
 func init() {
 	LocalPocDirectory, _ = InitPocHomeDirectory()
 	LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
+
+	// 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
+	EnsureCuratedAndMyPocDirectories()
 }
 
 func InitLocalAppendList(pathFolder []string) {
@@ -402,4 +405,24 @@ func getFileNameFromPath(filePath string) string {
 		return filePath[lastSlashIndex+1:]
 	}
 	return filePath
+}
+
+// EnsureCuratedAndMyPocDirectories
+// 启动时确保在用户家目录下创建 afrog-curated-pocs 和 afrog-my-pocs 两个目录（若不存在则创建）
+func EnsureCuratedAndMyPocDirectories() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	dirs := []string{
+		filepath.Join(homeDir, "afrog-curated-pocs"),
+		filepath.Join(homeDir, "afrog-my-pocs"),
+	}
+
+	for _, dir := range dirs {
+		if _, err := os.Stat(dir); err != nil {
+			_ = os.MkdirAll(dir, 0755)
+		}
+	}
 }
