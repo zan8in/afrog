@@ -52,3 +52,28 @@ type ReportListResponse struct {
 	Keyword    string       `json:"keyword,omitempty"`
 	Severity   []string     `json:"severity,omitempty"`
 }
+
+// POC 列表 - 单条记录
+type PocsListItem struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Severity string   `json:"severity"`
+	Author   []string `json:"author,omitempty"`
+	Tags     []string `json:"tags,omitempty"`
+	Source   string   `json:"source"` // builtin/curated/my/local
+	Path     string   `json:"path,omitempty"`
+}
+
+// POC 列表 - 响应
+type PocsListResponse struct {
+	Items      []PocsListItem `json:"items"`
+	Page       int            `json:"page"`
+	PageSize   int            `json:"page_size"`
+	Total      int            `json:"total"`
+	TotalPages int            `json:"total_pages"`
+	Source     string         `json:"source"`
+	Severity   []string       `json:"severity,omitempty"`
+	Tags       []string       `json:"tags,omitempty"`
+	Author     []string       `json:"author,omitempty"`
+	Keyword    string         `json:"keyword,omitempty"`
+}

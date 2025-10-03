@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/gologger"
 )
@@ -242,9 +243,11 @@ func incrSeverity(m map[string]int, sev string) {
 	}
 }
 
-func splitTags(s string) []string {
+// 包级辅助函数
+// splitCSV 是一个通用的逗号分隔字符串处理函数，会 trim 空白并忽略空项。
+func splitCSV(s string) []string {
 	if s == "" {
-		return []string{}
+		return nil
 	}
 	parts := strings.Split(s, ",")
 	out := make([]string, 0, len(parts))
@@ -255,6 +258,16 @@ func splitTags(s string) []string {
 		}
 	}
 	return out
+}
+
+// 顶层函数：统一委托到仓库层，避免重复实现
+func splitTags(tags string) []string {
+	return pocsrepo.SplitTags(tags)
+}
+
+// 保留语义名称：作者
+func splitAuthors(authors string) []string {
+	return pocsrepo.SplitAuthors(authors)
 }
 
 func parseCreated(s string) time.Time {
@@ -518,4 +531,140 @@ func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s.yaml\"", pocId))
 	w.WriteHeader(http.StatusOK)
 	w.Write(yamlContent)
+}
+
+func pocsListHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	q := r.URL.Query()
+	source := strings.ToLower(strings.TrimSpace(q.Get("source")))
+	if source == "" {
+		source = "all"
+	}
+	switch source {
+	case "builtin", "curated", "my", "all":
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "参数错误: source（允许 builtin|curated|my|all）"})
+		return
+	}
+
+	sevRaw := strings.TrimSpace(q.Get("severity"))
+	tagRaw := strings.TrimSpace(q.Get("tags"))
+	authRaw := strings.TrimSpace(q.Get("author"))
+	keyword := strings.TrimSpace(q.Get("q"))
+	pageStr := strings.TrimSpace(q.Get("page"))
+	pageSizeStr := strings.TrimSpace(q.Get("page_size"))
+
+	// 解析分页参数
+	page := 1
+	if pageStr != "" {
+		if v, err := strconv.Atoi(pageStr); err == nil && v > 0 {
+			page = v
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "参数错误: page"})
+			return
+		}
+	}
+	pageSize := 50
+	if pageSizeStr != "" {
+		if v, err := strconv.Atoi(pageSizeStr); err == nil && v > 0 && v <= 500 {
+			pageSize = v
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "参数错误: page_size(1-500)"})
+			return
+		}
+	}
+
+	// 解析多值筛选
+	parseCSV := func(s string, toLower bool) []string {
+		if s == "" {
+			return nil
+		}
+		parts := strings.Split(s, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			t := strings.TrimSpace(p)
+			if toLower {
+				t = strings.ToLower(t)
+			}
+			if t != "" {
+				out = append(out, t)
+			}
+		}
+		return out
+	}
+	severityList := parseCSV(sevRaw, true)
+	tagsList := parseCSV(tagRaw, false)
+	authorList := parseCSV(authRaw, false)
+
+	// 使用统一仓库层
+	opts := pocsrepo.ListOptions{
+		Source:   source,
+		Severity: severityList,
+		Tags:     tagsList,
+		Authors:  authorList,
+		Q:        keyword,
+	}
+	items, err := pocsrepo.ListMeta(opts)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "POC 列表加载失败"})
+		return
+	}
+
+	// 分页
+	total := len(items)
+	start := (page - 1) * pageSize
+	if start > total {
+		start = total
+	}
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+	pageItems := items[start:end]
+
+	// 转为 API 输出结构
+	respItems := make([]PocsListItem, 0, len(pageItems))
+	for _, it := range pageItems {
+		respItems = append(respItems, PocsListItem{
+			ID:       it.ID,
+			Name:     it.Name,
+			Severity: it.Severity,
+			Author:   it.Author,
+			Tags:     it.Tags,
+			Source:   string(it.Source),
+			Path:     it.Path,
+		})
+	}
+
+	// 返回
+	w.WriteHeader(http.StatusOK)
+	totalPages := int((total + pageSize - 1) / pageSize)
+	data := PocsListResponse{
+		Items:      respItems,
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+		Source:     source,
+		Severity:   severityList,
+		Tags:       tagsList,
+		Author:     authorList,
+		Keyword:    keyword,
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "OK",
+		Data:    data,
+	})
 }

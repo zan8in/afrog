@@ -426,3 +426,25 @@ func EnsureCuratedAndMyPocDirectories() {
 		}
 	}
 }
+
+// 仅解析 POC 元数据，避免解析 rules 触发 RuleMapSlice 的 Unmarshal
+type PocMeta struct {
+	Id   string `yaml:"id"`
+	Info Info   `yaml:"info"`
+}
+
+// 从本地路径读取 POC 元数据（不解析 rules）
+func LocalReadPocMetaByPath(pocYaml string) (PocMeta, error) {
+	var pm PocMeta
+
+	file, err := os.Open(pocYaml)
+	if err != nil {
+		return pm, err
+	}
+	defer file.Close()
+
+	if err := yaml.NewDecoder(file).Decode(&pm); err != nil {
+		return pm, err
+	}
+	return pm, nil
+}

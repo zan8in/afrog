@@ -101,6 +101,7 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/reports/detail/{id}", jwtAuthMiddleware(reportsDetailHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/reports/poc/{id}", jwtAuthMiddleware(pocDetailHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).Methods(http.MethodGet)
 }
 
 // API 未匹配路由 -> JSON 404

@@ -76,3 +76,19 @@ func EmbedReadPocByPath(path string) (poc.Poc, error) {
 	}
 	return poc, nil
 }
+
+// 仅解析嵌入 POC 的元数据（不解析 rules）
+func EmbedReadPocMetaByPath(path string) (poc.PocMeta, error) {
+	var pm poc.PocMeta
+
+	file, err := f.Open(path)
+	if err != nil {
+		return pm, err
+	}
+	defer file.Close()
+
+	if err := yaml.NewDecoder(file).Decode(&pm); err != nil {
+		return pm, err
+	}
+	return pm, nil
+}
