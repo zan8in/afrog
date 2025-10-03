@@ -64,13 +64,16 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 	sources := []Source{}
 	switch opts.Source {
 	case "builtin":
-		sources = []Source{SourceBuiltin}
+		// builtin = append + local + builtin
+		sources = []Source{SourceAppend, SourceLocal, SourceBuiltin}
 	case "curated":
 		sources = []Source{SourceCurated}
 	case "my":
 		sources = []Source{SourceMy}
 	case "all":
-		sources = []Source{SourceCurated, SourceMy, SourceLocal, SourceBuiltin}
+		// all/默认 = curated + my + (append + local + builtin)
+		// 遍历顺序决定去重优先级：curated > my > append > local > builtin
+		sources = []Source{SourceCurated, SourceMy, SourceAppend, SourceLocal, SourceBuiltin}
 	}
 
 	seen := map[string]struct{}{}
@@ -176,6 +179,56 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				}
 				seen[key] = struct{}{}
 				items = append(items, it)
+			}
+		case SourceAppend:
+			home, _ := os.UserHomeDir()
+			// 遍历追加目录/文件，统一读取元信息
+			for _, entry := range poc.LocalAppendList {
+				// 先尝试按目录收集文件
+				files, _ := poc.LocalWalkFiles(entry)
+				if len(files) == 0 {
+					// 非目录或遍历为空时，尝试作为单文件处理
+					pm, err := poc.LocalReadPocMetaByPath(entry)
+					if err == nil {
+						it := Item{
+							ID:       pm.Id,
+							Name:     pm.Info.Name,
+							Severity: normalizeSeverity(pm.Info.Severity),
+							Author:   SplitAuthors(pm.Info.Author),
+							Tags:     SplitTags(pm.Info.Tags),
+							Source:   SourceAppend,
+							Path:     strings.Replace(entry, home, "~", 1),
+						}
+						key := makeKey(it)
+						if _, ok := seen[key]; ok {
+							continue
+						}
+						seen[key] = struct{}{}
+						items = append(items, it)
+					}
+					continue
+				}
+				for _, lp := range files {
+					pm, err := poc.LocalReadPocMetaByPath(lp)
+					if err != nil {
+						continue
+					}
+					it := Item{
+						ID:       pm.Id,
+						Name:     pm.Info.Name,
+						Severity: normalizeSeverity(pm.Info.Severity),
+						Author:   SplitAuthors(pm.Info.Author),
+						Tags:     SplitTags(pm.Info.Tags),
+						Source:   SourceAppend,
+						Path:     strings.Replace(lp, home, "~", 1),
+					}
+					key := makeKey(it)
+					if _, ok := seen[key]; ok {
+						continue
+					}
+					seen[key] = struct{}{}
+					items = append(items, it)
+				}
 			}
 		}
 	}
