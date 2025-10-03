@@ -62,6 +62,7 @@ type PocsListItem struct {
 	Tags     []string `json:"tags,omitempty"`
 	Source   string   `json:"source"` // builtin/curated/my/local
 	Path     string   `json:"path,omitempty"`
+	Created  string   `json:"created,omitempty"`
 }
 
 // POC 列表 - 响应

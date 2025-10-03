@@ -30,6 +30,7 @@ type Item struct {
 	Tags     []string
 	Source   Source
 	Path     string // builtin: "embedded:<path>", 其他为本地路径（~ 开头）
+	Created  string
 }
 
 // 统一的路径项（扫描与 -pl 用）
@@ -95,6 +96,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					Tags:     SplitTags(pm.Info.Tags),
 					Source:   SourceBuiltin,
 					Path:     "embedded:" + ep,
+					Created:  pm.Info.Created,
 				}
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
@@ -121,6 +123,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					Tags:     SplitTags(pm.Info.Tags),
 					Source:   SourceCurated,
 					Path:     strings.Replace(lp, home, "~", 1),
+					Created:  pm.Info.Created,
 				}
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
@@ -147,6 +150,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					Tags:     SplitTags(pm.Info.Tags),
 					Source:   SourceMy,
 					Path:     strings.Replace(lp, home, "~", 1),
+					Created:  pm.Info.Created,
 				}
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
@@ -172,6 +176,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					Tags:     SplitTags(pm.Info.Tags),
 					Source:   SourceLocal,
 					Path:     strings.Replace(lp, home, "~", 1),
+					Created:  pm.Info.Created,
 				}
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
@@ -180,6 +185,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				seen[key] = struct{}{}
 				items = append(items, it)
 			}
+
 		case SourceAppend:
 			home, _ := os.UserHomeDir()
 			// 遍历追加目录/文件，统一读取元信息
@@ -198,6 +204,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 							Tags:     SplitTags(pm.Info.Tags),
 							Source:   SourceAppend,
 							Path:     strings.Replace(entry, home, "~", 1),
+							Created:  pm.Info.Created,
 						}
 						key := makeKey(it)
 						if _, ok := seen[key]; ok {
@@ -221,6 +228,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 						Tags:     SplitTags(pm.Info.Tags),
 						Source:   SourceAppend,
 						Path:     strings.Replace(lp, home, "~", 1),
+						Created:  pm.Info.Created,
 					}
 					key := makeKey(it)
 					if _, ok := seen[key]; ok {

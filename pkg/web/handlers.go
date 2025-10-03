@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
-	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/gologger"
 )
 
@@ -113,113 +111,129 @@ type pocRecentItem struct {
 func pocsStatsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// 统计计数
-	countBySeverity := map[string]int{
+	// 统一使用仓库层，整合所有来源并按 ID 去重
+	items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "统计数据加载失败"})
+		return
+	}
+
+	// 总数
+	total := len(items)
+
+	// 按来源统计（仅输出 builtin/curated/my）
+	bySource := map[string]int{
+		"builtin": 0,
+		"curated": 0,
+		"my":      0,
+	}
+	for _, it := range items {
+		switch it.Source {
+		case pocsrepo.SourceBuiltin:
+			bySource["builtin"]++
+		case pocsrepo.SourceCurated:
+			bySource["curated"]++
+		case pocsrepo.SourceMy:
+			bySource["my"]++
+		}
+	}
+
+	// 按严重等级统计
+	bySeverity := map[string]int{
 		"critical": 0,
 		"high":     0,
 		"medium":   0,
 		"low":      0,
 		"info":     0,
-		"other":    0,
 	}
-
-	type holder struct {
-		id       string
-		name     string
-		path     string
-		severity string
-		created  time.Time
-		tags     []string
-	}
-
-	var items []holder
-
-	// 遍历内置（embed）PoC
-	for _, ep := range pocs.EmbedFileList {
-		pp, err := pocs.EmbedReadPocByPath(ep)
-		if err != nil {
-			continue
+	for _, it := range items {
+		s := strings.ToLower(strings.TrimSpace(it.Severity))
+		if _, ok := bySeverity[s]; ok {
+			bySeverity[s]++
+		} else {
+			// 未知等级不计（仓库层已标准化为上述五类之一）
 		}
-		sv := normalizeSeverity(pp.Info.Severity)
-		incrSeverity(countBySeverity, sv)
-		cr := parseCreated(pp.Info.Created)
-		tags := splitTags(pp.Info.Tags)
-		items = append(items, holder{
-			id:       pp.Id,
-			name:     pp.Info.Name,
-			path:     "embedded:" + ep,
-			severity: sv,
-			created:  cr,
-			tags:     tags,
-		})
 	}
 
-	// 遍历本地 ~/afrog-pocs
-	localFiles, _ := poc.LocalWalkFiles(poc.LocalPocDirectory)
-	homeDir, _ := os.UserHomeDir()
-	for _, lp := range localFiles {
-		pp, err := poc.LocalReadPocByPath(lp)
-		if err != nil {
-			continue
+	// 标签与作者计数
+	tagCount := make(map[string]int, 1024)
+	authorCount := make(map[string]int, 1024)
+	for _, it := range items {
+		for _, t := range it.Tags {
+			tt := strings.TrimSpace(t)
+			if tt != "" {
+				tagCount[tt]++
+			}
 		}
-		sv := normalizeSeverity(pp.Info.Severity)
-		incrSeverity(countBySeverity, sv)
-		cr := parseCreated(pp.Info.Created)
-		tags := splitTags(pp.Info.Tags)
-		items = append(items, holder{
-			id:       pp.Id,
-			name:     pp.Info.Name,
-			path:     strings.Replace(lp, homeDir, "~", 1),
-			severity: sv,
-			created:  cr,
-			tags:     tags,
+		for _, a := range it.Author {
+			aa := strings.TrimSpace(a)
+			if aa != "" {
+				authorCount[aa]++
+			}
+		}
+	}
+
+	// 替换原来的泛型闭包：topN := func[K comparable](...) { ... }
+	type tagItem struct {
+		Tag   string `json:"tag"`
+		Count int    `json:"count"`
+	}
+	type authorItem struct {
+		Author string `json:"author"`
+		Count  int    `json:"count"`
+	}
+
+	buildTopTags := func(m map[string]int, limit int) []tagItem {
+		out := make([]tagItem, 0, len(m))
+		for k, v := range m {
+			out = append(out, tagItem{Tag: k, Count: v})
+		}
+		sort.Slice(out, func(i, j int) bool {
+			if out[i].Count != out[j].Count {
+				return out[i].Count > out[j].Count
+			}
+			return strings.ToLower(out[i].Tag) < strings.ToLower(out[j].Tag)
 		})
+		if limit > 0 && len(out) > limit {
+			out = out[:limit]
+		}
+		return out
 	}
 
-	total := 0
-	for _, v := range countBySeverity {
-		total += v
-	}
-
-	// 最近更新 Top 5（按 created 降序）
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].created.After(items[j].created)
-	})
-
-	top := 5
-	if len(items) < top {
-		top = len(items)
-	}
-	recent := make([]pocRecentItem, 0, top)
-	for i := 0; i < top; i++ {
-		it := items[i]
-		recent = append(recent, pocRecentItem{
-			ID:        it.id,
-			Name:      it.name,
-			Path:      it.path,
-			Severity:  it.severity,
-			UpdatedAt: it.created.UTC().Format(time.RFC3339),
-			Tags:      it.tags,
+	buildTopAuthors := func(m map[string]int, limit int) []authorItem {
+		out := make([]authorItem, 0, len(m))
+		for k, v := range m {
+			out = append(out, authorItem{Author: k, Count: v})
+		}
+		sort.Slice(out, func(i, j int) bool {
+			if out[i].Count != out[j].Count {
+				return out[i].Count > out[j].Count
+			}
+			return strings.ToLower(out[i].Author) < strings.ToLower(out[j].Author)
 		})
+		if limit > 0 && len(out) > limit {
+			out = out[:limit]
+		}
+		return out
 	}
+
+	topTags := buildTopTags(tagCount, 20)
+	topAuthors := buildTopAuthors(authorCount, 20)
 
 	data := map[string]interface{}{
-		"total": total,
-		"by_severity": map[string]int{
-			"critical": countBySeverity["critical"],
-			"high":     countBySeverity["high"],
-			"medium":   countBySeverity["medium"],
-			"low":      countBySeverity["low"],
-			"info":     countBySeverity["info"],
-			"other":    countBySeverity["other"],
-		},
-		"updated_at":     time.Now().UTC().Format(time.RFC3339),
-		"recent_updates": recent,
+		"total":       total,
+		"by_source":   bySource,
+		"by_severity": bySeverity,
+		"top_tags":    topTags,
+		"top_authors": topAuthors,
+		"updated_at":  time.Now().UTC().Format(time.RFC3339),
 	}
 
-	json.NewEncoder(w).Encode(APIResponse{
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(APIResponse{
 		Success: true,
-		Message: "ok",
+		Message: "success",
 		Data:    data,
 	})
 }
@@ -243,31 +257,9 @@ func incrSeverity(m map[string]int, sev string) {
 	}
 }
 
-// 包级辅助函数
-// splitCSV 是一个通用的逗号分隔字符串处理函数，会 trim 空白并忽略空项。
-func splitCSV(s string) []string {
-	if s == "" {
-		return nil
-	}
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		t := strings.TrimSpace(p)
-		if t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
 // 顶层函数：统一委托到仓库层，避免重复实现
 func splitTags(tags string) []string {
 	return pocsrepo.SplitTags(tags)
-}
-
-// 保留语义名称：作者
-func splitAuthors(authors string) []string {
-	return pocsrepo.SplitAuthors(authors)
 }
 
 func parseCreated(s string) time.Time {
@@ -621,6 +613,24 @@ func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 新增：按 created 从新到旧排序；没有 created 的排后面（稳定排序）
+	sort.SliceStable(items, func(i, j int) bool {
+		ti := parseCreated(items[i].Created)
+		tj := parseCreated(items[j].Created)
+		iz := ti.IsZero()
+		jz := tj.IsZero()
+		if iz && jz {
+			// 两者都没有创建时间，保持原有（severity->name）的相对顺序
+			return false
+		}
+		if iz != jz {
+			// 有创建时间的排前面
+			return !iz && jz
+		}
+		// 都有创建时间，越新越靠前
+		return ti.After(tj)
+	})
+
 	// 分页
 	total := len(items)
 	start := (page - 1) * pageSize
@@ -633,7 +643,7 @@ func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	pageItems := items[start:end]
 
-	// 转为 API 输出结构
+	// 转为 API 输出结构，新增 created 字段
 	respItems := make([]PocsListItem, 0, len(pageItems))
 	for _, it := range pageItems {
 		respItems = append(respItems, PocsListItem{
@@ -644,6 +654,7 @@ func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 			Tags:     it.Tags,
 			Source:   string(it.Source),
 			Path:     it.Path,
+			Created:  it.Created,
 		})
 	}
 
