@@ -679,3 +679,31 @@ func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 		Data:    data,
 	})
 }
+
+func pocsYamlHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte("Method Not Allowed"))
+		return
+	}
+
+	vars := mux.Vars(r)
+	pocId := strings.TrimSpace(vars["pocId"])
+	if pocId == "" {
+		http.Error(w, "Invalid pocId", http.StatusBadRequest)
+		return
+	}
+
+	// 从全部来源（builtin/local/append/curated/my）按 id 查找原始 YAML
+	yamlContent, err := pocsrepo.ReadYamlByID(pocId)
+	if err != nil || yamlContent == nil {
+		http.Error(w, fmt.Sprintf("POC YAML not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(yamlContent)
+	// ... existing code ...
+}

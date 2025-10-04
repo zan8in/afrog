@@ -1,6 +1,7 @@
 package pocsrepo
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -491,4 +492,35 @@ func sliceContainsSubstring(list []string, q string) bool {
 		}
 	}
 	return false
+}
+
+// ReadYamlByID 从所有来源中按 POC 的 id 查找并返回原始 YAML 内容
+func ReadYamlByID(pocId string) ([]byte, error) {
+	// 汇总所有来源的元信息
+	items, err := ListMeta(ListOptions{Source: "all"})
+	if err != nil {
+		return nil, err
+	}
+	for _, it := range items {
+		if it.ID != pocId {
+			continue
+		}
+		switch it.Source {
+		case SourceBuiltin:
+			// builtin 的 Path 形如 "embedded:afrog-pocs/xxx/yyy.yaml"
+			path := strings.TrimPrefix(it.Path, "embedded:")
+			base := path
+			if idx := strings.LastIndex(path, "/"); idx != -1 {
+				base = path[idx+1:]
+			}
+			// 通过文件名读取内嵌内容（保持原始 YAML 字节）
+			return pocs.EmbedReadContentByName(base)
+		default:
+			// 展开 "~" 为真实家目录并读取本地文件
+			home, _ := os.UserHomeDir()
+			full := strings.Replace(it.Path, "~", home, 1)
+			return os.ReadFile(full)
+		}
+	}
+	return nil, fmt.Errorf("poc with id '%s' not found", pocId)
 }
