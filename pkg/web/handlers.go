@@ -959,3 +959,77 @@ func pocsUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "POC更新成功", Data: respData})
 }
+
+func pocsDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "Method Not Allowed"})
+		return
+	}
+
+	userID := GetUserIDFromContext(r)
+	vars := mux.Vars(r)
+	pocID := strings.TrimSpace(vars["id"])
+	if pocID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的 POC ID"})
+		return
+	}
+
+	// 存在性检查：检测是否在任何来源中存在
+	existsAnywhere := false
+	items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"})
+	if err == nil {
+		for _, it := range items {
+			if strings.TrimSpace(it.ID) == pocID {
+				existsAnywhere = true
+				break
+			}
+		}
+	}
+
+	// 系统 POC 保护与 my 源检查：仅允许删除 my 目录中的 POC
+	home, _ := os.UserHomeDir()
+	myDir := filepath.Join(home, "afrog-my-pocs")
+	myPath := filepath.Join(myDir, pocID+".yaml")
+
+	if fi, statErr := os.Stat(myPath); statErr != nil {
+		if os.IsNotExist(statErr) {
+			// 如果其他来源存在该 POC，按系统保护返回 403；否则返回 404
+			if existsAnywhere {
+				w.WriteHeader(http.StatusForbidden)
+				_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅允许删除 my 目录中的 POC"})
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "未找到指定的 POC"})
+			return
+		}
+		// 其他 Stat 错误
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("检查文件失败: %v", statErr)})
+		return
+	} else if fi.IsDir() {
+		// 正常情况下不会有目录同名
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "目标不是有效的 POC 文件"})
+		return
+	}
+
+	// 删除文件
+	if err := os.Remove(myPath); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("删除文件失败: %v", err)})
+		return
+	}
+
+	// 删除后处理：缓存清理 / 索引更新 / 审计日志 / 通知（当前作为扩展点）
+	gologger.Info().Str("user_id", userID).Str("ip", getClientIP(r)).Str("poc_id", pocID).Msg("POC删除成功")
+	// TODO: 缓存清理（当前无缓存实现）
+	// TODO: 索引更新（当前未实现搜索索引）
+	// TODO: 通知相关用户（如需）
+
+	// 成功响应
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "POC删除成功", Data: nil})
+}
