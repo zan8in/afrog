@@ -84,12 +84,12 @@ func ValidatePocFiles(target string) error {
 				failedCount++
 			}
 		}
-		
+
 		fmt.Printf("\n❌ Validation completed with errors:\n")
 		fmt.Printf("   Total files: %d\n", len(files))
 		fmt.Printf("   Passed: %d\n", passedCount)
 		fmt.Printf("   Failed: %d\n", failedCount)
-		
+
 		return fmt.Errorf("validation failed for %d out of %d files", failedCount, len(files))
 	}
 
@@ -516,7 +516,7 @@ func validateFunctionCalls(expr string) error {
 func validateResponseProperties(expr string) error {
 	// 先移除字符串字面量，避免误判字符串内容为response属性
 	cleanExpr := removeStringLiterals(expr)
-	
+
 	// 检查response对象的属性使用
 	responsePattern := regexp.MustCompile(`response\.(\w+)`)
 	matches := responsePattern.FindAllStringSubmatch(cleanExpr, -1)
