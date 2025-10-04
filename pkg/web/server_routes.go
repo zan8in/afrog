@@ -103,6 +103,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs/yaml/{pocId}", jwtAuthMiddleware(pocsYamlHandler)).Methods(http.MethodGet)
+	// 新增：创建 POC
+	api.HandleFunc("/pocs", jwtAuthMiddleware(pocsCreateHandler)).Methods(http.MethodPost)
 	// 新增：更新指定 POC 的 YAML 内容（当前使用 POST）
 	api.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsUpdateHandler)).Methods(http.MethodPost)
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -711,6 +713,124 @@ func pocsYamlHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // 更新指定 POC 的 YAML 内容
+func pocsCreateHandler(w http.ResponseWriter, r *http.Request) {
+	// 仅支持 POST（如需改为 PUT，将路由方法调整为 http.MethodPut 即可）
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "Method Not Allowed"})
+		return
+	}
+
+	// 解析请求体
+	type createReq struct {
+		YamlContent string `json:"yaml_content"`
+	}
+	var req createReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	if strings.TrimSpace(req.YamlContent) == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "yaml_content 不能为空"})
+		return
+	}
+
+	// 先解析 YAML，提取 ID 与基本信息
+	var pm poc.PocMeta
+	if err := yaml.Unmarshal([]byte(req.YamlContent), &pm); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "YAML 解析失败"})
+		return
+	}
+	pocID := strings.TrimSpace(pm.Id)
+	if pocID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少 id 字段"})
+		return
+	}
+	// ID 仅允许字母、数字、连字符和下划线
+	idRe := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	if !idRe.MatchString(pocID) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "POC ID 仅允许字母、数字、连字符和下划线"})
+		return
+	}
+
+	// 用单文件校验器进行完整模板校验
+	tmpFile, err := os.CreateTemp("", "afrog-create-*.yaml")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建临时文件失败: %v", err)})
+		return
+	}
+	defer os.Remove(tmpFile.Name())
+	_, _ = tmpFile.Write([]byte(req.YamlContent))
+	_ = tmpFile.Close()
+
+	if err := validator.ValidateSinglePocFile(tmpFile.Name()); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("POC YAML 验证失败: %v", err)})
+		return
+	}
+
+	// 全源唯一性校验：id 不得与现有 POC 冲突
+	items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("读取 POC 元信息失败: %v", err)})
+		return
+	}
+	for _, it := range items {
+		if strings.TrimSpace(it.ID) == pocID {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "POC ID不能与现有POC冲突"})
+			return
+		}
+	}
+
+	// 仅支持写入 my 源目录
+	home, _ := os.UserHomeDir()
+	myDir := filepath.Join(home, "afrog-my-pocs")
+	if err := os.MkdirAll(myDir, 0o755); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建 my 目录失败: %v", err)})
+		return
+	}
+	filePath := filepath.Join(myDir, pocID+".yaml")
+
+	// 写入新文件
+	if err := os.WriteFile(filePath, []byte(req.YamlContent), 0o644); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
+		return
+	}
+
+	// 构造成功响应（不虚构数据库自增 id）
+	now := time.Now().UTC().Format(time.RFC3339)
+	respData := map[string]any{
+		"poc_id":       pocID,
+		"name":         pm.Info.Name,
+		"author":       pm.Info.Author,
+		"severity":     pm.Info.Severity,
+		"description":  pm.Info.Description,
+		"reference":    pm.Info.Reference,
+		"tags":         pocsrepo.SplitTags(pm.Info.Tags),
+		"yaml_content": req.YamlContent,
+		"created":      pm.Info.Created,
+		"created_at":   now,
+		"updated_at":   now,
+		"is_curated":   false,
+		"file_path":    filePath,
+		"is_favorite":  false,
+		"source":       "my",
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "POC创建成功", Data: respData})
+}
+
 func pocsUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	// 仅支持 POST（如需改为 PUT，将路由方法调整为 http.MethodPut 即可）
 	if r.Method != http.MethodPost {
