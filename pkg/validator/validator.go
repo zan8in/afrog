@@ -565,3 +565,18 @@ func removeStringLiterals(expr string) string {
 
 	return expr
 }
+
+func ValidateSinglePocFile(filePath string) error {
+	result := validateSinglePocFile(filePath)
+	if result.Passed {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("❌ %s: validation failed\n", filePath))
+	for _, err := range result.Errors {
+		b.WriteString("   ")
+		b.WriteString(err.Error())
+		b.WriteString("\n")
+	}
+	return fmt.Errorf(strings.TrimSpace(b.String()))
+}
