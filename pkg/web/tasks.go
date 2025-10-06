@@ -14,6 +14,7 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
+	"github.com/zan8in/gologger"
 )
 
 type TaskStatus string
@@ -84,6 +85,7 @@ func NewTaskManager(storageRoot string, workers int) *TaskManager {
 		workers = 2
 	}
 	_ = os.MkdirAll(filepath.Join(storageRoot, "tasks"), 0o755)
+	gologger.Info().Msgf("TaskManager init: storage=%s workers=%d", storageRoot, workers)
 	return &TaskManager{
 		tasks:       make(map[string]*Task),
 		results:     make(map[string][]ResultItem),
@@ -98,14 +100,17 @@ func (m *TaskManager) Start(ctx context.Context) {
 	for i := 0; i < m.workers; i++ {
 		go m.worker(ctx, i)
 	}
+	gologger.Info().Msgf("TaskManager started: workers=%d", m.workers)
 }
 
-func (m *TaskManager) worker(ctx context.Context, _ int) {
+func (m *TaskManager) worker(ctx context.Context, wid int) {
 	for {
 		select {
 		case <-ctx.Done():
+			gologger.Info().Msgf("TaskManager worker stopped: id=%d", wid)
 			return
 		case taskID := <-m.queue:
+			gologger.Info().Msgf("TaskManager worker[%d] processing: task_id=%s", wid, taskID)
 			m.runTask(ctx, taskID)
 		}
 	}
@@ -137,6 +142,7 @@ func (m *TaskManager) CreateTask(pocIDs []string, targets []string, options Task
 	m.persist(taskID)
 	m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 	m.queue <- taskID
+	gologger.Info().Msgf("Task Created: task_id=%s poc_ids=%v targets=%v options=%+v total=%d", taskID, pocIDs, targets, options, task.TotalTargets)
 	return task, nil
 }
 
@@ -250,9 +256,11 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 
 	m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 	m.persist(taskID)
+	gologger.Info().Msgf("RunTask Start: task_id=%s poc_ids=%v targets=%v total=%d", task.ID, task.PocIDs, task.Targets, task.TotalTargets)
 
 	// 如果已注册真实扫描执行器，则使用它；否则回退到内置模拟执行
 	if scanRunner != nil {
+		gologger.Info().Msgf("RunTask: using external scanRunner for task_id=%s", task.ID)
 		in := TaskScanInput{
 			TaskID:  task.ID,
 			PocIDs:  task.PocIDs,
@@ -267,6 +275,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 				m.mu.Unlock()
 				m.publish(taskID, SSEEvent{Type: "status", Data: s})
 				m.persist(taskID)
+				gologger.Info().Msgf("RunTask Status: task_id=%s status=%s", taskID, s)
 			},
 			OnProgress: func(completed, total int) {
 				m.mu.Lock()
@@ -285,6 +294,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 					},
 				})
 				m.persist(taskID)
+				gologger.Debug().Msgf("RunTask Progress: task_id=%s %d/%d", taskID, task.CompletedTargets, task.TotalTargets)
 			},
 			OnResult: func(res ResultItem) {
 				// 外部可直接填充 DbID；若未填充，可后续调用 AttachTaskDbID 回填
@@ -294,6 +304,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 				m.mu.Unlock()
 				m.publish(taskID, SSEEvent{Type: "result", Data: res})
 				m.persist(taskID)
+				gologger.Info().Msgf("RunTask Result: task_id=%s target=%s poc_id=%s success=%v latency=%dms db_id=%d", taskID, res.Target, res.PocID, res.Success, res.LatencyMs, res.DbID)
 			},
 			OnError: func(msg string) {
 				m.mu.Lock()
@@ -302,6 +313,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 				m.mu.Unlock()
 				m.publish(taskID, SSEEvent{Type: "error", Data: msg})
 				m.persist(taskID)
+				gologger.Error().Msgf("RunTask Error: task_id=%s error=%s", taskID, msg)
 			},
 			OnEnded: func(s TaskStatus) {
 				// 外部主动结束通知
@@ -312,6 +324,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 				m.publish(taskID, SSEEvent{Type: "status", Data: s})
 				m.publish(taskID, SSEEvent{Type: "ended", Data: s})
 				m.persist(taskID)
+				gologger.Info().Msgf("RunTask Ended (external): task_id=%s status=%s", taskID, s)
 			},
 		})
 		if err != nil {
@@ -323,6 +336,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 			m.publish(taskID, SSEEvent{Type: "error", Data: task.Error})
 			m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 			m.persist(taskID)
+			gologger.Error().Msgf("RunTask Failed: task_id=%s err=%v", taskID, err)
 			return
 		}
 		// 若外部未调用 OnEnded，这里统一收尾（状态以最后一次回调为准）
@@ -335,15 +349,18 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 		m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 		m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 		m.persist(taskID)
+		gologger.Info().Msgf("RunTask Completed: task_id=%s status=%s", taskID, task.Status)
 		return
 	}
 
 	// 内置模拟执行（未注册真实扫描器时的降级逻辑）
+	gologger.Info().Msgf("RunTask: fallback to simulated runner: task_id=%s", task.ID)
 	for _, pocID := range task.PocIDs {
 		yamlContent, err := LoadPocContent(pocID)
 		if err != nil || yamlContent == "" {
 			msg := fmt.Sprintf("根据 poc_id=%s 读取 YAML 失败或为空", pocID)
 			m.publish(taskID, SSEEvent{Type: "error", Data: msg})
+			gologger.Error().Msgf("SimRunner: load YAML failed: task_id=%s poc_id=%s err=%v", taskID, pocID, err)
 			continue
 		}
 		for _, tgt := range task.Targets {
@@ -357,6 +374,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 				m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 				m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 				m.persist(taskID)
+				gologger.Info().Msgf("SimRunner: canceled: task_id=%s", taskID)
 				return
 			default:
 			}
@@ -370,6 +388,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 			if st == StatusCanceled {
 				m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 				m.persist(taskID)
+				gologger.Info().Msgf("SimRunner: ended (canceled): task_id=%s", taskID)
 				return
 			}
 			res := runPocOnce(yamlContent, pocID, tgt, task.Options)
@@ -387,6 +406,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 			})
 			m.publish(taskID, SSEEvent{Type: "result", Data: res})
 			m.persist(taskID)
+			gologger.Info().Msgf("SimRunner Result: task_id=%s target=%s poc_id=%s success=%v latency=%dms", taskID, tgt, pocID, res.Success, res.LatencyMs)
 		}
 	}
 	m.mu.Lock()
@@ -396,6 +416,7 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 	m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 	m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 	m.persist(taskID)
+	gologger.Info().Msgf("SimRunner Completed: task_id=%s", taskID)
 }
 
 func runPocOnce(yaml string, pocID string, target string, _ TaskOptions) ResultItem {
@@ -426,6 +447,7 @@ func (m *TaskManager) Cancel(taskID string) error {
 	t.Status = StatusCanceled
 	m.publish(taskID, SSEEvent{Type: "status", Data: t.Status})
 	m.persist(taskID)
+	gologger.Info().Msgf("Task Canceled: task_id=%s", taskID)
 	return nil
 }
 
@@ -440,6 +462,7 @@ func (m *TaskManager) Pause(taskID string) error {
 		t.Status = StatusPaused
 		m.publish(taskID, SSEEvent{Type: "status", Data: t.Status})
 		m.persist(taskID)
+		gologger.Info().Msgf("Task Paused: task_id=%s", taskID)
 	}
 	return nil
 }
@@ -455,6 +478,7 @@ func (m *TaskManager) Resume(taskID string) error {
 		t.Status = StatusRunning
 		m.publish(taskID, SSEEvent{Type: "status", Data: t.Status})
 		m.persist(taskID)
+		gologger.Info().Msgf("Task Resumed: task_id=%s", taskID)
 	}
 	return nil
 }
@@ -542,5 +566,6 @@ func ensureSqlite() {
 	sqliteOnce.Do(func() {
 		_ = sqlite.NewWebSqliteDB()
 		_ = sqlite.InitX()
+		gologger.Info().Msg("SQLite initialized for web tasks")
 	})
 }

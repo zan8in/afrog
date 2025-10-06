@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/zan8in/gologger"
 )
 
 type apiResponse struct {
@@ -19,6 +20,8 @@ func writeJSON(w http.ResponseWriter, status int, payload apiResponse) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+	// 响应日志
+	gologger.Info().Msgf("API Response: status=%d success=%v message=%s", status, payload.Success, payload.Message)
 }
 
 // POST /api/pocs/tasks
@@ -31,6 +34,7 @@ func pocsTasksCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "请求体无效"})
+		gologger.Error().Msgf("CreateTask: invalid request body: %v", err)
 		return
 	}
 
@@ -48,13 +52,16 @@ func pocsTasksCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(pids) == 0 {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "poc_ids 不能为空"})
+		gologger.Error().Msg("CreateTask: poc_ids empty")
 		return
 	}
+	gologger.Info().Msgf("CreateTask Request: poc_ids=%v targets=%v options=%+v", pids, req.Targets, req.Options)
 
 	tm := EnsureTaskManager()
 	task, err := tm.CreateTask(pids, req.Targets, req.Options)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: err.Error()})
+		gologger.Error().Msgf("CreateTask: failed: %v", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{
@@ -65,6 +72,7 @@ func pocsTasksCreateHandler(w http.ResponseWriter, r *http.Request) {
 			"status":  task.Status,
 		},
 	})
+	gologger.Info().Msgf("CreateTask Success: task_id=%s status=%s total_targets=%d", task.ID, task.Status, task.TotalTargets)
 }
 
 // GET /api/pocs/tasks/{id}
@@ -73,12 +81,14 @@ func pocsTasksGetHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["id"])
 	if taskID == "" {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "task_id 不能为空"})
+		gologger.Error().Msg("GetTask: task_id empty")
 		return
 	}
 	tm := EnsureTaskManager()
 	task, err := tm.GetTask(taskID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, apiResponse{Success: false, Message: err.Error()})
+		gologger.Error().Msgf("GetTask: not found: task_id=%s err=%v", taskID, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{
@@ -92,6 +102,7 @@ func pocsTasksGetHandler(w http.ResponseWriter, r *http.Request) {
 			"last_heartbeat":    task.LastHeartbeat.Format(time.RFC3339),
 		},
 	})
+	gologger.Info().Msgf("GetTask: task_id=%s status=%s progress=%d/%d", task.ID, task.Status, task.CompletedTargets, task.TotalTargets)
 }
 
 // GET /api/pocs/tasks/{id}/stream
@@ -100,6 +111,7 @@ func pocsTasksStreamHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["id"])
 	if taskID == "" {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "task_id 不能为空"})
+		gologger.Error().Msg("StreamTask: task_id empty")
 		return
 	}
 
@@ -117,6 +129,7 @@ func pocsTasksStreamHandler(w http.ResponseWriter, r *http.Request) {
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
+	gologger.Info().Msgf("Stream Start: task_id=%s", taskID)
 
 	notify := r.Context().Done()
 	ticker := time.NewTicker(15 * time.Second)
@@ -125,12 +138,14 @@ func pocsTasksStreamHandler(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-notify:
+			gologger.Info().Msgf("Stream Closed: task_id=%s", taskID)
 			return
 		case evt := <-sub:
 			fmtWriteSSE(w, evt.Type, evt.Data)
 			if f, ok := w.(http.Flusher); ok {
 				f.Flush()
 			}
+			gologger.Debug().Msgf("SSE Event: task_id=%s type=%s", taskID, evt.Type)
 		case <-ticker.C:
 			fmtWriteSSE(w, "heartbeat", map[string]string{"ts": time.Now().Format(time.RFC3339)})
 			if f, ok := w.(http.Flusher); ok {
@@ -152,14 +167,17 @@ func pocsTasksCancelHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["id"])
 	if taskID == "" {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "task_id 不能为空"})
+		gologger.Error().Msg("CancelTask: task_id empty")
 		return
 	}
 	tm := EnsureTaskManager()
 	if err := tm.Cancel(taskID); err != nil {
 		writeJSON(w, http.StatusNotFound, apiResponse{Success: false, Message: err.Error()})
+		gologger.Error().Msgf("CancelTask: not found: task_id=%s err=%v", taskID, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Success: true, Message: "已取消", Data: map[string]string{"task_id": taskID, "status": "canceled"}})
+	gologger.Info().Msgf("CancelTask: task_id=%s", taskID)
 }
 
 // POST /api/pocs/tasks/{id}/pause
@@ -168,14 +186,17 @@ func pocsTasksPauseHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["id"])
 	if taskID == "" {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "task_id 不能为空"})
+		gologger.Error().Msg("PauseTask: task_id empty")
 		return
 	}
 	tm := EnsureTaskManager()
 	if err := tm.Pause(taskID); err != nil {
 		writeJSON(w, http.StatusNotFound, apiResponse{Success: false, Message: err.Error()})
+		gologger.Error().Msgf("PauseTask: not found: task_id=%s err=%v", taskID, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Success: true, Message: "已暂停", Data: map[string]string{"task_id": taskID, "status": "paused"}})
+	gologger.Info().Msgf("PauseTask: task_id=%s", taskID)
 }
 
 // POST /api/pocs/tasks/{id}/resume
@@ -184,12 +205,15 @@ func pocsTasksResumeHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["id"])
 	if taskID == "" {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "task_id 不能为空"})
+		gologger.Error().Msg("ResumeTask: task_id empty")
 		return
 	}
 	tm := EnsureTaskManager()
 	if err := tm.Resume(taskID); err != nil {
 		writeJSON(w, http.StatusNotFound, apiResponse{Success: false, Message: err.Error()})
+		gologger.Error().Msgf("ResumeTask: not found: task_id=%s err=%v", taskID, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, apiResponse{Success: true, Message: "已恢复", Data: map[string]string{"task_id": taskID, "status": "running"}})
+	gologger.Info().Msgf("ResumeTask: task_id=%s", taskID)
 }
