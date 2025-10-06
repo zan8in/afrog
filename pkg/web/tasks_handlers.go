@@ -24,16 +24,35 @@ func writeJSON(w http.ResponseWriter, status int, payload apiResponse) {
 // POST /api/pocs/tasks
 func pocsTasksCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PocID   string     `json:"poc_id"`
-		Targets []string   `json:"targets"`
+		PocID   string      `json:"poc_id"`
+		PocIDs  []string    `json:"poc_ids"` // 新增：支持多个 POC
+		Targets []string    `json:"targets"`
 		Options TaskOptions `json:"options"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "请求体无效"})
 		return
 	}
+
+	// 统一整理 POC IDs：优先使用 poc_ids；否则使用 poc_id（单个）
+	var pids []string
+	if len(req.PocIDs) > 0 {
+		for _, s := range req.PocIDs {
+			ps := strings.TrimSpace(s)
+			if ps != "" {
+				pids = append(pids, ps)
+			}
+		}
+	} else if strings.TrimSpace(req.PocID) != "" {
+		pids = []string{strings.TrimSpace(req.PocID)}
+	}
+	if len(pids) == 0 {
+		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: "poc_ids 不能为空"})
+		return
+	}
+
 	tm := EnsureTaskManager()
-	task, err := tm.CreateTask(strings.TrimSpace(req.PocID), req.Targets, req.Options)
+	task, err := tm.CreateTask(pids, req.Targets, req.Options)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, apiResponse{Success: false, Message: err.Error()})
 		return

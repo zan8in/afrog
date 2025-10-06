@@ -8,9 +8,11 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 )
 
@@ -35,24 +37,29 @@ type TaskOptions struct {
 
 type Task struct {
 	ID               string      `json:"task_id"`
-	PocID            string      `json:"poc_id"`
+	PocID            string      `json:"poc_id"`  // 为了兼容旧接口，保留首个 POC 的 id
+	PocIDs           []string    `json:"poc_ids"` // 新增：支持多个 POC
 	Targets          []string    `json:"targets"`
 	Options          TaskOptions `json:"options"`
 	Status           TaskStatus  `json:"status"`
-	TotalTargets     int         `json:"total_targets"`
-	CompletedTargets int         `json:"completed_targets"`
+	TotalTargets     int         `json:"total_targets"`     // 目标×POC 的组合总数
+	CompletedTargets int         `json:"completed_targets"` // 已完成组合数
 	CreatedAt        time.Time   `json:"created_at"`
 	LastHeartbeat    time.Time   `json:"last_heartbeat"`
 	Error            string      `json:"error,omitempty"`
+
+	cancel context.CancelFunc `json:"-"`
 }
 
 type ResultItem struct {
 	Target    string         `json:"target"`
+	PocID     string         `json:"poc_id"`
 	Success   bool           `json:"success"`
 	Message   string         `json:"message"`
 	Response  map[string]any `json:"response,omitempty"`
 	Error     string         `json:"error,omitempty"`
 	LatencyMs int            `json:"latency,omitempty"`
+	DbID      int64          `json:"db_id,omitempty"`
 }
 
 type SSEEvent struct {
@@ -104,9 +111,9 @@ func (m *TaskManager) worker(ctx context.Context, _ int) {
 	}
 }
 
-func (m *TaskManager) CreateTask(pocID string, targets []string, options TaskOptions) (*Task, error) {
-	if pocID == "" {
-		return nil, errors.New("poc_id 不能为空")
+func (m *TaskManager) CreateTask(pocIDs []string, targets []string, options TaskOptions) (*Task, error) {
+	if len(pocIDs) == 0 {
+		return nil, errors.New("poc_ids 不能为空")
 	}
 	if len(targets) == 0 {
 		return nil, errors.New("targets 不能为空")
@@ -114,11 +121,12 @@ func (m *TaskManager) CreateTask(pocID string, targets []string, options TaskOpt
 	taskID := fmt.Sprintf("%d-%06d", time.Now().Unix(), rand.Intn(1000000))
 	task := &Task{
 		ID:               taskID,
-		PocID:            pocID,
+		PocID:            strings.TrimSpace(pocIDs[0]), // 兼容旧字段
+		PocIDs:           pocIDs,
 		Targets:          targets,
 		Options:          options,
 		Status:           StatusPending,
-		TotalTargets:     len(targets),
+		TotalTargets:     len(targets) * len(pocIDs), // 目标×POC 的组合总数
 		CompletedTargets: 0,
 		CreatedAt:        time.Now(),
 		LastHeartbeat:    time.Now(),
@@ -204,6 +212,28 @@ func (m *TaskManager) snapshotPath(taskID string) string {
 	return filepath.Join(m.storageRoot, "tasks", taskID+".json")
 }
 
+// 扫描执行器注册：由外部（例如 afrog 包）注入真实扫描实现，避免 web 依赖 afrog 产生循环
+type TaskScanInput struct {
+	TaskID  string
+	PocIDs  []string
+	Targets []string
+	Options TaskOptions
+}
+
+type TaskScanCallbacks struct {
+	OnStatus   func(TaskStatus)
+	OnProgress func(completed, total int)
+	OnResult   func(ResultItem)
+	OnError    func(string)
+	OnEnded    func(TaskStatus)
+}
+
+var scanRunner func(ctx context.Context, in TaskScanInput, cb TaskScanCallbacks) error
+
+func RegisterTaskScanRunner(r func(ctx context.Context, in TaskScanInput, cb TaskScanCallbacks) error) {
+	scanRunner = r
+}
+
 func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 	m.mu.Lock()
 	task := m.tasks[taskID]
@@ -213,60 +243,152 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 	}
 	task.Status = StatusRunning
 	task.LastHeartbeat = time.Now()
+	// 为取消提供独立的 task 级上下文
+	taskCtx, cancel := context.WithCancel(ctx)
+	task.cancel = cancel
 	m.mu.Unlock()
+
 	m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 	m.persist(taskID)
 
-	yamlContent, err := LoadPocContent(task.PocID)
-	if err != nil || yamlContent == "" {
+	// 如果已注册真实扫描执行器，则使用它；否则回退到内置模拟执行
+	if scanRunner != nil {
+		in := TaskScanInput{
+			TaskID:  task.ID,
+			PocIDs:  task.PocIDs,
+			Targets: task.Targets,
+			Options: task.Options,
+		}
+		err := scanRunner(taskCtx, in, TaskScanCallbacks{
+			OnStatus: func(s TaskStatus) {
+				m.mu.Lock()
+				task.Status = s
+				task.LastHeartbeat = time.Now()
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{Type: "status", Data: s})
+				m.persist(taskID)
+			},
+			OnProgress: func(completed, total int) {
+				m.mu.Lock()
+				task.CompletedTargets = completed
+				// 保持 total 一致（可由外部自定义计算）
+				if total > 0 {
+					task.TotalTargets = total
+				}
+				task.LastHeartbeat = time.Now()
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{
+					Type: "progress",
+					Data: map[string]int{
+						"completed_targets": task.CompletedTargets,
+						"total_targets":     task.TotalTargets,
+					},
+				})
+				m.persist(taskID)
+			},
+			OnResult: func(res ResultItem) {
+				// 外部可直接填充 DbID；若未填充，可后续调用 AttachTaskDbID 回填
+				m.mu.Lock()
+				task.LastHeartbeat = time.Now()
+				m.results[taskID] = append(m.results[taskID], res)
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{Type: "result", Data: res})
+				m.persist(taskID)
+			},
+			OnError: func(msg string) {
+				m.mu.Lock()
+				task.Error = msg
+				task.LastHeartbeat = time.Now()
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{Type: "error", Data: msg})
+				m.persist(taskID)
+			},
+			OnEnded: func(s TaskStatus) {
+				// 外部主动结束通知
+				m.mu.Lock()
+				task.Status = s
+				task.LastHeartbeat = time.Now()
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{Type: "status", Data: s})
+				m.publish(taskID, SSEEvent{Type: "ended", Data: s})
+				m.persist(taskID)
+			},
+		})
+		if err != nil {
+			m.mu.Lock()
+			task.Status = StatusFailed
+			task.Error = fmt.Sprintf("扫描执行失败: %v", err)
+			task.LastHeartbeat = time.Now()
+			m.mu.Unlock()
+			m.publish(taskID, SSEEvent{Type: "error", Data: task.Error})
+			m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
+			m.persist(taskID)
+			return
+		}
+		// 若外部未调用 OnEnded，这里统一收尾（状态以最后一次回调为准）
 		m.mu.Lock()
-		task.Status = StatusFailed
-		task.Error = "根据 poc_id 读取 YAML 失败或为空"
+		if task.Status != StatusCanceled && task.Status != StatusFailed {
+			task.Status = StatusCompleted
+		}
 		task.LastHeartbeat = time.Now()
 		m.mu.Unlock()
-		m.publish(taskID, SSEEvent{Type: "error", Data: task.Error})
+		m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
 		m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
 		m.persist(taskID)
 		return
 	}
 
-	for _, tgt := range task.Targets {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-		m.mu.RLock()
-		st := task.Status
-		m.mu.RUnlock()
-		if st == StatusPaused {
-			time.Sleep(500 * time.Millisecond)
+	// 内置模拟执行（未注册真实扫描器时的降级逻辑）
+	for _, pocID := range task.PocIDs {
+		yamlContent, err := LoadPocContent(pocID)
+		if err != nil || yamlContent == "" {
+			msg := fmt.Sprintf("根据 poc_id=%s 读取 YAML 失败或为空", pocID)
+			m.publish(taskID, SSEEvent{Type: "error", Data: msg})
 			continue
 		}
-		if st == StatusCanceled {
-			m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
+		for _, tgt := range task.Targets {
+			select {
+			case <-taskCtx.Done():
+				// 任务被取消
+				m.mu.Lock()
+				task.Status = StatusCanceled
+				task.LastHeartbeat = time.Now()
+				m.mu.Unlock()
+				m.publish(taskID, SSEEvent{Type: "status", Data: task.Status})
+				m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
+				m.persist(taskID)
+				return
+			default:
+			}
+			m.mu.RLock()
+			st := task.Status
+			m.mu.RUnlock()
+			if st == StatusPaused {
+				time.Sleep(500 * time.Millisecond)
+				continue
+			}
+			if st == StatusCanceled {
+				m.publish(taskID, SSEEvent{Type: "ended", Data: task.Status})
+				m.persist(taskID)
+				return
+			}
+			res := runPocOnce(yamlContent, pocID, tgt, task.Options)
+			m.mu.Lock()
+			task.CompletedTargets++
+			task.LastHeartbeat = time.Now()
+			m.results[taskID] = append(m.results[taskID], res)
+			m.mu.Unlock()
+			m.publish(taskID, SSEEvent{
+				Type: "progress",
+				Data: map[string]int{
+					"completed_targets": task.CompletedTargets,
+					"total_targets":     task.TotalTargets,
+				},
+			})
+			m.publish(taskID, SSEEvent{Type: "result", Data: res})
 			m.persist(taskID)
-			return
 		}
-
-		res := runPocOnce(yamlContent, tgt, task.Options)
-		m.mu.Lock()
-		task.CompletedTargets++
-		task.LastHeartbeat = time.Now()
-		m.results[taskID] = append(m.results[taskID], res)
-		m.mu.Unlock()
-
-		m.publish(taskID, SSEEvent{
-			Type: "progress",
-			Data: map[string]int{
-				"completed_targets": task.CompletedTargets,
-				"total_targets":     task.TotalTargets,
-			},
-		})
-		m.publish(taskID, SSEEvent{Type: "result", Data: res})
-		m.persist(taskID)
 	}
-
 	m.mu.Lock()
 	task.Status = StatusCompleted
 	task.LastHeartbeat = time.Now()
@@ -276,13 +398,14 @@ func (m *TaskManager) runTask(ctx context.Context, taskID string) {
 	m.persist(taskID)
 }
 
-func runPocOnce(yaml string, target string, _ TaskOptions) ResultItem {
+func runPocOnce(yaml string, pocID string, target string, _ TaskOptions) ResultItem {
 	start := time.Now()
 	time.Sleep(time.Duration(300+rand.Intn(700)) * time.Millisecond)
 	ok := rand.Intn(2) == 0
 	msg := "ok"
 	return ResultItem{
 		Target:    target,
+		PocID:     pocID,
 		Success:   ok,
 		Message:   msg,
 		LatencyMs: int(time.Since(start) / time.Millisecond),
@@ -295,6 +418,10 @@ func (m *TaskManager) Cancel(taskID string) error {
 	t := m.tasks[taskID]
 	if t == nil {
 		return errors.New("task 不存在")
+	}
+	// 通过取消上下文通知外部执行器停止
+	if t.cancel != nil {
+		t.cancel()
 	}
 	t.Status = StatusCanceled
 	m.publish(taskID, SSEEvent{Type: "status", Data: t.Status})
@@ -349,9 +476,71 @@ var (
 
 func EnsureTaskManager() *TaskManager {
 	taskOnce.Do(func() {
-		taskManager = NewTaskManager("~/afrog-task", 2)
+		taskManager = NewTaskManager("~/afrog-task", 1)
 		ctx := context.Background()
 		taskManager.Start(ctx)
 	})
 	return taskManager
+}
+
+// AttachDbID 允许外部在写入 sqlite 后，回填对应任务结果项的数据库主键 id
+func (m *TaskManager) AttachDbID(taskID string, pocID string, target string, dbID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	items := m.results[taskID]
+	// 倒序尝试匹配最近的结果项
+	for i := len(items) - 1; i >= 0; i-- {
+		if items[i].PocID == pocID && items[i].Target == target && items[i].DbID == 0 {
+			items[i].DbID = dbID
+			m.results[taskID][i] = items[i]
+			// 也可推送一个事件（可选）
+			m.publish(taskID, SSEEvent{Type: "result_db_linked", Data: items[i]})
+			m.persist(taskID)
+			return nil
+		}
+	}
+	return errors.New("未找到匹配的结果项，无法关联 db_id")
+}
+
+// AttachTaskDbID 便捷函数（懒单例）
+func AttachTaskDbID(taskID string, pocID string, target string, dbID int64) error {
+	return EnsureTaskManager().AttachDbID(taskID, pocID, target, dbID)
+}
+
+// 准备临时 POC 目录：将所选 POC 的 YAML 写入临时目录
+func prepareTempPocsDir(pocIDs []string) (string, error) {
+	dir, err := os.MkdirTemp("", "afrog-pocs-*")
+	if err != nil {
+		return "", err
+	}
+	wrote := 0
+	for _, id := range pocIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		bs, err := pocsrepo.ReadYamlByID(id)
+		if err != nil || len(bs) == 0 {
+			continue
+		}
+		if err := os.WriteFile(filepath.Join(dir, id+".yaml"), bs, 0o644); err != nil {
+			continue
+		}
+		wrote++
+	}
+	if wrote == 0 {
+		_ = os.RemoveAll(dir)
+		return "", errors.New("未能写入任何 POC YAML")
+	}
+	return dir, nil
+}
+
+// sqlite 初始化（惰性一次）
+var sqliteOnce sync.Once
+
+func ensureSqlite() {
+	sqliteOnce.Do(func() {
+		_ = sqlite.NewWebSqliteDB()
+		_ = sqlite.InitX()
+	})
 }
