@@ -20,12 +20,9 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/fileutil"
 	"github.com/zan8in/gologger"
-	"github.com/zan8in/afrog/v3/pkg/webadapter"
 )
 
 func main() {
-	// 注册 Web 任务执行器，避免在 config 包中引入 import cycle
-	webadapter.RegisterAfrogWebRunner()
 
 	options, err := config.NewOptions()
 	if err != nil {

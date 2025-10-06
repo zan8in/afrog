@@ -109,12 +109,6 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/pocs/update/{id}", jwtAuthMiddleware(pocsUpdateHandler)).Methods(http.MethodPost)
 	// 新增：删除指定 POC（仅允许删除 my 源）
 	api.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsDeleteHandler)).Methods(http.MethodDelete)
-	api.HandleFunc("/pocs/tasks", jwtAuthMiddleware(pocsTasksCreateHandler)).Methods(http.MethodPost)
-	api.HandleFunc("/pocs/tasks/{id}", jwtAuthMiddleware(pocsTasksGetHandler)).Methods(http.MethodGet)
-	api.HandleFunc("/pocs/tasks/{id}/stream", jwtAuthMiddleware(pocsTasksStreamHandler)).Methods(http.MethodGet)
-	api.HandleFunc("/pocs/tasks/{id}/cancel", jwtAuthMiddleware(pocsTasksCancelHandler)).Methods(http.MethodPost)
-	api.HandleFunc("/pocs/tasks/{id}/pause", jwtAuthMiddleware(pocsTasksPauseHandler)).Methods(http.MethodPost)
-	api.HandleFunc("/pocs/tasks/{id}/resume", jwtAuthMiddleware(pocsTasksResumeHandler)).Methods(http.MethodPost)
 }
 
 // API 未匹配路由 -> JSON 404

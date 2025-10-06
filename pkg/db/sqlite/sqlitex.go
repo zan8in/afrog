@@ -144,6 +144,66 @@ func addx(r *result.Result) error {
 	return err
 }
 
+// InsertResultAndReturnID 同步写入一条结果并返回插入的主键 id（带锁冲突重试）
+func InsertResultAndReturnID(r *result.Result) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+
+	insertSQL := "INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+	currentTime := time.Now()
+	createdTime := currentTime.Format("2006-01-02 15:04:05")
+
+	pocBytes, _ := json.Marshal(r.PocInfo)
+
+	pocList := []db2.PocResult{}
+	if len(r.AllPocResult) > 0 {
+		for _, pocResult := range r.AllPocResult {
+			var reqRaw []byte
+			var respRaw []byte
+			if pocResult != nil && pocResult.ResultRequest != nil && pocResult.ResultRequest.Raw != nil {
+				reqRaw = pocResult.ResultRequest.Raw
+			}
+			if pocResult != nil && pocResult.ResultResponse != nil && pocResult.ResultResponse.Raw != nil {
+				respRaw = pocResult.ResultResponse.Raw
+			}
+			pocList = append(pocList, db2.PocResult{
+				FullTarget: pocResult.FullTarget,
+				Request:    string(reqRaw),
+				Response:   string(respRaw),
+				Other:      db2.Other{Latency: pocResult.ResultResponse.GetLatency()},
+			})
+		}
+	}
+	resultJSON, _ := json.Marshal(pocList)
+
+	extractorBytes, _ := json.Marshal(r.Extractor)
+	fingerBytes, _ := json.Marshal(r.FingerResult)
+
+	// 生成主键 id（SnowFlake）
+	id := db2.SnowFlake.NextID()
+
+	// 为单次写入设置整体超时，防止长期阻塞；并在锁冲突时重试
+	c := 0
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := dbx.ExecContext(ctx, insertSQL, id, db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, pocBytes, resultJSON, createdTime, fingerBytes, extractorBytes)
+		cancel()
+		if err != nil {
+			if strings.Contains(err.Error(), "database is locked") && c < 5 {
+				c++
+				randutil.RandSleep(1000)
+				continue
+			}
+			return 0, err
+		}
+		break
+	}
+
+	return id, nil
+}
+
 func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 
 	var err error
