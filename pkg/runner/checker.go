@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
@@ -14,7 +15,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 
 	"github.com/google/cel-go/checker/decls"
-	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/utils"
