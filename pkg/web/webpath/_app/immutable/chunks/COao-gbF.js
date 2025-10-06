@@ -1,0 +1,1 @@
+import{F as c,g as i,G as n,H as f,l as u,I as s,J as o}from"./CitxP-cn.js";function l(a){let e=0,r=n(0),t;return()=>{c()&&(i(r),f(()=>(e===0&&(t=u(()=>a(()=>s(r)))),e+=1,()=>{o(()=>{e-=1,e===0&&(t?.(),t=void 0,s(r))})})))}}export{l as c};
