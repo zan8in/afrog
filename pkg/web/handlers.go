@@ -929,13 +929,51 @@ func pocsUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 写回文件
+	// 写回文件（同步文件名与 YAML 中的 id）
 	home, _ := os.UserHomeDir()
-	fullPath := strings.Replace(target.Path, "~", home, 1)
-	if err := os.WriteFile(fullPath, []byte(req.YamlContent), 0644); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
-		return
+	oldFullPath := strings.Replace(target.Path, "~", home, 1)
+	fullPath := oldFullPath
+
+	if newID != targetID {
+		// 目标文件路径（与旧文件同目录下，文件名改为 newID.yaml）
+		dir := filepath.Dir(oldFullPath)
+		newFullPath := filepath.Join(dir, newID+".yaml")
+
+		// 目标文件存在性检查
+		if _, err := os.Stat(newFullPath); err == nil {
+			// 目标已存在，视为 ID 冲突
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "目标文件已存在，POC ID 冲突"})
+			return
+		} else if err != nil && !os.IsNotExist(err) {
+			// 其他 Stat 错误
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("检查重命名目标失败: %v", err)})
+			return
+		}
+
+		// 先重命名，再写入新内容；若写入失败则尝试回滚重命名
+		if err := os.Rename(oldFullPath, newFullPath); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("重命名文件失败: %v", err)})
+			return
+		}
+		if err := os.WriteFile(newFullPath, []byte(req.YamlContent), 0644); err != nil {
+			// 写入失败，尝试回滚到旧文件名
+			_ = os.Rename(newFullPath, oldFullPath)
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
+			return
+		}
+
+		fullPath = newFullPath
+	} else {
+		// id 未变，直接覆盖写入旧路径
+		if err := os.WriteFile(oldFullPath, []byte(req.YamlContent), 0644); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
+			return
+		}
 	}
 
 	// 成功响应（仅返回我们能够确定的字段，不虚构数据库自增 ID 等）

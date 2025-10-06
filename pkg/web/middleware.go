@@ -70,30 +70,41 @@ func jwtAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 
-		// 从Authorization header获取token
+		// 优先从Authorization header获取token，缺失时从查询参数兜底（兼容SSE）
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(APIResponse{
-				Success: false,
-				Message: "缺少Authorization header",
-			})
-			return
-		}
+		var token string
 
-		// 验证Bearer格式
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(APIResponse{
-				Success: false,
-				Message: "无效的Authorization格式，应为: Bearer <token>",
-			})
-			return
+		if authHeader != "" {
+			// 验证Bearer格式
+			tokenParts := strings.Split(authHeader, " ")
+			if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(APIResponse{
+					Success: false,
+					Message: "无效的Authorization格式，应为: Bearer <token>",
+				})
+				return
+			}
+			token = tokenParts[1]
+		} else {
+			// SSE 兼容：从 URL 查询参数读取 token 或 access_token
+			q := r.URL.Query()
+			token = strings.TrimSpace(q.Get("token"))
+			if token == "" {
+				token = strings.TrimSpace(q.Get("access_token"))
+			}
+			if token == "" {
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(APIResponse{
+					Success: false,
+					Message: "缺少Authorization header或token参数",
+				})
+				return
+			}
 		}
 
 		// 验证JWT Token
-		claims, err := validateJWTToken(tokenParts[1])
+		claims, err := validateJWTToken(token)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(APIResponse{
