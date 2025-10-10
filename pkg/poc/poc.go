@@ -332,18 +332,20 @@ func (poc *Poc) IsHTTPType() bool {
 }
 
 func (poc *Poc) IsReverse() bool {
-	if len(poc.Set) == 0 {
-		return false
-	}
+    // ... existing code ...
+    for _, set := range poc.Set {
+        k := set.Key.(string)
+        vStr, ok := set.Value.(string)
+        if !ok {
+            // 值不是字符串时无需参与反连判断，直接跳过
+            continue
+        }
+        if strings.Contains(k, "reverse") || strings.Contains(vStr, "reverse.url") {
+            return true
+        }
+    }
 
-	for _, set := range poc.Set {
-		k, v := set.Key.(string), set.Value.(string)
-		if strings.Contains(k, "reverse") || strings.Contains(v, "reverse.url") {
-			return true
-		}
-	}
-
-	return false
+    return false
 }
 
 type Extractors struct {

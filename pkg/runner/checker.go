@@ -276,47 +276,61 @@ func (c *Checker) checkURL(target string) (string, error) {
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 	for _, item := range args {
 		key := item.Key.(string)
-		value := item.Value.(string)
 
-		// if value == "newReverse()" {
-		// 	c.VariableMap[key] = c.newRerverse()
-		// 	c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
-		// 	continue
-		// }
+		// 新增：根据 YAML 值的实际类型分支处理
+		switch v := item.Value.(type) {
+		case string:
+			// oob() 函数特殊处理
+			if v == "oob()" {
+				c.VariableMap[key] = c.oob()
+				c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.OOB"))
+				continue
+			}
 
-		if value == "oob()" {
-			c.VariableMap[key] = c.oob()
-			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.OOB"))
-			continue
-		}
+			// 原有字符串路径：走 CEL 求值
+			out, err := c.CustomLib.RunEval(v, c.VariableMap)
+			if err != nil {
+				// fixed set string failed bug
+				c.VariableMap[key] = fmt.Sprintf("%v", v)
+				c.CustomLib.UpdateCompileOption(key, decls.String)
+				continue
+			}
+			switch value := out.Value().(type) {
+			case *proto.UrlType:
+				c.VariableMap[key] = utils.UrlTypeToString(value)
+				c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
+			case int64:
+				c.VariableMap[key] = int(value)
+				c.CustomLib.UpdateCompileOption(key, decls.Int)
+			case map[string]string:
+				c.VariableMap[key] = value
+				c.CustomLib.UpdateCompileOption(key, StrStrMapType)
+			default:
+				c.VariableMap[key] = fmt.Sprintf("%v", out)
+				c.CustomLib.UpdateCompileOption(key, decls.String)
+			}
 
-		// if value == "newJNDI()" {
-		// 	c.VariableMap[key] = c.newJNDI()
-		// 	c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.Reverse"))
-		// 	continue
-		// }
-
-		out, err := c.CustomLib.RunEval(value, c.VariableMap)
-		if err != nil {
-			// fixed set string failed bug
-			c.VariableMap[key] = fmt.Sprintf("%v", value)
-			c.CustomLib.UpdateCompileOption(key, decls.String)
-			continue
-		}
-
-		switch value := out.Value().(type) {
-		case *proto.UrlType:
-			c.VariableMap[key] = utils.UrlTypeToString(value)
-			c.CustomLib.UpdateCompileOption(key, decls.NewObjectType("proto.UrlType"))
-		case int64:
-			c.VariableMap[key] = int(value)
+		case int:
+			c.VariableMap[key] = v
 			c.CustomLib.UpdateCompileOption(key, decls.Int)
-		case map[string]string:
-			c.VariableMap[key] = value
-			c.CustomLib.UpdateCompileOption(key, StrStrMapType)
+			continue
+		case int64:
+			c.VariableMap[key] = int(v)
+			c.CustomLib.UpdateCompileOption(key, decls.Int)
+			continue
+		case float64:
+			c.VariableMap[key] = v
+			c.CustomLib.UpdateCompileOption(key, decls.Double)
+			continue
+		case bool:
+			c.VariableMap[key] = v
+			c.CustomLib.UpdateCompileOption(key, decls.Bool)
+			continue
 		default:
-			c.VariableMap[key] = fmt.Sprintf("%v", out)
+			// 其他类型统一按字符串存（保证兼容）
+			c.VariableMap[key] = fmt.Sprintf("%v", v)
 			c.CustomLib.UpdateCompileOption(key, decls.String)
+			continue
 		}
 	}
 }
