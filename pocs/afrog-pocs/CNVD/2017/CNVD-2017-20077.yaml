@@ -4,6 +4,7 @@ info:
   name: Ueditor编辑器.net版本存在文件上传漏洞
   author: zan8in wuhua
   severity: critical
+  verified: true
   description: |
     <form action="http://8.8.8.8:8001/ueditor/net/controller.ashx?action=catchimage" enctype="multipart/form-data" method="POST">
     http://vps/11.jpg?.aspx 11.jpg是图片马；制作图片马：copy 1.jpg/b +2.aspx 3.aspx
@@ -11,6 +12,8 @@ info:
     - https://www.CNVD.org.cn/flaw/show/CNVD-2017-20077
     - https://zhuanlan.zhihu.com/p/85265552
     - https://www.freebuf.com/vuls/181814.html
+  tags: ueditor,cnvd,cnvd2017,fileupload
+  created: 2020/09/11
 
 rules:
   r0:
@@ -18,7 +21,7 @@ rules:
       method: GET
       path: /ueditor/net/controller.ashx?action=catchimage&encode=utf-8
       headers:
-        Accept-Encoding: 'deflate'
+        Accept-Encoding: "deflate"
     expression: |
       response.status == 200 && response.body.bcontains(bytes(string("没有指定抓取源")))
   r1:
@@ -26,7 +29,7 @@ rules:
       method: GET
       path: /js/ueditor/net/controller.ashx?action=catchimage&encode=utf-8
       headers:
-        Accept-Encoding: 'deflate'
+        Accept-Encoding: "deflate"
     expression: |
       response.status == 200 && response.body.bcontains(bytes(string("没有指定抓取源")))
 expression: r0() || r1()
