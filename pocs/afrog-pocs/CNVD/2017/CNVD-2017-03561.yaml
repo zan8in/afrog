@@ -24,7 +24,7 @@ rules:
   r0:
     request:
       method: GET
-      path: "/login.do?message={{n1}}*{{n2}}{{result}}"
+      path: "/login.do?message={{n1}}*{{n2}}"
     expression: response.status == 200 && response.body.bcontains(bytes(string(result)))
   r1:
     request:

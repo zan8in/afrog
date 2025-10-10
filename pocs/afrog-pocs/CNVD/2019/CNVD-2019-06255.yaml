@@ -11,6 +11,7 @@ info:
     - https://github.com/xwlrbh/Catfish/issues/4
   solutions: Upgrade to CatfishCMS version 4.8.54 or later.
   tags: rce,cnvd,catfishcms,cnvd2019
+  created: 2020/09/11
 
 rules:
   r0:
