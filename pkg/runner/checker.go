@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"regexp"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
@@ -87,6 +88,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		if rule.BeforeSleep != 0 {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
+
+		// 预处理：让 rules 的 path/headers/body/host/raw/data 支持 {{...}} CEL 运算
+		c.preRenderRuleRequest(&rule.Request)
 
 		isMatch := false
 		reqType := strings.ToLower(rule.Request.Type)
@@ -455,4 +459,47 @@ func setVariableMap(find string, variableMap map[string]any) string {
 		find = strings.ReplaceAll(find, oldstr, newstr)
 	}
 	return find
+}
+
+func (c *Checker) renderCELPlaceholders(s string) string {
+	// 为空直接返回
+	if len(s) == 0 {
+		return s
+	}
+	re := regexp.MustCompile(`\{\{(.+?)\}\}`)
+	return re.ReplaceAllStringFunc(s, func(m string) string {
+		// 提取 {{ ... }} 内的表达式文本
+		expr := strings.TrimSpace(m[2 : len(m)-2])
+		// 优先走 CEL 求值
+		out, err := c.CustomLib.RunEval(expr, c.VariableMap)
+		if err != nil {
+			// 求值失败，保留原占位符，后续仍可由 setVariableMap 做简单变量替换
+			return m
+		}
+		switch v := out.Value().(type) {
+		case *proto.UrlType:
+			return utils.UrlTypeToString(v)
+		case []byte:
+			return string(v)
+		default:
+			return fmt.Sprintf("%v", v)
+		}
+	})
+}
+
+// 对当前 rule 的请求字段进行预渲染（仅替换能成功求值的表达式）
+func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
+	// HTTP(S)/RAW/NETX 通用字段
+	req.Path = c.renderCELPlaceholders(strings.TrimSpace(req.Path))
+	req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
+	req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
+	req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
+	req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
+
+	// headers 逐项处理
+	if req.Headers != nil {
+		for hk, hv := range req.Headers {
+			req.Headers[hk] = c.renderCELPlaceholders(strings.TrimSpace(hv))
+		}
+	}
 }

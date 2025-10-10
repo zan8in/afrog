@@ -24,6 +24,9 @@ rules:
   r0:
     request:
       method: GET
-      path: "/login.do?message={{numa}}*{{numb}}={{x}}"
+      path: "/login.do?message={{numa * numb}}={{x}}"
+      headers:
+        a: "{{numa + numb}}"
+      body: "message={{randomInt(99999911, 99999999)}}={{randomLowercase(32)}}"
     expression: response.status == 200 && response.body.bcontains(bytes(string(numa * numb)))
 expression: r0()
