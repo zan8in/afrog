@@ -7,6 +7,8 @@ info:
   verified: true
   reference:
     - https://github.com/LandGrey/SpringBootVulExploit
+  tags: actuator,springboot,unauth
+  created: 2022-12-15
 
 rules:
   r0:
@@ -25,15 +27,15 @@ rules:
       response.body.bcontains(b'"self":') && 
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
-      response.body.bcontains(b'"heapdump":') 
-  r2: 
-    request: 
+      response.body.bcontains(b'"heapdump":')
+  r2:
+    request:
       method: GET
       path: /appenv
     expression: |
       response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
-  r3: 
-    request: 
+  r3:
+    request:
       method: GET
       path: /api/actuator
     expression: |
@@ -42,7 +44,7 @@ rules:
       response.body.bcontains(b'"self":') && 
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
-      response.body.bcontains(b'"heapdump":') 
+      response.body.bcontains(b'"heapdump":')
   r4:
     request:
       method: GET
@@ -53,7 +55,7 @@ rules:
       response.body.bcontains(b'"self":') && 
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
-      response.body.bcontains(b'"heapdump":') 
+      response.body.bcontains(b'"heapdump":')
   r5:
     request:
       method: GET
@@ -64,7 +66,7 @@ rules:
       response.body.bcontains(b'"self":') && 
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
-      response.body.bcontains(b'"heapdump":') 
+      response.body.bcontains(b'"heapdump":')
   r6:
     request:
       method: GET
@@ -75,5 +77,5 @@ rules:
       response.body.bcontains(b'"self":') && 
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
-      response.body.bcontains(b'"heapdump":') 
+      response.body.bcontains(b'"heapdump":')
 expression: r0() || r1() || r2() || r3() || r4() || r5() || r6()
