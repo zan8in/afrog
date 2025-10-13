@@ -17,9 +17,25 @@ rules:
     request:
       method: POST
       path: /api/v4/auth
+      headers:
+        Content-Type: application/json
       body: |
         {"username":"admin","password":"public"}
     expression: |
       response.status == 200 && 
       response.body == bytes("{\"code\":0}")
-expression: r0()
+  r1:
+    request:
+      method: POST
+      path: /api/v5/login
+      headers:
+        Content-Type: application/json
+      body: |
+        {"username":"admin","password":"public"}
+    expression: |
+      response.status == 200 && 
+      response.content_type.contains("application/json") &&
+      response.body.bcontains(b'"token":') &&
+      response.body.bcontains(b'"license":') &&
+      response.body.bcontains(b'"version":')
+expression: r0() || r1()
