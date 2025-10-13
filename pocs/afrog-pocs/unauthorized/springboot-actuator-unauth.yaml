@@ -78,4 +78,71 @@ rules:
       response.body.bcontains(b'"health"') &&
       response.body.bcontains(b'"env":') && 
       response.body.bcontains(b'"heapdump":')
-expression: r0() || r1() || r2() || r3() || r4() || r5() || r6()
+  r00:
+    request:
+      method: GET
+      path: /env%72
+    expression: |
+      response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+  r01:
+    request:
+      method: GET
+      path: /actuator%72
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"_links":') && 
+      response.body.bcontains(b'"self":') && 
+      response.body.bcontains(b'"health"') &&
+      response.body.bcontains(b'"env":') && 
+      response.body.bcontains(b'"heapdump":')
+  r02:
+    request:
+      method: GET
+      path: /appenv%72
+    expression: |
+      response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"java.version") && response.body.bcontains(b"os.arch")
+  r03:
+    request:
+      method: GET
+      path: /api/actuator%72
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"_links":') && 
+      response.body.bcontains(b'"self":') && 
+      response.body.bcontains(b'"health"') &&
+      response.body.bcontains(b'"env":') && 
+      response.body.bcontains(b'"heapdump":')
+  r04:
+    request:
+      method: GET
+      path: /nacos/actuator%72
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"_links":') && 
+      response.body.bcontains(b'"self":') && 
+      response.body.bcontains(b'"health"') &&
+      response.body.bcontains(b'"env":') && 
+      response.body.bcontains(b'"heapdump":')
+  r05:
+    request:
+      method: GET
+      path: /prod-api/actuator%72
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"_links":') && 
+      response.body.bcontains(b'"self":') && 
+      response.body.bcontains(b'"health"') &&
+      response.body.bcontains(b'"env":') && 
+      response.body.bcontains(b'"heapdump":')
+  r06:
+    request:
+      method: GET
+      path: /dev-api/actuator%72
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"_links":') && 
+      response.body.bcontains(b'"self":') && 
+      response.body.bcontains(b'"health"') &&
+      response.body.bcontains(b'"env":') && 
+      response.body.bcontains(b'"heapdump":')
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r00() || r01() || r02() || r03() || r04() || r05() || r06()
