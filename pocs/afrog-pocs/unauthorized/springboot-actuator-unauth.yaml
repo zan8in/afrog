@@ -87,7 +87,7 @@ rules:
   r01:
     request:
       method: GET
-      path: /actuator%72
+      path: /actuato%72
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'"_links":') && 
@@ -104,7 +104,7 @@ rules:
   r03:
     request:
       method: GET
-      path: /api/actuator%72
+      path: /api/actuato%72
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'"_links":') && 
@@ -115,7 +115,7 @@ rules:
   r04:
     request:
       method: GET
-      path: /nacos/actuator%72
+      path: /nacos/actuato%72
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'"_links":') && 
@@ -126,7 +126,7 @@ rules:
   r05:
     request:
       method: GET
-      path: /prod-api/actuator%72
+      path: /prod-api/actuato%72
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'"_links":') && 
@@ -137,7 +137,7 @@ rules:
   r06:
     request:
       method: GET
-      path: /dev-api/actuator%72
+      path: /dev-api/actuato%72
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'"_links":') && 
