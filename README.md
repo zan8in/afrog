@@ -484,6 +484,18 @@ $ ./afrog -h
 
 ```sh
 $ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+
+# Confirm Go’s bin path is in your environment
+$ ls ~/go/bin/afrog
+
+# Make it runnable from anywhere (add ~/go/bin to PATH)
+# Permanently (Bash — add to ~/.bashrc):
+$ echo 'export PATH=$PATH:~/go/bin' >> ~/.bashrc
+$ source ~/.bashrc
+
+# If you use Zsh:
+$ echo 'export PATH=$PATH:~/go/bin' >> ~/.zshrc
+$ source ~/.zshrc
 ```
 
 ## Running afrog
