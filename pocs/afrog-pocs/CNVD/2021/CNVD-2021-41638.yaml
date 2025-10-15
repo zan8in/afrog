@@ -7,7 +7,11 @@ info:
   verified: false
   description: |
     紫光软件系统有限公司（以下简称“紫光软件”）是中国领先的行业解决方案和IT服务提供商。 紫光电子档案管理系统存在SQL注入漏洞。攻击者可利用漏洞获取数据库敏感信息
-    app="紫光档案管理系统"
+    fofa: app="紫光档案管理系统"
+  reference:
+    - https://www.cnvd.org.cn/patchInfo/show/270651
+  tags: cnvd,cnvd2021,sqli
+  created: 2021/10/23
 
 rules:
   r0:

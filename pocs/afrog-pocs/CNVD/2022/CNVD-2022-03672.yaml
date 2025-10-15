@@ -4,14 +4,16 @@ info:
   name: Sunflower Simple and Personal - Remote Code Execution
   author: daffainfo wuhua
   severity: critical
-  description: |
+  description: |-
     Sunflower Simple and Personal is susceptible to a remote code execution vulnerability.
-    body="Verification failure"
+    fofa: body="Verification failure"
   reference:
     - https://www.1024sou.com/article/741374.html
     - https://copyfuture.com/blogs-details/202202192249158884
     - https://www.cnvd.org.cn/flaw/show/CNVD-2022-10270
     - https://www.cnvd.org.cn/flaw/show/CNVD-2022-03672
+  tags: cnvd,cnvd2022,unauth,rce,sunflower
+  created: 2022/10/23
 
 rules:
   r0:

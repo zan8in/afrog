@@ -7,7 +7,7 @@ info:
   verified: true
   description: |
     畅捷通T+ Upload.aspx处存在任意文件上传漏洞，攻击者可以从其中获取服务器权限。
-    fofa：app="畅捷通-TPlus" && icon_hash="-2067519629"
+    fofa: app="畅捷通-TPlus" && icon_hash="-2067519629"
   tags: cnvd,cnvd2022,chanjet,fileupload
   created: 2024/12/30
 

@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     e-office is a standard collaborative mobile office platform. Ltd. e-office has an arbitrary file reading vulnerability, which can be exploited by attackers to obtain sensitive information.
-    FOFA: app="泛微-协同办公OA"
+    fofa: app="泛微-协同办公OA"
   tags: cnvd,cnvd2022,weaver,e-office,oa,lfi
   created: 2023/09/21
 

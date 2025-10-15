@@ -1,21 +1,23 @@
 id: CNVD-2021-14536
 
 info:
-    name: Ruijie RG-UAC Information Disclosure
-    author: jweny(https://github.com/jweny) daffainfo
-    severity: high
-    verified: true
-    description: |
-        Ruijie RG-UAC Unified Internet Behavior Management Audit System is susceptible to information disclosure. Attackers could obtain user accounts and passwords by reviewing the source code of web pages, resulting in the leakage of administrator user authentication information.
-        FOFA: title="RG-UAC登录页面"
-    reference:
-        - https://www.adminxe.com/2163.html
-    tags: ruijie,cnvd,cnvd2021,disclosure
+  name: Ruijie RG-UAC Information Disclosure
+  author: jweny,daffainfo
+  severity: high
+  verified: true
+  description: |-
+    Ruijie RG-UAC Unified Internet Behavior Management Audit System is susceptible to information disclosure. Attackers could obtain user accounts and passwords by reviewing the source code of web pages, resulting in the leakage of administrator user authentication information.
+    fofa: title="RG-UAC登录页面"
+  reference:
+    - https://www.adminxe.com/2163.html
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2021-14536
+  tags: ruijie,cnvd,cnvd2021,disclosure
+  created: 2021/10/23
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /login.php
-        expression: response.status == 200 && response.body.bcontains(b"get_dkey_passwd") && "\"password\":\"[a-f0-9]{32}\"".bmatches(response.body)
+  r0:
+    request:
+      method: GET
+      path: /login.php
+    expression: response.status == 200 && response.body.bcontains(b"get_dkey_passwd") && "\"password\":\"[a-f0-9]{32}\"".bmatches(response.body)
 expression: r0()

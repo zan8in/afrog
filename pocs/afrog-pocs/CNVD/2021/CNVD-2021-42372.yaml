@@ -4,11 +4,13 @@ info:
   name: Finetree 5MP 摄像机 user_pop.php 任意用户添加漏洞
   author: zan8in
   severity: high
-  description: |
+  description: |-
     Finetree 5MP 摄像机 user_pop.php文件存在未授权任意用户添加，攻击者添加后可以获取后台权限
     p="Finetree-5MP-Network-Camera"
   reference:
-    - http://wiki.peiqi.tech/wiki/iot/Finetree/Finetree%205MP%20%E6%91%84%E5%83%8F%E6%9C%BA%20user_pop.php%20%E4%BB%BB%E6%84%8F%E7%94%A8%E6%88%B7%E6%B7%BB%E5%8A%A0%E6%BC%8F%E6%B4%9E%20CNVD-2021-42372.html
+    - https://www.cnvd.org.cn/patchInfo/show/270651
+  tags: cnvd,cnvd2021,sqli
+  created: 2021/10/23
 
 rules:
   r0:

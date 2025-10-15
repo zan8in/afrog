@@ -4,12 +4,12 @@ info:
   author: laohuan12138
   severity: critical
   verified: true
-  description: |
-    fofa: app="MajordomoSL"
+  description: |-
     MajorDoMo 是一款用于家庭自动化和控制的开源软件,它允许您使用各种设备和协议控制您的家庭设备,该应用存在命令执行漏洞，可获取系统权限。
+    fofa: app="MajordomoSL"
   references:
     - https://mp.weixin.qq.com/s/2K3QrdFrJRmP29JgpTEKQg
-
+    - https://www.cnvd.org.cn/patchInfo/show/270651
   tags: rce,cnvd,cnvd2024
   created: 2024/05/13
 

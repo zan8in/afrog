@@ -7,7 +7,7 @@ info:
   verified: true
   description: |
     宏景人力系统 存在SQL注入漏洞(CNVD-2023-08743)，未经过身份认证的远程攻击者可利用此漏洞执行任意SQL指令，从而窃取数据库敏感信息。
-    FOFA: body='<div class="hj-hy-all-one-logo"'
+    fofa: body='<div class="hj-hy-all-one-logo"'
   reference:
     - https://mp.weixin.qq.com/s/NhJe4MUepwqc6SmDJw4aow
     - https://mp.weixin.qq.com/s/N5qe_tuqRC1QxwX6RvvXeg
@@ -15,7 +15,7 @@ info:
   created: 2023/06/22
 
 set:
-  randstr: randomLowercase(12)    
+  randstr: randomLowercase(12)
 rules:
   r0:
     request:

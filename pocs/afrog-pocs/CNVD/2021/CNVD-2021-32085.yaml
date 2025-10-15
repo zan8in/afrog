@@ -4,10 +4,14 @@ info:
   name: Sapido路由器存在命令执行漏洞
   author: doinb1517
   severity: high
-  description: "Sapido路由器存在命令执行漏洞 攻击者可利用该漏洞执行任意命令。 app=\"Sapido-路由器\""
+  description: |-
+    Sapido路由器存在命令执行漏洞 攻击者可利用该漏洞执行任意命令。 
+    fofa: app="Sapido-路由器"
   reference:
     - https://www.cnvd.org.cn/flaw/show/CNVD-2021-32085
     - https://www.hacking8.com/bug-iot/Sapido/Sapido%E5%A4%9A%E6%AC%BE%E8%B7%AF%E7%94%B1%E5%99%A8%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E%E7%AA%81%E7%A0%B4.html
+  tags: sapido,cnvd,cnvd2021,rce
+  created: 2021/10/23
 
 rules:
   r0:
@@ -15,7 +19,6 @@ rules:
       method: GET
       path: /syscmd.htm
     expression: response.status == 200 && response.body.bcontains(b'/boafrm/formSysCmd')
-
   r1:
     request:
       method: GET

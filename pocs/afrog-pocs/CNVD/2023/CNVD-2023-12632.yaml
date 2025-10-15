@@ -7,9 +7,9 @@ info:
   verified: true
   description: |
     由于泛微e-cology9中对用户前台输入的数据未做校验，可以通过构造恶意的数据包导致SQL注入漏洞，进一步获取敏感数据。
-    fofa-query: app="泛微-协同商务系统"
-    shodan-query: 'ecology_JSessionid'
-    Hunter: title=="泛微-协同软件的精英团队，我们的目标：造就协同软件第一品牌！"
+    fofa: app="泛微-协同商务系统"
+    shodan: 'ecology_JSessionid'
+    hunter: title=="泛微-协同软件的精英团队，我们的目标：造就协同软件第一品牌！"
     hex(hex(hex(a' union select 1,''+(SELECT @@VERSION)+')))
   affected: 泛微e-cology V9 < 10.56
   solutions: https://www.weaver.com.cn/cs/securityDownload.asp#
@@ -17,6 +17,7 @@ info:
     - https://www.zhihu.com/tardis/zm/art/625931869?source_id=1003
     - https://blog.csdn.net/qq_50854662/article/details/129992329
   tags: cnvd,cnvd2023,ecology,sqli
+  created: 2023/12/30
 
 rules:
   r0:

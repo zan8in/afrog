@@ -4,11 +4,13 @@ info:
   name: H3C IMC dynamiccontent.properties.xhtm 远程命令执行
   author: zan8in
   severity: high
-  description: |
+  description: |-
     H3C IMC dynamiccontent.properties.xhtm 存在远程命令执行，攻击者通过构造特殊的请求造成远程命令执行
-    "/imc/login.jsf" && body="/imc/javax.faces.resource/images/login_help.png.jsf?ln=primefaces-imc-new-webui"
+    fofa: "/imc/login.jsf" && body="/imc/javax.faces.resource/images/login_help.png.jsf?ln=primefaces-imc-new-webui"
   reference:
-    - http://wiki.peiqi.tech/wiki/webapp/H3C/H3C%20IMC%20dynamiccontent.properties.xhtm%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C.html
+    - https://www.cnvd.org.cn/patchInfo/show/270651
+  tags: cnvd,cnvd2021,rce
+  created: 2021/10/23
 
 rules:
   r0:

@@ -16,7 +16,5 @@ rules:
     request:
       method: GET
       path: /install/
-      headers:
-        Accept-Encoding: deflate
     expression: response.status == 200 && response.body.bcontains(bytes(string("/view/js/xiuno.js"))) && response.body.bcontains(bytes(string("Choose Language (选择语言)")))
 expression: r0()

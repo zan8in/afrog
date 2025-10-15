@@ -4,11 +4,13 @@ info:
   name: 泛微OA E-Cology LoginSSO.jsp SQL注入漏洞
   author: zan8in
   severity: high
-  description: |
+  description: |-
     泛微e-cology是专为大中型企业制作的OA办公系统,支持PC端、移动端和微信端同时办公等。 泛微e-cology存在SQL注入漏洞。攻击者可利用该漏洞获取敏感信息
-    app="泛微-协同办公OA"
+    fofa: app="泛微-协同办公OA"
   reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEOA%20E-Cology%20LoginSSO.jsp%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E%20CNVD-2021-33202.html
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2021-33202
+  tags: cnvd,cnvd2021,sqli
+  created: 2021/10/23
 
 rules:
   r0:

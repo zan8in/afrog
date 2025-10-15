@@ -4,11 +4,13 @@ info:
   name: 向日葵 check 远程命令执行漏洞
   author: zan8in
   severity: critical
-  description: |
+  description: |-
     向日葵通过发送特定的请求获取CID后，可调用 check接口实现远程命令执行，导致服务器权限被获取
-    body="Verification failure"
+    fofa: body="Verification failure"
   reference:
-    - http://wiki.peiqi.tech/wiki/serverapp/%E5%90%91%E6%97%A5%E8%91%B5/%E5%90%91%E6%97%A5%E8%91%B5%20check%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E%20CNVD-2022-10270.html
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2022-10270
+  tags: cnvd,cnvd2022,unauth,rce,sunflower
+  created: 2022/10/23
 
 rules:
   r0:

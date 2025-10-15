@@ -1,9 +1,16 @@
 id: CNVD-2020-67113
 
 info:
-    name: H5S CONSOLE 存在未授权访问
-    author: iak3ec(https://github.com/nu0l)
-    severity: high
+  name: H5S CONSOLE 存在未授权访问
+  author: iak3ec
+  severity: high
+  description: |
+    H5S CONSOLE 存在未授权访问，攻击者可利用该漏洞获取系统敏感信息
+    app="H5S-CONSOLE"
+  reference:
+    - https://www.cnvd.org.cn/flaw/show/CNVD-2020-67113
+  tags: cnvd,cnvd2020,h5s,console,unauth
+  created: 2020/12/15
 
 rules:
   h5s1:
@@ -17,4 +24,3 @@ rules:
       path: /api/v1/GetDevice
     expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"H5_DEV") && response.body.bcontains(b"strUser") && response.body.bcontains(b"strPasswd")
 expression: h5s1() || h5s2()
-
