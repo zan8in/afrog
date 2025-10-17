@@ -5,8 +5,8 @@ info:
   author: lei_sec
   severity: info
   verified: true
-  description: |
-    FOFA: app="用友-移动系统管理"
+  description: |-
+    fofa: app="用友-移动系统管理"
   tags: yonyou,fingerprint
   created: 2023/07/07
 

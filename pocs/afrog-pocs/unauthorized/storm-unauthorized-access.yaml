@@ -5,13 +5,17 @@ info:
   author: pikpikcu
   severity: medium
   verified: false
-  reference: 
+  reference:
     - https://storm.apache.org/releases/current/STORM-UI-REST-API.html
+  description: |-
+    Apache Storm Unauthorized Access
+  tags: storm,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /api/v1/cluster/summary
-        expression: response.status == 200 && response.body.bcontains(b"{\"totalMem\":") && response.body.bcontains(b"\"stormVersion\":")
+  r0:
+    request:
+      method: GET
+      path: /api/v1/cluster/summary
+    expression: response.status == 200 && response.body.bcontains(b"{\"totalMem\":") && response.body.bcontains(b"\"stormVersion\":")
 expression: r0()

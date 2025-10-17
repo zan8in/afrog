@@ -5,9 +5,12 @@ info:
   author: nu11secur1ty
   severity: high
   verified: false
-  description: URL 路径文件夹3似乎容易受到 XPath 注入攻击。测试payload 50539478' or 4591=4591--提交到URL路径文件夹3，返回XPath错误信息。攻击者可以利用此漏洞向系统发出大量请求，直到他收到该系统所有内容的实际路径，这些内容存储在某些内部或外部服务器上。
+  description: |-
+    URL 路径文件夹3似乎容易受到 XPath 注入攻击。测试payload 50539478' or 4591=4591--提交到URL路径文件夹3，返回XPath错误信息。攻击者可以利用此漏洞向系统发出大量请求，直到他收到该系统所有内容的实际路径，这些内容存储在某些内部或外部服务器上。
   reference:
     - https://github.com/nu11secur1ty/CVE-nu11secur1ty/tree/main/vendors/concretecms.org/2022/concretecms-9.1.3
+  tags: concretecms,xpathinjection
+  created: 2024/04/04
 
 rules:
   r0:

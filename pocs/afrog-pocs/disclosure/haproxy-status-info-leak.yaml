@@ -5,13 +5,16 @@ info:
   author: 不动明王
   severity: medium
   verified: true
-  description: |
+  description: |-
     前端负载均衡，监控后端状态，高可用。
     Dork to find system info leaks using haproxy stats.
     Google Search: inurl:haproxy-status site:example.com
   reference:
     - https://www.cnblogs.com/yinzhengjie/p/12147925.html
     - https://www.exploit-db.com/ghdb/4191
+  tags: haproxy,disclosure
+  created: 2023/10/29
+
 rules:
   r0:
     request:

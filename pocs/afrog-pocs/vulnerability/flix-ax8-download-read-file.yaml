@@ -6,9 +6,9 @@ info:
   severity: high
   description: |
     FLIR-AX8 download.php文件过滤不全 存在任意文件下载漏洞
-    app="FLIR-FLIR-AX8"
-  reference:
-    - http://wiki.peiqi.tech/wiki/iot/%E8%8F%B2%E5%8A%9B%E5%B0%94/FLIR-AX8%20download.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8B%E8%BD%BD.html
+    fofa: app="FLIR-FLIR-AX8"
+  tags: flir,ax8,download,read-file
+  created: 2023/11/14
 
 rules:
   r0:

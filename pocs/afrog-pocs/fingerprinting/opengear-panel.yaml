@@ -5,11 +5,11 @@ info:
   author: ffffffff0x,daffainfo
   severity: info
   verified: true
-  description: |
+  description: |-
     The Opengear Management Console admin panel has been discovered.
-    FOFA: app="opengear-Management-Console"
+    fofa: app="opengear-Management-Console"
     google: intitle:"Opengear Management Console"
-  reference: 
+  reference:
     - https://opengear.com/
   tags: panel,opengear
   created: 2023/06/17

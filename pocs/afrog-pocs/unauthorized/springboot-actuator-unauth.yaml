@@ -8,7 +8,7 @@ info:
   reference:
     - https://github.com/LandGrey/SpringBootVulExploit
   tags: actuator,springboot,unauth
-  created: 2022-12-15
+  created: 2023/07/07
 
 rules:
   r0:

@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
+  description: |-
     CDN detection by afrog
   tags: cdn
   created: 2025/05/15

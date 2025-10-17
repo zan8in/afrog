@@ -5,6 +5,8 @@ info:
   author: Adam Crosser
   severity: info
   verified: true
+  tags: spring,detect
+  created: 2023/07/01
 
 rules:
   r0:

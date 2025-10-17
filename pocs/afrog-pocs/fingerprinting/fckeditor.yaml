@@ -5,6 +5,8 @@ info:
   author: princechaddha,bernardofsr
   severity: info
   verified: true
+  tags: fckeditor,detect
+  created: 2025/05/15
 
 rules:
   r0:

@@ -5,11 +5,11 @@ info:
   author: ffffffff0x
   severity: info
   verified: true
-  description: |
+  description: |-
     An Acrolinx Analytics dashboard was detected.
-    FOFA: title=="Acrolinx Dashboard"
-    SHODAN: http.title:"Acrolinx Dashboard"
-    GOOGLE: inurl:"Acrolinx Dashboard"
+    fofa: title=="Acrolinx Dashboard"
+    shodan: http.title:"Acrolinx Dashboard"
+    google: inurl:"Acrolinx Dashboard"
   reference:
     - https://docs.acrolinx.com/coreplatform/latest/en/analytics/acrolinx-analytics-dashboards
   tags: acrolinx,panel

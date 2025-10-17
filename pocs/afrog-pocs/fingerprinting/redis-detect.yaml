@@ -5,8 +5,10 @@ info:
   author: pussycat0x
   severity: info
   verified: true
-  description: Redis service was detected.
+  description: |-
+    Redis service was detected.
   tags: network,redis
+  created: 2023/08/07
 
 set:
   hostname: request.url.host

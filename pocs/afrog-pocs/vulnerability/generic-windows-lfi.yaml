@@ -4,7 +4,10 @@ info:
   name: Generic Windows based LFI Test
   author: mesaglio,sushantkamble
   severity: high
-  description: Searches for /windows/win.ini on passed URLs
+  description: |-
+    Searches for /windows/win.ini on passed URLs
+  tags: windows,lfi
+  created: 2023/11/14
 
 rules:
   r0:

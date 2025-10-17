@@ -5,7 +5,9 @@ info:
   author: zan8in
   severity: info
   verified: true
-  
+  tags: fanruanoa,detect
+  created: 2025/05/15
+
 rules:
   r0:
     request:

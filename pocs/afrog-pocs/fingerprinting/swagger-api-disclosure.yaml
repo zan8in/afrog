@@ -5,6 +5,8 @@ info:
   author: pdteam
   severity: info
   verified: true
+  tags: swagger,disclosure
+  created: 2023/07/01
 
 rules:
   r0:

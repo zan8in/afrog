@@ -8,8 +8,8 @@ info:
   description: |-
     The Neo4j Browser has been detected.
     CVE-2021-34371 -> Neo4j 3.4及之前的版本存在远程代码执行漏洞。该漏洞源于Neo4j 3.5之前的版本依赖于一个存在远程代码执行漏洞的库(rhino 1.7.9)。当shell服务器开启时，攻击者可通过构造和序列化恶意的Java对象，从shell服务器实现远程代码执行。
-    Fofa: title="Neo4j Browser"
-    Shodan: http.title:"Neo4j Browser"
+    fofa: title="Neo4j Browser"
+    shodan: http.title:"Neo4j Browser"
   tags: neo4j,exposure,unauth,panel
   created: 2023/12/20
 

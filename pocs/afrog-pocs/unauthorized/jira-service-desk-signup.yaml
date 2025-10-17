@@ -5,14 +5,18 @@ info:
   author: TechbrunchFR
   severity: medium
   verified: false
+  description: |-
+    Jira Service Desk Signup
+  tags: jira,servicedesk,signup,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /servicedesk/customer/user/signup
-            headers:
-              Content-Type: application/json
-            body: '{"email":"invalid","signUpContext":{},"secondaryEmail":"","usingNewUi":true}'
-        expression: response.status == 400 && response.body.bcontains(b'signup.validation.errors')
+  r0:
+    request:
+      method: POST
+      path: /servicedesk/customer/user/signup
+      headers:
+        Content-Type: application/json
+      body: '{"email":"invalid","signUpContext":{},"secondaryEmail":"","usingNewUi":true}'
+    expression: response.status == 400 && response.body.bcontains(b'signup.validation.errors')
 expression: r0()

@@ -5,9 +5,9 @@ info:
   author: For3stCo1d
   severity: high
   verified: true
-  description: |
+  description: |-
     Rainloop WebMail default admin login credentials were successful.
-    FOFA: app="RAINLOOP-WebMail"
+    fofa: app="RAINLOOP-WebMail"
   reference:
     - https://github.com/RainLoop/rainloop-webmail/issues/28
   tags: default-login,rainloop,webmail,foss

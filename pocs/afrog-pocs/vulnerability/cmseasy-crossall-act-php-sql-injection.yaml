@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: high
   verified: true
-  description: CmsEasy 存在SQL注入漏洞，通过文件 service.php 加密SQL语句执行即可执行任意SQL命令。影响版本:CmsEasy V7.7.5_20210919 body="cmseasyedit"
+  description: |-
+    CmsEasy 存在SQL注入漏洞，通过文件 service.php 加密SQL语句执行即可执行任意SQL命令。影响版本:CmsEasy V7.7.5_20210919 body="cmseasyedit"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/CmsEasy%20crossall_act.php%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
+  tags: cmseasy,sqlinjection
+  created: 2024/01/01
 
 rules:
   r0:

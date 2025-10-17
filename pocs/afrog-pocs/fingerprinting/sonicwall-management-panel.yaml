@@ -5,6 +5,8 @@ info:
   author: PR3R00T
   severity: info
   verified: true
+  tags: sonicwall,management,panel
+  created: 2023/07/01
 
 rules:
   r0:

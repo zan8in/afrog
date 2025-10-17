@@ -6,8 +6,10 @@ info:
   severity: info
   verified: true
   description: |-
-    fofa:  product="GraphQL"
+    GraphQL API was detected.
+    fofa: product="GraphQL"
   tags: tech,graphql
+  created: 2023/06/14
 
 rules:
   r0:

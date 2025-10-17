@@ -5,7 +5,8 @@ info:
   author: gy741
   severity: high
   verified: false
-  description: Hongdian default login information was detected.
+  description: |-
+    Hongdian default login information was detected.
   reference:
     - https://ssd-disclosure.com/ssd-advisory-hongdian-h8922-multiple-vulnerabilities/
   tags: hongdian,default-login

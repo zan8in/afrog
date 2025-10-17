@@ -5,11 +5,13 @@ info:
   author: r3dg33k
   severity: info
   verified: true
-  description: |
+  description: |-
     Publicly accessible Microsoft Exchange Server Control Panel
-    Fofa: app="Microsoft-Exchange"
+    fofa: app="Microsoft-Exchange"
   reference:
     - https://docs.microsoft.com/en-us/answers/questions/58814/block-microsoft-exchange-server-2016-exchange-admi.html
+  tags: panel,exchange,detect
+  created: 2024/01/05
 
 set:
   hostUrl: request.url

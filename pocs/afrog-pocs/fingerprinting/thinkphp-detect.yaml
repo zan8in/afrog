@@ -1,16 +1,19 @@
 id: thinkphp-detect
 
 info:
-    name: ThinkPHP detect
-    author: zan8in
-    severity: info
-    verified: true
-    description: fofa app="ThinkPHP"
+  name: ThinkPHP detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    fofa app="ThinkPHP"
+  tags: thinkphp,detect
+  created: 2023/07/01
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /index.php?m=1
-        expression: '"ThinkPHP</a><sup>([0-9]+.[0-9]+.[0-9]+)</sup>".bmatches(response.body)'
+  r0:
+    request:
+      method: GET
+      path: /index.php?m=1
+    expression: '"ThinkPHP</a><sup>([0-9]+.[0-9]+.[0-9]+)</sup>".bmatches(response.body)'
 expression: r0()

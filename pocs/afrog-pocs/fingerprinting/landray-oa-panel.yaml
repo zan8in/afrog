@@ -5,7 +5,10 @@ info:
   author: YanYun
   severity: info
   verified: true
-  description: app="Landray-OA系统"
+  description: |-
+    app="Landray-OA系统"
+  tags: landray,oa,panel,detect
+  created: 2024/01/05
 
 rules:
   r0:

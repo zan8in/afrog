@@ -5,10 +5,10 @@ info:
   author: ritikchaddha
   severity: info
   verified: true
-  description: |
+  description: |-
     Live Helper Chat admin login panel was detected.
-    SHODAN: title:"Live Helper Chat"
-    FOFA: title="Live Helper Chat"
+    shodan: title:"Live Helper Chat"
+    fofa: title="Live Helper Chat"
   tags: livehelperchat,panel
   created: 2023/06/17
 

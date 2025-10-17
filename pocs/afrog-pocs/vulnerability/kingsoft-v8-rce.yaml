@@ -5,6 +5,10 @@ info:
   author: zan8in
   severity: critical
   verified: false
+  description: |-
+    金山 V8 终端安全系统 存在命令执行漏洞，攻击者可以通过漏洞执行任意命令
+  tags: kingsoft,rce
+  created: 2023/10/13
 
 rules:
   r0:

@@ -5,32 +5,37 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: app="Jenkins"
+  description: |-
+    Jenkins default admin login credentials were detected.
+  reference:
+    - https://www.tenable.com/plugins/nessus/105243
+  tags: default-login,jenkins
+  created: 2023/06/24
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /login
-        expression: |
-          response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
-        stop_if_mismatch: true
-    r1:
-        request:
-            method: POST
-            path: /j_spring_security_check
-            body: |
-              j_username=admin&j_password=admin&from=&Submit=Sign+in
-        expression: |
-          response.status == 302 && !response.headers["location"].contains("loginError")
-        stop_if_match: true
-    r2:
-        request:
-            method: POST
-            path: /j_spring_security_check
-            body: |
-              j_username=jenkins&j_password=password&from=&Submit=Sign+in
-        expression: |
-          response.status == 302 && response.body.bcontains(b'<title>工作台 [Jenkins]</title>')
-        stop_if_match: true
+  r0:
+    request:
+      method: GET
+      path: /login
+    expression: |
+      response.status == 200 && response.body.bcontains(b'Sign in [Jenkins]')
+    stop_if_mismatch: true
+  r1:
+    request:
+      method: POST
+      path: /j_spring_security_check
+      body: |
+        j_username=admin&j_password=admin&from=&Submit=Sign+in
+    expression: |
+      response.status == 302 && !response.headers["location"].contains("loginError")
+    stop_if_match: true
+  r2:
+    request:
+      method: POST
+      path: /j_spring_security_check
+      body: |
+        j_username=jenkins&j_password=password&from=&Submit=Sign+in
+    expression: |
+      response.status == 302 && response.body.bcontains(b'<title>工作台 [Jenkins]</title>')
+    stop_if_match: true
 expression: r0() && (r1() || r2())

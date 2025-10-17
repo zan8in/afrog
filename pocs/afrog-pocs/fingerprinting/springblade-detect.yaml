@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     SpringBlade 是一个由商业级项目升级优化而来的SpringCloud分布式微服务架构、SpringBoot单体式微服务架构并存的综合型项目。</p><p>SpringBlade 框架存在默认SIGN_KEY，攻击者可利用漏洞获取用户账号密码日志等敏感信息。
-    Fofa: body="saber/iconfont.css" || body="Saber 将不能正常工作"||title="Sword Admin"||body="We're sorry but avue-data doesn't work"
+    fofa: body="saber/iconfont.css" || body="Saber 将不能正常工作"||title="Sword Admin"||body="We're sorry but avue-data doesn't work"
   tags: springblade,detect
   created: 2023/12/12
 

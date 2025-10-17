@@ -1,18 +1,19 @@
 id: laravel-debug-info-leak
 
 info:
-    name: Laravel Debug Info Leak
-    author: Dem0ns (https://github.com/dem0ns)
-    severity: high
-    verified: true
-    description: |
-        Laravel 开启 Debug mode，可能泄露web路径、数据库账号密码等敏感信息
+  name: Laravel Debug Info Leak
+  author: Dem0ns
+  severity: high
+  verified: true
+  description: |-
+    Laravel 开启 Debug mode，可能泄露web路径、数据库账号密码等敏感信息
+  tags: laravel,disclosure
+  created: 2023/10/29
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /
-        expression: response.status == 405 && response.body.bcontains(b"MethodNotAllowedHttpException") && response.body.bcontains(b"Environment &amp; details") && (response.body.bcontains(b"vendor\\laravel\\framework\\src\\Illuminate\\Routing\\RouteCollection.php") || response.body.bcontains(b"vendor/laravel/framework/src/Illuminate/Routing/RouteCollection.php"))
+  r0:
+    request:
+      method: POST
+      path: /
+    expression: response.status == 405 && response.body.bcontains(b"MethodNotAllowedHttpException") && response.body.bcontains(b"Environment &amp; details") && (response.body.bcontains(b"vendor\\laravel\\framework\\src\\Illuminate\\Routing\\RouteCollection.php") || response.body.bcontains(b"vendor/laravel/framework/src/Illuminate/Routing/RouteCollection.php"))
 expression: r0()
-

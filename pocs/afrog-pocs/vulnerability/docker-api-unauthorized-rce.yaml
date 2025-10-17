@@ -2,19 +2,20 @@ id: docker-api-unauthorized-rce
 
 info:
   name: docker api未授权访问rce
-  author: j4ckzh0u(https://github.com/j4ckzh0u)
+  author: j4ckzh0u
   severity: critical
-  description: |
+  description: |-
     docker api未授权访问rce
-    fofa-query: port=2375 && protocol=="docker"
+    fofa: port=2375 && protocol=="docker"
   reference:
     - https://github.com/vulhub/vulhub/tree/master/docker/unauthorized-rce
-    
+  tags: docker,rce
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /info
-        expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"KernelVersion") && response.body.bcontains(b"RegistryConfig") && response.body.bcontains(b"DockerRootDir")
+  r0:
+    request:
+      method: GET
+      path: /info
+    expression: response.status == 200 && response.content_type.contains("json") && response.body.bcontains(b"KernelVersion") && response.body.bcontains(b"RegistryConfig") && response.body.bcontains(b"DockerRootDir")
 expression: r0()

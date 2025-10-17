@@ -5,10 +5,10 @@ info:
   author: For3stCo1d
   severity: high
   verified: true
-  description: |
+  description: |-
     Jupyterhub default admin credentials were discovered.
-    SHODAN: http.title:"JupyterHub"
-    FOFA: title="JupyterHub"
+    shodan: http.title:"JupyterHub"
+    fofa: title="JupyterHub"
   reference:
     - https://github.com/jupyterhub/jupyterhub
   tags: jupyterhub,default-login

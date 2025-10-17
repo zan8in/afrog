@@ -1,15 +1,18 @@
 id: laravel-improper-webdir
 
 info:
-    name: Laravel Improper Webdir
-    author: Dem0ns (https://github.com/dem0ns)
-    severity: high
+  name: Laravel Improper Webdir
+  author: Dem0ns
+  severity: high
+  description: |-
+    Laravel 开启 Debug mode，可能泄露web路径、数据库账号密码等敏感信息
+  tags: laravel,disclosure
+  created: 2024/02/29
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /storage/logs/laravel.log
-        expression: response.status == 200 && (response.content_type.contains("plain") || response.content_type.contains("octet-stream")) && (response.body.bcontains(b"vendor\\laravel\\framework") || response.body.bcontains(b"vendor/laravel/framework")) && (response.body.bcontains(b"stacktrace") || response.body.bcontains(b"Stack trace"))
+  r0:
+    request:
+      method: GET
+      path: /storage/logs/laravel.log
+    expression: response.status == 200 && (response.content_type.contains("plain") || response.content_type.contains("octet-stream")) && (response.body.bcontains(b"vendor\\laravel\\framework") || response.body.bcontains(b"vendor/laravel/framework")) && (response.body.bcontains(b"stacktrace") || response.body.bcontains(b"Stack trace"))
 expression: r0()
-

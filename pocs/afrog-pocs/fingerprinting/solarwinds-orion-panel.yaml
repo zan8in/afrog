@@ -5,6 +5,8 @@ info:
   author: puzzlepeaches
   severity: info
   verified: true
+  tags: solarwinds,orion,panel
+  created: 2023/07/01
 
 rules:
   r0:

@@ -5,12 +5,13 @@ info:
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     飞视美（facemeeting）：facemeeting，即飞视美，隶属飞鱼星科技有限公司，坐落在四川成都，以SAAS模式提供国际标准的多媒体通讯服务，为即租即用的全新一代视频会议产品。飞视美专注提供高效、智能的视频会议解决方案，服务中小企业各类会议、协同办公等领域，通过网络进行异地实时的音视频沟通，协助中小企业构建高效、智能的统一通信系统平台。飞视美 视频会议系统存在Struts2远程命令执行漏洞，攻击者通过漏洞可以获取服务器权限。
-    fofa-query: app="飞视美-视频会议系统"
+    fofa: app="飞视美-视频会议系统"
   reference:
     - https://mp.weixin.qq.com/s/mBAaR8bA2eibUgBcLDipfA
-    
+  tags: facemeeting,struts2,rce
+  created: 2023/11/14
 
 rules:
   r0:

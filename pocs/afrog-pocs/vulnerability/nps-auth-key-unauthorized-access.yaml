@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     NPS auth_key 存在未授权访问漏洞，当 nps.conf 中的 auth_key 未配置时攻击者通过生成特定的请求包可以获取服务器后台权限
-    fofa-query: body="serializeArray()" && body="/login/verify"
+    fofa: body="serializeArray()" && body="/login/verify"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/NPS%20auth_key%20%E6%9C%AA%E6%8E%88%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E.md
+  tags: nps,unauth,fileread
+  created: 2023/09/05
 
 set:
   tstamp: timestamp_second(0)

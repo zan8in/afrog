@@ -4,7 +4,8 @@ info:
   name: SAP NetWeaver WebGUI Detection
   author: randomstr1ng
   severity: info
-  description: Detection of SAP NetWeaver ABAP Webserver WebGUI
+  description: |-
+    Detection of SAP NetWeaver ABAP Webserver WebGUI
   tags: sap,webserver,tech
   created: 2024/04/15
 

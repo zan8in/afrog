@@ -1,14 +1,18 @@
 id: discuz-wechat-plugins-unauth
 
 info:
-    name: Discuz Wechat Plugins Unauth
-    author: JrD
-    severity: high
+  name: Discuz Wechat Plugins Unauth
+  author: JrD
+  severity: high
+  description: |-
+    Discuz Wechat Plugins Unauth
+  tags: discuz,wechat,unauth
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /plugin.php?id=wechat:wechat&ac=wxregister
-        expression: response.status == 302 && "set-cookie" in response.headers && response.headers["set-cookie"].contains("auth") && "location" in response.headers && response.headers["location"].contains("wsq.discuz.com")
+  r0:
+    request:
+      method: GET
+      path: /plugin.php?id=wechat:wechat&ac=wxregister
+    expression: response.status == 302 && "set-cookie" in response.headers && response.headers["set-cookie"].contains("auth") && "location" in response.headers && response.headers["location"].contains("wsq.discuz.com")
 expression: r0()

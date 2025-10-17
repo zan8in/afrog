@@ -5,10 +5,10 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: |
+  description: |-
     Memcached是一套分布式的高速缓存系统。它以Key-Value（键值对）形式将数据存储在内存中，由于memcached安全设计缺陷，客户端连接memcached服务器后 无需认证就 可读取、修改服务器缓存内容。
+  tags: memcache,unauth
   created: 2023/05/16
-
 
 set:
   hostname: request.url.host

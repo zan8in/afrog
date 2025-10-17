@@ -5,12 +5,15 @@ info:
   author: righettod
   severity: info
   verified: true
-  description: Try to detect the presence of a Jenkins API instance via the API default XML endpoint
+  description: |-
+    Try to detect the presence of a Jenkins API instance via the API default XML endpoint
+  tags: jenkins,api,panel,default,admin,credentials
+  created: 2023/06/17
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /api/xml
-        expression: response.status == 200 && response.body.bcontains(b"hudson.model.Hudson")
+  r0:
+    request:
+      method: GET
+      path: /api/xml
+    expression: response.status == 200 && response.body.bcontains(b"hudson.model.Hudson")
 expression: r0()

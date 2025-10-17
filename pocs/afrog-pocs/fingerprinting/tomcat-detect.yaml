@@ -5,9 +5,9 @@ info:
   author: philippedelteil,dhiyaneshDk
   severity: info
   verified: true
-  description: |
+  description: |-
     An Apache Tomcat Manager panel was discovered.
-    app="APACHE-Tomcat"
+    fofa: app="APACHE-Tomcat"
   tags: tomcat,detect,panel
   created: 2023/10/14
 

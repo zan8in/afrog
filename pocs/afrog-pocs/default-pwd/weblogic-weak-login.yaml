@@ -2,87 +2,88 @@ id: weblogic-weak-login
 
 info:
   name: WebLogic Weak Login
-  author: shadown1ng(https://github.com/shadown1ng)
-  description: WebLogic default login credentials were discovered.
+  author: shadown1ng
+  description: |-
+    WebLogic default login credentials were discovered.
   severity: high
   verified: true
   tags: weblogic,weak-login
   created: 2023/10/14
 
 set:
-    username: "weblogic"
-    password-1: "weblogic"
-    password-2: "weblogic1"
-    password-3: "welcome1"
-    password-4: "Oracle@123"
-    password-5: "weblogic123"
-    username-2: "admin"
-    password-22: "12345678"
-    password-23: "security"
-    username-3: "system"
-    password-33: "password"
+  username: "weblogic"
+  password-1: "weblogic"
+  password-2: "weblogic1"
+  password-3: "welcome1"
+  password-4: "Oracle@123"
+  password-5: "weblogic123"
+  username-2: "admin"
+  password-22: "12345678"
+  password-23: "security"
+  username-3: "system"
+  password-33: "password"
 rules:
-    r00:
-        request:
-            method: HEAD
-            path: /console/j_security_check
-        expression: |
-            response.status == 302  && response.headers['set-cookie'].contains("ADMINCONSOLESESSION")
-        stop_if_mismatch: true
-    r0:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username}}&j_password={{password-1}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r1:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username}}&j_password={{password-2}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r2:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username}}&j_password={{password-3}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r3:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username}}&j_password={{password-4}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r4:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username}}&j_password={{password-5}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r5:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username-2}}&j_password={{password-22}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r6:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username-2}}&j_password={{password-23}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
-    r7:
-        request:
-            method: POST
-            path: /console/j_security_check
-            body: j_username={{username-3}}&j_password={{password-33}}&j_character_encoding=UTF-8
-        expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
-        stop_if_match: true
+  r00:
+    request:
+      method: HEAD
+      path: /console/j_security_check
+    expression: |
+      response.status == 302  && response.headers['set-cookie'].contains("ADMINCONSOLESESSION")
+    stop_if_mismatch: true
+  r0:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username}}&j_password={{password-1}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r1:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username}}&j_password={{password-2}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r2:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username}}&j_password={{password-3}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r3:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username}}&j_password={{password-4}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r4:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username}}&j_password={{password-5}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r5:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username-2}}&j_password={{password-22}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r6:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username-2}}&j_password={{password-23}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
+  r7:
+    request:
+      method: POST
+      path: /console/j_security_check
+      body: j_username={{username-3}}&j_password={{password-33}}&j_character_encoding=UTF-8
+    expression: response.status == 302 && !response.headers["location"].icontains("LoginForm.jsp")
+    stop_if_match: true
 expression: r00() && (r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7())

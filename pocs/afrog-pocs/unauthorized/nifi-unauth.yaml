@@ -5,10 +5,10 @@ info:
   author: pwnhxl
   severity: high
   verified: true
-  description: |
-     Apache NiFi server was able to be accessed because no authentication was required.
-     SHODAN: title:"NiFi"
-     FOFA: title="nifi" && body="Did you mean"
+  description: |-
+    Apache NiFi server was able to be accessed because no authentication was required.
+    shodan: title:"NiFi"
+    fofa: title="nifi" && body="Did you mean"
   reference:
     - https://github.com/jm0x0/apache_nifi_processor_rce
   tags: misconfig,apache,nifi,unauth

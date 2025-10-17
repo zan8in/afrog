@@ -5,10 +5,10 @@ info:
   author: For3stCo1d
   severity: high
   verifed: true
-  description: |
+  description: |-
     Emqx default admin credentials were discovered.
-    SHODAN: http.favicon.hash:"-670975485"
-    FOFA: icon_hash="-670975485"
+    shodan: http.favicon.hash:"-670975485"
+    fofa: icon_hash="-670975485"
   tags: emqx,default-login
   created: 2023/06/24
 

@@ -4,11 +4,11 @@ info:
   name: 科迈 RAS系统 Cookie验证越权漏洞
   author: zan8in
   severity: high
-  description: |
+  description: |-
     科迈 RAS系统 存在Cookie验证越权，当 RAS_Admin_UserInfo_UserName 设置为 admin 时可访问后台
-    app="科迈-RAS系统"
-  reference:
-    - http://wiki.peiqi.tech/wiki/webapp/%E7%A7%91%E8%BF%88/%E7%A7%91%E8%BF%88%20RAS%E7%B3%BB%E7%BB%9F%20Cookie%E9%AA%8C%E8%AF%81%E8%B6%8A%E6%9D%83%E6%BC%8F%E6%B4%9E.html
+    fofa: app="科迈-RAS系统"
+  tags: maike,ras,cookie-bypass
+  created: 2025/03/27
 
 rules:
   r0:

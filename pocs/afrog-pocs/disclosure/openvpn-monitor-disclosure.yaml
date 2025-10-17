@@ -5,9 +5,12 @@ info:
   author: geeknik
   severity: medium
   verified: true
-  description: openvpn-monitor is a simple python program to generate html that displays the status of an OpenVPN server, including all current connections.
+  description: |-
+    openvpn-monitor is a simple python program to generate html that displays the status of an OpenVPN server, including all current connections.
   reference:
     - https://openvpn-monitor.openbytes.ie/
+  tags: openvpn,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

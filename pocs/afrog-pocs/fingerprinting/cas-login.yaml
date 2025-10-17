@@ -5,10 +5,12 @@ info:
   author: pdteam
   severity: info
   verified: true
-  description: |
+  description: |-
     shodan-query: http.title:'CAS - Central Authentication Service'
   reference:
     - https://github.com/apereo/cas
+  tags: cas,login,detect
+  created: 2023/06/17
 
 rules:
   r0:

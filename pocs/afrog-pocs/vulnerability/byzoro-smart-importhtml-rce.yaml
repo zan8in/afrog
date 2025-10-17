@@ -5,11 +5,11 @@ info:
   author: zan8in
   severity: critical
   verified: true
-  description: |
+  description: |-
     百卓 importhtml.php文件sql语句无过滤，通过Sql语句可远程命令执行
-    title="Smart管理平台"
-  reference:
-    - http://wiki.peiqi.tech/wiki/iot/%E7%99%BE%E5%8D%93/%E7%99%BE%E5%8D%93%20Smart%20importhtml.php%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+    fofa: title="Smart管理平台"
+  tags: byzoro,smart,importhtml,rce
+  created: 2025/08/15
 
 rules:
   r0:

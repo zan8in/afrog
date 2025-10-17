@@ -5,7 +5,8 @@ info:
   author: lu4nx
   severity: high
   verified: true
-  description: ClickHouse was able to be accessed with no required authentication in place.
+  description: |-
+    ClickHouse was able to be accessed with no required authentication in place.
   tags: network,clickhouse,unauth
   created: 2022/07/20
 

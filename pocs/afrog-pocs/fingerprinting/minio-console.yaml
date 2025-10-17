@@ -5,9 +5,12 @@ info:
   author: pussycat0x
   severity: info
   verified: true
-  description: |
-    fofa-query: app="MinIO-Console"
-    shodan-query: title:"MinIO Console"
+  description: |-
+    MinIO Console is a web-based interface for MinIO server.
+    fofa: app="MinIO-Console"
+    shodan: title:"MinIO Console"
+  tags: panel,minio,detect
+  created: 2024/01/05
 
 rules:
   r0:

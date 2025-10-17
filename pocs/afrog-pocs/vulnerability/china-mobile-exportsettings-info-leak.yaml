@@ -5,9 +5,11 @@ info:
   author: jijue
   severity: high
   verified: true
-  description: |
+  description: |-
     中国移动 禹路由 ExportSettings.sh 存在敏感信息泄露漏洞，攻击者通过漏洞获取配置文件，其中包含账号密码等敏感信息
-    title="互联世界 物联未来-登录"
+    fofa: title="互联世界 物联未来-登录"
+  tags: mobile,exportsettings,info-leak
+  created: 2023/05/26
 
 rules:
   r0:

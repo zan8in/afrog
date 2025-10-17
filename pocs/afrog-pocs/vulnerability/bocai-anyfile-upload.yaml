@@ -7,10 +7,11 @@ info:
   verified: false
   description: |
     网络赌博是指通过互联网手段（非法赌博网站、博彩App、微信群等）进行的赌博活动。由于网络赌博不合法，资金不受法律保护，有很多“出老千”的行为，很多人被骗后往往不敢报警，导致家破人亡，所以打击赌博，刻不容缓。某菠菜系统系统存在任意文件上传漏洞，攻击者通过漏洞可以上传木马文件，导致服务器失陷。
-    fofa-query: body="main.e5ee9b2df05fc2d310734b11cc8c911e.css"
+    fofa: body="main.e5ee9b2df05fc2d310734b11cc8c911e.css"
   reference:
     - https://mp.weixin.qq.com/s/q7rSG_sAMmbd5o6m532arg
-    
+  tags: bocai,anyfileupload
+  created: 2025/08/15
 
 rules:
   r0:

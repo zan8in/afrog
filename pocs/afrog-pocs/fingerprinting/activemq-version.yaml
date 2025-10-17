@@ -5,7 +5,10 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: ActiveMQ Version Detect
+  description: |-
+    ActiveMQ Version Detect
+  tags: activemq,version
+  created: 2023/06/17
 
 set:
   hostname: request.url.host
@@ -37,7 +40,3 @@ rules:
           ext1: '"ProviderVersion.+(?P<version>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
           version: ext1["version"]
 expression: r0() || r1()
-
-
-
-  

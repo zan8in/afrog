@@ -5,7 +5,8 @@ info:
   author: pikpikcu
   severity: high
   verified: false
-  description: FRP default login credentials were discovered.
+  description: |-
+    FRP default login credentials were discovered.
   reference:
     - https://github.com/fatedier/frp/issues/1840
   tags: frp,default-login

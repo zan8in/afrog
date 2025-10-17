@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     页面搜一下sec_pwd，有可能会暴露密码信息
-    FOFA: app="大唐电信AC集中管理平台"
+    fofa: app="大唐电信AC集中管理平台"
   tags: datang,disclosure
   created: 2023/10/29
 

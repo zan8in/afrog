@@ -5,6 +5,8 @@ info:
   author: zan8in
   severity: info
   verified: true
+  tags: dlink,panel
+  created: 2023/12/22
 
 rules:
   r0:

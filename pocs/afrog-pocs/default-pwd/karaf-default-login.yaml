@@ -5,10 +5,10 @@ info:
   author: s0obi
   severity: high
   verified: true
-  description: |
+  description: |-
     Apache Karaf contains a default login vulnerability. Default login credentials were detected. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
-    SHODAN: realm="karaf"
-    FOFA: apache-karaf
+    shodan: realm="karaf"
+    fofa: apache-karaf
   reference:
     - https://karaf.apache.org/manual/latest/webconsole
   tags: default-login,apache,karaf

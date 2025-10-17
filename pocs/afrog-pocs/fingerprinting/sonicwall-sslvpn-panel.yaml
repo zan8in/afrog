@@ -5,8 +5,10 @@ info:
   author: PR3R00T
   severity: info
   verified: true
-  description: |
+  description: |-
     shodan: http.title:"Virtual Office"
+  tags: sonicwall,sslvpn,panel
+  created: 2023/07/01
 
 rules:
   r0:

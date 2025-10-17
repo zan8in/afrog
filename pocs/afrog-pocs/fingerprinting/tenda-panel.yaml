@@ -5,11 +5,13 @@ info:
   author: doinb1517
   severity: info
   verified: true
-  description: |
+  description: |-
     A Tenda panel was detected.
     app="tenda-路由器"
   reference:
     - https://www.tenda.com.cn/default.html
+  tags: tenda,panel
+  created: 2023/07/01
 
 rules:
   r0:

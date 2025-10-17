@@ -5,11 +5,13 @@ info:
   author: random_robbie,meme-lord
   severity: info
   verified: true
-  description: |
+  description: |-
     An Adminer login panel was detected.
-    app="Adminer"
+    fofa: app="Adminer"
   reference:
     - https://blog.sorcery.ie/posts/adminer/
+  tags: adminer,panel
+  created: 2023/06/17
 
 rules:
   r0:

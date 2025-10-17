@@ -1,21 +1,24 @@
 id: gitlab-panel
 
 info:
-    name: GitLab Panel
-    author: zan8in
-    severity: info
-    description: fofa app="GitLab"
-    verified: true
+  name: GitLab Panel
+  author: zan8in
+  severity: info
+  description: |-
+    GitLab panel was detected.
+    fofa app="GitLab"
+  tags: gitlab,panel
+  created: 2023/06/14
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /explore
-        expression: response.status == 200 && response.body.ibcontains(b"<title>Projects · Explore · GitLab</title>")
-    r1:
-        request:
-            method: GET
-            path: /users/sign_in
-        expression: response.status == 200 && (resp.raw_header.ibcontains(b"_gitlab_session") || resp.body.bcontains(b"gon.default_issues_tracker") || resp.body.bcontains(b"GitLab Community Edition"))
+  r0:
+    request:
+      method: GET
+      path: /explore
+    expression: response.status == 200 && response.body.ibcontains(b"<title>Projects · Explore · GitLab</title>")
+  r1:
+    request:
+      method: GET
+      path: /users/sign_in
+    expression: response.status == 200 && (resp.raw_header.ibcontains(b"_gitlab_session") || resp.body.bcontains(b"gon.default_issues_tracker") || resp.body.bcontains(b"GitLab Community Edition"))
 expression: r0() || r1()

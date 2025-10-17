@@ -5,9 +5,9 @@ info:
   author: dhiyaneshDK
   severity: info
   verified: true
-  description: |
+  description: |-
     ZOHO ManageEngine analytics plus panel was detected.
-    FOFA: app="ZOHO-流量管理"
+    fofa: app="ZOHO-流量管理"
   tags: panel,zoho,manageengine
   created: 2023/06/17
 

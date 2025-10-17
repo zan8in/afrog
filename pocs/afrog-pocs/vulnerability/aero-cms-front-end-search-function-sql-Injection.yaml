@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: high
   verified: false
-  description: AeroCMS v0.0.1发现可以通过search.php文件中的search参数进行sql注入。该漏洞允许攻击者在未经身份验证的情况下获得数据库管理员权限并访问数据库信息。
+  description: |-
+    AeroCMS v0.0.1发现可以通过search.php文件中的search参数进行sql注入。该漏洞允许攻击者在未经身份验证的情况下获得数据库管理员权限并访问数据库信息。
   reference:
     - https://github.com/MegaTKC/AeroCMS/issues/8
+  tags: aero,sqli
+  created: 2025/03/21
 
 rules:
   r0:

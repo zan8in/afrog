@@ -4,10 +4,10 @@ info:
   name: XXL-JOB Default Login
   author: pdteam,ritikchaddha
   severity: high
-  description: |
+  description: |-
     XXL-JOB default admin credentials were discovered.
-    SHODAN: http.favicon.hash:1691956220
-    FOFA: icon_hash="1691956220"
+    shodan: http.favicon.hash:1691956220
+    fofa: icon_hash="1691956220"
   reference:
     - https://github.com/xuxueli/xxl-job
   tags: default-login,xxljob

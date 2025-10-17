@@ -5,7 +5,8 @@ info:
   author: Adam Crosser
   severity: high
   verified: false
-  description: Fuel CMS default admin credentials were discovered.
+  description: |-
+    Fuel CMS default admin credentials were discovered.
   reference:
     - https://docs.getfuelcms.com/general/security
   tags: fuelcms,default-login,oss

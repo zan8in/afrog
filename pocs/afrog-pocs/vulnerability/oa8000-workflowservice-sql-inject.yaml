@@ -4,11 +4,11 @@ info:
   name: 华天动力OA 8000版 workFlowService SQL注入漏洞
   author: zan8in
   severity: high
-  description: |
+  description: |-
     华天动力OA 8000版 workFlowService接口存在SQL注入漏洞，攻击者通过漏洞可获取数据库敏感信息
-    app="华天动力-OA8000"
-  reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E5%8D%8E%E5%A4%A9OA/%E5%8D%8E%E5%A4%A9%E5%8A%A8%E5%8A%9BOA%208000%E7%89%88%20workFlowService%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
+    fofa: app="华天动力-OA8000"
+  tags: oa,sql-inject
+  created: 2024/06/25
 
 rules:
   r0:

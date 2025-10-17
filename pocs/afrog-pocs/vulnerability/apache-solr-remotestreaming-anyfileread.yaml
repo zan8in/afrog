@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: high
   verified: false
-  description: |
+  description: |-
     ApacheSolr是一个功能强大的开源搜索服务器，它支持REST风格API。在ApacheSolr未开启认证的情况下，攻击者可直接构造特定请求开启特定配置，并最终造成任意文件读取。
-    fofa-query: app="APACHE-Solr"
+    fofa: app="APACHE-Solr"
   reference:
     - https://mp.weixin.qq.com/s/VMZfbUClU8I72pAzzitAOA
+  tags: apache,solr,fileread
+  created: 2023/12/29
 
 rules:
   r0:

@@ -5,10 +5,10 @@ info:
   author: j4vaovo
   severity: high
   verified: true
-  description: |
+  description: |-
     Apache Zeppelin server was able to be accessed because no authentication was required.
-    SHODAN: title:"Zeppelin"
-    FOFA: title="Zeppelin"
+    shodan: title:"Zeppelin"
+    fofa: title="Zeppelin"
   reference:
     - https://www.adminxe.com/2172.html
   tags: misconfig,apache,zeppelin,unauth

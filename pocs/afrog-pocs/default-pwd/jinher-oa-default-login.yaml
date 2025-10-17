@@ -4,12 +4,12 @@ info:
   name: Jinher oa C6 Default Password
   author: ritikchaddha
   severity: high
-  description: |
+  description: |-
     Jinher-OA C6 default administrator account credential.
     使用弱密码登录，admin:000000。访问写入大马路径，写入aspx大马->点击保存，写入大马：
     /C6/JHSoft.Web.Portal/EditMain.aspx?id=1.aspx
-    FOFA: app="金和网络-金和OA" 
-    FOFA: body="src=\"/c6/WebResource.axd"
+    fofa: app="金和网络-金和OA" 
+    fofa: body="src=\"/c6/WebResource.axd"
   reference:
     - https://github.com/nu0l/poc-wiki/blob/main/%E9%87%91%E5%92%8COA-C6-default-password.md
     - https://mp.weixin.qq.com/s/ZMJ1XdxThyKNvjvg4Ey90Q

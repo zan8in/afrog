@@ -5,12 +5,14 @@ info:
   author: For3stCo1d
   severity: info
   verified: true
-  description: |
+  description: |-
     Cloudera Hue default admin credentials were discovered. 
-    Fofa： title="Hue - 欢迎使用 Hue"
     default admin login: admin/admin   hue/hue  hadoop/hadoop   cloudera/cloudera
+    fofa: title="Hue - 欢迎使用 Hue"
   reference:
     - https://github.com/cloudera/hue
+  tags: hue,login,panel,default,admin,credentials
+  created: 2023/06/17
 
 rules:
   r0:

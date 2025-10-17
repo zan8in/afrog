@@ -5,9 +5,9 @@ info:
   author: PaperPen
   severity: high
   verified: true
-  description: |
+  description: |-
     A StackStorm default admin login was discovered.
-    FOFA: app="stackstorm"
+    fofa: app="stackstorm"
   reference:
     - https://github.com/StackStorm/st2-docker
   tags: stackstorm,default-login
@@ -29,4 +29,3 @@ rules:
       response.body.bcontains(b'"token":') &&
       response.body.bcontains(b'"expiry":')
 expression: r0()
-      

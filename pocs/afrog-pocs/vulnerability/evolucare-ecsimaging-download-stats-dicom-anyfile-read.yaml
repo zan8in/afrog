@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: critical
   verified: false
-  description: |
+  description: |-
     Evolucare Ecsimaging download_stats_dicom.php 存在文件读取漏洞,攻击者可利用该漏洞获取系统敏感信息等.漏洞影响:EVOLUCARE Evolucare Ecsimaging 6.21.5
-    body="ECSimaging"
+    fofa: body="ECSimaging"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/Evolucare%20Ecsimaging%20download_stats_dicom.php%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.md
+  tags: evolucare,ecsimaging,file-read
+  created: 2023/11/14
 
 rules:
   r0:

@@ -5,7 +5,8 @@ info:
   author: pdteam
   severity: high
   verified: true
-
+  tags: tomcat,default-login
+  created: 2023/06/24
 
 set:
   adminb64: base64('admin:admin')
@@ -18,19 +19,19 @@ rules:
       path: /manager/html
       headers:
         Authorization: "Basic {{adminb64}}"
-    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>")
   r1:
     request:
       method: GET
       path: /manager/html
       headers:
         Authorization: "Basic {{tomcatb64}}"
-    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>")
   r2:
     request:
       method: GET
       path: /manager/html
       headers:
         Authorization: "Basic {{admin123}}"
-    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>") 
+    expression: response.status == 200 && response.headers["set-cookie"].contains('JSESSIONID') && response.body.bcontains(b"<title>/manager</title>")
 expression: r0() || r1() || r2()

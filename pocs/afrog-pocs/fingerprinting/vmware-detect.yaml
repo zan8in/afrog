@@ -5,9 +5,9 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
+  description: |-
     通过调用 VMWare Sphere 组件的 SOAP API，可以获取其版本信息。
-    Hunter: app.name="VMWare vSphere Information Page"
+    hunter: app.name="VMWare vSphere Information Page"
   tags: vmware,vmware-vcenter,build-version
   created: 2023/11/13
 

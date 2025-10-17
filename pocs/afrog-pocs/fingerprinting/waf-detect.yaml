@@ -5,9 +5,9 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
+  description: |-
     WAF detection by afrog
-  tags: waf
+  tags: waf,detect
   created: 2025/05/15
 
 # from https://github.com/chainreactors/templates/blob/f9a28ba2bdac49c3670871d8800f80a873bbc4e5/fingers/http/waf.yaml

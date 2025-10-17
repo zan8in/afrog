@@ -5,6 +5,8 @@ info:
   author: pikpikcu
   severity: info
   verified: true
+  tags: zentao,fingerprint
+  created: 2023/07/07
 
 rules:
   r0:

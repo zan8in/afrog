@@ -5,10 +5,10 @@ info:
   author: pdteam
   severity: high
   verified: true
-  description: |
+  description: |-
     An Apache Apisix default admin login was discovered.
-    SHODAN: title:"Apache APISIX Dashboard"
-    FOFA: title="Apache APISIX Dashboard"
+    shodan: title:"Apache APISIX Dashboard"
+    fofa: title="Apache APISIX Dashboard"
   reference:
     - https://apisix.apache.org/
   tags: apisix,apache,default-login

@@ -5,8 +5,10 @@ info:
   author: ffffffff0x
   severity: info
   verified: true
-  description: |
-    fofa-query: title="emessage"
+  description: |-
+    fofa: title="emessage"
+  tags: emessage,panel
+  created: 2025/05/15
 
 rules:
   r0:
@@ -17,4 +19,3 @@ rules:
     expression: |
       response.status == 200 && "(?i)<title>emessage.*</title>".bmatches(bytes(response.body))
 expression: r0()
-

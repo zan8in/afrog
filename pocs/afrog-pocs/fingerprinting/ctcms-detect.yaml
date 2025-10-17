@@ -5,7 +5,10 @@ info:
   author: jijue
   severity: info
   verified: true
-  description: app="ctcms"
+  description: |-
+    app="ctcms"
+  tags: ctcms,detect
+  created: 2025/05/15
 
 rules:
   r0:

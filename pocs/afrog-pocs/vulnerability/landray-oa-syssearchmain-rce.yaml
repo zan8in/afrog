@@ -5,11 +5,11 @@ info:
   author: zan8in
   severity: critical
   verified: true
-  description: |
+  description: |-
     蓝凌OA sysSearchMain.do文件 存在任意文件写入漏洞，攻击者获取后台权限后可通过漏洞写入任意文件，也可以通过 custom.jsp 文件未授权写入恶意文件
-    app="Landray-OA系统"
-  reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E8%93%9D%E5%87%8COA/%E8%93%9D%E5%87%8COA%20sysSearchMain.do%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+    fofa: app="Landray-OA系统"
+  tags: landray,rce,fileread
+  created: 2024/12/30
 
 rules:
   r0:

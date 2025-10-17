@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: high
   verified: true
-  description: |
+  description: |-
     畅捷CRM是面向小企业全力打造的简单、实用的客户关系管理应用!畅捷CRM帮助企业用好自己的客户资源、管好商机跟进过程、引导好业务员跟单行为。畅捷CRM系统存在SQL注入和后台文件上传漏洞，攻击者可以通过上传木马执行任意命令，获取服务器管理权限。
-    fofa-query: title="畅捷CRM"
+    fofa: title="畅捷CRM"
   reference:
     - https://mp.weixin.qq.com/s/ZjjXqN1RDeOQIH9ueTPymQ
+  tags: chanjet-crm,sqli
+  created: 2025/08/29
 
 rules:
   r0:

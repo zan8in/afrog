@@ -5,11 +5,14 @@ info:
   author: c-sh0
   severity: high
   verified: true
-  description: Cobbler default login credentials for the testing module (testing/testing) were discovered. fofa "Cobbler"
+  description: |-
+    Cobbler default login credentials for the testing module (testing/testing) were discovered. fofa "Cobbler"
   reference:
     - https://seclists.org/oss-sec/2022/q1/146
     - https://github.com/cobbler/cobbler/issues/2307
     - https://github.com/cobbler/cobbler/issues/2909
+  tags: cobbler,defaultlogin
+  created: 2024/04/04
 
 rules:
   r0:

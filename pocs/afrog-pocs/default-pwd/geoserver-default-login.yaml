@@ -5,9 +5,9 @@ info:
   author: For3stCo1d
   severity: high
   verified: true
-  description: |
+  description: |-
     Geoserver default admin credentials were discovered.
-    fofa-query: app="GeoServer"
+    fofa: app="GeoServer"
   reference:
     - http://geoserver.org/
   tags: geoserver,default-login
@@ -26,6 +26,6 @@ rules:
     extractors:
       - type: word
         extractor:
-          user: 'admin'
+          user: "admin"
           pass: "geoserver"
 expression: r0()

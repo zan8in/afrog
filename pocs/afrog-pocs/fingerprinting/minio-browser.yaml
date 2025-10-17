@@ -5,8 +5,11 @@ info:
   author: pikpikcu
   severity: info
   verified: true
-  description: |
-    shodan-query: title:"MinIO Browser"
+  description: |-
+    MinIO Browser is a web-based interface for MinIO server.
+    shodan: title:"MinIO Browser"
+  tags: panel,minio,detect
+  created: 2024/01/05
 
 rules:
   r0:

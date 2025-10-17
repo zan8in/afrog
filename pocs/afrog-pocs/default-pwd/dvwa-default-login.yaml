@@ -6,7 +6,7 @@ info:
   severity: critical
   description: |-
     Damn Vulnerable Web App (DVWA) is a test application for security professionals. The hard coded credentials are part of a security testing scenario.
-    FOFA: app="Damn-Vulnerable-Web-App-(DVWA)-Login"
+    fofa: app="Damn-Vulnerable-Web-App-(DVWA)-Login"
   reference:
     - https://opensourcelibs.com/lib/dvwa
   tags: dvwa,default-login
@@ -23,4 +23,4 @@ rules:
       body: |
         username=admin&password=password&Login=Login
     expression: response.status == 200 && response.headers["location"] == "index.php"
-expression:  r1()
+expression: r1()

@@ -6,7 +6,7 @@ info:
   severity: info
   description: |-
     Roundcube webmail was detected.
-    shodan-query: http.component:"RoundCube"
+    shodan: http.component:"RoundCube"
   tags: roundcube,portal,tech
   created: 2025/06/16
 

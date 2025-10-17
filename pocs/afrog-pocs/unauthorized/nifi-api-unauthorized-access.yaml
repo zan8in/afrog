@@ -1,18 +1,21 @@
 id: nifi-api-unauthorized-access
 
 info:
-    name: Apache Nifi Api Unauthorized Access
-    author: wulalalaaa(https://github.com/wulalalaaa)
-    severity: high
-    verified: false
-    description: Apache NiFi Api未授权访问导致命令执行
-    reference:
-        - https://nifi.apache.org/docs/nifi-docs/rest-api/index.html
+  name: Apache Nifi Api Unauthorized Access
+  author: wulalalaaa
+  severity: high
+  verified: false
+  description: |-
+    Apache NiFi Api未授权访问导致命令执行
+  reference:
+    - https://nifi.apache.org/docs/nifi-docs/rest-api/index.html
+  tags: apache,nifi,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /nifi-api/flow/current-user
-        expression: response.status == 200 && response.headers["content-type"].contains("json") && response.body.bcontains(b"\"identity\":\"anonymous\",\"anonymous\":true")
+  r0:
+    request:
+      method: GET
+      path: /nifi-api/flow/current-user
+    expression: response.status == 200 && response.headers["content-type"].contains("json") && response.body.bcontains(b"\"identity\":\"anonymous\",\"anonymous\":true")
 expression: r0()

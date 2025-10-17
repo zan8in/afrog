@@ -5,9 +5,12 @@ info:
   author: dr_set
   severity: high
   verified: false
-  description: Verbose SQL error message reveals sensitive information including database credentials.
+  description: |-
+    Verbose SQL error message reveals sensitive information including database credentials.
   reference:
     - https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/in-sqlinjection
+  tags: thinkphp,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

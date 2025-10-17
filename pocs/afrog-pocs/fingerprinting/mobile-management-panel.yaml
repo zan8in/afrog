@@ -5,9 +5,9 @@ info:
   author: ritikchaddha
   severity: info
   verified: true
-  description: |
+  description: |-
     Mobile Management Platform panel was detected.
-    FOFA: title="移动管理平台-企业管理"
+    fofa: title="移动管理平台-企业管理"
   tags: panel,mobile,management
   created: 2023/06/17
 
@@ -22,4 +22,3 @@ rules:
       (response.body.bcontains(b'移动管理平台-企业管理') || 
       response.body.bcontains(b'Mobile management platform'))
 expression: r0()
-

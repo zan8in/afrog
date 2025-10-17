@@ -7,8 +7,8 @@ info:
   verified: true
   description: |
     Apache Ranger contains a default login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
-    SHODAN: http.title:"Ranger - Sign In"
-    FOFA: title="Ranger - Sign In"
+    shodan: http.title:"Ranger - Sign In"
+    fofa: title="Ranger - Sign In"
   reference:
     - https://github.com/apache/ranger
   tags: apache,ranger,default-login

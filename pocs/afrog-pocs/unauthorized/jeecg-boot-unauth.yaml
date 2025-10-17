@@ -5,8 +5,10 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: |
+  description: |-
     fofa: title="Jeecg-Boot"
+  tags: jeecg,boot,unauth
+  created: 2023/07/07
 
 rules:
   r0:

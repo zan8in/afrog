@@ -5,10 +5,10 @@ info:
   author: For3stCo1d
   severity: high
   verified: true
-  description: |
+  description: |-
     Apache DolphinScheduler default admin credentials were discovered.
-    SHODAN: http.title:"DolphinScheduler"
-    FOFA: title="DolphinScheduler"
+    shodan: http.title:"DolphinScheduler"
+    fofa: title="DolphinScheduler"
   reference:
     - https://github.com/apache/dolphinscheduler
   tags: apache,dolphinscheduler,default-login,oss

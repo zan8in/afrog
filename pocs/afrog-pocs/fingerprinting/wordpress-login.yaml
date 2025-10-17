@@ -5,6 +5,10 @@ info:
   author: its0x08
   severity: info
   verfied: true
+  description: |-
+    fofa: app="WordPress"
+  tags: wordpress,login
+  created: 2023/11/13
 
 rules:
   r0:

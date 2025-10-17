@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: high
   verified: false
-  description: |
+  description: |-
     ICEFlow VPN 存在信息泄露漏洞，攻击者可以查看日志中的敏感数据来进一步攻击系统
-    fofa-query: title="ICEFLOW VPN Router"
+    fofa: title="ICEFLOW VPN Router"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/ICEFlow%20VPN%20%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.md
+  tags: iceflow,vpn,info-leak
+  created: 2025/08/20
 
 rules:
   r0:

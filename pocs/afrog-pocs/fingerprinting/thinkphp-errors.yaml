@@ -5,8 +5,8 @@ info:
   author: j4vaovo
   severity: medium
   verified: true
-  description: |
-    FOFA: app="ThinkPHP" && title="System Error"
+  description: |-
+    fofa: app="ThinkPHP" && title="System Error"
   tags: thinkphp,misconfig,exposure
   created: 2023/06/17
 

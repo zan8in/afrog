@@ -3,18 +3,19 @@ id: ftp-anonymous-login
 info:
   name: FTP Anonymous Login
   author: C3l3si4n,pussycat0x
-  severity: medium
+  severity: high
   verified: true
   reference:
     - https://tools.ietf.org/html/rfc2577
-  description: |
+  description: |-
     Anonymous FTP access allows anyone to access your public_ftp folder, allowing unidentified visitors to download (and possibly upload) files on your website. Anonymous FTP creates the potential for a security hole for hackers and is not recommended.
   tags: network,ftp,default-login
+  created: 2023/07/07
 
 rules:
-  r0: 
+  r0:
     request:
       type: go
       data: ftp-anonymous
     expression: response.raw.bcontains(b'Anonymous access allowed,') || response.raw.bcontains(b'Logged in anonymously') || response.raw.bcontains(b'230')
-expression: r0() 
+expression: r0()

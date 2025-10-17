@@ -5,9 +5,9 @@ info:
   author: ffffffff0x
   severity: info
   verified: true
-  description: |
+  description: |-
     An Adminset login panel was detected.
-    FOFA: app="AdminSet"
+    fofa: app="AdminSet"
   reference:
     - https://github.com/guhongze/adminset/
   tags: adminset,panel

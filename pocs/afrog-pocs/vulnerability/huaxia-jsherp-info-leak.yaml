@@ -5,9 +5,11 @@ info:
   author: lei_sec
   severity: high
   verified: true
-  description: |
-    FOFA：body="jshERP"
-  
+  description: |-
+    fofa: body="jshERP"
+  tags: huaxia,jsherp,info-leak
+  created: 2025/08/20
+
 rules:
   r0:
     request:

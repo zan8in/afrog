@@ -5,18 +5,21 @@ info:
   author: pussycat0x,vsh00t
   severity: medium
   verfied: true
-  description: View dashboard with guest login.
+  description: |-
+    View dashboard with guest login.
   reference:
     - https://www.exploit-db.com/ghdb/5595
     - https://packetstormsecurity.com/files/163657/zabbix5x-sqlxss.txt
+  tags: zabbix,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /zabbix/zabbix.php?action=dashboard.list
-            headers:
-              User-Agent: TNAS
-        expression: |
-          response.status == 200 && response.body.bcontains(b'Create dashboard') && response.body.bcontains(b'Zabbix SIA')
+  r0:
+    request:
+      method: GET
+      path: /zabbix/zabbix.php?action=dashboard.list
+      headers:
+        User-Agent: TNAS
+    expression: |
+      response.status == 200 && response.body.bcontains(b'Create dashboard') && response.body.bcontains(b'Zabbix SIA')
 expression: r0()

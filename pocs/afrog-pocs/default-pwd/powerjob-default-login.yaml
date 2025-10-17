@@ -5,10 +5,10 @@ info:
   author: j4vaovo
   severity: high
   verified: true
-  description: |
+  description: |-
     PowerJob default login credentials were discovered.
-    SHODAN: http.title:"PowerJob"
-    FOFA: title="PowerJob"
+    shodan: http.title:"PowerJob"
+    fofa: title="PowerJob"
   reference:
     - https://www.yuque.com/powerjob/guidence/trial
   tags: powerjob,default-login
@@ -22,7 +22,7 @@ rules:
       headers:
         Content-Type: application/json
       body: |
-         {"appName":"powerjob-worker-samples","password":"powerjob123"}
+        {"appName":"powerjob-worker-samples","password":"powerjob123"}
     expression: |
       response.status == 200 && 
       response.body.bcontains(b'{"success":true,"data":') &&

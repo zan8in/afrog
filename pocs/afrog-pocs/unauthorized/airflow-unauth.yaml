@@ -1,17 +1,19 @@
 id: airflow-unauth
 
 info:
-    name: Airflow Unauth
-    author: pa55w0rd(www.pa55w0rd.online/)
-    severity: high
-    verified: true
-    description: app="APACHE-Airflow"
+  name: Airflow Unauth
+  author: pa55w0rd
+  severity: high
+  verified: true
+  description: |-
+    app="APACHE-Airflow"
+  tags: airflow,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /admin/
-        expression: response.status == 200 && response.body.bcontains(b"<title>Airflow - DAGs</title>")
+  r0:
+    request:
+      method: GET
+      path: /admin/
+    expression: response.status == 200 && response.body.bcontains(b"<title>Airflow - DAGs</title>")
 expression: r0()
-

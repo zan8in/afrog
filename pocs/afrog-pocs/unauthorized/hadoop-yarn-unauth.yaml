@@ -5,8 +5,8 @@ info:
   author: p0wd3r,sharecast
   severity: high
   verified: true
-  description: |
-    app="APACHE-hadoop-YARN"
+  description: |-
+    fofa: app="APACHE-hadoop-YARN"
   tags: hadoop,yarn,unauth
   created: 2024/01/17
 

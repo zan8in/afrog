@@ -5,9 +5,9 @@ info:
   author: For3stCo1d
   severity: high
   verified: true
-  description: |
+  description: |-
     An Opentwrt admin login page was discovered.
-    SHODAN: http.title:"OpenWrt - LuCI"
+    shodan: http.title:"OpenWrt - LuCI"
   reference:
     - https://forum.archive.openwrt.org/viewtopic.php?id=16611
   tags: default-login,openwrt

@@ -5,8 +5,10 @@ info:
   author: bing0o,meme-lord
   severity: info
   verified: true
-  description: |
-    shodan-query: product:"Oracle Weblogic"
+  description: |-
+    shodan: product:"Oracle Weblogic"
+  tags: weblogic,panel
+  created: 2023/11/13
 
 set:
   randstr: randomLowercase(10)

@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: medium
   verified: false
-  description: 快排CMS 默认开启日志记录，由于日志名为时间作为文件名，造成管理员的Cookie泄露
+  description: |-
+    快排CMS 默认开启日志记录，由于日志名为时间作为文件名，造成管理员的Cookie泄露
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/%E5%BF%AB%E6%8E%92CMS%20Socket.php%20%E6%97%A5%E5%BF%97%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.md
+  tags: kpcms,log,fileread
+  created: 2023/09/03
 
 set:
   foldername: year(0) + month(0)

@@ -5,11 +5,13 @@ info:
   author: zan8in
   severity: info
   verified: true
+  tags: seeyon,version
+  created: 2024/04/16
 
 rules:
   r0:
     request:
       method: GET
       path: /seeyon/main.do?method=showAbout
-    expression: response.status == 200 && response.body.bcontains(b'>Build Id:</td>') && response.body.bcontains(b'>注册数:</td>')  
+    expression: response.status == 200 && response.body.bcontains(b'>Build Id:</td>') && response.body.bcontains(b'>注册数:</td>')
 expression: r0()

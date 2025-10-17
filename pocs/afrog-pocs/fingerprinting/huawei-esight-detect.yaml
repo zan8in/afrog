@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
+  description: |-
     Huawei ESight api接口存在漏洞，攻击者通过泄漏的信息可以获得账号密码登录后台。
     ------------ SerialNumber 后8位即为初始密码------------
     fofa: app="ESight-ESight-ESight"

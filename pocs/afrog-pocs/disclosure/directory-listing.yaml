@@ -1,10 +1,15 @@
 id: directory-listing
 
 info:
-    name: 目录浏览 列目录
-    author: zan8in
-    severity: info
-    verified: true
+  name: 目录浏览 列目录
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    目录浏览 列目录
+    当目录浏览功能开启时，攻击者可以通过访问目录路径来查看目录下的文件列表。
+  tags: directory-listing,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

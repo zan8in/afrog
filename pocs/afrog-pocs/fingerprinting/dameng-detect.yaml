@@ -7,8 +7,8 @@ info:
   verified: true
   description: |-
     默认端口 5236 默认密码  达梦数据库默认用户密码SYSDBA:SYSDBA
-    Fofa: protocol="dameng"
-    ZoomEye: app:"DMSQL"
+    fofa: protocol="dameng"
+    zoomeye: app:"DMSQL"
   reference:
     - https://www.dameng.com/
   tags: network,db,dameng

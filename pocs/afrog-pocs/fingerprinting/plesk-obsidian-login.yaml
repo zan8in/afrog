@@ -6,14 +6,14 @@ info:
   severity: info
   description: |-
     Plesk Obsidian login panel was detected.
-    shodan-query:
+    shodan:
       - http.html:"Plesk Obsidian"
       - http.html:"plesk obsidian"
       - http.title:"plesk obsidian"
-    fofa-query:
+    fofa:
       - body="plesk obsidian"
       - title="plesk obsidian"
-    google-query: intitle:"plesk obsidian"
+    google: intitle:"plesk obsidian"
   tags: panel,plesk,login,edb
   created: 2025/06/16
 

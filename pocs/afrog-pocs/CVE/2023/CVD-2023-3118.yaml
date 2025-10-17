@@ -7,6 +7,8 @@ info:
   verified: true
   description: |-
     用友 UFIDA ActionHandlerServlet 反序列化漏洞
+  reference:
+    - https://nvd.nist.gov/vuln/detail/CVD-2023-3118
   tags: yongyou,cve,cve2023,deserialization,rce
   created: 2024/11/15
 

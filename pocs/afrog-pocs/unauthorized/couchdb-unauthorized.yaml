@@ -1,15 +1,17 @@
 id: couchdb-unauthorized
 
 info:
-    name: CouchDB Unauthorized
-    author: FiveAourThe(https://github.com/FiveAourThe)
-    severity: high
-    verified: true
+  name: CouchDB Unauthorized
+  author: FiveAourThe
+  severity: high
+  verified: true
+  tags: couchdb,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /_config
-        expression: response.status == 200 && response.body.bcontains(b"httpd_design_handlers") && response.body.bcontains(b"external_manager") && response.body.bcontains(b"replicator_manager")
+  r0:
+    request:
+      method: GET
+      path: /_config
+    expression: response.status == 200 && response.body.bcontains(b"httpd_design_handlers") && response.body.bcontains(b"external_manager") && response.body.bcontains(b"replicator_manager")
 expression: r0()

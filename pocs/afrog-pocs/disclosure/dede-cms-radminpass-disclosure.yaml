@@ -5,10 +5,12 @@ info:
   author: jijue
   severity: high
   verified: true
-  description: |
+  description: |-
     radminpass.php文件是一个用于修改管理员密码的PHP脚本工具
     多出现在新手站长用过这个工具以后忘记删了
-    app="DedeCMS"
+    fofa: app="DedeCMS"
+  tags: dede,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

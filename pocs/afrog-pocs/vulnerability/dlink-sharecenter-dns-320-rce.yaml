@@ -6,9 +6,9 @@ info:
   severity: critical
   description: |
     D-Link ShareCenter DNS-320 system_mgr.cgi 存在远程命令执行，攻击者通过漏洞可以控制服务器
-    app="D_Link-DNS-ShareCenter"
-  reference:
-    - http://wiki.peiqi.tech/wiki/iot/D-Link/D-Link%20ShareCenter%20DNS-320%20system_mgr.cgi%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+    fofa: app="D_Link-DNS-ShareCenter"
+  tags: dlink,rce
+  created: 2023/08/13
 
 rules:
   r0:

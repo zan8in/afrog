@@ -4,11 +4,12 @@ info:
   name: MongoDB Information - Detect
   author: pussycat0x
   severity: info
-  description: |
+  description: |-
     MongoDB build and server information was detected.
   reference:
     - https://nmap.org/nsedoc/scripts/mongodb-info.html
   tags: network,mongodb,enum
+  created: 2024/01/05
 
 set:
   hostname: request.url.host
@@ -21,4 +22,4 @@ rules:
       data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
       data-type: hex
     expression: response.raw.ibcontains(b'version') && response.raw.ibcontains(b'maxBsonObjectSize')
-expression:  r0()
+expression: r0()

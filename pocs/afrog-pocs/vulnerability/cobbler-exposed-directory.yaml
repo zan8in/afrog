@@ -5,7 +5,10 @@ info:
   author: c-sh0
   severity: medium
   verified: false
-  description: Searches for exposed Cobbler Directories
+  description: |-
+    Searches for exposed Cobbler Directories
+  tags: cobbler,exposeddirectory
+  created: 2024/04/04
 
 rules:
   r0:

@@ -4,11 +4,13 @@ info:
   name: Oracle Fatwire 6.3 - Path Traversal
   author: Bernardo Rodrigues @bernardofsr
   severity: high
-  description: |
+  description: |-
     Oracle Fatwire 6.3 suffers from a path traversal vulnerability in the getSurvey.jsp endpoint.
-    app="Oracle-FatWire-Content-Server"
+    fofa: app="Oracle-FatWire-Content-Server"
   reference:
     - https://www.exploit-db.com/exploits/50167
+  tags: oracle,fatwire,lfi
+  created: 2024/06/25
 
 rules:
   r0:

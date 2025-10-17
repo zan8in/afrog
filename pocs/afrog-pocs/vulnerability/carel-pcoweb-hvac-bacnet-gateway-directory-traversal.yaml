@@ -5,9 +5,12 @@ info:
   author: LiquidWorm
   severity: high
   verified: true
-  description: 设备存在未经验证的任意文件泄漏漏洞.输入通过“file”GET参数通过“logdownload”传递。cgi'Bash脚本在用于下载日志文件之前未正确验证。这可以被利用通过目录遍历攻击泄露任意和敏感文件的内容。
+  description: |-
+    设备存在未经验证的任意文件泄漏漏洞.输入通过“file”GET参数通过“logdownload”传递。cgi'Bash脚本在用于下载日志文件之前未正确验证。这可以被利用通过目录遍历攻击泄露任意和敏感文件的内容。
   reference:
     - https://www.exploit-db.com/exploits/50986
+  tags: carel-pcoweb-hvac-bacnet-gateway,directory-traversal
+  created: 2025/08/15
 
 rules:
   r0:

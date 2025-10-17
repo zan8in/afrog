@@ -5,9 +5,9 @@ info:
   author: Natto97
   severity: high
   verified: false
-  description: |
+  description: |-
     phpMyAdmin contains a default login vulnerability. An attacker can obtain access to user accounts and access sensitive information, modify data, and/or execute unauthorized operations.
-    SHODAN: http.title:phpMyAdmin
+    shodan: http.title:phpMyAdmin
   reference:
     - https://www.phpmyadmin.net
   tags: default-login,phpmyadmin
@@ -42,7 +42,7 @@ rules:
     expression: |
       response.status == 302 &&
       response.raw_header.ibcontains(b'phpMyAdmin=') && 
-      response.raw_header.ibcontains(b'pmaUser-1=') 
+      response.raw_header.ibcontains(b'pmaUser-1=')
     stop_if_match: true
   r2:
     request:
@@ -55,7 +55,7 @@ rules:
     expression: |
       response.status == 302 &&
       response.raw_header.ibcontains(b'phpMyAdmin=') && 
-      response.raw_header.ibcontains(b'pmaUser-1=') 
+      response.raw_header.ibcontains(b'pmaUser-1=')
     stop_if_match: true
   r3:
     request:
@@ -68,7 +68,7 @@ rules:
     expression: |
       response.status == 302 &&
       response.raw_header.ibcontains(b'phpMyAdmin=') && 
-      response.raw_header.ibcontains(b'pmaUser-1=') 
+      response.raw_header.ibcontains(b'pmaUser-1=')
     stop_if_match: true
   r4:
     request:
@@ -82,7 +82,7 @@ rules:
       response.status == 302 &&
       response.raw_header.ibcontains(b'phpMyAdmin=') && 
       response.raw_header.ibcontains(b'pmaUser-1=')
-    stop_if_match: true 
+    stop_if_match: true
   r5:
     request:
       method: POST

@@ -5,9 +5,9 @@ info:
   author: Lark Lab
   severity: high
   verified: true
-  description: |
+  description: |-
     An AlphaWeb XE default login was discovered.
-    FOFA: alphaweb 
+    fofa: alphaweb
   reference:
     - https://wiki.zenitel.com/wiki/AlphaWeb
   tags: default-login,AlphaWeb

@@ -1,15 +1,19 @@
 id: jupyter-notebook-unauthorized-access
 
 info:
-    name: Jupyter Notebook Unauthorized Access
-    author: bufsnake(https://github.com/bufsnake)
-    severity: high
-    verified: false
+  name: Jupyter Notebook Unauthorized Access
+  author: bufsnake
+  severity: high
+  verified: false
+  description: |-
+    Jupyter Notebook Unauthorized Access
+  tags: jupyter,notebook,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /terminals/3
-        expression: response.status == 200 && response.body.bcontains(b"terminals/websocket") && !response.body.bcontains(b"Password:")
+  r0:
+    request:
+      method: GET
+      path: /terminals/3
+    expression: response.status == 200 && response.body.bcontains(b"terminals/websocket") && !response.body.bcontains(b"Password:")
 expression: r0()

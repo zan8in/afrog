@@ -4,9 +4,9 @@ info:
   name: Huawei HG532e Default Credential
   author: pussycat0x
   severity: high
-  description: |
+  description: |-
     Huawei HG532e default admin credentials were discovered.
-    SHODAN: http.html:"HG532e"
+    shodan: http.html:"HG532e"
   tags: default-login,huawei
   created: 2023/06/24
 

@@ -5,9 +5,12 @@ info:
   author: nu11secur1ty
   severity: medium
   verified: false
-  description: Canteen-Management-1.0-2022 存在 XSS-Reflected 漏洞。任意提供的 URL 参数的名称被复制到封装在双引号中的 HTML 标记属性的值中。攻击者可以制作一个非常恶意的 HTTPS URL 重定向到一个非常恶意的 URL。
+  description: |-
+    Canteen-Management-1.0-2022 存在 XSS-Reflected 漏洞。任意提供的 URL 参数的名称被复制到封装在双引号中的 HTML 标记属性的值中。攻击者可以制作一个非常恶意的 HTTPS URL 重定向到一个非常恶意的 URL。
   reference:
     - https://github.com/nu11secur1ty/CVE-nu11secur1ty/tree/main/vendors/mayuri_k/2022/Canteen-Management
+  tags: canteen-management,xss
+  created: 2025/08/15
 
 rules:
   r0:

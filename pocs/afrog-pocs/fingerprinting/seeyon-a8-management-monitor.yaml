@@ -5,10 +5,12 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: |
+  description: |-
     A8 Management Monitor 
-    fofa：app="致远互联-OA" 
-  
+    fofa: app="致远互联-OA"
+  tags: seeyon,a8,monitor
+  created: 2024/04/16
+
 rules:
   r0:
     request:

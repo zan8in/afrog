@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: high
   verified: true
-  description: |
+  description: |-
     Alibaba AnyProxy 低版本存在任意文件读取，通过漏洞，攻击者可以获取服务器敏感信息。漏洞影响：Alibaba AnyProxy < 4.0.10
-    fofa-query: "anyproxy"
+    fofa: "anyproxy"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/Alibaba%20AnyProxy%20fetchBody%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.md
+  tags: anyproxy,sqli
+  created: 2025/03/21
 
 rules:
   r0:

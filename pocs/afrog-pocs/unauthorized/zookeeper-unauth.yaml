@@ -5,13 +5,12 @@ info:
   author: pdteam
   severity: high
   verified: true
-  description: |
+  description: |-
     Apache ZooKeeper was able to be accessed without any required authentication.
     fofa: port="2181" && protocol="zookeeper"
   reference:
     - https://zookeeper.apache.org/security.html
   tags: network,zookeeper,unauth
-
 
 set:
   hostname: request.url.host

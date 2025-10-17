@@ -5,17 +5,20 @@ info:
   author: pdteam
   severity: info
   verified: true
-  description: Jenkins is an open source automation server.
+  description: |-
+    Jenkins is an open source automation server.
   reference:
     - https://www.jenkins.io/doc/book/security/
+  tags: jenkins,login,panel,default,admin,credentials
+  created: 2023/06/17
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /login
-        expression: |
-          response.status == 200 && 
-          (response.body.ibcontains(b'Sign in [Jenkins]') ||
-          response.body.ibcontains(b'<title>登录 [Jenkins]</title>'))
+  r0:
+    request:
+      method: GET
+      path: /login
+    expression: |
+      response.status == 200 && 
+      (response.body.ibcontains(b'Sign in [Jenkins]') ||
+      response.body.ibcontains(b'<title>登录 [Jenkins]</title>'))
 expression: r0()

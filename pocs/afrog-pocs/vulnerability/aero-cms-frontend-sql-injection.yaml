@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: high
   verified: false
-  description: AeroCMS v0.0.1 被发现通过 \author_posts.php 中的“author”参数包含 SQL 注入漏洞。该漏洞使攻击者无需身份验证即可获得数据库管理员权限并访问数据库信息。
+  description: |-
+    AeroCMS v0.0.1 被发现通过 \author_posts.php 中的“author”参数包含 SQL 注入漏洞。该漏洞使攻击者无需身份验证即可获得数据库管理员权限并访问数据库信息。
   reference:
     - https://github.com/MegaTKC/AeroCMS/issues/6
+  tags: aero,sqli
+  created: 2025/03/21
 
 set:
   s1: randomInt(100000, 200000)

@@ -5,6 +5,9 @@ info:
   author: 0w4ys
   severity: info
   verified: true
+  description: |-
+    Directory listing via DS_Store file.
+  tags: ds-store,leak
 
 rules:
   r0:

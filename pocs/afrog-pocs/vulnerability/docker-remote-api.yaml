@@ -4,10 +4,10 @@ info:
   name: Docker Remote API
   author: zan8in
   severity: critical
-  description: |
+  description: |-
     fofa: port="2375" && server="docker"
-  reference:
-    - http://wiki.peiqi.tech/redteam/vulnerability/unauthorized/Docker%202375%E7%AB%AF%E5%8F%A3.html
+  tags: docker,remote,enum
+  created: 2023/05/16
 
 rules:
   r0:
@@ -19,5 +19,5 @@ rules:
     request:
       method: GET
       path: /containers/json
-    expression: response.status == 200 && response.content_type.contains("application/json") 
+    expression: response.status == 200 && response.content_type.contains("application/json")
 expression: r0() && r1()

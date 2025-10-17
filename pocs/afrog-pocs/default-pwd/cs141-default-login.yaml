@@ -4,10 +4,10 @@ info:
   name: UPS Adapter CS141 SNMP Module Default Login
   author: socketz
   severity: high
-  description: |
+  description: |-
     UPS Adapter CS141 SNMP Module default login credentials were discovered.
-    SHODAN: http.html:"CS141"
-    FOFA: app="GENEREX-CS141-Webmanager"
+    shodan: http.html:"CS141"
+    fofa: app="GENEREX-CS141-Webmanager"
   reference:
     - https://www.generex.de/media/pages/packages/documents/manuals/f65348d5b6-1628841637/manual_CS141_en.pdf
   tags: hiawatha,iot,default-login

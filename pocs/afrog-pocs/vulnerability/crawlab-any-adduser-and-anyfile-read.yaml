@@ -5,14 +5,16 @@ info:
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     Crawlab users 的 api 存在任意用户添加，且添加为未授权接口，可通过添加后在后台进一步攻击。漏洞影响:Crawlab v0.0.1
-    fofa-query: title="Crawlab"
+    fofa: title="Crawlab"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/Crawlab%20users%20%E4%BB%BB%E6%84%8F%E7%94%A8%E6%88%B7%E6%B7%BB%E5%8A%A0%E6%BC%8F%E6%B4%9E.md
+  tags: crawlab,anyadduser,anyfileread
+  created: 2024/04/04
 
 set:
-    r1: randomLowercase(20)
+  r1: randomLowercase(20)
 rules:
   r0:
     request:

@@ -5,6 +5,10 @@ info:
   author: zan8in
   severity: low
   verified: true
+  description: |-
+    Apache Hadoop 存在目录浏览漏洞，攻击者可以通过访问/dfshealth.html来获取Hadoop集群的配置信息。
+  tags: hadoop,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

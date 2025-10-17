@@ -5,11 +5,11 @@ info:
   author: zan8in
   severity: critical
   verified: true
-  description: |
+  description: |-
     博华网龙防火墙 cmd.php 过滤不足，导致命令拼接执行远程命令
     "博华网龙防火墙"
-  reference:
-    - http://wiki.peiqi.tech/wiki/iot/%E5%8D%9A%E5%8D%8E%E7%BD%91%E9%BE%99/%E5%8D%9A%E5%8D%8E%E7%BD%91%E9%BE%99%E9%98%B2%E7%81%AB%E5%A2%99%20cmd.php%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+  tags: bohuangwanglong,cmdphp,rce
+  created: 2025/08/15
 
 rules:
   r0:

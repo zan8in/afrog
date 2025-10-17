@@ -4,17 +4,10 @@ info:
   name: Fiori Launchpad Login Panel - Detect
   author: dhiyaneshDK
   severity: info
-  description: Fiori Launchpad login panel was detected.
+  description: |-
+    Fiori Launchpad login panel was detected.
   reference:
     - https://www.exploit-db.com/ghdb/6793
-  classification:
-    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N
-    cwe-id: CWE-200
-    cpe: cpe:2.3:a:sap:fiori_launchpad:*:*:*:*:*:*:*:*
-  metadata:
-    max-request: 1
-    product: fiori_launchpad
-    vendor: sap
   tags: panel,edb,sap
   created: 2024/04/15
 

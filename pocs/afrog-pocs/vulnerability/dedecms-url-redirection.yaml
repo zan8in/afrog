@@ -1,14 +1,18 @@
 id: dedecms-url-redirection
 
 info:
-    name: DedeCMS URL Redirection
-    author: cc_ci(https://github.com/cc8ci)
-    severity: low
+  name: DedeCMS URL Redirection
+  author: cc_ci
+  severity: low
+  description: |-
+    DedeCMS URL Redirection
+  tags: dedecms,url-redirection
+  created: 2023/08/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /plus/download.php?open=1&link=aHR0cDovL3d3dy5iYWlkdS5jb20%3D
-        expression: response.status == 302 && response.headers["location"] == "http://www.baidu.com"
+  r0:
+    request:
+      method: GET
+      path: /plus/download.php?open=1&link=aHR0cDovL3d3dy5iYWlkdS5jb20%3D
+    expression: response.status == 302 && response.headers["location"] == "http://www.baidu.com"
 expression: r0()

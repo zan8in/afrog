@@ -1,9 +1,13 @@
 id: qilin-bastion-host-rce
 
 info:
-    name: qilin bastion host rce
-    author: For3stCo1d (https://github.com/For3stCo1d)
-    severity: high
+  name: qilin bastion host rce
+  author: For3stCo1d
+  severity: high
+  description: |-
+    qilin bastion host rce
+  tags: qilin,bastion,host,rce
+  created: 2023/06/07
 
 set:
   r2: randomLowercase(10)
@@ -19,4 +23,3 @@ rules:
       path: /{{r2}}.php
     expression: response.status == 200 && response.body.bcontains(bytes(md5(r2)))
 expression: r0() && r1()
-

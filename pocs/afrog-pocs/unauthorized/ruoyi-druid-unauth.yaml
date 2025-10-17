@@ -5,6 +5,10 @@ info:
   author: Str1am
   severity: high
   verified: true
+  description: |-
+    若依管理系统未授权访问
+  tags: ruoyi,druid,unauth
+  created: 2023/07/07
 
 rules:
   r0:

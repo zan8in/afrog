@@ -5,13 +5,15 @@ info:
   author: pussycat0x
   severity: info
   verified: false
-  description: |
-    fofa-query: app="Kubernetes-Enterprise-Manager"
+  description: |-
+    fofa: app="Kubernetes-Enterprise-Manager"
+  tags: kubernetes,enterprise,manager,detect
+  created: 2024/01/05
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /metrics
-        expression: response.status == 200 && response.body.bcontains(b"Kubernetes Enterprise Manager")
-expression: r0() 
+  r0:
+    request:
+      method: GET
+      path: /metrics
+    expression: response.status == 200 && response.body.bcontains(b"Kubernetes Enterprise Manager")
+expression: r0()

@@ -5,8 +5,10 @@ info:
   author: zan8in
   severity: info
   verified: true
-  description: MySQL instance was detected
+  description: |-
+    MySQL instance was detected
   tags: network,db,mysql
+  created: 2024/01/05
 
 set:
   host: request.url.domain
@@ -19,13 +21,13 @@ rules:
       data: "\n"
     expression: |
       response.raw.ibcontains(b"mysql") || 
-      response.raw.ibcontains(b"mariadb") 
+      response.raw.ibcontains(b"mariadb")
     extractors:
       - type: regex
         extractor:
           ext: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
           mysql: ext["mysql"]
-    
+
   r1:
     request:
       type: tcp
@@ -33,14 +35,10 @@ rules:
       data: "\n"
     expression: |
       response.raw.ibcontains(b"mysql") || 
-      response.raw.ibcontains(b"mariadb") 
+      response.raw.ibcontains(b"mariadb")
     extractors:
       - type: regex
         extractor:
           ext: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
           mysql: ext["mysql"]
-expression: r0() || r1() 
-
-
-
-  
+expression: r0() || r1()

@@ -4,7 +4,8 @@ info:
   name: kkFileView Panel - Detect
   author: arafatansari
   severity: info
-  description: kkFileView panel was detected.
+  description: |-
+    kkFileView panel was detected.
   tags: panel,kkfileview
   created: 2024/01/05
 

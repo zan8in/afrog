@@ -1,31 +1,31 @@
 id: shiro-detect
 
 info:
-    name: Shiro Detect
-    author: zan8in
-    severity: info
-    verified: true
-    description: |
-        FOFA: app="APACHE-Shiro"
-    tags: shiro,detect
-    created: 2023/07/01
+  name: Shiro Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    fofa: app="APACHE-Shiro"
+  tags: shiro,detect
+  created: 2023/07/01
 
 set:
-    randstr: randomLowercase(6)
+  randstr: randomLowercase(6)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /
-            follow_redirects: true
-            headers:
-              cookie: JSESSIONID={{randstr}};rememberMe=123;
-        expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
-    r1:
-        request:
-            method: GET
-            path: /
-            headers:
-              cookie: JSESSIONID={{randstr}};rememberMe=123;
-        expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
+  r0:
+    request:
+      method: GET
+      path: /
+      follow_redirects: true
+      headers:
+        cookie: JSESSIONID={{randstr}};rememberMe=123;
+    expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
+  r1:
+    request:
+      method: GET
+      path: /
+      headers:
+        cookie: JSESSIONID={{randstr}};rememberMe=123;
+    expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
 expression: r0() || r1()

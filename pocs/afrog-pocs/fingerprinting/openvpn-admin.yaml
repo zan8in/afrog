@@ -5,10 +5,12 @@ info:
   author: ritikchaddha
   severity: info
   verified: true
-  description: |
+  description: |-
     OpenVPN Admin login panel was detected.
-    shodan-query: http.title:"OpenVPN-Admin"
+    shodan: http.title:"OpenVPN-Admin"
     fofa: title="OpenVPN-Admin"
+  tags: panel,openvpn
+  created: 2023/11/30
 
 rules:
   r0:

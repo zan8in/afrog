@@ -4,12 +4,13 @@ info:
   name: HFS 2.3h 命令执行漏洞检测
   author: chatgpt
   severity: critical
-  description: |
+  description: |-
     检测 HttpFileServer (HFS) v2.3h 存在命令执行漏洞，允许远程攻击者通过构造特定 search 参数执行系统命令。
   reference:
     - https://www.exploit-db.com/exploits/34668
     - https://nvd.nist.gov/vuln/detail/CVE-2014-6287
   tags: rce,hfs,cve,cve2014,windows
+  created: 2023/06/17
 
 rules:
   r0:

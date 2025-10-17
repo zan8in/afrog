@@ -5,6 +5,8 @@ info:
   author: pdteam,daffainfo,meme-lord,dhiyaneshDK
   severity: low
   verified: true
+  tags: php,disclosure
+  created: 2023/10/29
 
 rules:
   r0:

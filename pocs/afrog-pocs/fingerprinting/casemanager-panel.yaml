@@ -5,9 +5,9 @@ info:
   author: ffffffff0x
   severity: info
   verified: true
-  description: |
+  description: |-
     CaseManager login panel was detected.
-    FOFA: title="CaseManager"
+    fofa: title="CaseManager"
   tags: casemanager,panel
   created: 2023/06/17
 

@@ -5,7 +5,8 @@ info:
   author: zan8in
   severity: info
   verified: true
-  tags: mapgis,panel,cloud
+  tags: mapgis,panel,cloud,detect
+  created: 2024/01/05
 
 rules:
   r0:

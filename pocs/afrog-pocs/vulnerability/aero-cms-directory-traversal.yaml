@@ -5,9 +5,12 @@ info:
   author: daffainfo
   severity: medium
   verified: false
-  description: AeroCMS v0.0.1 被发现包含目录遍历漏洞。该漏洞是由于未能规范化 url。该漏洞允许攻击者读取网站根目录中的任意文件。
+  description: |-
+    AeroCMS v0.0.1 被发现包含目录遍历漏洞。该漏洞是由于未能规范化 url。该漏洞允许攻击者读取网站根目录中的任意文件。
   reference:
     - https://github.com/MegaTKC/AeroCMS/issues/7
+  tags: aero,sqli
+  created: 2025/03/21
 
 rules:
   r0:

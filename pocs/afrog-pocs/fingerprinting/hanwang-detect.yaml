@@ -5,8 +5,8 @@ info:
   author: ffffffff0x
   severity: info
   verified: true
-  description: |
-    FOFA: 汉王人脸考勤管理系统
+  description: |-
+    fofa: 汉王人脸考勤管理系统
   tags: hanwang,tech
   created: 2023/06/17
 

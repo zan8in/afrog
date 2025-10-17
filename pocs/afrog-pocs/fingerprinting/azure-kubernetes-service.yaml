@@ -5,11 +5,13 @@ info:
   author: dhiyaneshDk
   severity: info
   verified: true
+  tags: azure,aks,kubernetes,detect
+  created: 2023/06/17
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /version
-        expression: response.status == 200 && response.body.bcontains(b"<title>Welcome to Azure Kubernetes Service (AKS)</title>")
-expression: r0() 
+  r0:
+    request:
+      method: GET
+      path: /version
+    expression: response.status == 200 && response.body.bcontains(b"<title>Welcome to Azure Kubernetes Service (AKS)</title>")
+expression: r0()

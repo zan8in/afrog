@@ -5,10 +5,10 @@ info:
   author: Geekby
   severity: high
   verified: true
-  description: |
+  description: |-
     OpenEMR default admin credentials were discovered.
-    FOFA: app="OpenEMR"
-    SHODAN: http.html:"OpenEMR"
+    fofa: app="OpenEMR"
+    shodan: http.html:"OpenEMR"
   reference:
     - https://github.com/openemr/openemr-devops/tree/master/docker/openemr/6.1.0/#openemr-official-docker-image
   tags: openemr,default-login

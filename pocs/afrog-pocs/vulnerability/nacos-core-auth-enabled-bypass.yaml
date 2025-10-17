@@ -5,7 +5,10 @@ info:
   author: yoyo
   severity: critical
   verified: true
-  description: atlassian-bitbucket-代码注入-CVE-2022-36804
+  description: |-
+    atlassian-bitbucket-代码注入-CVE-2022-36804
+  tags: nacos,sqli
+  created: 2025/03/27
 
 rules:
   r0:

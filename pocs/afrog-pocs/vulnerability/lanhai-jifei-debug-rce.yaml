@@ -7,10 +7,10 @@ info:
   verified: true
   description: |
     蓝海卓越认证计费管理系统是一套以实现网络运营为基础，增强全局安全为中心，提高管理效率为目的的网络安全运营管理系统，提供“高安全、可运营、易管理”的运营管理体验。另外，友好的Web访问管理的方式，为用户提供更好用、易用的方式，更贴心的使用形式。蓝海卓越认证计费管理系统存在命令注入漏洞，攻击者可以通过指定接口执行任意命令，获取服务器管理权限。
-    fofa-query: title=="蓝海卓越计费管理系统"
+    fofa: title=="蓝海卓越计费管理系统"
   reference:
     - https://mp.weixin.qq.com/s/gqlfmCYXA9xX5Ku-36ixaQ
- 
+
 rules:
   r0:
     request:

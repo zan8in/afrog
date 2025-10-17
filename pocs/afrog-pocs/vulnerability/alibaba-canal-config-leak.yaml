@@ -5,11 +5,11 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: |
+  description: |-
     由于/api/v1/canal/config 未进行权限验证可直接访问，导致账户密码、accessKey、secretKey等一系列敏感信息泄露
-    title="Canal Admin"
-  reference:
-    - http://wiki.peiqi.tech/wiki/webapp/AlibabaCanal/Alibaba%20Canal%20config%20%E4%BA%91%E5%AF%86%E9%92%A5%E4%BF%A1%E6%81%AF%E6%B3%84%E9%9C%B2%E6%BC%8F%E6%B4%9E.html
+    fofa: title="Canal Admin"
+  tags: canal,sqli
+  created: 2025/03/21
 
 rules:
   r0:

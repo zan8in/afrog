@@ -5,47 +5,51 @@ info:
   author: TESS
   severity: info
   verfied: true
+  description: |-
+    Jira Unauthenticated Admin Projects
+  tags: jira,unauth
+  created: 2023/07/07
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /rest/menu/latest/admin
-        expression: response.status == 200 && response.body.bcontains(b'key') && response.body.bcontains(b'link') && response.body.bcontains(b'label') && response.body.bcontains(b'self') && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
-    r1:
-      request:
-          method: GET
-          path: /rest/api/2/dashboard?maxResults=100
-      expression: response.status == 200 && response.body.bcontains(b'dashboards') && response.body.bcontains(b'startAt') && response.body.bcontains(b'maxResults')
-    r2:
-        request:
-            method: GET
-            path: /rest/config/1.0/directory
-            follow_redirects: true
-        expression: response.status == 200 && response.body.bcontains(b'jaxbDirectoryContents')
-    r3:
-        request:
-            method: GET
-            path: /rest/api/2/projectCategory?maxResults=1000
-        expression: response.status == 200 && response.body.bcontains(b'self') && response.body.bcontains(b'description') && response.body.bcontains(b'name')  && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
-    r4:
-        request:
-            method: GET
-            path: /rest/api/2/project?maxResults=100
-        expression: response.status == 200 && response.body.bcontains(b'projects') && response.body.bcontains(b'startAt') && response.body.bcontains(b'maxResults')
-    r5:
-        request:
-            method: GET
-            path: /rest/api/2/resolution
-        expression: response.status == 200 && response.body.bcontains(b'self') && response.body.bcontains(b'description') && response.body.bcontains(b'name') && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
-    r6:
-        request:
-            method: GET
-            path: /rest/api/2/screens
-        expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"name":') && response.body.bcontains(b'"description":')
-    r7:
-        request:
-            method: GET
-            path: /secure/popups/UserPickerBrowser.jspa
-        expression: response.body.bcontains(b'user-picker')
+  r0:
+    request:
+      method: GET
+      path: /rest/menu/latest/admin
+    expression: response.status == 200 && response.body.bcontains(b'key') && response.body.bcontains(b'link') && response.body.bcontains(b'label') && response.body.bcontains(b'self') && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
+  r1:
+    request:
+      method: GET
+      path: /rest/api/2/dashboard?maxResults=100
+    expression: response.status == 200 && response.body.bcontains(b'dashboards') && response.body.bcontains(b'startAt') && response.body.bcontains(b'maxResults')
+  r2:
+    request:
+      method: GET
+      path: /rest/config/1.0/directory
+      follow_redirects: true
+    expression: response.status == 200 && response.body.bcontains(b'jaxbDirectoryContents')
+  r3:
+    request:
+      method: GET
+      path: /rest/api/2/projectCategory?maxResults=1000
+    expression: response.status == 200 && response.body.bcontains(b'self') && response.body.bcontains(b'description') && response.body.bcontains(b'name')  && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
+  r4:
+    request:
+      method: GET
+      path: /rest/api/2/project?maxResults=100
+    expression: response.status == 200 && response.body.bcontains(b'projects') && response.body.bcontains(b'startAt') && response.body.bcontains(b'maxResults')
+  r5:
+    request:
+      method: GET
+      path: /rest/api/2/resolution
+    expression: response.status == 200 && response.body.bcontains(b'self') && response.body.bcontains(b'description') && response.body.bcontains(b'name') && response.headers["set-cookie"].icontains("atlassian.xsrf.token")
+  r6:
+    request:
+      method: GET
+      path: /rest/api/2/screens
+    expression: response.status == 200 && response.body.bcontains(b'"id":') && response.body.bcontains(b'"name":') && response.body.bcontains(b'"description":')
+  r7:
+    request:
+      method: GET
+      path: /secure/popups/UserPickerBrowser.jspa
+    expression: response.body.bcontains(b'user-picker')
 expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7()

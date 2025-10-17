@@ -5,11 +5,13 @@ info:
   author: daffainfo
   severity: critical
   verified: true
-  description: |
+  description: |-
     EVOLUCARE ECSimage是一款国外使用的医疗管理系统，研究发现其new_movie.php接口中存在命令注入漏洞,攻击者可利用该漏洞获取系统敏感信息等.漏洞影响:EVOLUCARE Evolucare Ecsimaging 6.21.5
-    fofa-query: body="ECSimaging"
+    fofa: body="ECSimaging"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/Web%E5%BA%94%E7%94%A8%E6%BC%8F%E6%B4%9E/Evolucare%20Ecsimaging%20new_movie.php%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.md
+  tags: evolucare,ecsimaging,rce
+  created: 2023/11/14
 
 rules:
   r0:

@@ -5,76 +5,80 @@ info:
   author: pdteam
   severity: info
   verified: true
+  description: |-
+    phpMyAdmin login panel was detected.
+  tags: panel,phpmyadmin
+  created: 2023/11/30
 
 rules:
   r0:
     request:
       method: GET
       path: /phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r1:
     request:
       method: GET
       path: /phpMyAdmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r2:
     request:
       method: GET
       path: /xampp/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r3:
     request:
       method: GET
       path: /web/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r4:
     request:
       method: GET
       path: /pma/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r5:
     request:
       method: GET
       path: /forum/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r6:
     request:
       method: GET
       path: /php/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r7:
     request:
       method: GET
       path: /phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r8:
     request:
       method: GET
       path: /blog/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r9:
     request:
       method: GET
       path: /apache-default/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r10:
     request:
       method: GET
       path: /administrator/components/com_joommyadmin/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r11:
     request:
       method: GET
       path: /_phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r12:
     request:
       method: GET
       path: /admin/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
   r13:
     request:
       method: GET
       path: /typo3/phpmyadmin/
-    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>') 
+    expression: response.status == 200 && response.body.bcontains(b'<title>phpMyAdmin</title>')
 expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() | r10() || r11() || r12() || r13()

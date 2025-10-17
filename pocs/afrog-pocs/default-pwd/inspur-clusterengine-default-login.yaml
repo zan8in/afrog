@@ -5,9 +5,9 @@ info:
   author: ritikchaddha
   severity: high
   verified: true
-  description: |
+  description: |-
     Inspur Clusterengine version 4 default admin login credentials were successful.
-    FOFA: title="TSCEV4.0"
+    fofa: title="TSCEV4.0"
   reference:
     - https://blog.csdn.net/qq_36197704/article/details/115665793
   tags: default-login,inspur,clusterengine

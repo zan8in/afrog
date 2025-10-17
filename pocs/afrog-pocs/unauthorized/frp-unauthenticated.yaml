@@ -1,15 +1,17 @@
 id: frp-unauthenticated
 
 info:
-    name: FRP Unauthenticated
-    author: pikpikcu
-    severity: info
-    verified: false
+  name: FRP Unauthenticated
+  author: pikpikcu
+  severity: info
+  verified: false
+  tags: frp,unauth
+  created: 2023/06/24
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /static
-        expression: response.status == 200 && response.body.bcontains(b"<title>frps dashboard</title>")
+  r0:
+    request:
+      method: GET
+      path: /static
+    expression: response.status == 200 && response.body.bcontains(b"<title>frps dashboard</title>")
 expression: r0()

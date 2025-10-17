@@ -7,9 +7,10 @@ info:
   verified: true
   description: |
     Adobe AEM default login credentials were discovered.
-    SHODAN: http.component:"Adobe Experience Manager"
+    shodan: http.component:"Adobe Experience Manager"
   reference:
     - https://experienceleague.adobe.com/docs/experience-manager-64/administering/security/security-checklist.html?lang=en
+    - https://nvd.nist.gov/vuln/detail/CVE-2025-53833
   tags: aem,default-login,adobe
   created: 2023/06/24
 

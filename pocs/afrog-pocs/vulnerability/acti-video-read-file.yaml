@@ -5,11 +5,11 @@ info:
   author: zan8in
   severity: high
   verified: true
-  description: |
+  description: |-
     ACTI 视频监控 存在任意文件读取漏洞
-    app="ACTi-视频监控"
-  reference:
-    - http://wiki.peiqi.tech/wiki/iot/ACTI/ACTI%20%E8%A7%86%E9%A2%91%E7%9B%91%E6%8E%A7%20images%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.html
+    fofa: app="ACTi-视频监控"
+  tags: acti,sqli
+  created: 2025/03/21
 
 rules:
   r0:

@@ -5,12 +5,14 @@ info:
   author: ritikchaddha
   severity: critical
   verified: false
-  description: |
+  description: |-
     DedeCMS 5.8.1-beta is susceptible to remote code execution via a variable override vulnerability that allows an attacker to construct malicious code with template file inclusion without proper authorization, thus possibly obtaining sensitive information, modifying data, and/or gaining full control over a compromised system without entering necessary credentials.
-    app="DedeCMS"
+    fofa: app="DedeCMS"
   reference:
     - https://srcincite.io/blog/2021/09/30/chasing-a-dream-pwning-the-biggest-cms-in-china.html
     - https://sectime.top/post/1d114771.html
+  tags: dedecms,rce
+  created: 2023/08/13
 
 set:
   hostname: request.url.host

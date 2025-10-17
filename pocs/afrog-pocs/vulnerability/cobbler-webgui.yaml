@@ -5,9 +5,11 @@ info:
   author: c-sh0
   severity: info
   verified: true
-  description: |
+  description: |-
     Detection of Cobbler WebGUI 
-    shodan-query: http.title:"Cobbler Web Interface"
+    shodan: http.title:"Cobbler Web Interface"
+  tags: cobbler,webgui
+  created: 2024/04/04
 
 rules:
   r0:
