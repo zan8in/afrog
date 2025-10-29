@@ -3,10 +3,10 @@ package runner
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
-	"regexp"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"

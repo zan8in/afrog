@@ -46,7 +46,7 @@ func main() {
 		// 正常退出时删除自动保存文件
 		if normalExit {
 			if fileutil.FileExists(autoSaveFile) {
-				if err := os.Remove(autoSaveFile); err == nil {
+				if err = os.Remove(autoSaveFile); err == nil {
 					gologger.Debug().Msgf("已清理自动保存文件: %s", autoSaveFile)
 				}
 			}
