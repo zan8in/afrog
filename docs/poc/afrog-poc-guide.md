@@ -410,8 +410,7 @@ rules:
 
 ### 请求与响应变量
 - 请求变量（只读）：`request.url`, `request.url.host`, `request.url.path`, `request.url.query`
-- 响应变量：`response.status`, `response.body`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`
-- 部分网络协议检测中可用 `response.raw`（字节流）
+- 响应变量：`response.status`, `response.body`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`, `response.raw`（字节流）
 
 ---
 
