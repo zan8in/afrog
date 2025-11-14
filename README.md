@@ -22,8 +22,7 @@
 <p align="center" dir="auto">
   <a href="https://github.com/zan8in/afrog/releases">Download</a> •
   <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md">Helper Function</a>
-
+  <a href="https://github.com/zan8in/afrog/wiki/Afrog-PoC-规则编写权威指南">Afrog PoC 规则编写权威指南</a>
 </p>
 
 ## PoC Contributors

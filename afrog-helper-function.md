@@ -1,33 +1,5 @@
 ## Afrog PoC 内置函数
 
-### 注意事项
-
-在使用 Afrog 内置函数时，请注意以下事项：它们仅能在 set 和 expression 中声明，而不能直接在 path、headers、body 等位置使用。
-
-例如：
-
-```yaml
-id: demo
-
-info:
-  name: Demo
-  author: zan8in
-  severity: info
-
-rules:
-  r0:
-    request:
-      method: POST
-      path: /md5={{md5(string(randomInt(10000000, 50000000)))}} # 错误
-      headers:
-        md5str: "{{md5(randomLowercase(16))}}" # 错误
-      body: "{{randLowercase(32)}}" # 错误
-    expression: true
-expression: r0()
-```
-
-正确用法是首先在 set 内声明，详细用法请参考 [md5 函数示例](https://github.com/zan8in/afrog/blob/main/afrog-helper-function.md#md5)
-
 内置函数源码位置：`v2\pkg\runner\celcompile.go`
 
 ### randomInt
