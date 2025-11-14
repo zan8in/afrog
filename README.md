@@ -16,7 +16,7 @@
 <a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
 <a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
 <a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog">
+<!-- <a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog"> -->
 </p>
 
 <p align="center" dir="auto">
