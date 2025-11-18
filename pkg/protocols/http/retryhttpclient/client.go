@@ -211,58 +211,60 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
 	}
 
-	// store the response
-	protoResp := &proto.Response{}
-	protoResp.Status = int32(resp.StatusCode)
-	protoResp.Url = url2ProtoUrl(resp.Request.URL)
+    writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+    writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
 
-	newRespHeader := make(map[string]string)
-	rawHeaderBuilder := strings.Builder{}
-	for k, v := range resp.Header {
-		newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
-
-		rawHeaderBuilder.WriteString(k)
-		rawHeaderBuilder.WriteString(": ")
-		rawHeaderBuilder.WriteString(strings.Join(v, ";"))
-		rawHeaderBuilder.WriteString("\n")
-	}
-	protoResp.Headers = newRespHeader
-	protoResp.ContentType = resp.Header.Get("Content-Type")
-	protoResp.Body = []byte(utf8RespBody)
-	protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + utf8RespBody)
-	protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
-	protoResp.Latency = milliseconds
-	variableMap["response"] = protoResp
-
-	// store the request
-	protoReq := &proto.Request{}
-	protoReq.Method = rule.Request.Method
-	protoReq.Url = url2ProtoUrl(req.URL.URL)
-
-	newReqHeader := make(map[string]string)
-	rawReqHeaderBuilder := strings.Builder{}
-	for k := range req.Header {
-		newReqHeader[k] = req.Header.Get(k)
-
-		rawReqHeaderBuilder.WriteString(k)
-		rawReqHeaderBuilder.WriteString(": ")
-		rawReqHeaderBuilder.WriteString(req.Header.Get(k))
-		rawReqHeaderBuilder.WriteString("\n")
-	}
-
-	protoReq.Headers = newReqHeader
-	protoReq.ContentType = req.Header.Get("Content-Type")
-	protoReq.Body = []byte(rule.Request.Body)
-
-	reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
-	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + resp.Request.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + string(rule.Request.Body))
-	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
-	variableMap["request"] = protoReq
-
-	// store the full target url
-	variableMap["fulltarget"] = target
+    // store the full target url
+    variableMap["fulltarget"] = target
 
 	return nil
+}
+
+func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body string, latency int64) {
+    protoResp := &proto.Response{}
+    protoResp.Status = int32(resp.StatusCode)
+    protoResp.Url = url2ProtoUrl(resp.Request.URL)
+
+    newRespHeader := make(map[string]string)
+    rawHeaderBuilder := strings.Builder{}
+    for k, v := range resp.Header {
+        newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
+        rawHeaderBuilder.WriteString(k)
+        rawHeaderBuilder.WriteString(": ")
+        rawHeaderBuilder.WriteString(strings.Join(v, ";"))
+        rawHeaderBuilder.WriteString("\n")
+    }
+    protoResp.Headers = newRespHeader
+    protoResp.ContentType = resp.Header.Get("Content-Type")
+    protoResp.Body = []byte(body)
+    protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + body)
+    protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
+    protoResp.Latency = latency
+    variableMap["response"] = protoResp
+}
+
+func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Request, body string, target string, u *url.URL) {
+    protoReq := &proto.Request{}
+    protoReq.Method = req.Method
+    protoReq.Url = url2ProtoUrl(req.URL.URL)
+
+    newReqHeader := make(map[string]string)
+    rawReqHeaderBuilder := strings.Builder{}
+    for k := range req.Header {
+        newReqHeader[k] = req.Header.Get(k)
+        rawReqHeaderBuilder.WriteString(k)
+        rawReqHeaderBuilder.WriteString(": ")
+        rawReqHeaderBuilder.WriteString(req.Header.Get(k))
+        rawReqHeaderBuilder.WriteString("\n")
+    }
+    protoReq.Headers = newReqHeader
+    protoReq.ContentType = req.Header.Get("Content-Type")
+    protoReq.Body = []byte(body)
+
+    reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
+    protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + u.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
+    protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
+    variableMap["request"] = protoReq
 }
 
 func convertCookie(old, new string) string {

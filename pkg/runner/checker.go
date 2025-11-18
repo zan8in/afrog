@@ -1,25 +1,22 @@
 package runner
 
 import (
-	"fmt"
-	"net/http"
-	"regexp"
-	"strings"
-	"sync"
-	"time"
+    "fmt"
+    "net/http"
+    "regexp"
+    "strings"
+    "sync"
+    "time"
 
-	"github.com/zan8in/afrog/v3/pkg/config"
-	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
-	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
-	"github.com/zan8in/afrog/v3/pkg/protocols/raw"
-	"github.com/zan8in/afrog/v3/pkg/result"
+    "github.com/zan8in/afrog/v3/pkg/config"
+    "github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+    "github.com/zan8in/afrog/v3/pkg/result"
 
-	"github.com/google/cel-go/checker/decls"
-	"github.com/zan8in/afrog/v3/pkg/poc"
-	"github.com/zan8in/afrog/v3/pkg/proto"
-	"github.com/zan8in/afrog/v3/pkg/utils"
-	"gopkg.in/yaml.v2"
+    "github.com/google/cel-go/checker/decls"
+    "github.com/zan8in/afrog/v3/pkg/poc"
+    "github.com/zan8in/afrog/v3/pkg/proto"
+    "github.com/zan8in/afrog/v3/pkg/utils"
+    "gopkg.in/yaml.v2"
 )
 
 var MMutex = &sync.Mutex{}
@@ -92,55 +89,18 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		// 预处理：让 rules 的 path/headers/body/host/raw/data 支持 {{...}} CEL 运算
 		c.preRenderRuleRequest(&rule.Request)
 
-		isMatch := false
-		reqType := strings.ToLower(rule.Request.Type)
+        isMatch := false
+        reqType := strings.ToLower(rule.Request.Type)
 
-		if len(reqType) > 0 && reqType != string(poc.HTTP_Type) && reqType != string(poc.HTTPS_Type) {
-			if reqType == poc.TCP_Type || reqType == poc.UDP_Type {
-				if nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
-					Network:     rule.Request.Type,
-					ReadTimeout: time.Duration(rule.Request.ReadTimeout),
-					ReadSize:    rule.Request.ReadSize,
-					MaxRetries:  1,
-				}); err == nil {
-					nc.Request(rule.Request.Data, rule.Request.DataType, c.VariableMap)
-					nc.Close()
-				}
-			}
-			if reqType == poc.GO_Type {
-				err = gox.Request(target, rule.Request.Data, c.VariableMap)
-			}
-
-		} else {
-
-			if len(rule.Request.Raw) > 0 {
-				rt := raw.RawHttp{
-					RawhttpClient:   raw.GetRawHTTP(c.Options.Proxy, int(c.Options.Timeout)),
-					MaxRespBodySize: c.Options.MaxRespBodySize,
-					// 新增最大响应体限制
-					// @editor 2024/02/06
-				}
-				err = rt.RawHttpRequest(rule.Request.Raw, target, c.Options.Header, c.VariableMap)
-
-			} else {
-				// 自定义type类型：http、https
-				// @editor 2024/08/07
-				targetTmp := target
-				if len(reqType) > 0 {
-					if reqType == poc.HTTPS_Type {
-						if strings.HasPrefix(targetTmp, "http://") {
-							targetTmp = strings.Replace(targetTmp, "http://", "https://", 1)
-						}
-					}
-					if reqType == poc.HTTP_Type {
-						if strings.HasPrefix(targetTmp, "https://") {
-							targetTmp = strings.Replace(targetTmp, "https://", "http://", 1)
-						}
-					}
-				}
-				err = retryhttpclient.Request(targetTmp, c.Options.Header, rule, c.VariableMap)
-			}
-		}
+        if len(rule.Request.Raw) > 0 {
+            err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
+        } else {
+            exec, ok := executors[reqType]
+            if !ok {
+                exec = HTTPExecutor{}
+            }
+            err = exec.Execute(target, rule, c.Options, c.VariableMap)
+        }
 
 		if err == nil {
 			if len(rule.Expressions) > 0 {
@@ -489,17 +449,25 @@ func (c *Checker) renderCELPlaceholders(s string) string {
 
 // 对当前 rule 的请求字段进行预渲染（仅替换能成功求值的表达式）
 func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
-	// HTTP(S)/RAW/NETX 通用字段
-	req.Path = c.renderCELPlaceholders(strings.TrimSpace(req.Path))
-	req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
-	req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
-	req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
-	req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
+    // HTTP(S)/RAW/NETX 通用字段
+    req.Path = c.renderCELPlaceholders(strings.TrimSpace(req.Path))
+    req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
+    req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
+    req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
+    req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
 
-	// headers 逐项处理
-	if req.Headers != nil {
-		for hk, hv := range req.Headers {
-			req.Headers[hk] = c.renderCELPlaceholders(strings.TrimSpace(hv))
-		}
-	}
+    // CEL 渲染后做一次简单 {{var}} 替换作为兜底
+    req.Path = setVariableMap(req.Path, c.VariableMap)
+    req.Host = setVariableMap(req.Host, c.VariableMap)
+    req.Body = setVariableMap(req.Body, c.VariableMap)
+    req.Raw = setVariableMap(req.Raw, c.VariableMap)
+    req.Data = setVariableMap(req.Data, c.VariableMap)
+
+    // headers 逐项处理
+    if req.Headers != nil {
+        for hk, hv := range req.Headers {
+            h := c.renderCELPlaceholders(strings.TrimSpace(hv))
+            req.Headers[hk] = setVariableMap(h, c.VariableMap)
+        }
+    }
 }

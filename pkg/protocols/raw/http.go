@@ -112,12 +112,23 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, header []string, varia
 
 	newheader := appendHeader(request, header)
 
-	rhttp, err := Parse(newheader, baseurl, true)
-	if err != nil {
-		return fmt.Errorf("parse Failed, %s", err.Error())
-	}
+    rhttp, err := Parse(newheader, baseurl, true)
+    if err != nil {
+        return fmt.Errorf("parse Failed, %s", err.Error())
+    }
 
-	resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), io.NopCloser(strings.NewReader(rhttp.Data)))
+    ct := strings.ToLower(rhttp.Headers["Content-Type"])
+    if strings.Contains(ct, "multipart/") {
+        if strings.Contains(rhttp.Data, "\n") && !strings.Contains(rhttp.Data, "\r\n") {
+            rhttp.Data = strings.ReplaceAll(rhttp.Data, "\n", "\r\n")
+            if !strings.HasSuffix(rhttp.Data, "\r\n") {
+                rhttp.Data = rhttp.Data + "\r\n"
+            }
+            rhttp.Headers["Content-Length"] = fmt.Sprintf("%d", len(rhttp.Data))
+        }
+    }
+
+    resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), io.NopCloser(strings.NewReader(rhttp.Data)))
 	if err != nil {
 		//fmt.Println(err.Error())
 		return fmt.Errorf("doRaw Failed, %s", err.Error())
