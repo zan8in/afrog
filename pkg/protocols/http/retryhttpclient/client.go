@@ -74,33 +74,31 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 		return err
 	}
 
-	// target
-	target = fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-	if !strings.HasPrefix(rule.Request.Path, "^") {
-		targetfull := fulltarget(fmt.Sprintf("%s://%s", u.Scheme, u.Host), u.Path)
-		if targetfull != target {
-			target = targetfull
-		}
-	}
-	target = strings.TrimRight(target, "/")
+	// base
+	baseHost := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	basePath := u.Path
 
 	// path
 	rule.Request.Path = setVariableMap(strings.TrimSpace(rule.Request.Path), variableMap)
 
 	newpath := rule.Request.Path
-	if strings.HasPrefix(rule.Request.Path, "^") {
-		newpath = "/" + rule.Request.Path[1:]
+	isAbs := false
+	if strings.HasPrefix(newpath, "^") {
+		isAbs = true
+		newpath = newpath[1:]
 	}
-
 	if !strings.HasPrefix(newpath, "/") {
 		newpath = "/" + newpath
 	}
-
 	newpath = strings.ReplaceAll(newpath, " ", "%20")
-	// newpath = strings.ReplaceAll(newpath, "+", "%20")
 	newpath = strings.ReplaceAll(newpath, "#", "%23")
 
-	target = target + newpath
+	if isAbs {
+		target = baseHost + newpath
+	} else {
+		bp := strings.TrimRight(basePath, "/")
+		target = baseHost + bp + newpath
+	}
 
 	// body
 	if strings.HasPrefix(strings.ToLower(rule.Request.Headers["Content-Type"]), "multipart/") && !strings.Contains(rule.Request.Body, "\r\n") && (strings.Contains(rule.Request.Body, "\n") || strings.Contains(rule.Request.Body, "\n\n")) {
@@ -211,60 +209,60 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
 	}
 
-    writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
-    writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
+	writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+	writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
 
-    // store the full target url
-    variableMap["fulltarget"] = target
+	// store the full target url
+	variableMap["fulltarget"] = target
 
 	return nil
 }
 
 func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body string, latency int64) {
-    protoResp := &proto.Response{}
-    protoResp.Status = int32(resp.StatusCode)
-    protoResp.Url = url2ProtoUrl(resp.Request.URL)
+	protoResp := &proto.Response{}
+	protoResp.Status = int32(resp.StatusCode)
+	protoResp.Url = url2ProtoUrl(resp.Request.URL)
 
-    newRespHeader := make(map[string]string)
-    rawHeaderBuilder := strings.Builder{}
-    for k, v := range resp.Header {
-        newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
-        rawHeaderBuilder.WriteString(k)
-        rawHeaderBuilder.WriteString(": ")
-        rawHeaderBuilder.WriteString(strings.Join(v, ";"))
-        rawHeaderBuilder.WriteString("\n")
-    }
-    protoResp.Headers = newRespHeader
-    protoResp.ContentType = resp.Header.Get("Content-Type")
-    protoResp.Body = []byte(body)
-    protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + body)
-    protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
-    protoResp.Latency = latency
-    variableMap["response"] = protoResp
+	newRespHeader := make(map[string]string)
+	rawHeaderBuilder := strings.Builder{}
+	for k, v := range resp.Header {
+		newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
+		rawHeaderBuilder.WriteString(k)
+		rawHeaderBuilder.WriteString(": ")
+		rawHeaderBuilder.WriteString(strings.Join(v, ";"))
+		rawHeaderBuilder.WriteString("\n")
+	}
+	protoResp.Headers = newRespHeader
+	protoResp.ContentType = resp.Header.Get("Content-Type")
+	protoResp.Body = []byte(body)
+	protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + body)
+	protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
+	protoResp.Latency = latency
+	variableMap["response"] = protoResp
 }
 
 func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Request, body string, target string, u *url.URL) {
-    protoReq := &proto.Request{}
-    protoReq.Method = req.Method
-    protoReq.Url = url2ProtoUrl(req.URL.URL)
+	protoReq := &proto.Request{}
+	protoReq.Method = req.Method
+	protoReq.Url = url2ProtoUrl(req.URL.URL)
 
-    newReqHeader := make(map[string]string)
-    rawReqHeaderBuilder := strings.Builder{}
-    for k := range req.Header {
-        newReqHeader[k] = req.Header.Get(k)
-        rawReqHeaderBuilder.WriteString(k)
-        rawReqHeaderBuilder.WriteString(": ")
-        rawReqHeaderBuilder.WriteString(req.Header.Get(k))
-        rawReqHeaderBuilder.WriteString("\n")
-    }
-    protoReq.Headers = newReqHeader
-    protoReq.ContentType = req.Header.Get("Content-Type")
-    protoReq.Body = []byte(body)
+	newReqHeader := make(map[string]string)
+	rawReqHeaderBuilder := strings.Builder{}
+	for k := range req.Header {
+		newReqHeader[k] = req.Header.Get(k)
+		rawReqHeaderBuilder.WriteString(k)
+		rawReqHeaderBuilder.WriteString(": ")
+		rawReqHeaderBuilder.WriteString(req.Header.Get(k))
+		rawReqHeaderBuilder.WriteString("\n")
+	}
+	protoReq.Headers = newReqHeader
+	protoReq.ContentType = req.Header.Get("Content-Type")
+	protoReq.Body = []byte(body)
 
-    reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
-    protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + u.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
-    protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
-    variableMap["request"] = protoReq
+	reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
+	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + u.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
+	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
+	variableMap["request"] = protoReq
 }
 
 func convertCookie(old, new string) string {
