@@ -463,11 +463,13 @@ func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
     req.Raw = setVariableMap(req.Raw, c.VariableMap)
     req.Data = setVariableMap(req.Data, c.VariableMap)
 
-    // headers 逐项处理
+    // headers 逐项处理（深拷贝避免并发写入共享 map）
     if req.Headers != nil {
+        newHeaders := make(map[string]string, len(req.Headers))
         for hk, hv := range req.Headers {
             h := c.renderCELPlaceholders(strings.TrimSpace(hv))
-            req.Headers[hk] = setVariableMap(h, c.VariableMap)
+            newHeaders[hk] = setVariableMap(h, c.VariableMap)
         }
+        req.Headers = newHeaders
     }
 }
