@@ -36,30 +36,49 @@ type Options struct {
 }
 
 func Init(opt *Options) (err error) {
-	po := &retryablehttp.DefaultPoolOptions
-	po.Proxy = opt.Proxy
-	po.Timeout = opt.Timeout
-	po.Retries = opt.Retries
-	po.DisableRedirects = true
+    po := &retryablehttp.DefaultPoolOptions
+    // 避免上游 SDK 在处理代理列表时触发并发通道错误，先不让池初始化解析代理
+    // 后续我们在拿到客户端后手动设置 http.Transport 的代理
+    po.Proxy = ""
+    po.Timeout = opt.Timeout
+    po.Retries = opt.Retries
+    po.DisableRedirects = true
 
 	// -timeout 参数默认是 50s @editor 2024/11/03
 	defaultTimeout = time.Duration(opt.Timeout) * time.Second
 
-	retryablehttp.InitClientPool(po)
-	if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
-		return err
-	}
+    retryablehttp.InitClientPool(po)
+    if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
+        return err
+    }
 
 	po.DisableRedirects = false
 	po.EnableRedirect(retryablehttp.FollowAllRedirect)
-	retryablehttp.InitClientPool(po)
-	if RtryRedirect, err = retryablehttp.GetPool(po); err != nil {
-		return err
-	}
+    retryablehttp.InitClientPool(po)
+    if RtryRedirect, err = retryablehttp.GetPool(po); err != nil {
+        return err
+    }
 
-	maxDefaultBody = int64(opt.MaxRespBodySize * 1024 * 1024)
+    // 如果设置了代理，手动配置到 http.Transport，支持 http/https
+    if len(strings.TrimSpace(opt.Proxy)) > 0 {
+        if u, perr := url.Parse(opt.Proxy); perr == nil {
+            switch strings.ToLower(u.Scheme) {
+            case "http", "https":
+                t1 := &http.Transport{Proxy: http.ProxyURL(u)}
+                t2 := &http.Transport{Proxy: http.ProxyURL(u)}
+                if RtryNoRedirect != nil && RtryNoRedirect.HTTPClient != nil {
+                    RtryNoRedirect.HTTPClient.Transport = t1
+                }
+                if RtryRedirect != nil && RtryRedirect.HTTPClient != nil {
+                    RtryRedirect.HTTPClient.Transport = t2
+                }
+            }
+        }
+    }
 
-	return nil
+    maxDefaultBody = int64(opt.MaxRespBodySize * 1024 * 1024)
+
+    return nil
 }
 
 func Request(target string, header []string, rule poc.Rule, variableMap map[string]any) error {
