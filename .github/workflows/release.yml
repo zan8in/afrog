@@ -81,7 +81,7 @@ jobs:
           # 清理现有 webpath（如果存在），然后复制新构建的
           rm -rf pkg/web/webpath
           mkdir -p pkg/web/webpath
-          cp -r _afrogweb_tmp/dist/* pkg/web/webpath/  # 调整为你的输出目录，如 build/
+          cp -r _afrogweb_tmp/build/* pkg/web/webpath/  # 调整为你的输出目录，如 build/
 
           # 清理临时目录
           rm -rf _afrogweb_tmp
