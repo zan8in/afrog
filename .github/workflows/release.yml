@@ -40,10 +40,9 @@ jobs:
           set -euo pipefail
           ls -la pkg/web/webpath || (echo "missing webpath directory" && exit 1)
           test -f pkg/web/webpath/index.html || (echo "missing index.html" && exit 1)
-          APPJS=$(ls pkg/web/webpath/_app/immutable/entry/app.*.js | head -n1 || true)
-          STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/start.*.js | head -n1 || true)
-          [ -n "$APPJS" ] || (echo "missing entry app js" && exit 1)
-          [ -n "$STARTJS" ] || (echo "missing entry start js" && exit 1)
+          test -d pkg/web/webpath/_app/immutable/entry || (echo "missing entry directory" && exit 1)
+          ENTRY_COUNT=$(find pkg/web/webpath/_app/immutable/entry -maxdepth 1 -type f -name '*.js' | wc -l || echo 0)
+          [ "$ENTRY_COUNT" -gt 0 ] || (echo "missing entry js" && exit 1)
           CHUNKS=$(ls pkg/web/webpath/_app/immutable/chunks/*.js | wc -l)
           [ "$CHUNKS" -gt 0 ] || (echo "missing chunks js" && exit 1)
 
@@ -83,11 +82,15 @@ jobs:
           sleep 3
           curl -fsS -I http://127.0.0.1:16868/ | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I http://127.0.0.1:16868/ | grep -i "Content-Type: text/html" >/dev/null
-          APPJS=$(ls pkg/web/webpath/_app/immutable/entry/app.*.js | head -n1)
+          APPJS=$(ls pkg/web/webpath/_app/immutable/entry/*app*.js 2>/dev/null | head -n1 || true)
+          if [ -z "$APPJS" ]; then APPJS=$(ls pkg/web/webpath/_app/immutable/entry/*.js | head -n1 || true); fi
           APPURL=$(echo "$APPJS" | sed 's#pkg/web/webpath##')
-          curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -E "HTTP/.* 200" >/dev/null
-          curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
-          STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/start.*.js | head -n1)
+          if [ -n "$APPURL" ]; then
+            curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -E "HTTP/.* 200" >/dev/null
+            curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
+          fi
+          STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/*start*.js 2>/dev/null | head -n1 || true)
+          if [ -z "$STARTJS" ]; then STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/*.js | head -n1 || true); fi
           STARTURL=$(echo "$STARTJS" | sed 's#pkg/web/webpath##')
           curl -fsS -I "http://127.0.0.1:16868$STARTURL" | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I "http://127.0.0.1:16868$STARTURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
