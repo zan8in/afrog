@@ -79,7 +79,12 @@ jobs:
           set -euo pipefail
           ./_afrog_smoke -web >/dev/null 2>&1 & echo $! > _afrog_pid
           trap 'kill "$(cat _afrog_pid)" 2>/dev/null || true' EXIT
-          sleep 3
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:16868/api/health | grep -q '"status":"ok"'; then
+              break
+            fi
+            sleep 1
+          done
           curl -fsS -I http://127.0.0.1:16868/ | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I http://127.0.0.1:16868/ | grep -i "Content-Type: text/html" >/dev/null
           APPJS=$(ls pkg/web/webpath/_app/immutable/entry/*app*.js 2>/dev/null | head -n1 || true)

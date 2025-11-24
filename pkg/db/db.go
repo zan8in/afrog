@@ -126,18 +126,18 @@ func createTaskID() string {
 }
 
 func DbName() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return ""
+    }
 
-	path := path.Join(homeDir, ".config", "afrog")
-	// 权限收紧为 0700，避免其它系统用户读取数据库
-	// if err := os.MkdirAll(path, 0o700); err != nil {
-	// 	return ""
-	// }
+    path := path.Join(homeDir, ".config", "afrog")
+    // 权限收紧为 0700，避免其它系统用户读取数据库
+    if err := os.MkdirAll(path, 0o700); err != nil {
+        return ""
+    }
 
-	return filepath.Join(path, DBName+".db")
+    return filepath.Join(path, DBName+".db")
 }
 
 func NewSnowFlake() error {
