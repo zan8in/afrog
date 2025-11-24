@@ -195,7 +195,12 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 未找到文件或为目录 -> 返回 index.html（支持前端路由）
+	// 未找到文件或为目录 -> 对于 .js 请求返回 404，而不是 fallback 到 index.html
+	if strings.HasSuffix(path, ".js") {
+		http.NotFound(w, r)
+		return
+	}
+	// 其他情况 fallback 到 index.html（支持前端路由）
 	h.serveIndex(w, r)
 }
 
