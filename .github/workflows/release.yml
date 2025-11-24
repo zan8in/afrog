@@ -9,6 +9,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      GOPROXY: https://proxy.golang.org,direct
+      GOSUMDB: sum.golang.org
 
     steps:
       - uses: actions/checkout@v3
@@ -18,10 +21,54 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: 1.24.1
+          cache: true
+
+      - name: Verify embedded web assets
+        run: |
+          set -euo pipefail
+          ls -la pkg/web/webpath || (echo "missing webpath directory" && exit 1)
+          test -f pkg/web/webpath/index.html || (echo "missing index.html" && exit 1)
+          APPJS=$(ls pkg/web/webpath/_app/immutable/entry/app.*.js | head -n1 || true)
+          STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/start.*.js | head -n1 || true)
+          [ -n "$APPJS" ] || (echo "missing entry app js" && exit 1)
+          [ -n "$STARTJS" ] || (echo "missing entry start js" && exit 1)
+          CHUNKS=$(ls pkg/web/webpath/_app/immutable/chunks/*.js | wc -l)
+          [ "$CHUNKS" -gt 0 ] || (echo "missing chunks js" && exit 1)
+
+      - name: Smoke build (validate go:embed)
+        env:
+          CGO_ENABLED: 0
+        run: |
+          go build -trimpath -ldflags "-s -w" -o ./_afrog_smoke ./cmd/afrog
+          file ./_afrog_smoke || true
+
+      - name: Web smoke test (-web mode assets)
+        env:
+          CGO_ENABLED: 0
+        run: |
+          set -euo pipefail
+          ./_afrog_smoke -web >/dev/null 2>&1 & echo $! > _afrog_pid
+          sleep 3
+          curl -fsS -I http://127.0.0.1:16868/ | grep -E "HTTP/.* 200" >/dev/null
+          curl -fsS -I http://127.0.0.1:16868/ | grep -i "Content-Type: text/html" >/dev/null
+          APPJS=$(ls pkg/web/webpath/_app/immutable/entry/app.*.js | head -n1)
+          APPURL=$(echo "$APPJS" | sed 's#pkg/web/webpath##')
+          curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -E "HTTP/.* 200" >/dev/null
+          curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
+          kill "$(cat _afrog_pid)" || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: afrog-smoke-debug
+          path: |
+            _afrog_smoke
+            _afrog_pid
 
       - uses: goreleaser/goreleaser-action@v4
         with:
           args: "release --clean"
           version: latest
+          workdir: .
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
