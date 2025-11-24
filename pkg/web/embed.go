@@ -14,7 +14,6 @@ import "embed"
 //go:embed webpath/android-chrome-512x512.png
 //go:embed webpath/apple-touch-icon.png
 //go:embed webpath/site.webmanifest
-//go:embed webpath/robots.txt
 //go:embed webpath/placeholder.svg
 //go:embed webpath/fonts/Geist/*
 //go:embed webpath/_app/env.js
