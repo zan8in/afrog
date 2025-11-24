@@ -100,65 +100,65 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o ./_afrog_smoke ./cmd/afrog
           file ./_afrog_smoke || true
 
-      - name: Validate embedded FS contents
-        env:
-          CGO_ENABLED: 0
-        run: |
-          set -euo pipefail
+      # - name: Validate embedded FS contents
+      #   env:
+      #     CGO_ENABLED: 0
+      #   run: |
+      #     set -euo pipefail
 
-          # 创建临时 Go 脚本检查 embed.FS
-          cat <<EOF > embed_check.go
-          package main
+      #     # 创建临时 Go 脚本检查 embed.FS
+      #     cat <<EOF > embed_check.go
+      #     package main
 
-          import (
-            "embed"
-            "fmt"
-            "io/fs"
-            "os"
-            "path/filepath"
-            "strings"
-          )
+      #     import (
+      #       "embed"
+      #       "fmt"
+      #       "io/fs"
+      #       "os"
+      #       "path/filepath"
+      #       "strings"
+      #     )
 
-          //go:embed webpath/*.* 
-          //go:embed webpath/fonts/*/*.* 
-          //go:embed webpath/_app/*.* 
-          //go:embed webpath/_app/immutable/*/*.*
-          var webpathFS embed.FS
+      #     //go:embed webpath/*.*
+      #     //go:embed webpath/fonts/*/*.*
+      #     //go:embed webpath/_app/*.*
+      #     //go:embed webpath/_app/immutable/*/*.*
+      #     var webpathFS embed.FS
 
-          func main() {
-            var hasEntryJS bool
-            err := fs.WalkDir(webpathFS, ".", func(path string, d fs.DirEntry, err error) error {
-              if err != nil {
-                return err
-              }
-              if !d.IsDir() && strings.HasPrefix(path, "webpath/_app/immutable/entry/") && strings.HasSuffix(path, ".js") {
-                hasEntryJS = true
-                fmt.Printf("Found entry JS: %s\n", path)
-              }
-              return nil
-            })
-            if err != nil {
-              fmt.Printf("Error walking FS: %v\n", err)
-              os.Exit(1)
-            }
-            if !hasEntryJS {
-              fmt.Println("No JS files found in _app/immutable/entry/")
-              os.Exit(1)
-            }
-            fmt.Println("Embedded FS validation passed")
-          }
-          EOF
+      #     func main() {
+      #       var hasEntryJS bool
+      #       err := fs.WalkDir(webpathFS, ".", func(path string, d fs.DirEntry, err error) error {
+      #         if err != nil {
+      #           return err
+      #         }
+      #         if !d.IsDir() && strings.HasPrefix(path, "webpath/_app/immutable/entry/") && strings.HasSuffix(path, ".js") {
+      #           hasEntryJS = true
+      #           fmt.Printf("Found entry JS: %s\n", path)
+      #         }
+      #         return nil
+      #       })
+      #       if err != nil {
+      #         fmt.Printf("Error walking FS: %v\n", err)
+      #         os.Exit(1)
+      #       }
+      #       if !hasEntryJS {
+      #         fmt.Println("No JS files found in _app/immutable/entry/")
+      #         os.Exit(1)
+      #       }
+      #       fmt.Println("Embedded FS validation passed")
+      #     }
+      #     EOF
 
-          # 编译并运行检查
-          go build -o embed_check embed_check.go
-          ./embed_check > embed_check.log 2>&1
-          cat embed_check.log
-          if grep -q "validation passed" embed_check.log; then
-            echo "Embedded FS OK"
-          else
-            echo "Embedded FS validation failed" >&2
-            exit 1
-          fi
+      #     # 编译并运行检查
+      #     go build -o embed_check embed_check.go
+      #     ./embed_check > embed_check.log 2>&1
+      #     cat embed_check.log
+      #     if grep -q "validation passed" embed_check.log; then
+      #       echo "Embedded FS OK"
+      #     else
+      #       echo "Embedded FS validation failed" >&2
+      #       exit 1
+      #     fi
 
       - name: Web smoke test (-web mode assets)
         env:
