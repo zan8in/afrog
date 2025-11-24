@@ -5,6 +5,17 @@ on:
     tags:
       - "*"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run snapshot build without publishing"
+        type: boolean
+        default: true
+        required: false
+      ref:
+        description: "Git ref to test (branch or commit SHA)"
+        type: string
+        default: ""
+        required: false
 
 jobs:
   release:
@@ -17,6 +28,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          ref: ${{ github.event.inputs.ref }}
 
       - uses: actions/setup-go@v4
         with:
@@ -35,6 +47,25 @@ jobs:
           CHUNKS=$(ls pkg/web/webpath/_app/immutable/chunks/*.js | wc -l)
           [ "$CHUNKS" -gt 0 ] || (echo "missing chunks js" && exit 1)
 
+      - name: Detect unmatched web assets (embed coverage guard)
+        run: |
+          set -euo pipefail
+          TOP_EXTS='html|ico|png|svg|webmanifest|json|txt'
+          ALLOWED_TOP_RE="^pkg/web/webpath/[^/]+\.(${TOP_EXTS})$"
+          ALLOWED_DIRS_RE='^pkg/web/webpath/(fonts/.+|_app/.+|docs/.+|pocs/.+|reports/.+)$'
+          UNMATCHED=$(find pkg/web/webpath -type f | grep -v -E "$ALLOWED_TOP_RE" | grep -v -E "$ALLOWED_DIRS_RE" | grep -v -E "/\.DS_Store$" || true)
+          if [ -n "$UNMATCHED" ]; then
+            echo "[embed coverage] Detected files not covered by go:embed patterns:" >&2
+            echo "$UNMATCHED" >&2
+            echo "Please update pkg/web/embed.go to include these paths." >&2
+            exit 1
+          fi
+
+      - name: Go modules download
+        run: |
+          set -euo pipefail
+          go mod download
+
       - name: Smoke build (validate go:embed)
         env:
           CGO_ENABLED: 0
@@ -48,6 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           ./_afrog_smoke -web >/dev/null 2>&1 & echo $! > _afrog_pid
+          trap 'kill "$(cat _afrog_pid)" 2>/dev/null || true' EXIT
           sleep 3
           curl -fsS -I http://127.0.0.1:16868/ | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I http://127.0.0.1:16868/ | grep -i "Content-Type: text/html" >/dev/null
@@ -55,7 +87,16 @@ jobs:
           APPURL=$(echo "$APPJS" | sed 's#pkg/web/webpath##')
           curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I "http://127.0.0.1:16868$APPURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
-          kill "$(cat _afrog_pid)" || true
+          STARTJS=$(ls pkg/web/webpath/_app/immutable/entry/start.*.js | head -n1)
+          STARTURL=$(echo "$STARTJS" | sed 's#pkg/web/webpath##')
+          curl -fsS -I "http://127.0.0.1:16868$STARTURL" | grep -E "HTTP/.* 200" >/dev/null
+          curl -fsS -I "http://127.0.0.1:16868$STARTURL" | grep -i "Content-Type: application/javascript\|Content-Type: text/javascript" >/dev/null
+          ASSETCSS=$(ls pkg/web/webpath/_app/immutable/assets/*.css | head -n1 || true)
+          if [ -n "$ASSETCSS" ]; then
+            CSSURL=$(echo "$ASSETCSS" | sed 's#pkg/web/webpath##')
+            curl -fsS -I "http://127.0.0.1:16868$CSSURL" | grep -E "HTTP/.* 200" >/dev/null
+            curl -fsS -I "http://127.0.0.1:16868$CSSURL" | grep -i "Content-Type: text/css" >/dev/null
+          fi
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -65,7 +106,27 @@ jobs:
             _afrog_smoke
             _afrog_pid
 
-      - uses: goreleaser/goreleaser-action@v4
+      - name: Goreleaser snapshot (no publish)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          args: "release --clean --skip-publish --snapshot"
+          version: latest
+          workdir: .
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Upload snapshot artifacts
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: afrog-dist-snapshot
+          path: |
+            dist/**
+
+      - name: Goreleaser publish
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
+        uses: goreleaser/goreleaser-action@v4
         with:
           args: "release --clean"
           version: latest
