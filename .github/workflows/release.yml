@@ -65,6 +65,33 @@ jobs:
           set -euo pipefail
           go mod download
 
+      - name: Build and copy afrogweb assets
+        run: |
+          set -euo pipefail
+
+          # Clone afrogweb repository (假设是你的 repo；如果私有，需要添加 token)
+          git clone https://x-access-token:${{ secrets.AFROGWEB_TOKEN }}@github.com/zan8in/afrogweb.git _afrogweb_tmp
+
+          # 进入 afrogweb 目录，构建
+          cd _afrogweb_tmp
+          npm install
+          npm run build
+          cd ..
+
+          # 复制生成的静态文件到 afrog 的 webpath（假设 build 输出在 dist/ 或 build/；根据你的 afrogweb 配置调整）
+          mkdir -p pkg/web/webpath
+          cp -r _afrogweb_tmp/dist/* pkg/web/webpath/  # 或 cp -r _afrogweb_tmp/build/* pkg/web/webpath/
+
+          # 清理临时目录
+          rm -rf _afrogweb_tmp
+
+          # 验证复制成功
+          if [ ! -d "pkg/web/webpath/_app/immutable/entry" ] || [ $(ls pkg/web/webpath/_app/immutable/entry/*.js 2>/dev/null | wc -l) -eq 0 ]; then
+            echo "afrogweb build or copy failed: no JS files in entry/" >&2
+            exit 1
+          fi
+          echo "afrogweb assets copied successfully"
+
       - name: Smoke build (validate go:embed)
         env:
           CGO_ENABLED: 0
