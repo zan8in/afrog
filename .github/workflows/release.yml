@@ -77,14 +77,25 @@ jobs:
           CGO_ENABLED: 0
         run: |
           set -euo pipefail
-          ./_afrog_smoke -web >/dev/null 2>&1 & echo $! > _afrog_pid
+          ./_afrog_smoke -web > web_smoke.log 2>&1 & echo $! > _afrog_pid
           trap 'kill "$(cat _afrog_pid)" 2>/dev/null || true' EXIT
-          for i in $(seq 1 15); do
+          for i in $(seq 1 20); do
+            if ! kill -0 "$(cat _afrog_pid)" 2>/dev/null; then
+              echo "web process exited early" >&2
+              tail -n 200 web_smoke.log >&2 || true
+              exit 1
+            fi
             if curl -fsS http://127.0.0.1:16868/api/health | grep -q '"status":"ok"'; then
               break
             fi
             sleep 1
           done
+          # 若健康检查仍未通过，输出日志并失败
+          if ! curl -fsS http://127.0.0.1:16868/api/health | grep -q '"status":"ok"'; then
+            echo "health probe failed" >&2
+            tail -n 200 web_smoke.log >&2 || true
+            exit 1
+          fi
           curl -fsS -I http://127.0.0.1:16868/ | grep -E "HTTP/.* 200" >/dev/null
           curl -fsS -I http://127.0.0.1:16868/ | grep -i "Content-Type: text/html" >/dev/null
           APPJS=$(ls pkg/web/webpath/_app/immutable/entry/*app*.js 2>/dev/null | head -n1 || true)
@@ -113,6 +124,7 @@ jobs:
           path: |
             _afrog_smoke
             _afrog_pid
+            web_smoke.log
 
       - name: Goreleaser snapshot (no publish)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
