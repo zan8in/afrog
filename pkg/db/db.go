@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 
@@ -125,19 +124,19 @@ func createTaskID() string {
 	return taskID
 }
 
-func DbName() string {
-    homeDir, err := os.UserHomeDir()
-    if err != nil {
-        return ""
-    }
+func DbName() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("get home dir failed: %w", err)
+	}
 
-    path := path.Join(homeDir, ".config", "afrog")
-    // 权限收紧为 0700，避免其它系统用户读取数据库
-    if err := os.MkdirAll(path, 0o700); err != nil {
-        return ""
-    }
+	path := filepath.Join(homeDir, ".config", "afrog")
+	// 权限收紧为 0700，避免其它系统用户读取数据库
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return "", fmt.Errorf("create db dir failed: %w", err)
+	}
 
-    return filepath.Join(path, DBName+".db")
+	return filepath.Join(path, DBName+".db"), nil
 }
 
 func NewSnowFlake() error {

@@ -66,7 +66,11 @@ func saveToDatabaseX() {
 func NewWebSqliteDB() error {
 	// 初始化数据库连接（增加 busy_timeout，开启 WAL）
 	// 备注：logoove/sqlite 驱动使用名为 sqlite3 的驱动注册
-	dsn := "file:" + db2.DbName() + "?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000"
+	dbName, err := db2.DbName()
+	if err != nil {
+		return err
+	}
+	dsn := "file:" + dbName + "?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000"
 	db, err := sqlx.Connect("sqlite3", dsn)
 	if err != nil {
 		return err
