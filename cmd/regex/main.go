@@ -2,12 +2,63 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dlclark/regexp2"
+	"github.com/zan8in/gologger"
+	"github.com/zan8in/retryablehttp"
 )
 
+// test retryablehttp.rawtcpdo
 func main() {
+	po := &retryablehttp.DefaultPoolOptions
+	// 避免上游 SDK 在处理代理列表时触发并发通道错误，先不让池初始化解析代理
+	// 后续我们在拿到客户端后手动设置 http.Transport 的代理
+	po.Proxy = ""
+	po.Timeout = 50
+	po.Retries = 3
+	po.DisableRedirects = true
+
+	var RtryNoRedirect *retryablehttp.Client
+	var err error
+
+	retryablehttp.InitClientPool(po)
+	if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
+		gologger.Error().Msgf("[retryablehttp.GetPool] error: %v", err)
+		return
+	}
+
+	req, err := retryablehttp.NewRequest(http.MethodPost, "http://honey.scanme.sh", nil)
+	if err != nil {
+		gologger.Error().Msgf("[retryablehttp.NewRequest] error: %v", err)
+		return
+	}
+	req.Header.Set("Accept", "text/html,application/xhtml xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	req.Header.Set("Accept-Encoding", "gzip, deflate")
+	req.Header.Set("Accept-Language", "zh-CN")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := RtryNoRedirect.RawTCPDo(req.Request)
+	if err != nil {
+		gologger.Error().Msgf("[retryablehttp.RawTCPDo] error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		gologger.Error().Msgf("[io.ReadAll] error: %v", err)
+		return
+	}
+	gologger.Info().Msgf("[respBody] \n%s", string(respBody))
+	time.Sleep(3)
+}
+
+func main2() {
 	// for _, line := range pocs.EmbedFileList {
 	// 	b, err := pocs.EmbedReadFile(line)
 	// 	if err != nil {

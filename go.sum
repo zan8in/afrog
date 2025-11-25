@@ -1261,6 +1261,10 @@ github.com/zan8in/retryablehttp v0.0.0-20251124101932-65a9c12ee410 h1:a/Q2mRdn2P
 github.com/zan8in/retryablehttp v0.0.0-20251124101932-65a9c12ee410/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
 github.com/zan8in/retryablehttp v0.0.0-20251124104159-6d0131b2178f h1:00jjMsaI2/DEU5iS2fO/zDjzw60xdS/AIPQteT2lieg=
 github.com/zan8in/retryablehttp v0.0.0-20251124104159-6d0131b2178f/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
+github.com/zan8in/retryablehttp v0.0.0-20251124112346-679a1a6cbcf9 h1:geF07azq6cc0rkwiu/+Ar9W1EuUfumddLNGpr1tceI8=
+github.com/zan8in/retryablehttp v0.0.0-20251124112346-679a1a6cbcf9/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
+github.com/zan8in/retryablehttp v0.0.0-20251124115604-704daa576ff2 h1:+lmuumCjlryHUU7QfzJS9PhGXPsDLMx8IqNv08nFoMY=
+github.com/zan8in/retryablehttp v0.0.0-20251124115604-704daa576ff2/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
 github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a h1:0FJgwyL9TXasVoqtFFju3LW50jk86wL7QTX+Jt8RmKA=

