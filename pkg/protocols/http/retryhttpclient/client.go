@@ -48,7 +48,7 @@ func Init(opt *Options) (err error) {
 	// -timeout 参数默认是 50s @editor 2024/11/03
 	defaultTimeout = time.Duration(opt.Timeout) * time.Second
 
-	// 保序
+	// 保持查询参数顺序，避免因重新排序导致的漏洞触发失败 @editor 2025/11/25
 	retryablehttpurlutil.PreserveQueryOrder = true
 
 	retryablehttp.InitClientPool(po)
