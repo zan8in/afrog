@@ -2,6 +2,7 @@ package retryhttpclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/retryablehttp"
-	"golang.org/x/net/context"
+	retryablehttpurlutil "github.com/zan8in/retryablehttp/pkg/utils/urlutil"
 )
 
 var (
@@ -46,6 +47,9 @@ func Init(opt *Options) (err error) {
 
 	// -timeout 参数默认是 50s @editor 2024/11/03
 	defaultTimeout = time.Duration(opt.Timeout) * time.Second
+
+	// 保序
+	retryablehttpurlutil.PreserveQueryOrder = true
 
 	retryablehttp.InitClientPool(po)
 	if RtryNoRedirect, err = retryablehttp.GetPool(po); err != nil {
