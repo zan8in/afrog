@@ -1267,6 +1267,8 @@ github.com/zan8in/retryablehttp v0.0.0-20251124115604-704daa576ff2 h1:+lmuumCjlr
 github.com/zan8in/retryablehttp v0.0.0-20251124115604-704daa576ff2/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
 github.com/zan8in/retryablehttp v0.0.0-20251125105208-4ca357a4e729 h1:KGmETSIriWOV+FvBKm4Tn99lo4eLk6PQMx1NdhbpMB4=
 github.com/zan8in/retryablehttp v0.0.0-20251125105208-4ca357a4e729/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
+github.com/zan8in/retryablehttp v0.0.0-20251125123135-5f7019bb2876 h1:FuA1xfXV1bBoQ1xa/0rprxFlnIb5/ljF4A4hArbk9mo=
+github.com/zan8in/retryablehttp v0.0.0-20251125123135-5f7019bb2876/go.mod h1:GODJhJZrvSrebU65H4Fn4/cnNFQWlN6OfnKd71aM/Ks=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142 h1:VuFo0cT3pSP9TNFq868KdZy3+53so9JOl4mgx+Km5G4=
 github.com/zan8in/stringsutil v0.0.0-20220917064022-03a0bd835142/go.mod h1:EOSzFnNEZ09g1cG0Rlbi3F5JPsbRx2C2cbog+cLnWoc=
 github.com/zan8in/zoomeye v0.0.0-20231206032430-be54343a903a h1:0FJgwyL9TXasVoqtFFju3LW50jk86wL7QTX+Jt8RmKA=
