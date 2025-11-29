@@ -32,6 +32,8 @@ urls*
 *pocs/afrog-pocs/a-private/
 
 /afrog-pocs/
+afrogweb
+dist
 *.afg
 
 *pocs/deleted*
@@ -63,4 +65,4 @@ urls*
 *cmd/workgroup*
 *cmd/xray*
 
-*dist/
+*dist/\nafrogweb
