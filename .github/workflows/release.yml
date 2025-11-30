@@ -35,31 +35,6 @@ jobs:
           go-version: 1.24.1
           cache: true
 
-      - name: Verify embedded web assets
-        run: |
-          set -euo pipefail
-          ls -la pkg/web/webpath || (echo "missing webpath directory" && exit 1)
-          test -f pkg/web/webpath/index.html || (echo "missing index.html" && exit 1)
-          test -d pkg/web/webpath/_app/immutable/entry || (echo "missing entry directory" && exit 1)
-          ENTRY_COUNT=$(find pkg/web/webpath/_app/immutable/entry -maxdepth 1 -type f -name '*.js' | wc -l || echo 0)
-          [ "$ENTRY_COUNT" -gt 0 ] || (echo "missing entry js" && exit 1)
-          CHUNKS=$(ls pkg/web/webpath/_app/immutable/chunks/*.js | wc -l)
-          [ "$CHUNKS" -gt 0 ] || (echo "missing chunks js" && exit 1)
-
-      - name: Detect unmatched web assets (embed coverage guard)
-        run: |
-          set -euo pipefail
-          TOP_EXTS='html|ico|png|svg|webmanifest|json|txt'
-          ALLOWED_TOP_RE="^pkg/web/webpath/[^/]+\.(${TOP_EXTS})$"
-          ALLOWED_DIRS_RE='^pkg/web/webpath/(fonts/.+|_app/.+|docs/.+|pocs/.+|reports/.+)$'
-          UNMATCHED=$(find pkg/web/webpath -type f | grep -v -E "$ALLOWED_TOP_RE" | grep -v -E "$ALLOWED_DIRS_RE" | grep -v -E "/\.DS_Store$" || true)
-          if [ -n "$UNMATCHED" ]; then
-            echo "[embed coverage] Detected files not covered by go:embed patterns:" >&2
-            echo "$UNMATCHED" >&2
-            echo "Please update pkg/web/embed.go to include these paths." >&2
-            exit 1
-          fi
-
       - name: Go modules download
         run: |
           set -euo pipefail
@@ -92,6 +67,31 @@ jobs:
             exit 1
           fi
           echo "afrogweb assets copied successfully"
+
+      - name: Verify embedded web assets
+        run: |
+          set -euo pipefail
+          ls -la pkg/web/webpath || (echo "missing webpath directory" && exit 1)
+          test -f pkg/web/webpath/index.html || (echo "missing index.html" && exit 1)
+          test -d pkg/web/webpath/_app/immutable/entry || (echo "missing entry directory" && exit 1)
+          ENTRY_COUNT=$(find pkg/web/webpath/_app/immutable/entry -maxdepth 1 -type f -name '*.js' | wc -l || echo 0)
+          [ "$ENTRY_COUNT" -gt 0 ] || (echo "missing entry js" && exit 1)
+          CHUNKS=$(ls pkg/web/webpath/_app/immutable/chunks/*.js | wc -l)
+          [ "$CHUNKS" -gt 0 ] || (echo "missing chunks js" && exit 1)
+
+      - name: Detect unmatched web assets (embed coverage guard)
+        run: |
+          set -euo pipefail
+          TOP_EXTS='html|ico|png|svg|webmanifest|json|txt'
+          ALLOWED_TOP_RE="^pkg/web/webpath/[^/]+\.(${TOP_EXTS})$"
+          ALLOWED_DIRS_RE='^pkg/web/webpath/(fonts/.+|_app/.+|docs/.+|pocs/.+|reports/.+)$'
+          UNMATCHED=$(find pkg/web/webpath -type f | grep -v -E "$ALLOWED_TOP_RE" | grep -v -E "$ALLOWED_DIRS_RE" | grep -v -E "/\.DS_Store$" || true)
+          if [ -n "$UNMATCHED" ]; then
+            echo "[embed coverage] Detected files not covered by go:embed patterns:" >&2
+            echo "$UNMATCHED" >&2
+            echo "Please update pkg/web/embed.go to include these paths." >&2
+            exit 1
+          fi
 
       - name: Smoke build (validate go:embed)
         env:
