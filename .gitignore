@@ -28,6 +28,11 @@ urls*
 
 *docs/POCLIST.md*
 
+pkg/web/webpath/
+_afrog_smoke
+_afrog_pid
+web_smoke.log
+
 *pocs/afrog-pocs/e-privbox/
 *pocs/afrog-pocs/a-private/
 
