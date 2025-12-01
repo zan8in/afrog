@@ -212,18 +212,17 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 		return err
 	}
 
-	reader := io.LimitReader(resp.Body, maxDefaultBody)
-	respBody, err := io.ReadAll(reader)
+	var buf bytes.Buffer
+	lr := io.LimitedReader{R: resp.Body, N: maxDefaultBody}
+	_, err = io.Copy(&buf, &lr) // fixed 服务端或代理提前断开连接，HTTP 响应体被截断， io.ReadAll 在读取 io.LimitReader 时会抛出 unexpected EOF 。@eidtor 2025.12.1
 	if err != nil {
-		// 解决 https 使用 proxy http 代理时，user canceled 导致 afrog 接收不到响应的问题
-		// @editor 2024/01/08
-		if !strings.Contains(err.Error(), "user canceled") {
+		if !strings.Contains(err.Error(), "user canceled") && !errors.Is(err, io.ErrUnexpectedEOF) {
 			resp.Body.Close()
 			return err
 		}
-
 	}
 	resp.Body.Close()
+	respBody := buf.Bytes()
 
 	// respbody gbk to utf8 encoding
 	utf8RespBody := ""
