@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" href="/favicon.ico" />
+		<link rel="shortcut icon" href="/favicon-16x16.png" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="manifest" href="/site.webmanifest" />
+		<script>
+			const USER_CONFIG_COOKIE_NAME = 'scn_user_config';
+			const cookieMap = {};
+			document.cookie.split(';').forEach((pair) => {
+				const [key, value] = pair.trim().split('=');
+				cookieMap[key] = value;
+			});
+			const userConfigCookie = cookieMap[USER_CONFIG_COOKIE_NAME];
+			if (userConfigCookie) {
+				try {
+					const userConfig = JSON.parse(userConfigCookie);
+					if (userConfig.activeTheme) {
+						document.documentElement.classList.add(`theme-${userConfig.activeTheme}`);
+						document.documentElement.setAttribute('data-theme', userConfig.activeTheme);
+					}
+					if (userConfig.layout) {
+						document.documentElement.classList.add(`layout-${userConfig.layout}`);
+					}
+				} catch (e) {
+					console.error('Error parsing user config cookie:', e);
+				}
+			}
+		</script>
+		
+		<link href="/_app/immutable/assets/vendor.lE_il3B4.css" rel="stylesheet">
+		<link href="/_app/immutable/assets/monaco-editor.BYL4WPEd.css" rel="stylesheet">
+		<link rel="modulepreload" href="/_app/immutable/entry/start.CJdsiY1d.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/DV-hihCm.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/app.DUiRh8ai.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/BzkQKSe_.js">
+	</head>
+
+	<body
+		data-sveltekit-preload-data="hover"
+		class="group/body overscroll-none font-sans text-foreground antialiased [--footer-height:calc(var(--spacing)*14)] [--header-height:calc(var(--spacing)*14)] xl:[--footer-height:calc(var(--spacing)*24)]"
+	>
+		<div style="display: contents">
+			<script>
+				{
+					__sveltekit_eqitcr = {
+						base: ""
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("/_app/immutable/entry/start.CJdsiY1d.js"),
+						import("/_app/immutable/entry/app.DUiRh8ai.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element);
+					});
+				}
+			</script>
+		</div>
+	</body>
+</html>

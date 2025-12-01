@@ -1,0 +1,1 @@
+const t={name:"afrog",url:"https://afrogx.com",ogImage:{width:"1200",height:"630"},keywords:["penetration-testing","poc","bug-bounty","pentest","vulnerablility-scanner","red-teaming","vulnerablility-scanning-tools","afrog"],links:{github:"https://github.com/zan8in/afrog"}};export{t as s};
