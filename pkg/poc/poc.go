@@ -1,14 +1,15 @@
 package poc
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "os"
+    "path/filepath"
+    "sort"
+    "strings"
 
-	"github.com/zan8in/afrog/v3/pkg/utils"
-	// 移除对pocs包的导入
-	"gopkg.in/yaml.v2"
+    "github.com/zan8in/afrog/v3/pkg/utils"
+    // 移除对pocs包的导入
+    "gopkg.in/yaml.v2"
 )
 
 // https://docs.xray.cool/#/guide/poc/v2
@@ -291,24 +292,31 @@ func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(any) error) error {
-	order = 0
+    order = 0
 
-	tempMap := make(map[string]Rule, 1)
-	err := unmarshal(&tempMap)
-	if err != nil {
-		return err
-	}
+    tempMap := make(map[string]Rule, 1)
+    if err := unmarshal(&tempMap); err != nil {
+        return err
+    }
 
-	newRuleSlice := make([]RuleMap, len(tempMap))
-	for roleName, role := range tempMap {
-		newRuleSlice[role.order] = RuleMap{
-			Key:   roleName,
-			Value: role,
-		}
-	}
+    type pair struct {
+        name string
+        rule Rule
+    }
+    arr := make([]pair, 0, len(tempMap))
+    for name, rule := range tempMap {
+        arr = append(arr, pair{name: name, rule: rule})
+    }
 
-	*m = RuleMapSlice(newRuleSlice)
-	return nil
+    sort.Slice(arr, func(i, j int) bool { return arr[i].rule.order < arr[j].rule.order })
+
+    newRuleSlice := make([]RuleMap, 0, len(arr))
+    for _, p := range arr {
+        newRuleSlice = append(newRuleSlice, RuleMap{Key: p.name, Value: p.rule})
+    }
+
+    *m = RuleMapSlice(newRuleSlice)
+    return nil
 }
 
 func (poc *Poc) Reset() {
