@@ -106,9 +106,18 @@ func registerAPIRoutes(api *mux.Router) {
 	// 新增：创建 POC
 	api.HandleFunc("/pocs/create", jwtAuthMiddleware(pocsCreateHandler)).Methods(http.MethodPost)
 	// 新增：更新指定 POC 的 YAML 内容（当前使用 POST）
-	api.HandleFunc("/pocs/update/{id}", jwtAuthMiddleware(pocsUpdateHandler)).Methods(http.MethodPost)
-	// 新增：删除指定 POC（仅允许删除 my 源）
-	api.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsDeleteHandler)).Methods(http.MethodDelete)
+    api.HandleFunc("/pocs/update/{id}", jwtAuthMiddleware(pocsUpdateHandler)).Methods(http.MethodPost)
+    // 新增：删除指定 POC（仅允许删除 my 源）
+    api.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsDeleteHandler)).Methods(http.MethodDelete)
+
+    api.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsSetsListHandler)).Methods(http.MethodGet)
+    api.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsCreateSetHandler)).Methods(http.MethodPost)
+    api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsGetSetHandler)).Methods(http.MethodGet)
+    api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsUpdateSetHandler)).Methods(http.MethodPut)
+    api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsDeleteSetHandler)).Methods(http.MethodDelete)
+    api.HandleFunc("/assets/sets/{id}/import", jwtAuthMiddleware(assetsImportHandler)).Methods(http.MethodPost)
+    api.HandleFunc("/assets/search", jwtAuthMiddleware(assetsSearchHandler)).Methods(http.MethodGet)
+    api.HandleFunc("/assets/export", jwtAuthMiddleware(assetsExportHandler)).Methods(http.MethodGet)
 }
 
 // API 未匹配路由 -> JSON 404

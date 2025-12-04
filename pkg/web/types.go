@@ -55,14 +55,40 @@ type ReportListResponse struct {
 
 // POC 列表 - 单条记录
 type PocsListItem struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Severity string   `json:"severity"`
-	Author   []string `json:"author,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	Source   string   `json:"source"` // builtin/curated/my/local
-	Path     string   `json:"path,omitempty"`
-	Created  string   `json:"created,omitempty"`
+    ID       string   `json:"id"`
+    Name     string   `json:"name"`
+    Severity string   `json:"severity"`
+    Author   []string `json:"author,omitempty"`
+    Tags     []string `json:"tags,omitempty"`
+    Source   string   `json:"source"` // builtin/curated/my/local
+    Path     string   `json:"path,omitempty"`
+    Created  string   `json:"created,omitempty"`
+}
+
+// 资产地址集合元信息
+type AssetSetInfo struct {
+    ID        string   `json:"id"`
+    Name      string   `json:"name"`
+    Path      string   `json:"path"`
+    Category  string   `json:"category,omitempty"`
+    Tags      []string `json:"tags,omitempty"`
+    Created   string   `json:"created,omitempty"`
+    Updated   string   `json:"updated,omitempty"`
+    LineCount int      `json:"line_count"`
+    Favorite  bool     `json:"favorite,omitempty"`
+}
+
+// 资产集合内容响应
+type AssetSetContent struct {
+    Info  AssetSetInfo `json:"info"`
+    Items []string     `json:"items"`
+}
+
+// 资产集合列表响应
+type AssetsListResponse struct {
+    Items     []AssetSetInfo `json:"items"`
+    Total     int            `json:"total"`
+    UpdatedAt string         `json:"updated_at"`
 }
 
 // POC 列表 - 响应

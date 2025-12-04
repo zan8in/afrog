@@ -1071,3 +1071,410 @@ func pocsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "POC删除成功", Data: nil})
 }
+
+func assetsSetsListHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+	root, err := assetRootDir()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无法初始化资产库目录"})
+		return
+	}
+	items, err := listAssetFiles(root)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "读取资产库失败"})
+		return
+	}
+	resp := AssetsListResponse{Items: items, Total: len(items), UpdatedAt: time.Now().UTC().Format(time.RFC3339)}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: resp})
+}
+
+func assetsCreateSetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+	type reqBody struct {
+		ID        string   `json:"id"`
+		Name      string   `json:"name"`
+		Category  string   `json:"category"`
+		Items     []string `json:"items"`
+		Content   string   `json:"content"`
+		Dedup     bool     `json:"dedup"`
+		Normalize bool     `json:"normalize"`
+	}
+	var req reqBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	if strings.TrimSpace(req.ID) == "" && strings.TrimSpace(req.Name) == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少name"})
+		return
+	}
+	id := strings.TrimSpace(req.ID)
+	if id == "" {
+		id = strings.TrimSpace(req.Name)
+		if strings.TrimSpace(req.Category) != "" {
+			id = strings.TrimSpace(req.Category) + "/" + id
+		}
+	}
+	path, name, category, err := assetFilePathFromID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "非法的集合标识"})
+		return
+	}
+	lines := make([]string, 0, 128)
+	if len(req.Items) > 0 {
+		lines = append(lines, req.Items...)
+	}
+	if strings.TrimSpace(req.Content) != "" {
+		for _, ln := range strings.Split(req.Content, "\n") {
+			lines = append(lines, ln)
+		}
+	}
+	out := make([]string, 0, len(lines))
+	seen := make(map[string]struct{}, len(lines))
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if t == "" {
+			continue
+		}
+		if !isValidAddress(t) {
+			continue
+		}
+		if req.Normalize {
+			t = normalizeAddress(t)
+		}
+		if req.Dedup {
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+		}
+		out = append(out, t)
+	}
+	if err := writeLinesAtomic(path, out); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "写入失败"})
+		return
+	}
+	fi, _ := os.Stat(path)
+	root, _ := assetRootDir()
+	rel, _ := filepath.Rel(root, path)
+	rel = filepath.ToSlash(rel)
+	info := AssetSetInfo{
+		ID:        strings.TrimSuffix(rel, ".txt"),
+		Name:      name,
+		Path:      rel,
+		Category:  category,
+		Created:   fi.ModTime().UTC().Format(time.RFC3339),
+		Updated:   fi.ModTime().UTC().Format(time.RFC3339),
+		LineCount: len(out),
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: info})
+}
+
+func assetsGetSetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少id"})
+		return
+	}
+	path, name, category, err := assetFilePathFromID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "非法的集合标识"})
+		return
+	}
+	lines, err := readLines(path)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "读取失败"})
+		return
+	}
+	fi, _ := os.Stat(path)
+	root, _ := assetRootDir()
+	rel, _ := filepath.Rel(root, path)
+	rel = filepath.ToSlash(rel)
+	info := AssetSetInfo{
+		ID:        strings.TrimSuffix(rel, ".txt"),
+		Name:      name,
+		Path:      rel,
+		Category:  category,
+		Created:   fi.ModTime().UTC().Format(time.RFC3339),
+		Updated:   fi.ModTime().UTC().Format(time.RFC3339),
+		LineCount: len(lines),
+	}
+	resp := AssetSetContent{Info: info, Items: lines}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: resp})
+}
+
+func assetsUpdateSetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持PUT方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	path, _, _, err := assetFilePathFromID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "非法的集合标识"})
+		return
+	}
+	type reqBody struct {
+		Items     []string `json:"items"`
+		Content   string   `json:"content"`
+		Dedup     bool     `json:"dedup"`
+		Normalize bool     `json:"normalize"`
+	}
+	var req reqBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	lines := make([]string, 0, 128)
+	lines = append(lines, req.Items...)
+	if strings.TrimSpace(req.Content) != "" {
+		for _, ln := range strings.Split(req.Content, "\n") {
+			lines = append(lines, ln)
+		}
+	}
+	out := make([]string, 0, len(lines))
+	seen := make(map[string]struct{}, len(lines))
+	for _, ln := range lines {
+		t := strings.TrimSpace(ln)
+		if t == "" {
+			continue
+		}
+		if !isValidAddress(t) {
+			continue
+		}
+		if req.Normalize {
+			t = normalizeAddress(t)
+		}
+		if req.Dedup {
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+		}
+		out = append(out, t)
+	}
+	if err := writeLinesAtomic(path, out); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "写入失败"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: map[string]any{"count": len(out)}})
+}
+
+func assetsDeleteSetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持DELETE方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	path, _, _, err := assetFilePathFromID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "非法的集合标识"})
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			w.WriteHeader(http.StatusNotFound)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "未找到集合"})
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "删除失败"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK"})
+}
+
+func assetsImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	id := strings.TrimSpace(vars["id"])
+	path, _, _, err := assetFilePathFromID(id)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "非法的集合标识"})
+		return
+	}
+	type reqBody struct {
+		Items     []string `json:"items"`
+		Content   string   `json:"content"`
+		Dedup     bool     `json:"dedup"`
+		Normalize bool     `json:"normalize"`
+	}
+	var req reqBody
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	existing, _ := readLines(path)
+	all := make([]string, 0, len(existing)+len(req.Items)+128)
+	all = append(all, existing...)
+	all = append(all, req.Items...)
+	if strings.TrimSpace(req.Content) != "" {
+		for _, ln := range strings.Split(req.Content, "\n") {
+			all = append(all, ln)
+		}
+	}
+	out := make([]string, 0, len(all))
+	seen := make(map[string]struct{}, len(all))
+	for _, ln := range all {
+		t := strings.TrimSpace(ln)
+		if t == "" {
+			continue
+		}
+		if !isValidAddress(t) {
+			continue
+		}
+		if req.Normalize {
+			t = normalizeAddress(t)
+		}
+		if req.Dedup {
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+		}
+		out = append(out, t)
+	}
+	if err := writeLinesAtomic(path, out); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "写入失败"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: map[string]any{"count": len(out)}})
+}
+
+func assetsSearchHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+	q := strings.TrimSpace(r.URL.Query().Get("query"))
+	qLower := strings.ToLower(q)
+	qAlias := strings.ReplaceAll(strings.TrimSuffix(qLower, ".txt"), " ", "-")
+	root, err := assetRootDir()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无法初始化资产库目录"})
+		return
+	}
+	items, err := listAssetFiles(root)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "读取资产库失败"})
+		return
+	}
+	result := make([]string, 0, 256)
+	seen := make(map[string]struct{}, 256)
+	for _, it := range items {
+		p, _, _, _ := assetFilePathFromID(it.ID)
+		nameLower := strings.ToLower(it.Name)
+		pathLower := strings.ToLower(it.Path)
+		lines, _ := readLines(p)
+		// 如果集合名或路径匹配查询，则整集合加入（去重）
+		if qLower != "" && (strings.Contains(nameLower, qLower) || strings.Contains(pathLower, qLower) || strings.Contains(nameLower, qAlias) || strings.Contains(pathLower, qAlias)) {
+			for _, ln := range lines {
+				t := strings.TrimSpace(ln)
+				if t == "" {
+					continue
+				}
+				if _, ok := seen[t]; ok {
+					continue
+				}
+				seen[t] = struct{}{}
+				result = append(result, t)
+			}
+			continue
+		}
+		// 否则按行匹配查询词
+		for _, ln := range lines {
+			t := strings.TrimSpace(ln)
+			if t == "" {
+				continue
+			}
+			if qLower != "" && !strings.Contains(strings.ToLower(t), qLower) {
+				continue
+			}
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+			result = append(result, t)
+		}
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: map[string]any{"items": result, "total": len(result)}})
+}
+
+func assetsExportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+	idsRaw := strings.TrimSpace(r.URL.Query().Get("ids"))
+	if idsRaw == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少ids"})
+		return
+	}
+	ids := strings.Split(idsRaw, ",")
+	out := make([]string, 0, 512)
+	seen := make(map[string]struct{}, 512)
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		p, _, _, err := assetFilePathFromID(id)
+		if err != nil {
+			continue
+		}
+		lines, _ := readLines(p)
+		for _, ln := range lines {
+			t := strings.TrimSpace(ln)
+			if t == "" {
+				continue
+			}
+			if _, ok := seen[t]; ok {
+				continue
+			}
+			seen[t] = struct{}{}
+			out = append(out, t)
+		}
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: map[string]any{"items": out, "total": len(out), "text": strings.Join(out, "\n")}})
+}
