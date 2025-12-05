@@ -1,22 +1,22 @@
 package runner
 
 import (
-    "fmt"
-    "net/http"
-    "regexp"
-    "strings"
-    "sync"
-    "time"
+	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/zan8in/afrog/v3/pkg/config"
-    "github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
-    "github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/result"
 
-    "github.com/google/cel-go/checker/decls"
-    "github.com/zan8in/afrog/v3/pkg/poc"
-    "github.com/zan8in/afrog/v3/pkg/proto"
-    "github.com/zan8in/afrog/v3/pkg/utils"
-    "gopkg.in/yaml.v2"
+	"github.com/google/cel-go/checker/decls"
+	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/utils"
+	"gopkg.in/yaml.v2"
 )
 
 var MMutex = &sync.Mutex{}
@@ -89,18 +89,18 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		// 预处理：让 rules 的 path/headers/body/host/raw/data 支持 {{...}} CEL 运算
 		c.preRenderRuleRequest(&rule.Request)
 
-        isMatch := false
-        reqType := strings.ToLower(rule.Request.Type)
+		isMatch := false
+		reqType := strings.ToLower(rule.Request.Type)
 
-        if len(rule.Request.Raw) > 0 {
-            err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
-        } else {
-            exec, ok := executors[reqType]
-            if !ok {
-                exec = HTTPExecutor{}
-            }
-            err = exec.Execute(target, rule, c.Options, c.VariableMap)
-        }
+		if len(rule.Request.Raw) > 0 {
+			err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
+		} else {
+			exec, ok := executors[reqType]
+			if !ok {
+				exec = HTTPExecutor{}
+			}
+			err = exec.Execute(target, rule, c.Options, c.VariableMap)
+		}
 
 		if err == nil {
 			if len(rule.Expressions) > 0 {
@@ -449,27 +449,27 @@ func (c *Checker) renderCELPlaceholders(s string) string {
 
 // 对当前 rule 的请求字段进行预渲染（仅替换能成功求值的表达式）
 func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
-    // HTTP(S)/RAW/NETX 通用字段
-    req.Path = c.renderCELPlaceholders(strings.TrimSpace(req.Path))
-    req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
-    req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
-    req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
-    req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
+	// HTTP(S)/RAW/NETX 通用字段
+	req.Path = c.renderCELPlaceholders(strings.TrimSpace(req.Path))
+	req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
+	req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
+	req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
+	req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
 
-    // CEL 渲染后做一次简单 {{var}} 替换作为兜底
-    req.Path = setVariableMap(req.Path, c.VariableMap)
-    req.Host = setVariableMap(req.Host, c.VariableMap)
-    req.Body = setVariableMap(req.Body, c.VariableMap)
-    req.Raw = setVariableMap(req.Raw, c.VariableMap)
-    req.Data = setVariableMap(req.Data, c.VariableMap)
+	// CEL 渲染后做一次简单 {{var}} 替换作为兜底
+	req.Path = setVariableMap(req.Path, c.VariableMap)
+	req.Host = setVariableMap(req.Host, c.VariableMap)
+	req.Body = setVariableMap(req.Body, c.VariableMap)
+	req.Raw = setVariableMap(req.Raw, c.VariableMap)
+	req.Data = setVariableMap(req.Data, c.VariableMap)
 
-    // headers 逐项处理（深拷贝避免并发写入共享 map）
-    if req.Headers != nil {
-        newHeaders := make(map[string]string, len(req.Headers))
-        for hk, hv := range req.Headers {
-            h := c.renderCELPlaceholders(strings.TrimSpace(hv))
-            newHeaders[hk] = setVariableMap(h, c.VariableMap)
-        }
-        req.Headers = newHeaders
-    }
+	// headers 逐项处理（深拷贝避免并发写入共享 map）
+	if req.Headers != nil {
+		newHeaders := make(map[string]string, len(req.Headers))
+		for hk, hv := range req.Headers {
+			h := c.renderCELPlaceholders(strings.TrimSpace(hv))
+			newHeaders[hk] = setVariableMap(h, c.VariableMap)
+		}
+		req.Headers = newHeaders
+	}
 }

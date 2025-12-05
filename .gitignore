@@ -25,6 +25,7 @@ urls*
 .vscode
 .idea
 .trae
+.DS_Store
 
 *docs/POCLIST.md*
 
