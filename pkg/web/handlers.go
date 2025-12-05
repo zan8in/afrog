@@ -791,13 +791,13 @@ func pocsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 仅支持写入 my 源目录
-	home, _ := os.UserHomeDir()
-	myDir := filepath.Join(home, "afrog-my-pocs")
-	if err := os.MkdirAll(myDir, 0o755); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建 my 目录失败: %v", err)})
-		return
-	}
+    home, _ := os.UserHomeDir()
+    myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
+    if err := os.MkdirAll(myDir, 0o755); err != nil {
+        w.WriteHeader(http.StatusInternalServerError)
+        _ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建 my 目录失败: %v", err)})
+        return
+    }
 	filePath := filepath.Join(myDir, pocID+".yaml")
 
 	// 写入新文件
@@ -1027,9 +1027,9 @@ func pocsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 系统 POC 保护与 my 源检查：仅允许删除 my 目录中的 POC
-	home, _ := os.UserHomeDir()
-	myDir := filepath.Join(home, "afrog-my-pocs")
-	myPath := filepath.Join(myDir, pocID+".yaml")
+    home, _ := os.UserHomeDir()
+    myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
+    myPath := filepath.Join(myDir, pocID+".yaml")
 
 	if fi, statErr := os.Stat(myPath); statErr != nil {
 		if os.IsNotExist(statErr) {

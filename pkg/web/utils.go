@@ -1,19 +1,18 @@
 package web
 
 import (
-	"bufio"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"path/filepath"
-	"regexp"
-	"runtime"
-	"sort"
-	"strings"
-	"time"
+    "bufio"
+    "net"
+    "net/http"
+    "net/url"
+    "os"
+    "path/filepath"
+    "regexp"
+    "sort"
+    "strings"
+    "time"
 
-	"github.com/zan8in/afrog/v3/pkg/utils"
+    "github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 // context keys
@@ -52,18 +51,12 @@ func generateRandomPassword() string {
 }
 
 func assetRootDir() (string, error) {
-	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, "afrog-urls")
-	if err := os.MkdirAll(dir, 0o700); err == nil {
-		return dir, nil
-	}
-	if runtime.GOOS == "darwin" {
-		dir2 := filepath.Join(home, "Library", "Application Support", "afrogweb", "urls")
-		if err := os.MkdirAll(dir2, 0o700); err == nil {
-			return dir2, nil
-		}
-	}
-	return dir, os.MkdirAll(dir, 0o700)
+    home, _ := os.UserHomeDir()
+    dir := filepath.Join(home, ".config", "afrog", "assets")
+    if err := os.MkdirAll(dir, 0o700); err != nil {
+        return dir, err
+    }
+    return dir, nil
 }
 
 var safeSegRe = regexp.MustCompile(`^[\p{Han}A-Za-z0-9._-]+$`)

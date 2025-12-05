@@ -1,17 +1,18 @@
 package config
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"strings"
+    "errors"
+    "fmt"
+    "io"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
 
-	"github.com/cavaliergopher/grab/v3"
-	"github.com/zan8in/afrog/v3/pkg/poc"
-	"github.com/zan8in/afrog/v3/pkg/utils"
-	"github.com/zan8in/gologger"
+    "github.com/cavaliergopher/grab/v3"
+    "github.com/zan8in/afrog/v3/pkg/poc"
+    "github.com/zan8in/afrog/v3/pkg/utils"
+    "github.com/zan8in/gologger"
 )
 
 type AfrogUpdate struct {
@@ -24,11 +25,10 @@ type AfrogUpdate struct {
 }
 
 const (
-	upHost          = "https://gitee.com/zanbin/afrog/raw/main/pocs/v"
-	upPathName      = "/afrog-pocs"
-	upPath          = "/afrog-pocs.zip"
-	upRemoteVersion = "/version"
-	afrogVersion    = "/afrog.version"
+    upHost          = "https://gitee.com/zanbin/afrog/raw/main/pocs/v"
+    upPath          = "/afrog-pocs.zip"
+    upRemoteVersion = "/version"
+    afrogVersion    = "/afrog.version"
 )
 
 func NewAfrogUpdate(updatePoc bool) (*AfrogUpdate, error) {
@@ -107,42 +107,48 @@ func (u *AfrogUpdate) AfrogUpdatePocs() (string, error) {
 }
 
 func (u *AfrogUpdate) Download() error {
-	// @date 2023/10/12 first removed it before download afrog-pocs.zip
-	if err := os.RemoveAll(u.HomeDir + upPath); err != nil {
-		return err
-	}
+    if err := os.RemoveAll(u.HomeDir + upPath); err != nil {
+        return err
+    }
 
-	resp, err := grab.Get(u.HomeDir, upHost+upPath)
-	if err != nil {
-		return fmt.Errorf("%s", err.Error())
-	}
+    resp, err := grab.Get(u.HomeDir, upHost+upPath)
+    if err != nil {
+        return fmt.Errorf("%s", err.Error())
+    }
 
-	if err = os.RemoveAll(u.HomeDir + upPathName); err != nil {
-		return err
-	}
-
-	utils.RandSleep(1000)
-
-	u.Unzip(resp.Filename)
+    afHome := filepath.Join(u.HomeDir, ".config", "afrog")
+    _ = os.MkdirAll(afHome, 0755)
+    _ = os.RemoveAll(filepath.Join(afHome, "pocs"))
 
 	utils.RandSleep(1000)
 
-	u.LastestVersion = u.RemoteVersion
+    u.Unzip(resp.Filename)
 
-	return os.Remove(resp.Filename)
+	utils.RandSleep(1000)
+
+    u.LastestVersion = u.RemoteVersion
+
+    return os.Remove(resp.Filename)
 }
 
 func (u *AfrogUpdate) Unzip(src string) error {
-	uz := utils.NewUnzip()
+    uz := utils.NewUnzip()
+    afHome := filepath.Join(u.HomeDir, ".config", "afrog")
+    if _, err := uz.Extract(src, afHome); err != nil {
+        return fmt.Errorf("afrog-poc decompression failed. %s", err.Error())
+    }
 
-	if _, err := uz.Extract(src, u.HomeDir); err != nil {
-		return fmt.Errorf("afrog-poc decompression failed. %s", err.Error())
-	}
+    oldDir := filepath.Join(afHome, "afrog-pocs")
+    newDir := filepath.Join(afHome, "pocs")
+    if _, err := os.Stat(oldDir); err == nil {
+        _ = os.RemoveAll(newDir)
+        _ = os.Rename(oldDir, newDir)
+    }
 
-	if len(u.RemoteVersion) > 0 {
-		u.CurrVersion = u.RemoteVersion
-	}
-	gologger.Print().Msgf("Successfully installed afrog-pocs at %s\n", strings.ReplaceAll(u.HomeDir+upPathName, "\\", "/"))
+    if len(u.RemoteVersion) > 0 {
+        u.CurrVersion = u.RemoteVersion
+    }
+    gologger.Print().Msgf("Successfully installed pocs at %s\n", strings.ReplaceAll(newDir, "\\", "/"))
 
-	return nil
+    return nil
 }

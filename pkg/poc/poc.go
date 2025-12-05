@@ -8,7 +8,6 @@ import (
     "strings"
 
     "github.com/zan8in/afrog/v3/pkg/utils"
-    // 移除对pocs包的导入
     "gopkg.in/yaml.v2"
 )
 
@@ -128,21 +127,21 @@ type Classification struct {
 	CweId       string  `yaml:"cwe-id"`
 }
 
-const DefaultLocalPocDirectory = "afrog-pocs"
+const DefaultLocalPocDirectory = "pocs"
 
 var (
-	LocalFileList   []string
-	LocalAppendList []string
-	LocalTestList   []string
+    LocalFileList   []string
+    LocalAppendList []string
+    LocalTestList   []string
 )
 var LocalPocDirectory string
 
 func init() {
-	LocalPocDirectory, _ = InitPocHomeDirectory()
-	LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
+    LocalPocDirectory, _ = InitPocHomeDirectory()
+    LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
 
-	// 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
-	EnsureCuratedAndMyPocDirectories()
+    // 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
+    EnsureCuratedAndMyPocDirectories()
 }
 
 func InitLocalAppendList(pathFolder []string) {
@@ -211,19 +210,17 @@ func LocalReadContentByName(name string) ([]byte, error) {
 // Initialize afrog-pocs directory
 // @return pocsDir {{UserHomeDir}}/afrog-pocs
 func InitPocHomeDirectory() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	pocsDir := filepath.Join(homeDir, DefaultLocalPocDirectory)
-
-	_, err = os.Stat(pocsDir)
-	if err != nil {
-		err = os.MkdirAll(pocsDir, 0755)
-		return pocsDir, err
-	}
-	return pocsDir, err
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return "", err
+    }
+    configDir := filepath.Join(homeDir, ".config", "afrog")
+    _ = os.MkdirAll(configDir, 0755)
+    pocsDir := filepath.Join(configDir, DefaultLocalPocDirectory)
+    if _, err := os.Stat(pocsDir); err != nil {
+        _ = os.MkdirAll(pocsDir, 0755)
+    }
+    return pocsDir, nil
 }
 
 func GetPocVersionNumber() (string, error) {
@@ -420,21 +417,21 @@ func getFileNameFromPath(filePath string) string {
 // EnsureCuratedAndMyPocDirectories
 // 启动时确保在用户家目录下创建 afrog-curated-pocs 和 afrog-my-pocs 两个目录（若不存在则创建）
 func EnsureCuratedAndMyPocDirectories() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-
-	dirs := []string{
-		filepath.Join(homeDir, "afrog-curated-pocs"),
-		filepath.Join(homeDir, "afrog-my-pocs"),
-	}
-
-	for _, dir := range dirs {
-		if _, err := os.Stat(dir); err != nil {
-			_ = os.MkdirAll(dir, 0755)
-		}
-	}
+    homeDir, err := os.UserHomeDir()
+    if err != nil {
+        return
+    }
+    configDir := filepath.Join(homeDir, ".config", "afrog")
+    _ = os.MkdirAll(configDir, 0755)
+    dirs := []string{
+        filepath.Join(configDir, "pocs-curated"),
+        filepath.Join(configDir, "pocs-my"),
+    }
+    for _, dir := range dirs {
+        if _, err := os.Stat(dir); err != nil {
+            _ = os.MkdirAll(dir, 0755)
+        }
+    }
 }
 
 // 仅解析 POC 元数据，避免解析 rules 触发 RuleMapSlice 的 Unmarshal
