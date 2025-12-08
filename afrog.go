@@ -79,6 +79,7 @@ type SDKOptions struct {
 	Retries      int // 重试次数 (默认: 1)
 	Timeout      int // 超时时间秒 (默认: 10)
 	MaxHostError int // 主机最大错误数 (默认: 3)
+	Smart        bool
 
 	// ========== 网络配置 ==========
 	Proxy string // HTTP/SOCKS5代理
@@ -479,6 +480,7 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 		MaxRespBodySize: 2,
 		OOBRateLimit:    50,
 		OOBConcurrency:  20,
+		Smart:           opts.Smart,
 	}
 
 	// 转换目标列表
