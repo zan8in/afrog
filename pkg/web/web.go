@@ -34,9 +34,9 @@ func StartServer(addr string) error {
 		Addr:              addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadTimeout:       0,
+		WriteTimeout:      0,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	gologger.Info().Msgf("Web服务器启动于: http://%s", addr)

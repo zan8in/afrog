@@ -105,10 +105,18 @@ func (runner *Runner) Execute() {
 	go func() {
 		defer rwg.Done()
 
-		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(options.RateLimit))
+		rate := options.RateLimit
+		if rate <= 0 {
+			rate = 1
+		}
+		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(rate))
 		var wg sync.WaitGroup
 
-		p, _ := ants.NewPoolWithFunc(options.Concurrency, func(p any) {
+		con := options.Concurrency
+		if con <= 0 {
+			con = 1
+		}
+		p, _ := ants.NewPoolWithFunc(con, func(p any) {
 
 			defer wg.Done()
 			<-runner.engine.ticker.C
@@ -144,10 +152,26 @@ func (runner *Runner) Execute() {
 	go func() {
 		defer rwg.Done()
 
-		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(options.OOBRateLimit))
+		oobRate := options.OOBRateLimit
+		if oobRate <= 0 {
+			baseRate := options.RateLimit
+			if baseRate <= 0 {
+				baseRate = 1
+			}
+			oobRate = baseRate
+		}
+		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(oobRate))
 		var wg sync.WaitGroup
 
-		p, _ := ants.NewPoolWithFunc(options.OOBConcurrency, func(p any) {
+		oobCon := options.OOBConcurrency
+		if oobCon <= 0 {
+			baseCon := options.Concurrency
+			if baseCon <= 0 {
+				baseCon = 1
+			}
+			oobCon = baseCon
+		}
+		p, _ := ants.NewPoolWithFunc(oobCon, func(p any) {
 
 			defer wg.Done()
 			<-runner.engine.ticker.C

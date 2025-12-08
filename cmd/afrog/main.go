@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/web"
 	"github.com/zan8in/fileutil"
 	"github.com/zan8in/gologger"
 )
@@ -27,6 +28,27 @@ func main() {
 	options, err := config.NewOptions()
 	if err != nil {
 		gologger.Error().Msg(err.Error())
+		return
+	}
+
+	if options.Web {
+		cfg := options.Config
+		addr := ":16868"
+		if cfg != nil && cfg.ServerAddress != "" {
+			addr = cfg.ServerAddress
+		}
+		if err = sqlite.NewWebSqliteDB(); err != nil {
+			gologger.Error().Msg(err.Error())
+			return
+		}
+		if err = sqlite.InitX(); err != nil {
+			gologger.Error().Msg(err.Error())
+			return
+		}
+		defer sqlite.CloseX()
+		if err = web.StartServer(addr); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
 		return
 	}
 

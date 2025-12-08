@@ -140,10 +140,11 @@ func isValidAddress(line string) bool {
 }
 
 func normalizeAddress(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return s
-	}
+    s = strings.TrimSpace(s)
+    s = strings.Trim(s, "`\"")
+    if s == "" {
+        return s
+    }
 	if strings.HasPrefix(strings.ToLower(s), "http://") || strings.HasPrefix(strings.ToLower(s), "https://") {
 		if u, err := url.Parse(s); err == nil {
 			host := strings.ToLower(u.Host)

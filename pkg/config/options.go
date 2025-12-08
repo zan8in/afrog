@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/rs/xid"
+	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/output"
@@ -17,7 +18,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/validator"
-	"github.com/zan8in/afrog/v3/pkg/web"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/goflags"
@@ -330,15 +330,7 @@ func (opt *Options) VerifyOptions() error {
 	}
 
 	if opt.Web {
-		serveraddress := ":16868"
-		if config.ServerAddress != "" {
-			serveraddress = config.ServerAddress
-		}
-        err = web.StartServer(serveraddress)
-        if err != nil {
-            gologger.Error().Msg(err.Error())
-            os.Exit(1)
-        }
+		return nil
 	}
 
 	// init append poc
@@ -665,39 +657,40 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 func (o *Options) CreatePocList() []poc.Poc {
 	var pocSlice []poc.Poc
 
-	if len(o.PocFile) > 0 && len(poc.LocalTestList) > 0 {
-		for _, pocYaml := range poc.LocalTestList {
-			if p, err := poc.LocalReadPocByPath(pocYaml); err == nil {
+	if len(o.PocFile) > 0 {
+		c := catalog.New(o.PocFile)
+		paths, _ := c.GetPocPath(o.PocFile)
+		for _, pth := range paths {
+			if p, err := poc.LocalReadPocByPath(pth); err == nil {
 				pocSlice = append(pocSlice, p)
 			} else {
-				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", pocYaml, err)
+				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", pth, err)
 			}
 		}
-		return pocSlice
-	}
+	} else {
 
-	// 使用仓库层统一的路径整合与去重（优先级：curated > my > append > local > builtin）
-	pathItems, _ := pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
+		// 使用仓库层统一的路径整合与去重（优先级：curated > my > append > local > builtin）
+		pathItems, _ := pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
 
-	// 读取并校验：格式错误的 POC 剔除并输出错误
-	for _, it := range pathItems {
-		if it.Source == pocsrepo.SourceBuiltin { // 嵌入式
-			path := strings.TrimPrefix(it.Path, "embedded:")
-			if p, err := pocs.EmbedReadPocByPath(path); err == nil {
-				pocSlice = append(pocSlice, p)
+		// 读取并校验：格式错误的 POC 剔除并输出错误
+		for _, it := range pathItems {
+			if it.Source == pocsrepo.SourceBuiltin {
+				path := strings.TrimPrefix(it.Path, "embedded:")
+				if p, err := pocs.EmbedReadPocByPath(path); err == nil {
+					pocSlice = append(pocSlice, p)
+				} else {
+					gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", path, err)
+				}
 			} else {
-				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", path, err)
-			}
-		} else { // curated/my/append/local
-			if p, err := poc.LocalReadPocByPath(it.Path); err == nil {
-				pocSlice = append(pocSlice, p)
-			} else {
-				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", it.Path, err)
+				if p, err := poc.LocalReadPocByPath(it.Path); err == nil {
+					pocSlice = append(pocSlice, p)
+				} else {
+					gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", it.Path, err)
+				}
 			}
 		}
 	}
 
-	// 保留原有过滤逻辑
 	newPocSlice := []poc.Poc{}
 	for _, pp := range pocSlice {
 		if o.FilterPocSeveritySearch(pp.Id, pp.Info.Name, pp.Info.Severity) {

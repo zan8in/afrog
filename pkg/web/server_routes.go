@@ -118,6 +118,11 @@ func registerAPIRoutes(api *mux.Router) {
     api.HandleFunc("/assets/sets/{id}/import", jwtAuthMiddleware(assetsImportHandler)).Methods(http.MethodPost)
     api.HandleFunc("/assets/search", jwtAuthMiddleware(assetsSearchHandler)).Methods(http.MethodGet)
     api.HandleFunc("/assets/export", jwtAuthMiddleware(assetsExportHandler)).Methods(http.MethodGet)
+
+    api.HandleFunc("/scans", jwtAuthMiddleware(scansCreateHandler)).Methods(http.MethodPost)
+    api.HandleFunc("/scans/{taskId}/events", jwtAuthMiddleware(scanEventsHandler)).Methods(http.MethodGet)
+    api.HandleFunc("/scans/{taskId}/status", jwtAuthMiddleware(scanStatusHandler)).Methods(http.MethodGet)
+    api.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
 }
 
 // API 未匹配路由 -> JSON 404

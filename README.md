@@ -460,7 +460,7 @@ afrog is a high-performance vulnerability scanner that is fast and stable. It su
 
 ### Prerequisites
 
-- [Go](https://go.dev/) version 1.19 or higher.
+- [Go](https://go.dev/) version 1.24 or higher.
 
 you can install it with:
 

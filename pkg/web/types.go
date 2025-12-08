@@ -44,13 +44,13 @@ type ReportItem struct {
 
 // 报告列表 - 响应
 type ReportListResponse struct {
-	Items      []ReportItem `json:"items"`
-	Page       int          `json:"page"`
-	PageSize   int          `json:"page_size"`
-	Total      int64        `json:"total"`
-	TotalPages int          `json:"total_pages"`
-	Keyword    string       `json:"keyword,omitempty"`
-	Severity   []string     `json:"severity,omitempty"`
+    Items      []ReportItem `json:"items"`
+    Page       int          `json:"page"`
+    PageSize   int          `json:"page_size"`
+    Total      int64        `json:"total"`
+    TotalPages int          `json:"total_pages"`
+    Keyword    string       `json:"keyword,omitempty"`
+    Severity   []string     `json:"severity,omitempty"`
 }
 
 // POC 列表 - 单条记录
@@ -93,14 +93,58 @@ type AssetsListResponse struct {
 
 // POC 列表 - 响应
 type PocsListResponse struct {
-	Items      []PocsListItem `json:"items"`
-	Page       int            `json:"page"`
-	PageSize   int            `json:"page_size"`
-	Total      int            `json:"total"`
-	TotalPages int            `json:"total_pages"`
-	Source     string         `json:"source"`
-	Severity   []string       `json:"severity,omitempty"`
-	Tags       []string       `json:"tags,omitempty"`
-	Author     []string       `json:"author,omitempty"`
-	Keyword    string         `json:"keyword,omitempty"`
+    Items      []PocsListItem `json:"items"`
+    Page       int            `json:"page"`
+    PageSize   int            `json:"page_size"`
+    Total      int            `json:"total"`
+    TotalPages int            `json:"total_pages"`
+    Source     string         `json:"source"`
+    Severity   []string       `json:"severity,omitempty"`
+    Tags       []string       `json:"tags,omitempty"`
+    Author     []string       `json:"author,omitempty"`
+    Keyword    string         `json:"keyword,omitempty"`
+}
+
+type ScanCreateRequest struct {
+    Targets         []string `json:"targets,omitempty"`
+    AssetSetID      string   `json:"assetSetId,omitempty"`
+    PocFile         string   `json:"poc_file,omitempty"`
+    PocSource       string   `json:"poc_source,omitempty"`
+    PocIDs          []string `json:"poc_ids,omitempty"`
+    Search          string   `json:"search,omitempty"`
+    Severity        string   `json:"severity,omitempty"`
+    Concurrency     int      `json:"concurrency,omitempty"`
+    RateLimit       int      `json:"rate_limit,omitempty"`
+    Timeout         int      `json:"timeout,omitempty"`
+    Retries         int      `json:"retries,omitempty"`
+    MaxHostError    int      `json:"max_host_error,omitempty"`
+    Proxy           string   `json:"proxy,omitempty"`
+    FollowRedirects bool     `json:"follow_redirects,omitempty"`
+    EnableOOB       bool     `json:"enable_oob,omitempty"`
+    OOB             string   `json:"oob,omitempty"`
+    OOBKey          string   `json:"oob_key,omitempty"`
+    OOBDomain       string   `json:"oob_domain,omitempty"`
+    OOBApiUrl       string   `json:"oob_api_url,omitempty"`
+    OOBHttpUrl      string   `json:"oob_http_url,omitempty"`
+    TaskName        string   `json:"task_name,omitempty"`
+    Labels          []string `json:"labels,omitempty"`
+    EnableStream    bool     `json:"enable_stream"`
+}
+
+type ScanProgressData struct {
+    Percent   int     `json:"percent"`
+    Finished  int     `json:"finished"`
+    Total     int     `json:"total"`
+    Rate      int     `json:"rate"`
+    ElapsedMs int64   `json:"elapsedMs"`
+}
+
+type ScanStatusData struct {
+    Status   string           `json:"status"`
+    Progress ScanProgressData `json:"progress"`
+    Stats    struct {
+        CompletedScans int `json:"completedScans"`
+        TotalScans     int `json:"totalScans"`
+        FoundVulns     int `json:"foundVulns"`
+    } `json:"stats"`
 }
