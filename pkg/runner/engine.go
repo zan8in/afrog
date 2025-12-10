@@ -48,11 +48,13 @@ type Engine struct {
 	mu      sync.Mutex
 	paused  bool
 	stopped bool
+	quit    chan struct{}
 }
 
 func NewEngine(options *config.Options) *Engine {
 	engine := &Engine{
 		options: options,
+		quit:    make(chan struct{}),
 	}
 	return engine
 }
@@ -134,6 +136,9 @@ func (runner *Runner) Execute() {
 		defer p.Release()
 
 		for _, poc := range otherPocs {
+			if options.VulnerabilityScannerBreakpoint {
+				break
+			}
 			for _, t := range runner.options.Targets.List() {
 				// check resume
 				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
@@ -195,6 +200,9 @@ func (runner *Runner) Execute() {
 		defer p.Release()
 
 		for _, poc := range reversePocs {
+			if options.VulnerabilityScannerBreakpoint {
+				break
+			}
 			for _, t := range runner.options.Targets.List() {
 				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
 					runner.NotVulCallback()
@@ -272,7 +280,8 @@ func (e *Engine) waitTick() {
 	}
 	select {
 	case <-e.ticker.C:
-	default:
+	case <-e.quit:
+		return
 	}
 	e.mu.Lock()
 	for e.paused {
@@ -306,9 +315,12 @@ func (e *Engine) IsPaused() bool {
 
 func (e *Engine) Stop() {
 	e.mu.Lock()
-	e.stopped = true
-	if e.ticker != nil {
-		e.ticker.Stop()
+	if !e.stopped {
+		e.stopped = true
+		if e.ticker != nil {
+			e.ticker.Stop()
+		}
+		close(e.quit)
 	}
 	e.mu.Unlock()
 	gologger.Debug().Msgf("engine stopped: ticker stopped and scheduling halted")
