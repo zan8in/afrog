@@ -187,6 +187,31 @@ func (runner *Runner) Run() error {
 	return nil
 }
 
+func (r *Runner) Pause() {
+	if r.engine != nil {
+		r.engine.Pause()
+	}
+}
+
+func (r *Runner) Resume() {
+	if r.engine != nil {
+		r.engine.Resume()
+	}
+}
+
+func (r *Runner) IsPaused() bool {
+	if r.engine == nil {
+		return false
+	}
+	return r.engine.IsPaused()
+}
+
+func (r *Runner) Stop() {
+	if r.engine != nil {
+		r.engine.Stop()
+	}
+}
+
 // func checkReversePlatform() {
 
 // 	wg := sync.WaitGroup{}

@@ -17,6 +17,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/gologger"
 )
 
 type TaskStatus string
@@ -42,7 +43,7 @@ type Task struct {
 	Status        TaskStatus
 	Scanner       *afrog.SDKScanner
 	SeverityStats map[string]int
-	Subscribers   map[chan []byte]struct{}
+	Subscribers   map[chan ScanEvent]struct{}
 	mu            sync.Mutex
 	startTime     time.Time
 	lastProgress  time.Time
@@ -90,30 +91,28 @@ func nextTaskID(m *TaskManager) string {
 }
 
 func publish(t *Task, ev ScanEvent) {
-	b, _ := json.Marshal(ev)
-	line := append(b, '\n')
 	t.mu.Lock()
 	for ch := range t.Subscribers {
 		select {
-		case ch <- line:
+		case ch <- ev:
 		default:
 		}
 	}
 	t.mu.Unlock()
 }
 
-func addSubscriber(t *Task) chan []byte {
-	ch := make(chan []byte, 256)
+func addSubscriber(t *Task) chan ScanEvent {
+	ch := make(chan ScanEvent, 256)
 	t.mu.Lock()
 	if t.Subscribers == nil {
-		t.Subscribers = make(map[chan []byte]struct{})
+		t.Subscribers = make(map[chan ScanEvent]struct{})
 	}
 	t.Subscribers[ch] = struct{}{}
 	t.mu.Unlock()
 	return ch
 }
 
-func removeSubscriber(t *Task, ch chan []byte) {
+func removeSubscriber(t *Task, ch chan ScanEvent) {
 	t.mu.Lock()
 	delete(t.Subscribers, ch)
 	t.mu.Unlock()
@@ -125,7 +124,8 @@ func startTask(m *TaskManager, t *Task) {
 	if m.running >= m.maxRunning {
 		m.queue = append(m.queue, t.ID)
 		m.mu.Unlock()
-		publish(t, ScanEvent{Type: "state", Data: map[string]string{"status": "starting"}})
+		gologger.Debug().Msgf("start scan queued: taskId=%s running=%d maxRunning=%d", t.ID, m.running, m.maxRunning)
+		publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
 		return
 	}
 	m.running++
@@ -133,7 +133,8 @@ func startTask(m *TaskManager, t *Task) {
 
 	t.Status = TaskRunning
 	t.startTime = time.Now()
-	publish(t, ScanEvent{Type: "state", Data: map[string]string{"status": "running"}})
+	gologger.Debug().Msgf("start scan running: taskId=%s capacity available", t.ID)
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "running"}})
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
@@ -142,7 +143,9 @@ func startTask(m *TaskManager, t *Task) {
 			select {
 			case r, ok := <-t.Scanner.ResultChan:
 				if !ok {
-					finalizeTask(m, t, TaskCompleted)
+					if t.Status != TaskCancelled {
+						finalizeTask(m, t, TaskCompleted)
+					}
 					return
 				}
 				sev := strings.ToLower(r.PocInfo.Info.Severity)
@@ -151,7 +154,7 @@ func startTask(m *TaskManager, t *Task) {
 				}
 				t.SeverityStats[sev]++
 				_ = persistHit(t.ID, r)
-				publish(t, ScanEvent{Type: "hit", Data: map[string]interface{}{
+				publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
 					"target":   r.Target,
 					"severity": r.PocInfo.Info.Severity,
 					"poc": map[string]string{
@@ -179,7 +182,7 @@ func startTask(m *TaskManager, t *Task) {
 
 func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	t.Status = status
-	publish(t, ScanEvent{Type: "state", Data: map[string]string{"status": string(status)}})
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(status)}})
 	m.mu.Lock()
 	if m.running > 0 {
 		m.running--
@@ -206,6 +209,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		gologger.Debug().Str("path", r.URL.Path).Str("method", r.Method).Msg("start scan failed: method not allowed")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
 		return
 	}
@@ -213,11 +217,13 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	var req ScanCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("start scan failed: invalid json")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
 		return
 	}
 	if !req.EnableStream {
 		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("start scan failed: enable_stream must be true")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "enable_stream 必须为 true"})
 		return
 	}
@@ -242,6 +248,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(targets) == 0 {
 		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("start scan failed: no valid targets")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少有效扫描目标"})
 		return
 	}
@@ -326,6 +333,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	scanner, err := afrog.NewSDKScanner(sdkOpts)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Str("error", err.Error()).Msg("start scan failed: create scanner error")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
 		return
 	}
@@ -337,7 +345,8 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	m.tasks[id] = t
 	m.mu.Unlock()
 
-	publish(t, ScanEvent{Type: "state", Data: map[string]string{"status": "starting"}})
+	gologger.Debug().Msgf("start scan accepted: taskId=%s targets=%d poc_path=%s concurrency=%d rate_limit=%d timeout=%d retries=%d enable_oob=%t", id, len(targets), pocPath, sdkOpts.Concurrency, sdkOpts.RateLimit, sdkOpts.Timeout, sdkOpts.Retries, sdkOpts.EnableOOB)
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
 	startTask(m, t)
 
 	w.WriteHeader(http.StatusCreated)
@@ -366,7 +375,7 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Del("Content-Type")
-	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
@@ -380,11 +389,17 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
-		case line, ok := <-ch:
+		case ev, ok := <-ch:
 			if !ok {
 				return
 			}
-			_, _ = bw.Write(line)
+			_, _ = bw.WriteString("event: ")
+			_, _ = bw.WriteString(ev.Type)
+			_, _ = bw.WriteString("\n")
+			b, _ := json.Marshal(ev.Data)
+			_, _ = bw.WriteString("data: ")
+			_, _ = bw.Write(b)
+			_, _ = bw.WriteString("\n\n")
 			_ = bw.Flush()
 			if fl != nil {
 				fl.Flush()
@@ -420,6 +435,9 @@ func scanStatusHandler(w http.ResponseWriter, r *http.Request) {
 			Rate:      calcRate(t.startTime, st.CompletedScans),
 			ElapsedMs: time.Since(t.startTime).Milliseconds(),
 		},
+		TaskID:     taskID,
+		InstanceID: serverInstanceID,
+		BaseURL:    serverBaseURL,
 	}
 	resp.Stats.CompletedScans = int(st.CompletedScans)
 	resp.Stats.TotalScans = st.TotalScans
@@ -427,9 +445,11 @@ func scanStatusHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: resp})
 }
 
-func scanStopHandler(w http.ResponseWriter, r *http.Request) {
+// 暂停任务
+func scanPauseHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		gologger.Debug().Str("path", r.URL.Path).Msg("pause failed: method not allowed")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
 		return
 	}
@@ -437,6 +457,7 @@ func scanStopHandler(w http.ResponseWriter, r *http.Request) {
 	taskID := strings.TrimSpace(vars["taskId"])
 	if taskID == "" {
 		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("pause failed: missing taskId")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少任务ID"})
 		return
 	}
@@ -446,10 +467,89 @@ func scanStopHandler(w http.ResponseWriter, r *http.Request) {
 	m.mu.Unlock()
 	if t == nil {
 		w.WriteHeader(http.StatusNotFound)
+		gologger.Debug().Str("taskId", taskID).Msg("pause failed: task not found")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
+		return
+	}
+	t.Scanner.Pause()
+	t.Status = TaskPaused
+	if t.Scanner.IsPaused() {
+		gologger.Debug().Str("taskId", taskID).Msg("pause succeeded: engine gated")
+	} else {
+		gologger.Debug().Str("taskId", taskID).Msg("pause uncertain: engine not gated")
+	}
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskPaused)}})
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "paused", Data: map[string]bool{"paused": true}})
+}
+
+// 恢复任务
+func scanResumeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		gologger.Debug().Str("path", r.URL.Path).Msg("resume failed: method not allowed")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	taskID := strings.TrimSpace(vars["taskId"])
+	if taskID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("resume failed: missing taskId")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少任务ID"})
+		return
+	}
+	m := getTaskManager()
+	m.mu.Lock()
+	t := m.tasks[taskID]
+	m.mu.Unlock()
+	if t == nil {
+		w.WriteHeader(http.StatusNotFound)
+		gologger.Debug().Str("taskId", taskID).Msg("resume failed: task not found")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
+		return
+	}
+	t.Scanner.Resume()
+	t.Status = TaskRunning
+	if !t.Scanner.IsPaused() {
+		gologger.Debug().Str("taskId", taskID).Msg("resume succeeded: engine released")
+	} else {
+		gologger.Debug().Str("taskId", taskID).Msg("resume uncertain: engine still gated")
+	}
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskRunning)}})
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "resumed", Data: map[string]bool{"resumed": true}})
+}
+
+func scanStopHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		gologger.Debug().Str("path", r.URL.Path).Msg("stop failed: method not allowed")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	taskID := strings.TrimSpace(vars["taskId"])
+	if taskID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Msg("stop failed: missing taskId")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少任务ID"})
+		return
+	}
+	m := getTaskManager()
+	m.mu.Lock()
+	t := m.tasks[taskID]
+	m.mu.Unlock()
+	if t == nil {
+		w.WriteHeader(http.StatusNotFound)
+		gologger.Debug().Str("taskId", taskID).Msg("stop failed: task not found")
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
 	t.Scanner.Stop()
+	if t.Scanner.IsStopping() {
+		gologger.Debug().Str("taskId", taskID).Msg("stop succeeded: context cancelled")
+	} else {
+		gologger.Debug().Str("taskId", taskID).Msg("stop uncertain: cancel flag not set")
+	}
 	t.Status = TaskCancelled
 	finalizeTask(m, t, TaskCancelled)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})

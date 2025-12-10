@@ -273,6 +273,9 @@ func (s *SDKScanner) GetProgress() float64 {
 func (s *SDKScanner) Stop() {
 	s.cancel()
 	s.options.VulnerabilityScannerBreakpoint = true
+	if s.runner != nil {
+		s.runner.Stop()
+	}
 }
 
 // Close 关闭扫描器，释放资源
@@ -292,6 +295,29 @@ func (s *SDKScanner) HasVulnerabilities() bool {
 // GetVulnerabilityCount 获取漏洞数量
 func (s *SDKScanner) GetVulnerabilityCount() int {
 	return int(atomic.LoadInt32(&s.stats.FoundVulns))
+}
+
+func (s *SDKScanner) Pause() {
+	if s.runner != nil {
+		s.runner.Pause()
+	}
+}
+
+func (s *SDKScanner) Resume() {
+	if s.runner != nil {
+		s.runner.Resume()
+	}
+}
+
+func (s *SDKScanner) IsPaused() bool {
+	if s.runner == nil {
+		return false
+	}
+	return s.runner.IsPaused()
+}
+
+func (s *SDKScanner) IsStopping() bool {
+	return s.options.VulnerabilityScannerBreakpoint
 }
 
 // SetProxy 动态设置代理

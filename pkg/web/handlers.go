@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
@@ -88,6 +90,122 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "退出成功"})
+}
+
+func serverInfoHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	data := map[string]any{
+		"instance_id": serverInstanceID,
+		"base_url":    serverBaseURL,
+		"version":     fmt.Sprintf("v%s", config.Version),
+		"started_at":  serverStartedAt.Format(time.RFC3339),
+		"pid":         serverPID,
+		"argv":        serverArgv,
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: data})
+}
+
+func instancesListHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	m := getTaskManager()
+	active := make([]string, 0, 16)
+	m.mu.Lock()
+	for id, t := range m.tasks {
+		if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
+			active = append(active, id)
+		}
+	}
+	m.mu.Unlock()
+	resp := map[string]any{
+		"instances": []map[string]any{
+			{
+				"instance_id":     serverInstanceID,
+				"base_url":        serverBaseURL,
+				"version":         fmt.Sprintf("v%s", config.Version),
+				"started_at":      serverStartedAt.Format(time.RFC3339),
+				"pid":             serverPID,
+				"argv":            serverArgv,
+				"active_task_ids": active,
+			},
+		},
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: resp})
+}
+
+type ForceStopRequest struct {
+	TaskID  string `json:"taskId"`
+	Confirm bool   `json:"confirm"`
+}
+
+func instanceForceStopHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+	vars := mux.Vars(r)
+	instanceID := strings.TrimSpace(vars["instanceId"])
+	if instanceID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少实例ID"})
+		return
+	}
+	if instanceID != serverInstanceID {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "实例不存在"})
+		return
+	}
+	var req ForceStopRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	if !req.Confirm {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "confirm 必须为 true"})
+		return
+	}
+	m := getTaskManager()
+	found := false
+	m.mu.Lock()
+	for id, t := range m.tasks {
+		if id == req.TaskID {
+			// 仅允许关闭属于该实例的活跃任务
+			if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
+				found = true
+			}
+			break
+		}
+	}
+	m.mu.Unlock()
+	if !found {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "taskId 不属于该实例或非活跃任务"})
+		return
+	}
+	m.mu.Lock()
+	t := m.tasks[req.TaskID]
+	m.mu.Unlock()
+	if t != nil {
+		t.Scanner.Stop()
+		t.Status = TaskCancelled
+		publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskCancelled)}})
+		finalizeTask(m, t, TaskCancelled)
+		if t.Scanner.IsStopping() {
+			gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop succeeded: task cancelled and server shutting down")
+		} else {
+			gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop uncertain: cancel flag not set")
+		}
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if httpSrv != nil {
+			_ = httpSrv.Shutdown(ctx)
+		}
+	}()
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
 }
 
 func vulnsHandler(w http.ResponseWriter, r *http.Request) {
@@ -791,13 +909,13 @@ func pocsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 仅支持写入 my 源目录
-    home, _ := os.UserHomeDir()
-    myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
-    if err := os.MkdirAll(myDir, 0o755); err != nil {
-        w.WriteHeader(http.StatusInternalServerError)
-        _ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建 my 目录失败: %v", err)})
-        return
-    }
+	home, _ := os.UserHomeDir()
+	myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
+	if err := os.MkdirAll(myDir, 0o755); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("创建 my 目录失败: %v", err)})
+		return
+	}
 	filePath := filepath.Join(myDir, pocID+".yaml")
 
 	// 写入新文件
@@ -1027,9 +1145,9 @@ func pocsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 系统 POC 保护与 my 源检查：仅允许删除 my 目录中的 POC
-    home, _ := os.UserHomeDir()
-    myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
-    myPath := filepath.Join(myDir, pocID+".yaml")
+	home, _ := os.UserHomeDir()
+	myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
+	myPath := filepath.Join(myDir, pocID+".yaml")
 
 	if fi, statErr := os.Stat(myPath); statErr != nil {
 		if os.IsNotExist(statErr) {

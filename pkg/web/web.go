@@ -1,18 +1,35 @@
 package web
 
 import (
-	"net/http"
-	"time"
+    "net/http"
+    "time"
+    "os"
+    "crypto/rand"
+    "encoding/hex"
 
-	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
-	"github.com/zan8in/gologger"
+    "github.com/zan8in/afrog/v3/pkg/db/sqlite"
+    "github.com/zan8in/gologger"
+    "github.com/zan8in/gologger/levels"
 )
 
+var serverInstanceID string
+var serverStartedAt time.Time
+var serverBaseURL string
+var serverPID int
+var serverArgv []string
+var httpSrv *http.Server
+
+func generateInstanceID() string {
+    b := make([]byte, 16)
+    _, _ = rand.Read(b)
+    return hex.EncodeToString(b)
+}
+
 func StartServer(addr string) error {
-	// 初始化安全组件
-	generatedPassword = generateRandomPassword()
-	initJWTSecret()
-	gologger.Info().Msgf("Web访问密码: %s", generatedPassword)
+    gologger.DefaultLogger.SetMaxLevel(levels.LevelDebug)
+    generatedPassword = generateRandomPassword()
+    initJWTSecret()
+    gologger.Info().Msgf("Web访问密码: %s", generatedPassword)
 
 	// 初始化数据库（连接 + 写入worker）
 	if err := sqlite.NewWebSqliteDB(); err != nil {
@@ -30,15 +47,22 @@ func StartServer(addr string) error {
 	}
 
 	// 使用 http.Server 并设置超时，提升抗慢速攻击能力
-	srv := &http.Server{
-		Addr:              addr,
-		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       0,
-		WriteTimeout:      0,
-		IdleTimeout:       120 * time.Second,
-	}
+    srv := &http.Server{
+        Addr:              addr,
+        Handler:           handler,
+        ReadHeaderTimeout: 5 * time.Second,
+        ReadTimeout:       0,
+        WriteTimeout:      0,
+        IdleTimeout:       120 * time.Second,
+    }
 
-	gologger.Info().Msgf("Web服务器启动于: http://%s", addr)
-	return srv.ListenAndServe()
+    serverInstanceID = generateInstanceID()
+    serverStartedAt = time.Now().UTC()
+    serverBaseURL = "http://" + addr
+    serverPID = os.Getpid()
+    serverArgv = os.Args
+    httpSrv = srv
+
+    gologger.Info().Msgf("Web服务器启动于: http://%s", addr)
+    return srv.ListenAndServe()
 }

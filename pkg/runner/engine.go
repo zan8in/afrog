@@ -45,6 +45,9 @@ func (e *Engine) ReleaseChecker(c *Checker) {
 type Engine struct {
 	options *config.Options
 	ticker  *time.Ticker
+	mu      sync.Mutex
+	paused  bool
+	stopped bool
 }
 
 func NewEngine(options *config.Options) *Engine {
@@ -119,7 +122,10 @@ func (runner *Runner) Execute() {
 		p, _ := ants.NewPoolWithFunc(con, func(p any) {
 
 			defer wg.Done()
-			<-runner.engine.ticker.C
+			runner.engine.waitTick()
+			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+				return
+			}
 
 			tap := p.(*TransData)
 			runner.exec(tap)
@@ -135,6 +141,9 @@ func (runner *Runner) Execute() {
 					continue
 				}
 
+				if options.VulnerabilityScannerBreakpoint {
+					break
+				}
 				wg.Add(1)
 				p.Invoke(&TransData{Target: t.(string), Poc: poc})
 			}
@@ -174,7 +183,10 @@ func (runner *Runner) Execute() {
 		p, _ := ants.NewPoolWithFunc(oobCon, func(p any) {
 
 			defer wg.Done()
-			<-runner.engine.ticker.C
+			runner.engine.waitTick()
+			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+				return
+			}
 
 			tap := p.(*TransData)
 			runner.exec(tap)
@@ -189,6 +201,9 @@ func (runner *Runner) Execute() {
 					continue
 				}
 
+				if options.VulnerabilityScannerBreakpoint {
+					break
+				}
 				wg.Add(1)
 				p.Invoke(&TransData{Target: t.(string), Poc: poc})
 			}
@@ -249,6 +264,54 @@ func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 
 	c.Check(target, poc)
 	runner.OnResult(c.Result)
+}
+
+func (e *Engine) waitTick() {
+	if e.ticker == nil {
+		return
+	}
+	select {
+	case <-e.ticker.C:
+	default:
+	}
+	e.mu.Lock()
+	for e.paused {
+		e.mu.Unlock()
+		time.Sleep(100 * time.Millisecond)
+		e.mu.Lock()
+	}
+	e.mu.Unlock()
+}
+
+func (e *Engine) Pause() {
+	e.mu.Lock()
+	e.paused = true
+	e.mu.Unlock()
+	gologger.Debug().Msgf("engine paused: ticker gated")
+}
+
+func (e *Engine) Resume() {
+	e.mu.Lock()
+	e.paused = false
+	e.mu.Unlock()
+	gologger.Debug().Msgf("engine resumed: ticker released")
+}
+
+func (e *Engine) IsPaused() bool {
+	e.mu.Lock()
+	p := e.paused
+	e.mu.Unlock()
+	return p
+}
+
+func (e *Engine) Stop() {
+	e.mu.Lock()
+	e.stopped = true
+	if e.ticker != nil {
+		e.ticker.Stop()
+	}
+	e.mu.Unlock()
+	gologger.Debug().Msgf("engine stopped: ticker stopped and scheduling halted")
 }
 
 func (runner *Runner) NotVulCallback() {
