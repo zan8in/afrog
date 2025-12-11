@@ -254,6 +254,8 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pocPath := strings.TrimSpace(req.PocFile)
+	var appendPocs []string
+
 	if pocPath == "" {
 		src := strings.ToLower(strings.TrimSpace(req.PocSource))
 		switch src {
@@ -264,8 +266,11 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 			home, _ := os.UserHomeDir()
 			pocPath = filepath.Join(home, ".config", "afrog", "pocs-my")
 		default:
-			abs, _ := filepath.Abs("pocs/afrog-pocs")
-			pocPath = abs
+			home, _ := os.UserHomeDir()
+			appendPocs = []string{
+				filepath.Join(home, ".config", "afrog", "pocs-curated"),
+				filepath.Join(home, ".config", "afrog", "pocs-my"),
+			}
 		}
 	}
 
@@ -297,6 +302,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	sdkOpts := afrog.NewSDKOptions()
 	sdkOpts.Targets = targets
 	sdkOpts.PocFile = pocPath
+	sdkOpts.AppendPoc = appendPocs
 	if useIDs {
 		sdkOpts.Search = ""
 		sdkOpts.Severity = ""

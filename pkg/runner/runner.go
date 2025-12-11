@@ -154,11 +154,12 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if len(pocsDir) > 0 {
 			runner.options.PocsDirectory.Set(pocsDir)
 		}
-		// append PoCs
-		if len(runner.options.AppendPoc) > 0 {
-			for _, p := range runner.options.AppendPoc {
-				runner.options.PocsDirectory.Set(p)
-			}
+	}
+
+	// append PoCs
+	if len(runner.options.AppendPoc) > 0 {
+		for _, p := range runner.options.AppendPoc {
+			runner.options.PocsDirectory.Set(p)
 		}
 	}
 

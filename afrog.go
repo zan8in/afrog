@@ -69,9 +69,10 @@ type SDKOptions struct {
 	TargetsFile string   // 目标文件路径
 
 	// ========== POC配置 ==========
-	PocFile  string // POC文件或目录路径（必须）
-	Search   string // POC搜索关键词
-	Severity string // 严重程度过滤
+	PocFile   string   // POC文件或目录路径（必须）
+	AppendPoc []string // 附加POC文件或目录路径
+	Search    string   // POC搜索关键词
+	Severity  string   // 严重程度过滤
 
 	// ========== 性能配置 ==========
 	RateLimit    int // 请求速率限制 (默认: 150)
@@ -495,6 +496,7 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 	options := &config.Options{
 		TargetsFile:     opts.TargetsFile,
 		PocFile:         opts.PocFile,
+		AppendPoc:       opts.AppendPoc,
 		Search:          opts.Search,
 		Severity:        opts.Severity,
 		RateLimit:       opts.RateLimit,
@@ -527,13 +529,16 @@ func validateSDKConfig(options *config.Options) error {
 	}
 
 	// 验证POC文件
-	if options.PocFile == "" {
-		return errors.New("必须指定POC文件或目录")
+	if options.PocFile == "" && len(options.AppendPoc) == 0 {
+		// 如果PocFile为空且AppendPoc也为空，且不使用默认配置（这里允许为空，由Runner处理默认值）
+		// return errors.New("必须指定POC文件或目录")
 	}
 
 	// 验证POC文件是否存在
-	if _, err := os.Stat(options.PocFile); err != nil {
-		return fmt.Errorf("POC文件或目录不存在: %s", options.PocFile)
+	if options.PocFile != "" {
+		if _, err := os.Stat(options.PocFile); err != nil {
+			return fmt.Errorf("POC文件或目录不存在: %s", options.PocFile)
+		}
 	}
 
 	return nil
@@ -586,7 +591,12 @@ func createSDKRunner(options *config.Options) (*runner.Runner, error) {
 	}
 
 	// 设置POC目录
-	options.PocsDirectory.Set(options.PocFile)
+	if options.PocFile != "" {
+		options.PocsDirectory.Set(options.PocFile)
+	}
+	for _, p := range options.AppendPoc {
+		options.PocsDirectory.Set(p)
+	}
 
 	// 清空Target切片
 	options.Target = nil
