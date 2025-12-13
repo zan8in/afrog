@@ -40,6 +40,10 @@ func StartServer(addr string) error {
 	}
 	defer sqlite.CloseX()
 
+	// 初始化系统监控
+	InitMonitor()
+	defer StopMonitor() // 确保退出时停止
+
 	// 构建路由与静态文件服务
 	handler, err := setupHandler()
 	if err != nil {

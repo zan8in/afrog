@@ -94,13 +94,19 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 func serverInfoHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
+	// 获取监控数据
+	cpu, mem := GetMonitorStats()
+
 	data := map[string]any{
-		"instance_id": serverInstanceID,
-		"base_url":    serverBaseURL,
-		"version":     fmt.Sprintf("v%s", config.Version),
-		"started_at":  serverStartedAt.Format(time.RFC3339),
-		"pid":         serverPID,
-		"argv":        serverArgv,
+		"instance_id":  serverInstanceID,
+		"base_url":     serverBaseURL,
+		"version":      fmt.Sprintf("v%s", config.Version),
+		"started_at":   serverStartedAt.Format(time.RFC3339),
+		"pid":          serverPID,
+		"argv":         serverArgv,
+		"cpu_usage":    cpu, // 新增字段
+		"memory_usage": mem, // 新增字段
 	}
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: data})
 }
