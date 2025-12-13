@@ -98,15 +98,27 @@ func serverInfoHandler(w http.ResponseWriter, r *http.Request) {
 	// 获取监控数据
 	cpu, mem := GetMonitorStats()
 
+	// 获取活跃任务数
+	m := getTaskManager()
+	activeTaskCount := 0
+	m.mu.Lock()
+	for _, t := range m.tasks {
+		if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
+			activeTaskCount++
+		}
+	}
+	m.mu.Unlock()
+
 	data := map[string]any{
-		"instance_id":  serverInstanceID,
-		"base_url":     serverBaseURL,
-		"version":      fmt.Sprintf("v%s", config.Version),
-		"started_at":   serverStartedAt.Format(time.RFC3339),
-		"pid":          serverPID,
-		"argv":         serverArgv,
-		"cpu_usage":    cpu, // 新增字段
-		"memory_usage": mem, // 新增字段
+		"instance_id":       serverInstanceID,
+		"base_url":          serverBaseURL,
+		"version":           fmt.Sprintf("v%s", config.Version),
+		"started_at":        serverStartedAt.Format(time.RFC3339),
+		"pid":               serverPID,
+		"argv":              serverArgv,
+		"cpu_usage":         cpu,             // 新增字段
+		"memory_usage":      mem,             // 新增字段
+		"active_task_count": activeTaskCount, // 新增：活跃任务数
 	}
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: data})
 }
