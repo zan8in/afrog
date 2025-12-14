@@ -130,7 +130,12 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	options.Output = ""
 
 	// 使用空配置，避免读取配置文件
-	cfg, _ := config.NewConfig("")
+	// SDK 模式下，尝试读取默认配置文件以获取 OOB 配置
+	cfg, err := config.NewConfig("")
+	if err != nil {
+		// 如果读取失败，则使用空配置
+		cfg = &config.Config{}
+	}
 	options.Config = cfg
 
 	// 设置OOB配置（只有启用OOB且配置了OOB适配器才设置）
@@ -140,6 +145,33 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		options.OOBDomain = opts.OOBDomain
 		options.OOBApiUrl = opts.OOBApiUrl
 		options.OOBHttpUrl = opts.OOBHttpUrl
+
+		// 如果 SDK 选项中未提供 OOB 配置，尝试从配置文件中读取
+		if options.OOBKey == "" && options.OOBDomain == "" && options.OOBApiUrl == "" && options.OOBHttpUrl == "" {
+			switch options.OOB {
+			case "ceyeio":
+				options.OOBKey = cfg.Reverse.Ceye.ApiKey
+				options.OOBDomain = cfg.Reverse.Ceye.Domain
+			case "dnslogcn":
+				options.OOBDomain = cfg.Reverse.Dnslogcn.Domain
+			case "alphalog":
+				options.OOBDomain = cfg.Reverse.Alphalog.Domain
+				options.OOBApiUrl = cfg.Reverse.Alphalog.ApiUrl
+			case "xray":
+				options.OOBKey = cfg.Reverse.Xray.XToken
+				options.OOBDomain = cfg.Reverse.Xray.Domain
+				options.OOBApiUrl = cfg.Reverse.Xray.ApiUrl
+			case "revsuit":
+				options.OOBKey = cfg.Reverse.Revsuit.Token
+				options.OOBDomain = cfg.Reverse.Revsuit.DnsDomain
+				options.OOBApiUrl = cfg.Reverse.Revsuit.ApiUrl
+				options.OOBHttpUrl = cfg.Reverse.Revsuit.HttpUrl
+			}
+		}
+
+		if options.OOB == "dnslogcn" && options.OOBDomain == "" {
+			options.OOBDomain = "dnslog.cn"
+		}
 	}
 
 	// 验证配置
