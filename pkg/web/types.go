@@ -128,6 +128,7 @@ type ScanCreateRequest struct {
 	OOBHttpUrl      string   `json:"oob_http_url,omitempty"`
 	TaskName        string   `json:"task_name,omitempty"`
 	Labels          []string `json:"labels,omitempty"`
+	Smart           bool     `json:"smart,omitempty"`
 	EnableStream    bool     `json:"enable_stream"`
 }
 

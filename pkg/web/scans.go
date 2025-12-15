@@ -313,6 +313,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	if req.Concurrency > 0 {
 		sdkOpts.Concurrency = req.Concurrency
 	}
+	sdkOpts.Smart = req.Smart
 	if req.RateLimit > 0 {
 		sdkOpts.RateLimit = req.RateLimit
 	}
@@ -358,7 +359,7 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	// 获取扫描初始化信息
 	stats := scanner.GetStats()
 	oobEnabled, oobStatus := scanner.GetOOBStatus()
-	
+
 	// 获取扫描目标（截取前5个用于展示，与CLI保持一致）
 	displayTargets := []string{}
 	// 这里需要从 scanner 中获取目标列表，SDKScanner 提供了 stats 但没直接提供 Targets 的获取方法
@@ -367,16 +368,16 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	// 但要获取具体目标，最好在 SDKScanner 中增加方法。
 	// 不过 SDKScanner 的 options 字段是公开的 (Options *config.Options)，但在 SDKScanner struct 定义里是小写的 options
 	// 让我们检查 afrog.go 中 SDKScanner 的定义
-	
+
 	// 在 afrog.go 中:
 	// type SDKScanner struct {
 	//     options *config.Options
-    // ...
-	
+	// ...
+
 	// 我们无法直接访问 options。
 	// 但我们可以利用 startScanHandler 中的 targets 变量，它是传递给 NewSDKScanner 的。
 	// sdkOpts.Targets = targets
-	
+
 	count := len(targets)
 	if count > 5 {
 		displayTargets = targets[:5]
@@ -395,10 +396,10 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(APIResponse{
-		Success: true, 
-		Message: "created", 
+		Success: true,
+		Message: "created",
 		Data: map[string]interface{}{
-			"taskId": id,
+			"taskId":   id,
 			"scanInfo": scanInfo,
 		},
 	})
