@@ -151,3 +151,12 @@ type ScanStatusData struct {
 	InstanceID string `json:"instance_id,omitempty"`
 	BaseURL    string `json:"base_url,omitempty"`
 }
+
+type ScanInitInfo struct {
+	TotalTargets int      `json:"total_targets"`
+	TotalPocs    int      `json:"total_pocs"`
+	TotalScans   int      `json:"total_scans"`
+	Targets      []string `json:"targets"`
+	OOBEnabled   bool     `json:"oob_enabled"`
+	OOBStatus    string   `json:"oob_status"`
+}
