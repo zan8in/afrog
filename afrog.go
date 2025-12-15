@@ -83,7 +83,8 @@ type SDKOptions struct {
 	Smart        bool
 
 	// ========== 网络配置 ==========
-	Proxy string // HTTP/SOCKS5代理
+	Proxy   string // HTTP/SOCKS5代理
+	Headers []string
 
 	// ========== OOB配置 ==========
 	EnableOOB  bool   // 是否启用OOB检测 (默认: false)
@@ -541,6 +542,12 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 		OOBRateLimit:    50,
 		OOBConcurrency:  20,
 		Smart:           opts.Smart,
+	}
+
+	if len(opts.Headers) > 0 {
+		for _, h := range opts.Headers {
+			options.Header = append(options.Header, h)
+		}
 	}
 
 	// 转换目标列表

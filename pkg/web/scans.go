@@ -314,6 +314,9 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 		sdkOpts.Concurrency = req.Concurrency
 	}
 	sdkOpts.Smart = req.Smart
+	if len(req.Headers) > 0 {
+		sdkOpts.Headers = req.Headers
+	}
 	if req.RateLimit > 0 {
 		sdkOpts.RateLimit = req.RateLimit
 	}
