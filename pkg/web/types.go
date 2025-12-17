@@ -130,8 +130,6 @@ type ScanCreateRequest struct {
 	Labels          []string `json:"labels,omitempty"`
 	EnableStream    bool     `json:"enable_stream"`
 	Smart           bool     `json:"smart,omitempty"`
-	VSB             bool     `json:"vsb,omitempty"`
-	DisableOutputHtml bool   `json:"disable_output_html,omitempty"`
 }
 
 type ScanProgressData struct {

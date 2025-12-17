@@ -328,6 +328,10 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.Proxy) != "" {
 		sdkOpts.Proxy = strings.TrimSpace(req.Proxy)
 	}
+	if req.Smart {
+		sdkOpts.Smart = true
+	}
+
 	sdkOpts.EnableOOB = req.EnableOOB
 	sdkOpts.OOB = strings.TrimSpace(req.OOB)
 	sdkOpts.OOBKey = strings.TrimSpace(req.OOBKey)
@@ -422,12 +426,6 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Smart {
 		logParts = append(logParts, fmt.Sprintf("smart=%t", req.Smart))
-	}
-	if req.VSB {
-		logParts = append(logParts, fmt.Sprintf("vsb=%t", req.VSB))
-	}
-	if req.DisableOutputHtml {
-		logParts = append(logParts, fmt.Sprintf("disable_output_html=%t", req.DisableOutputHtml))
 	}
 	gologger.Debug().Msg(strings.Join(logParts, " "))
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
