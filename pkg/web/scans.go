@@ -439,21 +439,6 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 获取扫描目标（截取前5个用于展示，与CLI保持一致）
 	displayTargets := []string{}
-	// 这里需要从 scanner 中获取目标列表，SDKScanner 提供了 stats 但没直接提供 Targets 的获取方法
-	// 我们需要给 SDKScanner 加一个 GetTargets() 或者直接访问 options.Targets
-	// 由于 options 是私有的，我们可以通过 scanner.GetStats() 获取数量，
-	// 但要获取具体目标，最好在 SDKScanner 中增加方法。
-	// 不过 SDKScanner 的 options 字段是公开的 (Options *config.Options)，但在 SDKScanner struct 定义里是小写的 options
-	// 让我们检查 afrog.go 中 SDKScanner 的定义
-
-	// 在 afrog.go 中:
-	// type SDKScanner struct {
-	//     options *config.Options
-	// ...
-
-	// 我们无法直接访问 options。
-	// 但我们可以利用 startScanHandler 中的 targets 变量，它是传递给 NewSDKScanner 的。
-	// sdkOpts.Targets = targets
 
 	count := len(targets)
 	if count > 5 {
