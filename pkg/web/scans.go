@@ -313,10 +313,6 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	if req.Concurrency > 0 {
 		sdkOpts.Concurrency = req.Concurrency
 	}
-	sdkOpts.Smart = req.Smart
-	if len(req.Headers) > 0 {
-		sdkOpts.Headers = req.Headers
-	}
 	if req.RateLimit > 0 {
 		sdkOpts.RateLimit = req.RateLimit
 	}
@@ -355,7 +351,85 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	m.tasks[id] = t
 	m.mu.Unlock()
 
-	gologger.Debug().Msgf("start scan accepted: taskId=%s targets=%d poc_path=%s concurrency=%d rate_limit=%d timeout=%d retries=%d enable_oob=%t", id, len(targets), pocPath, sdkOpts.Concurrency, sdkOpts.RateLimit, sdkOpts.Timeout, sdkOpts.Retries, sdkOpts.EnableOOB)
+	var logParts []string = []string{"start scan accepted:"}
+	logParts = append(logParts, fmt.Sprintf("taskId=%s", id))
+	logParts = append(logParts, fmt.Sprintf("targets=%d", len(targets)))
+	if req.TaskName != "" {
+		logParts = append(logParts, fmt.Sprintf("task_name=%s", req.TaskName))
+	}
+	if req.PocFile != "" {
+		logParts = append(logParts, fmt.Sprintf("poc_file=%s", req.PocFile))
+	}
+	if req.PocSource != "" {
+		logParts = append(logParts, fmt.Sprintf("poc_source=%s", req.PocSource))
+	}
+	if len(req.PocIDs) > 0 {
+		logParts = append(logParts, fmt.Sprintf("poc_ids=%d", len(req.PocIDs)))
+	}
+	if req.Search != "" {
+		logParts = append(logParts, fmt.Sprintf("search=%s", req.Search))
+	}
+	if req.Severity != "" {
+		logParts = append(logParts, fmt.Sprintf("severity=%s", req.Severity))
+	}
+	if req.Concurrency != 0 {
+		logParts = append(logParts, fmt.Sprintf("concurrency=%d", req.Concurrency))
+	}
+	if req.RateLimit != 0 {
+		logParts = append(logParts, fmt.Sprintf("rate_limit=%d", req.RateLimit))
+	}
+	if req.Timeout != 0 {
+		logParts = append(logParts, fmt.Sprintf("timeout=%d", req.Timeout))
+	}
+	if req.Retries != 0 {
+		logParts = append(logParts, fmt.Sprintf("retries=%d", req.Retries))
+	}
+	if req.MaxHostError != 0 {
+		logParts = append(logParts, fmt.Sprintf("max_host_error=%d", req.MaxHostError))
+	}
+	if req.Proxy != "" {
+		logParts = append(logParts, fmt.Sprintf("proxy=%s", req.Proxy))
+	}
+	if req.FollowRedirects {
+		logParts = append(logParts, fmt.Sprintf("follow_redirects=%t", req.FollowRedirects))
+	}
+	if req.EnableOOB {
+		logParts = append(logParts, fmt.Sprintf("enable_oob=%t", req.EnableOOB))
+	}
+	if req.OOB != "" {
+		logParts = append(logParts, fmt.Sprintf("oob=%s", req.OOB))
+	}
+	if req.OOBKey != "" {
+		logParts = append(logParts, fmt.Sprintf("oob_key=%s", req.OOBKey))
+	}
+	if req.OOBDomain != "" {
+		logParts = append(logParts, fmt.Sprintf("oob_domain=%s", req.OOBDomain))
+	}
+	if req.OOBApiUrl != "" {
+		logParts = append(logParts, fmt.Sprintf("oob_api_url=%s", req.OOBApiUrl))
+	}
+	if req.OOBHttpUrl != "" {
+		logParts = append(logParts, fmt.Sprintf("oob_http_url=%s", req.OOBHttpUrl))
+	}
+	if req.AssetSetID != "" {
+		logParts = append(logParts, fmt.Sprintf("asset_set_id=%s", req.AssetSetID))
+	}
+	if len(req.Labels) > 0 {
+		logParts = append(logParts, fmt.Sprintf("labels=%d", len(req.Labels)))
+	}
+	if req.EnableStream {
+		logParts = append(logParts, fmt.Sprintf("enable_stream=%t", req.EnableStream))
+	}
+	if req.Smart {
+		logParts = append(logParts, fmt.Sprintf("smart=%t", req.Smart))
+	}
+	if req.VSB {
+		logParts = append(logParts, fmt.Sprintf("vsb=%t", req.VSB))
+	}
+	if req.DisableOutputHtml {
+		logParts = append(logParts, fmt.Sprintf("disable_output_html=%t", req.DisableOutputHtml))
+	}
+	gologger.Debug().Msg(strings.Join(logParts, " "))
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
 	startTask(m, t)
 
