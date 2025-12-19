@@ -9,11 +9,11 @@ import (
 
 func main() {
 	options := afrog.NewSDKOptions()
-	options.Targets = []string{"http://127.0.0.1:8848"}
+	options.Targets = []string{"honey.scanme.sh"}
 	options.PocFile = "./pocs/afrog-pocs"
-	options.Severity = "info"
-	options.Search = "nacos"
-	options.Proxy = "http://127.0.0.1:51024"
+	// options.Severity = "info"
+	// options.Search = "React"
+	// options.Proxy = "http://127.0.0.1:51024"
 
 	scanner, err := afrog.NewSDKScanner(options)
 	if err != nil {

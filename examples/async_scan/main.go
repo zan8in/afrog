@@ -40,12 +40,12 @@ func main() {
 	options.PocFile = pocPath
 
 	// Configuration for async scanning / 异步扫描配置
-	options.Concurrency = 8              // Higher concurrency for async / 异步使用更高并发
-	options.RateLimit = 30               // Moderate rate limit / 适中的速率限制
-	options.Timeout = 12                 // Reasonable timeout / 合理的超时时间
-	options.Search = "fingerprint"       // Search fingerprint POCs / 搜索指纹识别 POC
-	options.Severity = "info,low,medium" // Multiple severity levels / 多个严重级别
-	options.EnableStream = true          // Enable streaming for async results / 启用流式输出获取异步结果
+	options.Concurrency = 8  // Higher concurrency for async / 异步使用更高并发
+	options.RateLimit = 30   // Moderate rate limit / 适中的速率限制
+	options.Timeout = 12     // Reasonable timeout / 合理的超时时间
+	options.Search = "react" // Search fingerprint POCs / 搜索指纹识别 POC
+	// options.Severity = "info,low,medium" // Multiple severity levels / 多个严重级别
+	options.EnableStream = true // Enable streaming for async results / 启用流式输出获取异步结果
 
 	fmt.Println("Creating SDK scanner for async scanning... / 创建异步扫描的 SDK 扫描器...")
 
