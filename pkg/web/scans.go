@@ -96,6 +96,16 @@ func publish(t *Task, ev ScanEvent) {
 		select {
 		case ch <- ev:
 		default:
+			if ev.Type == "status" {
+				select {
+				case <-ch:
+				default:
+				}
+				select {
+				case ch <- ev:
+				default:
+				}
+			}
 		}
 	}
 	t.mu.Unlock()
@@ -492,11 +502,33 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 	fl, _ := w.(http.Flusher)
-	ch := addSubscriber(t)
-	defer removeSubscriber(t, ch)
 	bw := bufio.NewWriter(w)
+	writeEvent := func(ev ScanEvent) {
+		_, _ = bw.WriteString("event: ")
+		_, _ = bw.WriteString(ev.Type)
+		_, _ = bw.WriteString("\n")
+		b, _ := json.Marshal(ev.Data)
+		_, _ = bw.WriteString("data: ")
+		_, _ = bw.Write(b)
+		_, _ = bw.WriteString("\n\n")
+		_ = bw.Flush()
+		if fl != nil {
+			fl.Flush()
+		}
+	}
 	_, _ = bw.WriteString("\n")
 	_ = bw.Flush()
+	if fl != nil {
+		fl.Flush()
+	}
+
+	writeEvent(ScanEvent{Type: "status", Data: map[string]string{"status": string(t.Status)}})
+	if t.Status == TaskCompleted || t.Status == TaskFailed || t.Status == TaskCancelled {
+		return
+	}
+
+	ch := addSubscriber(t)
+	defer removeSubscriber(t, ch)
 	for {
 		select {
 		case <-r.Context().Done():
@@ -505,16 +537,21 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			_, _ = bw.WriteString("event: ")
-			_, _ = bw.WriteString(ev.Type)
-			_, _ = bw.WriteString("\n")
-			b, _ := json.Marshal(ev.Data)
-			_, _ = bw.WriteString("data: ")
-			_, _ = bw.Write(b)
-			_, _ = bw.WriteString("\n\n")
-			_ = bw.Flush()
-			if fl != nil {
-				fl.Flush()
+			writeEvent(ev)
+			if ev.Type == "status" {
+				switch data := ev.Data.(type) {
+				case map[string]string:
+					s := strings.ToLower(strings.TrimSpace(data["status"]))
+					if s == string(TaskCompleted) || s == string(TaskFailed) || s == string(TaskCancelled) {
+						return
+					}
+				case map[string]interface{}:
+					raw, _ := data["status"].(string)
+					s := strings.ToLower(strings.TrimSpace(raw))
+					if s == string(TaskCompleted) || s == string(TaskFailed) || s == string(TaskCancelled) {
+						return
+					}
+				}
 			}
 		}
 	}

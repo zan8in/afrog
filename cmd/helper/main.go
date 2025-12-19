@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 
 	fileutil "github.com/zan8in/pins/file"
 )
@@ -11,7 +12,7 @@ import (
 func main() {
 	files, err := fileutil.ReadFile("C:\\Users\\zanbi\\Downloads\\atfersotg.zip")
 	if err != nil {
-		fmt.Errorf(err.Error())
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		return
 	}
 

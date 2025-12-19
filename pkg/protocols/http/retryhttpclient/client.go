@@ -290,7 +290,7 @@ func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Reque
 func convertCookie(old, new string) string {
 
 	if len(new) > 0 && len(old) > 0 {
-		return fmt.Sprintf(strings.TrimSuffix(new, ";") + ";" + old)
+		return strings.TrimSuffix(new, ";") + ";" + old
 	}
 
 	if len(new) > 0 && len(old) == 0 {

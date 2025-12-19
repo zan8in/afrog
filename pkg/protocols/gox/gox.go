@@ -1,7 +1,6 @@
 package gox
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -21,13 +20,13 @@ func Request(target, data string, variableMap map[string]any) error {
 func callFunction(name string, args []interface{}, funcMap map[string]interface{}) interface{} {
 	f, ok := funcMap[name]
 	if !ok {
-		gologger.Debug().Msgf(fmt.Sprintf("function %s not found", name))
+		gologger.Debug().Msgf("function %s not found", name)
 		return nil
 	}
 
 	v := reflect.ValueOf(f)
 	if v.Kind() != reflect.Func {
-		gologger.Debug().Msgf(fmt.Sprintf("%s is not a function", name))
+		gologger.Debug().Msgf("%s is not a function", name)
 		return nil
 	}
 	in := make([]reflect.Value, len(args))

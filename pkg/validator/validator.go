@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -578,5 +579,5 @@ func ValidateSinglePocFile(filePath string) error {
 		b.WriteString(err.Error())
 		b.WriteString("\n")
 	}
-	return fmt.Errorf(strings.TrimSpace(b.String()))
+	return errors.New(strings.TrimSpace(b.String()))
 }
