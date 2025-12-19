@@ -155,15 +155,15 @@ func startTask(m *TaskManager, t *Task) {
 				t.SeverityStats[sev]++
 				_ = persistHit(t.ID, r)
 				publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
-					"target":   r.Target,
-					"severity": r.PocInfo.Info.Severity,
-					"poc": map[string]string{
-						"id":   r.PocInfo.Id,
-						"name": r.PocInfo.Info.Name,
-					},
-					"message": fmt.Sprintf("命中 %s", r.PocInfo.Info.Severity),
-					"ts":      time.Now().UnixMilli(),
-				}})
+	"target":   r.FullTarget,
+	"severity": r.PocInfo.Info.Severity,
+	"poc": map[string]string{
+		"id":   r.PocInfo.Id,
+		"name": r.PocInfo.Info.Name,
+	},
+	"message": fmt.Sprintf("命中 %s", r.PocInfo.Info.Severity),
+	"ts":      time.Now().UnixMilli(),
+}})
 			case <-ticker.C:
 				st := t.Scanner.GetStats()
 				prog := t.Scanner.GetProgress()
