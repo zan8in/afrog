@@ -218,7 +218,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
         uses: goreleaser/goreleaser-action@v4
         with:
-          args: "release --clean --snapshot --skip=publish"
+          args: "release --clean --snapshot --skip=publish --skip=validate"
           version: latest
           workdir: .
         env:
@@ -236,7 +236,7 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
         uses: goreleaser/goreleaser-action@v4
         with:
-          args: "release --clean --skip-validate"
+          args: "release --clean --skip=validate"
           version: latest
           workdir: .
         env:
