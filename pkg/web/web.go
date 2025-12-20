@@ -26,7 +26,7 @@ func generateInstanceID() string {
 }
 
 func StartServer(addr string) error {
-	gologger.DefaultLogger.SetMaxLevel(levels.LevelDebug)
+	gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
 	gologger.Info().Msgf("Web访问密码: %s", generatedPassword)
