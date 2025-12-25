@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -24,22 +25,32 @@ var (
 		"{{date_time('%Y')}}", // 2023
 		"backup",
 		"bak",
+		"bin",
 		"old",
+		"db",
+		"data",
+		"database",
+		"dump",
+		"sql",
+		"index",
+		"conf",
+		"conf/conf",
+		"config",
+		"admin",
+		"upload",
+		"package",
+		"temp",
+		"tmp",
 		"ROOT", // tomcat
 		"wwwroot",
+		"webroot",
 		"htdocs",
 		"www",
-		"html",
 		"web",
-		"webapps",
 		"public",
-		"public_html",
-		"uploads",
+		"pc",
 		"website",
-		"api",
 		"test",
-		"app",
-		"bin",
 		"release",
 		"Release",
 	}
@@ -48,27 +59,14 @@ var (
 		"7z",
 		"rar",
 		"tar.gz",
-		"bz2",
-		"gz",
-		"lz",
-		"tar.bz2",
-		"xz",
-		"tar.z",
-		"z",
+		"tgz",
 		"war",
 		"db",
 		"sqlite",
 		"sqlitedb",
-		"sql.7z",
-		"sql.bz2",
+		"sql",
 		"sql.gz",
-		"sql.lz",
-		"sql.rar",
-		"sql.tar.gz",
-		"sql.xz",
 		"sql.zip",
-		"sql.z",
-		"sql.tar.z",
 	}
 
 	csize = 20
@@ -89,6 +87,25 @@ func uniqueStringsPreserveOrder(input []string) []string {
 		output = append(output, v)
 	}
 	return output
+}
+
+func getBaseTargets(target string) []string {
+	target = strings.TrimRight(target, "/")
+	u, err := url.Parse(target)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return []string{target}
+	}
+	root := u.Scheme + "://" + u.Host
+	return uniqueStringsPreserveOrder([]string{target, root})
+}
+
+func joinURL(base string, path string) string {
+	base = strings.TrimRight(base, "/")
+	path = strings.TrimLeft(path, "/")
+	if path == "" {
+		return base
+	}
+	return base + "/" + path
 }
 
 func getFilenames(target string) []string {
@@ -169,20 +186,26 @@ func backup_files(target string, variableMap map[string]any) error {
 	shouldStop := make(chan string, 1)
 	found := &atomic.Bool{}
 
+	baseTargets := getBaseTargets(target)
 	filenames := getFilenames(target)
 	exts := uniqueStringsPreserveOrder(exts)
 
 	swg := sizedwaitgroup.New(csize)
-	for _, filename := range filenames {
-		for _, ext := range exts {
+	for _, baseTarget := range baseTargets {
+		for _, filename := range filenames {
+			for _, ext := range exts {
+				if found.Load() {
+					break
+				}
+				swg.Add()
+				go func(baseTarget, filename, ext string) {
+					defer swg.Done()
+					processData(joinURL(baseTarget, filename+"."+ext), shouldStop, found)
+				}(baseTarget, filename, ext)
+			}
 			if found.Load() {
 				break
 			}
-			swg.Add()
-			go func(filename, ext string) {
-				defer swg.Done()
-				processData(target+"/"+filename+"."+ext, shouldStop, found)
-			}(filename, ext)
 		}
 		if found.Load() {
 			break
@@ -224,7 +247,7 @@ func GetBackupFile(target string) string {
 	if err != nil {
 		return ""
 	}
-	if status != 200 {
+	if status != 200 && status != 206 {
 		return ""
 	}
 
@@ -248,16 +271,19 @@ func GetBackupFile(target string) string {
 	if bytes.HasPrefix(dd, []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x00}) {
 		return target
 	}
-	if bytes.HasPrefix(dd, []byte{0x1F, 0x9D}) || bytes.HasPrefix(dd, []byte{0x1F, 0xA0}) {
-		return target
-	}
-	if bytes.HasPrefix(dd, []byte("LZIP")) {
-		return target
-	}
 	if bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x03, 0x04}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x05, 0x06}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x07, 0x08}) {
 		return target
 	}
 	if bytes.HasPrefix(dd, []byte("SQLite format 3\x00")) {
+		return target
+	}
+	if len(dd) >= 262 && bytes.Equal(dd[257:262], []byte("ustar")) {
+		return target
+	}
+	if (bytes.Contains(dd, []byte("CREATE TABLE")) || bytes.Contains(dd, []byte("create table")) ||
+		bytes.Contains(dd, []byte("INSERT INTO")) || bytes.Contains(dd, []byte("insert into"))) &&
+		!(bytes.Contains(dd, []byte("<html")) || bytes.Contains(dd, []byte("<HTML")) ||
+			bytes.Contains(dd, []byte("<!DOCTYPE")) || bytes.Contains(dd, []byte("<!doctype"))) {
 		return target
 	}
 
