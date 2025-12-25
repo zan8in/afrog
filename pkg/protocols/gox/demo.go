@@ -1,15 +1,9 @@
 package gox
 
 import (
-	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
-
-	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/utils"
-	"github.com/zan8in/retryablehttp"
 )
 
 func demo(target string, variableMap map[string]any) error {
@@ -34,42 +28,13 @@ func init() {
 // GET 请求示例
 // target  get request url
 func ExampleGet(target string, redirect bool) error {
-	ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
-	defer cancel()
-
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	respBody, status, _, err := FetchLimited(http.MethodGet, target, nil, nil, redirect, 0, 0, nil)
 	if err != nil {
 		return err
 	}
-
-	resp := &http.Response{}
-	if !redirect {
-		// 不重定向
-		resp, err = retryhttpclient.RtryNoRedirect.Do(req)
-	} else {
-		// 重定向
-		resp, err = retryhttpclient.RtryRedirect.Do(req)
-	}
-	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		return err
-	}
-
-	// 获取 response body
-	reader := io.LimitReader(resp.Body, retryhttpclient.GetMaxDefaultBody())
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		resp.Body.Close()
-		return err
-	}
-	resp.Body.Close()
-
-	// GBK TO UTF-8
 	utf8RespBody := utils.Str2UTF8(string(respBody))
 
-	fmt.Println(resp.StatusCode)
+	fmt.Println(status)
 	fmt.Println(utf8RespBody)
 
 	return nil
@@ -79,38 +44,16 @@ func ExampleGet(target string, redirect bool) error {
 // target  post request url
 // body  post request body
 func ExamplePost(target, body string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
-	defer cancel()
-
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(body))
+	headers := map[string]string{"Content-Type": "application/json"}
+	respBody, status, _, err := FetchLimited(http.MethodPost, target, []byte(body), headers, false, 0, 0, nil)
 	if err != nil {
 		return err
 	}
-
-	// 自定义 headers
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := retryhttpclient.RtryNoRedirect.Do(req)
-	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		return err
-	}
-
-	// 获取 response body
-	reader := io.LimitReader(resp.Body, retryhttpclient.GetMaxDefaultBody())
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		resp.Body.Close()
-		return err
-	}
-	resp.Body.Close()
 
 	// GBK TO UTF-8
 	utf8RespBody := utils.Str2UTF8(string(respBody))
 
-	fmt.Println(resp.StatusCode)
+	fmt.Println(status)
 	fmt.Println(utf8RespBody)
 
 	return nil

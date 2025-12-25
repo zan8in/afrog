@@ -1,18 +1,51 @@
 package gox
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptrace"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
+	"github.com/zan8in/retryablehttp"
 )
 
 var funcMap = map[string]any{}
 
+const httpSenderVarKey = "__gox_http_sender"
+
 func Request(target, data string, variableMap map[string]any) error {
+	if variableMap == nil {
+		variableMap = make(map[string]any)
+	}
 	err := callFunction(data, []any{target, variableMap}, funcMap)
 	if err != nil {
 		return err.(error)
+	}
+
+	if variableMap["target"] == nil {
+		variableMap["target"] = target
+	}
+	if variableMap["fulltarget"] == nil {
+		if s, ok := variableMap["target"].(string); ok && len(strings.TrimSpace(s)) > 0 {
+			variableMap["fulltarget"] = s
+		} else {
+			variableMap["fulltarget"] = target
+		}
+	}
+	if variableMap["request"] == nil {
+		variableMap["request"] = &proto.Request{}
+	}
+	if variableMap["response"] == nil {
+		variableMap["response"] = &proto.Response{}
 	}
 	return nil
 }
@@ -42,13 +75,15 @@ func callFunction(name string, args []interface{}, funcMap map[string]interface{
 
 func setRequest(data string, vmap map[string]any) {
 	vmap["request"] = &proto.Request{
-		Raw: []byte(data),
+		Raw:  []byte(data),
+		Body: []byte(data),
 	}
 }
 
 func setResponse(data string, vmap map[string]any) {
 	vmap["response"] = &proto.Response{
-		Raw: []byte(data),
+		Raw:  []byte(data),
+		Body: []byte(data),
 	}
 }
 
@@ -58,4 +93,200 @@ func setFullTarget(data string, vmap map[string]any) {
 
 func setTarget(data string, vmap map[string]any) {
 	vmap["target"] = data
+}
+
+type HTTPSender interface {
+	Do(ctx context.Context, method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error)
+}
+
+type defaultHTTPSender struct{}
+
+func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if strings.TrimSpace(target) == "" {
+		return nil, errors.New("empty target")
+	}
+
+	var req *retryablehttp.Request
+	var err error
+	if body == nil {
+		req, err = retryablehttp.NewRequestWithContext(ctx, method, target, nil)
+	} else {
+		req, err = retryablehttp.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range headers {
+		if strings.EqualFold(k, "Host") {
+			req.Request.Host = v
+			continue
+		}
+		req.Header.Set(k, v)
+	}
+
+	if len(req.Header.Get("User-Agent")) == 0 {
+		req.Header.Add("User-Agent", utils.RandomUA())
+	}
+
+	var milliseconds int64
+	start := time.Now()
+	trace := httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			milliseconds = time.Since(start).Nanoseconds() / 1e6
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
+
+	resp := &http.Response{}
+	if !followRedirects {
+		resp, err = retryhttpclient.RtryNoRedirect.Do(req)
+	} else {
+		resp, err = retryhttpclient.RtryRedirect.Do(req)
+	}
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	lr := io.LimitedReader{R: resp.Body, N: retryhttpclient.GetMaxDefaultBody()}
+	_, err = io.Copy(&buf, &lr)
+	if err != nil {
+		if !strings.Contains(err.Error(), "user canceled") && !errors.Is(err, io.ErrUnexpectedEOF) {
+			resp.Body.Close()
+			return nil, err
+		}
+	}
+	resp.Body.Close()
+	respBody := buf.Bytes()
+
+	utf8RespBody := ""
+	if len(respBody) > 0 {
+		utf8RespBody = utils.Str2UTF8(string(respBody))
+	}
+
+	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+	retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
+	variableMap["fulltarget"] = target
+
+	if v := variableMap["response"]; v != nil {
+		if pr, ok := v.(*proto.Response); ok {
+			return pr, nil
+		}
+	}
+	return nil, nil
+}
+
+func InjectDefaultHTTPSender(variableMap map[string]any) {
+	if variableMap == nil {
+		return
+	}
+	if _, ok := variableMap[httpSenderVarKey]; ok {
+		return
+	}
+	variableMap[httpSenderVarKey] = &defaultHTTPSender{}
+}
+
+func getHTTPSender(variableMap map[string]any) HTTPSender {
+	if variableMap == nil {
+		return &defaultHTTPSender{}
+	}
+	if v, ok := variableMap[httpSenderVarKey]; ok && v != nil {
+		if s, ok := v.(HTTPSender); ok && s != nil {
+			return s
+		}
+	}
+	s := &defaultHTTPSender{}
+	variableMap[httpSenderVarKey] = s
+	return s
+}
+
+func DoHTTP(method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
+	defer cancel()
+	if variableMap == nil {
+		variableMap = make(map[string]any)
+	}
+	return getHTTPSender(variableMap).Do(ctx, method, target, body, headers, followRedirects, variableMap)
+}
+
+func DoHTTPWithTimeout(timeout time.Duration, method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error) {
+	if timeout <= 0 {
+		timeout = retryhttpclient.GetDefaultTimeout()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if variableMap == nil {
+		variableMap = make(map[string]any)
+	}
+	return getHTTPSender(variableMap).Do(ctx, method, target, body, headers, followRedirects, variableMap)
+}
+
+func FetchLimited(method string, target string, body []byte, headers map[string]string, followRedirects bool, timeout time.Duration, maxBytes int64, variableMap map[string]any) ([]byte, int, int64, error) {
+	if timeout <= 0 {
+		timeout = retryhttpclient.GetDefaultTimeout()
+	}
+	if maxBytes <= 0 {
+		maxBytes = retryhttpclient.GetMaxDefaultBody()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var req *retryablehttp.Request
+	var err error
+	if body == nil {
+		req, err = retryablehttp.NewRequestWithContext(ctx, method, target, nil)
+	} else {
+		req, err = retryablehttp.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
+	}
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	for k, v := range headers {
+		if strings.EqualFold(k, "Host") {
+			req.Request.Host = v
+			continue
+		}
+		req.Header.Set(k, v)
+	}
+	if len(req.Header.Get("User-Agent")) == 0 {
+		req.Header.Add("User-Agent", utils.RandomUA())
+	}
+
+	var milliseconds int64
+	start := time.Now()
+	trace := httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			milliseconds = time.Since(start).Nanoseconds() / 1e6
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
+
+	resp := &http.Response{}
+	if !followRedirects {
+		resp, err = retryhttpclient.RtryNoRedirect.Do(req)
+	} else {
+		resp, err = retryhttpclient.RtryRedirect.Do(req)
+	}
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil, 0, milliseconds, err
+	}
+	defer resp.Body.Close()
+
+	reader := io.LimitReader(resp.Body, maxBytes)
+	data, err := io.ReadAll(reader)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !strings.Contains(err.Error(), "user canceled") {
+		return nil, resp.StatusCode, milliseconds, err
+	}
+
+	return data, resp.StatusCode, milliseconds, nil
 }

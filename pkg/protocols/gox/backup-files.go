@@ -60,18 +60,18 @@ var (
 		"rar",
 		"tar.gz",
 		"tgz",
-		"war",
+		// "war",
 		"db",
-		"sqlite",
-		"sqlitedb",
+		// "sqlite",
+		// "sqlitedb",
 		"sql",
-		"sql.gz",
-		"sql.zip",
+		// "sql.gz",
+		// "sql.zip",
 	}
 
 	csize = 20
 
-	maxSize = 500
+	maxSize = 50
 
 	timeout = 10 * time.Second
 )
@@ -244,6 +244,9 @@ func GetBackupFile(target string) string {
 	}()
 
 	data, status, _, err := FetchLimited(http.MethodGet, target, nil, nil, false, timeout, int64(maxSize), nil)
+	// fmt.Println("err: ", err)
+	// fmt.Println("status: ", status)
+	// fmt.Println("data: ", string(data))
 	if err != nil {
 		return ""
 	}
@@ -256,30 +259,39 @@ func GetBackupFile(target string) string {
 		return ""
 	}
 
+	// 7z 压缩包文件头: 37 7A BC AF 27 1C ("7z\xBC\xAF\x27\x1C")
 	if bytes.HasPrefix(dd, []byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}) {
 		return target
 	}
+	// bzip2 文件头: "BZh"，流内也常见 "1AY&SY" (31 41 59 26 53 59)
 	if bytes.HasPrefix(dd, []byte("BZh")) || bytes.Contains(dd, []byte{0x31, 0x41, 0x59, 0x26, 0x53, 0x59}) {
 		return target
 	}
+	// gzip 文件头: 1F 8B
 	if bytes.HasPrefix(dd, []byte{0x1F, 0x8B}) {
 		return target
 	}
+	// rar 文件头: "Rar!\x1A\x07\x00" 或 "Rar!\x1A\x07\x01\x00"
 	if bytes.HasPrefix(dd, []byte{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00}) || bytes.HasPrefix(dd, []byte{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00}) {
 		return target
 	}
+	// xz 文件头: FD 37 7A 58 5A 00 00
 	if bytes.HasPrefix(dd, []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x00}) {
 		return target
 	}
+	// zip 文件头: "PK\x03\x04"（本地文件头）/"PK\x05\x06"（空归档结束）/"PK\x07\x08"（数据描述符）
 	if bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x03, 0x04}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x05, 0x06}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x07, 0x08}) {
 		return target
 	}
+	// SQLite 数据库文件头: "SQLite format 3\x00"
 	if bytes.HasPrefix(dd, []byte("SQLite format 3\x00")) {
 		return target
 	}
+	// tar 归档标识: header 偏移 257 开始的 "ustar"
 	if len(dd) >= 262 && bytes.Equal(dd[257:262], []byte("ustar")) {
 		return target
 	}
+	// SQL dump 特征: 包含 CREATE TABLE / INSERT INTO 等，且不是 HTML 页面
 	if (bytes.Contains(dd, []byte("CREATE TABLE")) || bytes.Contains(dd, []byte("create table")) ||
 		bytes.Contains(dd, []byte("INSERT INTO")) || bytes.Contains(dd, []byte("insert into"))) &&
 		!(bytes.Contains(dd, []byte("<html")) || bytes.Contains(dd, []byte("<HTML")) ||

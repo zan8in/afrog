@@ -493,6 +493,10 @@ func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, bo
 	variableMap["response"] = protoResp
 }
 
+func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body string, latency int64) {
+	writeHTTPResponseToVars(variableMap, resp, body, latency)
+}
+
 func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Request, body string, target string, u *url.URL) {
 	protoReq := &proto.Request{}
 	protoReq.Method = req.Method
@@ -515,6 +519,10 @@ func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Reque
 	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + u.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
 	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
 	variableMap["request"] = protoReq
+}
+
+func WriteHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Request, body string, target string, u *url.URL) {
+	writeHTTPRequestToVars(variableMap, req, body, target, u)
 }
 
 func convertCookie(old, new string) string {

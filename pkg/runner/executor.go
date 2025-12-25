@@ -66,6 +66,11 @@ func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, 
 type GoExecutor struct{}
 
 func (e GoExecutor) Execute(target string, rule poc.Rule, opt *config.Options, vars map[string]any) error {
+	vars["request"] = nil
+	vars["response"] = nil
+	vars["target"] = target
+	vars["fulltarget"] = target
+	gox.InjectDefaultHTTPSender(vars)
 	return gox.Request(target, rule.Request.Data, vars)
 }
 
