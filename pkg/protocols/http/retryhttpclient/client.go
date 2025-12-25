@@ -175,27 +175,29 @@ func (l *hostPortLimiter) cleanupLocked(now time.Time) {
 }
 
 func (l *perKeyLimiter) Wait(ctx context.Context) error {
-	now := time.Now()
+	for {
+		now := time.Now()
 
-	l.mu.Lock()
-	l.lastUsed = now
-	if l.next.IsZero() || !now.Before(l.next) {
-		l.next = now.Add(l.interval)
+		l.mu.Lock()
+		l.lastUsed = now
+		if l.next.IsZero() {
+			l.next = now
+		}
+		wait := l.next.Sub(now)
+		if wait <= 0 {
+			l.next = now.Add(l.interval)
+			l.mu.Unlock()
+			return nil
+		}
 		l.mu.Unlock()
-		return nil
-	}
 
-	wait := l.next.Sub(now)
-	l.next = l.next.Add(l.interval)
-	l.mu.Unlock()
-
-	timer := time.NewTimer(wait)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 }
 
