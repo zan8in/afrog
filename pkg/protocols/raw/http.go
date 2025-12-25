@@ -148,6 +148,8 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, header []string, varia
 		cancel()
 	}
 
+	retryhttpclient.AddRawInflight(1)
+	defer retryhttpclient.AddRawInflight(-1)
 	resp, err = r.RawhttpClient.DoRaw(rhttp.Method, baseurl, rhttp.Path, ExpandMapValues(rhttp.Headers), io.NopCloser(strings.NewReader(rhttp.Data)))
 	if err != nil {
 		//fmt.Println(err.Error())

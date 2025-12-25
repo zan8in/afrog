@@ -34,6 +34,8 @@ var (
 	reqLimiter *hostPortLimiter
 
 	httpInflight      int64
+	rawInflight       int64
+	netInflight       int64
 	reqLimitWaitNs    int64
 	reqLimitWaitCount int64
 	taskGateWaitNs    int64
@@ -277,6 +279,8 @@ func WaitHostPort(ctx context.Context, host string, port string) error {
 
 type LiveMetrics struct {
 	HTTPInflight      int64
+	RawInflight       int64
+	NetInflight       int64
 	ReqLimitWaitNs    int64
 	ReqLimitWaitCount int64
 	TaskGateWaitNs    int64
@@ -286,6 +290,8 @@ type LiveMetrics struct {
 func GetLiveMetrics() LiveMetrics {
 	return LiveMetrics{
 		HTTPInflight:      atomic.LoadInt64(&httpInflight),
+		RawInflight:       atomic.LoadInt64(&rawInflight),
+		NetInflight:       atomic.LoadInt64(&netInflight),
 		ReqLimitWaitNs:    atomic.LoadInt64(&reqLimitWaitNs),
 		ReqLimitWaitCount: atomic.LoadInt64(&reqLimitWaitCount),
 		TaskGateWaitNs:    atomic.LoadInt64(&taskGateWaitNs),
@@ -299,6 +305,14 @@ func AddTaskGateWait(d time.Duration) {
 	}
 	atomic.AddInt64(&taskGateWaitNs, d.Nanoseconds())
 	atomic.AddInt64(&taskGateWaitCount, 1)
+}
+
+func AddRawInflight(delta int64) {
+	atomic.AddInt64(&rawInflight, delta)
+}
+
+func AddNetInflight(delta int64) {
+	atomic.AddInt64(&netInflight, delta)
 }
 
 func Request(target string, header []string, rule poc.Rule, variableMap map[string]any) error {

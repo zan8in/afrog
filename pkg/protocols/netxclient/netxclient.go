@@ -92,6 +92,9 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 		cancel()
 	}
 
+	retryhttpclient.AddNetInflight(1)
+	defer retryhttpclient.AddNetInflight(-1)
+
 	// SSL/TLS 走独立实现，避免非预期的明文连接
 	if strings.ToLower(nc.config.Network) == "ssl" {
 		body, err := nc.sendReceiveTLS([]byte(data))
