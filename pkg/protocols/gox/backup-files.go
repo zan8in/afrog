@@ -2,7 +2,6 @@ package gox
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/remeh/sizedwaitgroup"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/gologger"
 	iputil "github.com/zan8in/pins/ip"
 	urlutil "github.com/zan8in/pins/url"
@@ -71,9 +71,9 @@ var (
 
 	csize = 20
 
-	maxSize = 50
+	maxSize = 4096
 
-	timeout = 10 * time.Second
+	timeout = 30 * time.Second
 )
 
 func uniqueStringsPreserveOrder(input []string) []string {
@@ -190,7 +190,14 @@ func backup_files(target string, variableMap map[string]any) error {
 	filenames := getFilenames(target)
 	exts := uniqueStringsPreserveOrder(exts)
 
-	swg := sizedwaitgroup.New(csize)
+	workerCount := csize
+	if rl := retryhttpclient.GetReqLimitPerTarget(); rl > 0 && rl < workerCount {
+		workerCount = rl
+	}
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+	swg := sizedwaitgroup.New(workerCount)
 	for _, baseTarget := range baseTargets {
 		for _, filename := range filenames {
 			for _, ext := range exts {
@@ -228,7 +235,7 @@ func backup_files(target string, variableMap map[string]any) error {
 		return nil
 	}
 
-	return fmt.Errorf("err")
+	return nil
 
 }
 

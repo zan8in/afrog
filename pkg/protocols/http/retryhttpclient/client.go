@@ -107,6 +107,13 @@ func Init(opt *Options) (err error) {
 	return nil
 }
 
+func GetReqLimitPerTarget() int {
+	if reqLimiter == nil {
+		return 0
+	}
+	return reqLimiter.rate
+}
+
 type hostPortLimiter struct {
 	rate int
 
