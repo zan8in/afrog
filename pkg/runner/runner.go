@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/config"
@@ -37,6 +40,9 @@ type Runner struct {
 	Ding          *dingtalk.Dingtalk
 	ScanProgress  *ScanProgress
 	Cyberspace    *cyberspace.Cyberspace
+	liveMu        sync.Mutex
+	livePrev      retryhttpclient.LiveMetrics
+	livePrevAt    time.Time
 	// OOB           *oobadapter.OOBAdapter
 }
 
@@ -44,10 +50,11 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	var err error
 
 	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:           options.Proxy,
-		Timeout:         options.Timeout,
-		Retries:         options.Retries,
-		MaxRespBodySize: options.MaxRespBodySize,
+		Proxy:             options.Proxy,
+		Timeout:           options.Timeout,
+		Retries:           options.Retries,
+		MaxRespBodySize:   options.MaxRespBodySize,
+		ReqLimitPerTarget: options.ReqLimitPerTarget,
 	})
 
 	runner := &Runner{options: options}
@@ -211,6 +218,51 @@ func (r *Runner) Stop() {
 	if r.engine != nil {
 		r.engine.Stop()
 	}
+}
+
+func (r *Runner) LiveStatsSuffix() string {
+	if r == nil || r.engine == nil {
+		return ""
+	}
+
+	cur := retryhttpclient.GetLiveMetrics()
+	now := time.Now()
+
+	r.liveMu.Lock()
+	prev := r.livePrev
+	prevAt := r.livePrevAt
+	if prevAt.IsZero() {
+		prevAt = now.Add(-time.Second)
+	}
+	r.livePrev = cur
+	r.livePrevAt = now
+	r.liveMu.Unlock()
+
+	dt := now.Sub(prevAt)
+	if dt <= 0 {
+		dt = time.Second
+	}
+
+	deltaTaskWaitCount := cur.TaskGateWaitCount - prev.TaskGateWaitCount
+	deltaReqWaitCount := cur.ReqLimitWaitCount - prev.ReqLimitWaitCount
+
+	deltaTaskWaitNs := cur.TaskGateWaitNs - prev.TaskGateWaitNs
+	deltaReqWaitNs := cur.ReqLimitWaitNs - prev.ReqLimitWaitNs
+
+	taskWaitPerSec := deltaTaskWaitCount * int64(time.Second) / int64(dt)
+	reqWaitPerSec := deltaReqWaitCount * int64(time.Second) / int64(dt)
+
+	taskWaitMsPerSec := (deltaTaskWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
+	reqWaitMsPerSec := (deltaReqWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
+
+	return fmt.Sprintf(" ta=%d hi=%d tw=%dms/%d rw=%dms/%d",
+		atomic.LoadInt64(&r.engine.activeTasks),
+		cur.HTTPInflight,
+		taskWaitMsPerSec,
+		taskWaitPerSec,
+		reqWaitMsPerSec,
+		reqWaitPerSec,
+	)
 }
 
 // func checkReversePlatform() {

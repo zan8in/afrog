@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
@@ -43,12 +45,13 @@ func (e *Engine) ReleaseChecker(c *Checker) {
 }
 
 type Engine struct {
-	options *config.Options
-	ticker  *time.Ticker
-	mu      sync.Mutex
-	paused  bool
-	stopped bool
-	quit    chan struct{}
+	options     *config.Options
+	ticker      *time.Ticker
+	mu          sync.Mutex
+	paused      bool
+	stopped     bool
+	quit        chan struct{}
+	activeTasks int64
 }
 
 func NewEngine(options *config.Options) *Engine {
@@ -228,6 +231,8 @@ func (runner *Runner) exec(tap *TransData) {
 	options := runner.options
 
 	if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+		atomic.AddInt64(&runner.engine.activeTasks, 1)
+		defer atomic.AddInt64(&runner.engine.activeTasks, -1)
 		if options.PocExecutionDurationMonitor {
 			timeout := make(chan bool)
 			go func(target string, poc poc.Poc) {
@@ -278,11 +283,13 @@ func (e *Engine) waitTick() {
 	if e.ticker == nil {
 		return
 	}
+	start := time.Now()
 	select {
 	case <-e.ticker.C:
 	case <-e.quit:
 		return
 	}
+	retryhttpclient.AddTaskGateWait(time.Since(start))
 	e.mu.Lock()
 	for e.paused {
 		e.mu.Unlock()

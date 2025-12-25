@@ -108,7 +108,8 @@ type Options struct {
 	// OnResult OnResult
 
 	// maximum number of requests to send per second (default 150)
-	RateLimit int
+	RateLimit         int
+	ReqLimitPerTarget int
 
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
@@ -158,7 +159,8 @@ type Options struct {
 	Resume string
 
 	// debug
-	Debug bool
+	Debug     bool
+	LiveStats bool
 
 	// sort
 	// -sort severity (default low, info, medium, high, critical)
@@ -231,6 +233,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
+		flagSet.IntVar(&options.ReqLimitPerTarget, "req-limit-per-target", 0, "maximum number of requests per second per target (host:port), 0 disables"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
 		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
@@ -263,6 +266,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("debug", "Debug",
 		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
+		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),
 		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
 		flagSet.StringVar(&options.Validate, "validate", "", "validate POC YAML syntax, support file or directory"),
 	)

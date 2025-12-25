@@ -1,15 +1,19 @@
 package netxclient
 
 import (
-    "encoding/hex"
-    "fmt"
-    "strings"
-    "time"
+	"context"
+	"encoding/hex"
+	"fmt"
+	"net/url"
+	"strings"
+	"time"
 
-    "github.com/zan8in/afrog/v3/pkg/proto"
-    "github.com/zan8in/pins/netx"
-    "crypto/tls"
-    "net"
+	"crypto/tls"
+	"net"
+
+	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/pins/netx"
 )
 
 type Config struct {
@@ -62,8 +66,8 @@ func NewNetClient(address string, conf Config) (*NetClient, error) {
 }
 
 func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) error {
-    nc.address = setVariableMap(nc.address, variableMap)
-    data = setVariableMap(data, variableMap)
+	nc.address = setVariableMap(nc.address, variableMap)
+	data = setVariableMap(data, variableMap)
 
 	if len(dataType) > 0 {
 		dataType = strings.ToLower(dataType)
@@ -72,37 +76,50 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 		}
 	}
 
-    variableMap["request"] = nil
-    variableMap["response"] = nil
+	variableMap["request"] = nil
+	variableMap["response"] = nil
 
-    // SSL/TLS 走独立实现，避免非预期的明文连接
-    if strings.ToLower(nc.config.Network) == "ssl" {
-        body, err := nc.sendReceiveTLS([]byte(data))
-        if err != nil {
-            return err
-        }
-        variableMap["request"] = &proto.Request{Raw: []byte(nc.address + "\r\n" + data)}
-        variableMap["response"] = &proto.Response{Raw: body, Body: body}
-        variableMap["fulltarget"] = nc.address
-        return nil
-    }
+	if host, port, ok := parseHostPort(nc.address); ok {
+		timeout := nc.config.DialTimeout
+		if timeout <= 0 {
+			timeout = retryhttpclient.GetDefaultTimeout()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		if err := retryhttpclient.WaitHostPort(ctx, host, port); err != nil {
+			cancel()
+			return err
+		}
+		cancel()
+	}
 
-    var err error
-    nc.netx, err = netx.NewClient(nc.address, nc.config)
-    if err != nil {
-        return err
-    }
-    defer nc.netx.Close()
+	// SSL/TLS 走独立实现，避免非预期的明文连接
+	if strings.ToLower(nc.config.Network) == "ssl" {
+		body, err := nc.sendReceiveTLS([]byte(data))
+		if err != nil {
+			return err
+		}
+		variableMap["request"] = &proto.Request{Raw: []byte(nc.address + "\r\n" + data)}
+		variableMap["response"] = &proto.Response{Raw: body, Body: body}
+		variableMap["fulltarget"] = nc.address
+		return nil
+	}
 
-    err = nc.netx.Send([]byte(data))
-    if err != nil {
-        return err
-    }
+	var err error
+	nc.netx, err = netx.NewClient(nc.address, nc.config)
+	if err != nil {
+		return err
+	}
+	defer nc.netx.Close()
 
-    body, err := nc.netx.Receive()
-    if err != nil {
-        return err
-    }
+	err = nc.netx.Send([]byte(data))
+	if err != nil {
+		return err
+	}
+
+	body, err := nc.netx.Receive()
+	if err != nil {
+		return err
+	}
 
 	variableMap["request"] = &proto.Request{
 		Raw: []byte(nc.address + "\r\n" + data),
@@ -118,42 +135,42 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 	// fmt.Println(variableMap["request"])
 	// fmt.Println(variableMap["response"])
 
-    return nil
+	return nil
 }
 
 func (nc *NetClient) sendReceiveTLS(payload []byte) ([]byte, error) {
-    dialer := &net.Dialer{}
-    if nc.config.DialTimeout != 0 {
-        dialer.Timeout = nc.config.DialTimeout
-    }
+	dialer := &net.Dialer{}
+	if nc.config.DialTimeout != 0 {
+		dialer.Timeout = nc.config.DialTimeout
+	}
 
-    conn, err := tls.DialWithDialer(dialer, "tcp", nc.address, &tls.Config{InsecureSkipVerify: true})
-    if err != nil {
-        return nil, err
-    }
-    defer conn.Close()
+	conn, err := tls.DialWithDialer(dialer, "tcp", nc.address, &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
 
-    if nc.config.WriteTimeout != 0 {
-        _ = conn.SetWriteDeadline(time.Now().Add(nc.config.WriteTimeout))
-    }
-    if _, err = conn.Write(payload); err != nil {
-        return nil, err
-    }
+	if nc.config.WriteTimeout != 0 {
+		_ = conn.SetWriteDeadline(time.Now().Add(nc.config.WriteTimeout))
+	}
+	if _, err = conn.Write(payload); err != nil {
+		return nil, err
+	}
 
-    if nc.config.ReadTimeout != 0 {
-        _ = conn.SetReadDeadline(time.Now().Add(nc.config.ReadTimeout))
-    }
+	if nc.config.ReadTimeout != 0 {
+		_ = conn.SetReadDeadline(time.Now().Add(nc.config.ReadTimeout))
+	}
 
-    size := nc.config.ReadSize
-    if size <= 0 {
-        size = 20480
-    }
-    buf := make([]byte, size)
-    n, err := conn.Read(buf)
-    if err != nil {
-        return nil, err
-    }
-    return buf[:n], nil
+	size := nc.config.ReadSize
+	if size <= 0 {
+		size = 20480
+	}
+	buf := make([]byte, size)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf[:n], nil
 }
 
 func (nc *NetClient) Close() error {
@@ -185,4 +202,23 @@ func fromHex(data string) string {
 		return string(new)
 	}
 	return data
+}
+
+func parseHostPort(address string) (string, string, bool) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return "", "", false
+	}
+
+	if strings.Contains(address, "://") {
+		if u, err := url.Parse(address); err == nil && u.Host != "" {
+			address = u.Host
+		}
+	}
+
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return "", "", false
+	}
+	return host, port, true
 }

@@ -75,12 +75,13 @@ type SDKOptions struct {
 	Severity  string   // 严重程度过滤
 
 	// ========== 性能配置 ==========
-	RateLimit    int // 请求速率限制 (默认: 150)
-	Concurrency  int // 并发数 (默认: 25)
-	Retries      int // 重试次数 (默认: 1)
-	Timeout      int // 超时时间秒 (默认: 10)
-	MaxHostError int // 主机最大错误数 (默认: 3)
-	Smart        bool
+	RateLimit         int // 请求速率限制 (默认: 150)
+	ReqLimitPerTarget int
+	Concurrency       int // 并发数 (默认: 25)
+	Retries           int // 重试次数 (默认: 1)
+	Timeout           int // 超时时间秒 (默认: 10)
+	MaxHostError      int // 主机最大错误数 (默认: 3)
+	Smart             bool
 
 	// ========== 网络配置 ==========
 	Proxy   string // HTTP/SOCKS5代理
@@ -358,10 +359,11 @@ func (s *SDKScanner) IsStopping() bool {
 func (s *SDKScanner) SetProxy(proxy string) {
 	s.options.Proxy = proxy
 	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:           proxy,
-		Timeout:         s.options.Timeout,
-		Retries:         s.options.Retries,
-		MaxRespBodySize: s.options.MaxRespBodySize,
+		Proxy:             proxy,
+		Timeout:           s.options.Timeout,
+		Retries:           s.options.Retries,
+		MaxRespBodySize:   s.options.MaxRespBodySize,
+		ReqLimitPerTarget: s.options.ReqLimitPerTarget,
 	})
 }
 
@@ -527,21 +529,22 @@ func (s *SDKScanner) printScanInfo() {
 // convertSDKOptions 转换SDK配置到内部配置
 func convertSDKOptions(opts *SDKOptions) *config.Options {
 	options := &config.Options{
-		TargetsFile:     opts.TargetsFile,
-		PocFile:         opts.PocFile,
-		AppendPoc:       opts.AppendPoc,
-		Search:          opts.Search,
-		Severity:        opts.Severity,
-		RateLimit:       opts.RateLimit,
-		Concurrency:     opts.Concurrency,
-		Retries:         opts.Retries,
-		MaxHostError:    opts.MaxHostError,
-		Timeout:         opts.Timeout,
-		Proxy:           opts.Proxy,
-		MaxRespBodySize: 2,
-		OOBRateLimit:    50,
-		OOBConcurrency:  20,
-		Smart:           opts.Smart,
+		TargetsFile:       opts.TargetsFile,
+		PocFile:           opts.PocFile,
+		AppendPoc:         opts.AppendPoc,
+		Search:            opts.Search,
+		Severity:          opts.Severity,
+		RateLimit:         opts.RateLimit,
+		ReqLimitPerTarget: opts.ReqLimitPerTarget,
+		Concurrency:       opts.Concurrency,
+		Retries:           opts.Retries,
+		Timeout:           opts.Timeout,
+		MaxHostError:      opts.MaxHostError,
+		Proxy:             opts.Proxy,
+		MaxRespBodySize:   2,
+		OOBRateLimit:      50,
+		OOBConcurrency:    20,
+		Smart:             opts.Smart,
 	}
 
 	if len(opts.Headers) > 0 {
@@ -587,10 +590,11 @@ func validateSDKConfig(options *config.Options) error {
 func createSDKRunner(options *config.Options) (*runner.Runner, error) {
 	// 初始化HTTP客户端
 	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:           options.Proxy,
-		Timeout:         options.Timeout,
-		Retries:         options.Retries,
-		MaxRespBodySize: options.MaxRespBodySize,
+		Proxy:             options.Proxy,
+		Timeout:           options.Timeout,
+		Retries:           options.Retries,
+		MaxRespBodySize:   options.MaxRespBodySize,
+		ReqLimitPerTarget: options.ReqLimitPerTarget,
 	})
 
 	// 处理目标

@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -27,13 +30,22 @@ var (
 	defaultTimeout = 50 * time.Second
 
 	maxDefaultBody int64
+
+	reqLimiter *hostPortLimiter
+
+	httpInflight      int64
+	reqLimitWaitNs    int64
+	reqLimitWaitCount int64
+	taskGateWaitNs    int64
+	taskGateWaitCount int64
 )
 
 type Options struct {
-	Proxy           string
-	Timeout         int
-	Retries         int
-	MaxRespBodySize int
+	Proxy             string
+	Timeout           int
+	Retries           int
+	MaxRespBodySize   int
+	ReqLimitPerTarget int
 }
 
 func Init(opt *Options) (err error) {
@@ -82,7 +94,211 @@ func Init(opt *Options) (err error) {
 
 	maxDefaultBody = int64(opt.MaxRespBodySize * 1024 * 1024)
 
+	if opt.ReqLimitPerTarget > 0 {
+		reqLimiter = newHostPortLimiter(opt.ReqLimitPerTarget)
+	} else {
+		reqLimiter = nil
+	}
+	applyReqLimitTransport(RtryNoRedirect)
+	applyReqLimitTransport(RtryRedirect)
+
 	return nil
+}
+
+type hostPortLimiter struct {
+	rate int
+
+	mu          sync.Mutex
+	limiters    map[string]*perKeyLimiter
+	lastCleanup time.Time
+}
+
+type perKeyLimiter struct {
+	interval time.Duration
+	next     time.Time
+	lastUsed time.Time
+	mu       sync.Mutex
+}
+
+func newHostPortLimiter(rate int) *hostPortLimiter {
+	return &hostPortLimiter{
+		rate:        rate,
+		limiters:    make(map[string]*perKeyLimiter),
+		lastCleanup: time.Now(),
+	}
+}
+
+func (l *hostPortLimiter) Wait(ctx context.Context, u *url.URL) error {
+	key := urlHostPortKey(u)
+	if key == "" {
+		return nil
+	}
+	pl := l.get(key)
+	return pl.Wait(ctx)
+}
+
+func (l *hostPortLimiter) get(key string) *perKeyLimiter {
+	now := time.Now()
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if now.Sub(l.lastCleanup) > 2*time.Minute {
+		l.cleanupLocked(now)
+		l.lastCleanup = now
+	}
+
+	if pl, ok := l.limiters[key]; ok {
+		return pl
+	}
+
+	interval := time.Second / time.Duration(l.rate)
+	if interval <= 0 {
+		interval = time.Second
+	}
+	pl := &perKeyLimiter{interval: interval, lastUsed: now}
+	l.limiters[key] = pl
+	return pl
+}
+
+func (l *hostPortLimiter) cleanupLocked(now time.Time) {
+	for k, pl := range l.limiters {
+		pl.mu.Lock()
+		lastUsed := pl.lastUsed
+		pl.mu.Unlock()
+		if now.Sub(lastUsed) > 10*time.Minute {
+			delete(l.limiters, k)
+		}
+	}
+}
+
+func (l *perKeyLimiter) Wait(ctx context.Context) error {
+	now := time.Now()
+
+	l.mu.Lock()
+	l.lastUsed = now
+	if l.next.IsZero() || !now.Before(l.next) {
+		l.next = now.Add(l.interval)
+		l.mu.Unlock()
+		return nil
+	}
+
+	wait := l.next.Sub(now)
+	l.next = l.next.Add(l.interval)
+	l.mu.Unlock()
+
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+type reqLimitTransport struct {
+	base http.RoundTripper
+}
+
+func (t *reqLimitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if reqLimiter != nil && req != nil && req.URL != nil {
+		start := time.Now()
+		if err := reqLimiter.Wait(req.Context(), req.URL); err != nil {
+			return nil, err
+		}
+		waited := time.Since(start)
+		if waited > 0 {
+			atomic.AddInt64(&reqLimitWaitNs, waited.Nanoseconds())
+			atomic.AddInt64(&reqLimitWaitCount, 1)
+		}
+	}
+	atomic.AddInt64(&httpInflight, 1)
+	defer atomic.AddInt64(&httpInflight, -1)
+	return t.base.RoundTrip(req)
+}
+
+func applyReqLimitTransport(c *retryablehttp.Client) {
+	if c == nil || c.HTTPClient == nil {
+		return
+	}
+
+	rt := c.HTTPClient.Transport
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	if _, ok := rt.(*reqLimitTransport); ok {
+		return
+	}
+	c.HTTPClient.Transport = &reqLimitTransport{base: rt}
+}
+
+func urlHostPortKey(u *url.URL) string {
+	host := u.Hostname()
+	if host == "" {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "https":
+			port = "443"
+		default:
+			port = "80"
+		}
+	}
+	if _, _, err := net.SplitHostPort(net.JoinHostPort(host, port)); err == nil {
+		return net.JoinHostPort(host, port)
+	}
+	return host + ":" + port
+}
+
+func WaitHostPort(ctx context.Context, host string, port string) error {
+	if reqLimiter == nil {
+		return nil
+	}
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	if host == "" {
+		return nil
+	}
+	if port == "" {
+		port = "80"
+	}
+	start := time.Now()
+	err := reqLimiter.get(net.JoinHostPort(host, port)).Wait(ctx)
+	waited := time.Since(start)
+	if waited > 0 {
+		atomic.AddInt64(&reqLimitWaitNs, waited.Nanoseconds())
+		atomic.AddInt64(&reqLimitWaitCount, 1)
+	}
+	return err
+}
+
+type LiveMetrics struct {
+	HTTPInflight      int64
+	ReqLimitWaitNs    int64
+	ReqLimitWaitCount int64
+	TaskGateWaitNs    int64
+	TaskGateWaitCount int64
+}
+
+func GetLiveMetrics() LiveMetrics {
+	return LiveMetrics{
+		HTTPInflight:      atomic.LoadInt64(&httpInflight),
+		ReqLimitWaitNs:    atomic.LoadInt64(&reqLimitWaitNs),
+		ReqLimitWaitCount: atomic.LoadInt64(&reqLimitWaitCount),
+		TaskGateWaitNs:    atomic.LoadInt64(&taskGateWaitNs),
+		TaskGateWaitCount: atomic.LoadInt64(&taskGateWaitCount),
+	}
+}
+
+func AddTaskGateWait(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	atomic.AddInt64(&taskGateWaitNs, d.Nanoseconds())
+	atomic.AddInt64(&taskGateWaitCount, 1)
 }
 
 func Request(target string, header []string, rule poc.Rule, variableMap map[string]any) error {

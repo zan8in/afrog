@@ -93,6 +93,49 @@ func main() {
 		starttime = time.Now()
 		number    uint32
 	)
+
+	progressLine := func() string {
+		total := options.Count
+		current := atomic.LoadUint32(&options.CurrentCount)
+		pgress := 0
+		if total > 0 {
+			pgress = int(current) * 100 / total
+		}
+		elapsed := strings.Split(time.Since(starttime).String(), ".")[0] + "s"
+
+		suffix := ""
+		if options.LiveStats {
+			suffix = r.LiveStatsSuffix()
+		}
+		return fmt.Sprintf("[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(pgress, 0), pgress, current, total, elapsed, suffix)
+	}
+
+	renderProgress := func() {
+		line := progressLine()
+		fmt.Print("\r\033[2K")
+		fmt.Printf("\r%s", line)
+	}
+
+	var progressDone chan struct{}
+	if options.LiveStats && !options.Silent {
+		progressDone = make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-progressDone:
+					return
+				case <-ticker.C:
+					lock.Lock()
+					renderProgress()
+					lock.Unlock()
+				}
+			}
+		}()
+		defer close(progressDone)
+	}
+
 	r.OnResult = func(result *result.Result) {
 		// add recover @edit 2025/06/12
 		defer func() {
@@ -104,11 +147,11 @@ func main() {
 		if !options.Silent {
 			defer func() {
 				atomic.AddUint32(&options.CurrentCount, 1)
-				if !options.Silent {
+				if !options.Silent && !options.LiveStats {
 					// 花里胡哨的进度条，看起来炫，实际并没什么卵用！ @edit 2024/01/03
-					pgress := int(options.CurrentCount) * 100 / options.Count
-					// 兼容性进度条 @edit 2025/03/29
-					fmt.Printf("\r[%s] %d%% (%d/%d), %s", progress.GetProgressBar(pgress, 0), pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
+					lock.Lock()
+					renderProgress()
+					lock.Unlock()
 					// fmt.Printf("\r[%s] %d%% (%d/%d), %s", progress.CreateProgressBar(pgress, 50, '▉', '░'), pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
 				}
 			}()
@@ -120,9 +163,13 @@ func main() {
 
 		if result.IsVul {
 			lock.Lock()
+			fmt.Print("\r\033[2K\r")
 
 			atomic.AddUint32(&number, 1)
 			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			if !options.Silent {
+				renderProgress()
+			}
 
 			go sqlite.SetResultX(result)
 
