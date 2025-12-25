@@ -1,21 +1,18 @@
 package gox
 
 import (
-	"context"
+	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/remeh/sizedwaitgroup"
-	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
-	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	iputil "github.com/zan8in/pins/ip"
 	urlutil "github.com/zan8in/pins/url"
-	"github.com/zan8in/retryablehttp"
 )
 
 var (
@@ -25,7 +22,10 @@ var (
 		"{{DN}}",              // example
 		"{{SD}}",              // www
 		"{{date_time('%Y')}}", // 2023
-		"ROOT",                // tomcat
+		"backup",
+		"bak",
+		"old",
+		"ROOT", // tomcat
 		"wwwroot",
 		"htdocs",
 		"www",
@@ -39,24 +39,23 @@ var (
 		"api",
 		"test",
 		"app",
-		"backup",
 		"bin",
-		"bak",
-		"old",
+		"release",
 		"Release",
 	}
 	exts = []string{
+		"zip",
 		"7z",
+		"rar",
+		"tar.gz",
 		"bz2",
 		"gz",
 		"lz",
-		"rar",
-		"tar.gz",
 		"tar.bz2",
 		"xz",
-		"zip",
-		"z",
 		"tar.z",
+		"z",
+		"war",
 		"db",
 		"sqlite",
 		"sqlitedb",
@@ -70,21 +69,6 @@ var (
 		"sql.zip",
 		"sql.z",
 		"sql.tar.z",
-		"war",
-	}
-
-	binaries = []string{
-		"377ABCAF271C",                     // 7z
-		"314159265359",                     // bz2
-		"53514C69746520666F726D6174203300", // SQLite format 3.
-		"1F8B",                             // gz tar.gz
-		"526172211A0700",                   // rar RAR archive version 1.50
-		"526172211A070100",                 // rar RAR archive version 5.0
-		"FD377A585A0000",                   // xz tar.xz
-		"1F9D",                             // z tar.z
-		"1FA0",                             // z tar.z
-		"4C5A4950",                         // lz
-		"504B0304",                         // zip
 	}
 
 	csize = 20
@@ -92,9 +76,20 @@ var (
 	maxSize = 500
 
 	timeout = 10 * time.Second
-
-	respBody string
 )
+
+func uniqueStringsPreserveOrder(input []string) []string {
+	seen := make(map[string]struct{}, len(input))
+	output := make([]string, 0, len(input))
+	for _, v := range input {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		output = append(output, v)
+	}
+	return output
+}
 
 func getFilenames(target string) []string {
 	defer func() {
@@ -139,23 +134,27 @@ func getFilenames(target string) []string {
 		}
 	}
 
-	return result
+	return uniqueStringsPreserveOrder(result)
 }
 
-func processData(target string, wg *sizedwaitgroup.SizedWaitGroup, shouldStop chan string) {
+func processData(target string, shouldStop chan string, found *atomic.Bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			gologger.Error().Msgf("[backup_files:processData] error: %v", r)
 		}
 	}()
 
-	wg.Add()
-	defer wg.Done()
-
+	if found.Load() {
+		return
+	}
 	body := GetBackupFile(target)
 	if len(body) > 0 {
-		respBody = body
-		shouldStop <- target
+		if found.CompareAndSwap(false, true) {
+			select {
+			case shouldStop <- target:
+			default:
+			}
+		}
 	}
 
 }
@@ -167,32 +166,39 @@ func backup_files(target string, variableMap map[string]any) error {
 		}
 	}()
 
-	setRequest(target, variableMap)
-
-	shouldStop := make(chan string)
+	shouldStop := make(chan string, 1)
+	found := &atomic.Bool{}
 
 	filenames := getFilenames(target)
+	exts := uniqueStringsPreserveOrder(exts)
 
 	swg := sizedwaitgroup.New(csize)
-	go func() {
-		for _, filename := range filenames {
-			for _, ext := range exts {
-				go func(filename, ext string) {
-					processData(target+"/"+filename+"."+ext, &swg, shouldStop)
-				}(filename, ext)
+	for _, filename := range filenames {
+		for _, ext := range exts {
+			if found.Load() {
+				break
 			}
+			swg.Add()
+			go func(filename, ext string) {
+				defer swg.Done()
+				processData(target+"/"+filename+"."+ext, shouldStop, found)
+			}(filename, ext)
 		}
-
-		go func() {
-			swg.Wait()
-			close(shouldStop)
-		}()
+		if found.Load() {
+			break
+		}
+	}
+	go func() {
+		swg.Wait()
+		close(shouldStop)
 	}()
 
 	resultUrl := <-shouldStop
 	if len(resultUrl) > 0 {
-		setResponse(respBody+"\r\n\r\nbackup-file-url: "+resultUrl, variableMap)
-		setRequest(resultUrl, variableMap)
+		_, err := DoHTTPWithTimeout(timeout, http.MethodGet, resultUrl, nil, nil, false, variableMap)
+		if err != nil {
+			return err
+		}
 		setTarget(target, variableMap)
 		setFullTarget(resultUrl, variableMap)
 
@@ -214,41 +220,45 @@ func GetBackupFile(target string) string {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	data, status, _, err := FetchLimited(http.MethodGet, target, nil, nil, false, timeout, int64(maxSize), nil)
 	if err != nil {
 		return ""
 	}
-
-	resp := &http.Response{}
-	resp, err = retryhttpclient.RtryNoRedirect.Do(req)
-	if err != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
+	if status != 200 {
 		return ""
 	}
 
-	reader := io.LimitReader(resp.Body, int64(maxSize))
-	respBody, err := io.ReadAll(reader)
-	if err != nil {
-		resp.Body.Close()
-		return ""
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != 200 {
+	dd := data
+	if len(dd) == 0 {
 		return ""
 	}
 
-	hexBody := strings.ToUpper(string(utils.HexEncode(string(respBody))))
-
-	for _, r := range binaries {
-		if strings.Contains(hexBody, r) {
-			return hexBody
-		}
+	if bytes.HasPrefix(dd, []byte{0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte("BZh")) || bytes.Contains(dd, []byte{0x31, 0x41, 0x59, 0x26, 0x53, 0x59}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte{0x1F, 0x8B}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00}) || bytes.HasPrefix(dd, []byte{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00, 0x00}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte{0x1F, 0x9D}) || bytes.HasPrefix(dd, []byte{0x1F, 0xA0}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte("LZIP")) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x03, 0x04}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x05, 0x06}) || bytes.HasPrefix(dd, []byte{0x50, 0x4B, 0x07, 0x08}) {
+		return target
+	}
+	if bytes.HasPrefix(dd, []byte("SQLite format 3\x00")) {
+		return target
 	}
 
 	return ""
