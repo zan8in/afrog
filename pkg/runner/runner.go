@@ -258,11 +258,12 @@ func (r *Runner) LiveStatsSuffix() string {
 	taskWaitMsPerSec := (deltaTaskWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 	reqWaitMsPerSec := (deltaReqWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 
-	return fmt.Sprintf(" ta=%d hi=%d ri=%d ni=%d tw=%dms/%d rw=%dms/%d",
+	return fmt.Sprintf(" ta=%d hi=%d ri=%d ni=%d rlt=%d tw=%dms/%d rw=%dms/%d",
 		atomic.LoadInt64(&r.engine.activeTasks),
 		cur.HTTPInflight,
 		cur.RawInflight,
 		cur.NetInflight,
+		retryhttpclient.GetReqLimitPerTarget(),
 		taskWaitMsPerSec,
 		taskWaitPerSec,
 		reqWaitMsPerSec,
