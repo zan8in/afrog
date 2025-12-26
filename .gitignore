@@ -42,6 +42,8 @@ afrogweb
 dist
 *.afg
 
+/afrog.wiki
+
 *pocs/deleted*
 *pocs/peiqi*
 *pocs/test*
