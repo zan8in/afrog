@@ -233,7 +233,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
-		flagSet.IntVar(&options.ReqLimitPerTarget, "req-limit-per-target", 0, "maximum number of requests per second per target (host:port), 0 disables"),
+		flagSet.IntVarP(&options.ReqLimitPerTarget, "req-limit-per-target", "rlt", 0, "maximum number of requests per second per target (host:port), 0 disables"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
 		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
