@@ -60,6 +60,9 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	runner := &Runner{options: options}
 
 	runner.engine = NewEngine(options)
+	if options.AutoReqLimit {
+		retryhttpclient.StartAutoReqLimit(runner.engine.quit, 5, 30)
+	}
 
 	if options.Dingtalk {
 		runner.Ding, err = dingtalk.New(options.Config.Webhook.Dingtalk.Tokens,

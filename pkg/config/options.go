@@ -110,6 +110,10 @@ type Options struct {
 	// maximum number of requests to send per second (default 150)
 	RateLimit         int
 	ReqLimitPerTarget int
+	AutoReqLimit      bool
+	Polite            bool
+	Balanced          bool
+	Aggressive        bool
 
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
@@ -234,6 +238,10 @@ func NewOptions() (*Options, error) {
 	flagSet.CreateGroup("rate-limit", "Rate-Limit",
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.ReqLimitPerTarget, "req-limit-per-target", "rlt", 0, "maximum number of requests per second per target (host:port), 0 disables"),
+		flagSet.BoolVar(&options.AutoReqLimit, "auto-req-limit", false, "automatically set per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Polite, "polite", false, "use polite per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Balanced, "balanced", false, "use balanced per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Aggressive, "aggressive", false, "use aggressive per-target request limit (host:port)"),
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
 		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
@@ -335,6 +343,61 @@ func (opt *Options) VerifyOptions() error {
 
 	if opt.Web {
 		return nil
+	}
+
+	limitModeCount := 0
+	if opt.ReqLimitPerTarget > 0 {
+		limitModeCount++
+	}
+	if opt.AutoReqLimit {
+		limitModeCount++
+	}
+	if opt.Polite {
+		limitModeCount++
+	}
+	if opt.Balanced {
+		limitModeCount++
+	}
+	if opt.Aggressive {
+		limitModeCount++
+	}
+	if limitModeCount > 1 {
+		return fmt.Errorf("only one of --req-limit-per-target/--auto-req-limit/--polite/--balanced/--aggressive can be used")
+	}
+	if opt.ReqLimitPerTarget < 0 {
+		return fmt.Errorf("--req-limit-per-target must be >= 0")
+	}
+
+	if opt.ReqLimitPerTarget == 0 {
+		if opt.Polite {
+			opt.ReqLimitPerTarget = 5
+		} else if opt.Balanced {
+			opt.ReqLimitPerTarget = 15
+		} else if opt.Aggressive {
+			opt.ReqLimitPerTarget = 50
+		} else if opt.AutoReqLimit {
+			baseRate := opt.RateLimit
+			if baseRate <= 0 {
+				baseRate = 150
+			}
+			r := baseRate / 10
+			if r < 5 {
+				r = 5
+			}
+			if r > 15 {
+				r = 15
+			}
+			con := opt.Concurrency
+			if con <= 0 {
+				con = 1
+			}
+			if con >= 100 && r > 8 {
+				r = 8
+			} else if con >= 50 && r > 12 {
+				r = 12
+			}
+			opt.ReqLimitPerTarget = r
+		}
 	}
 
 	// init append poc

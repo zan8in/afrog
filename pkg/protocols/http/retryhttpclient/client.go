@@ -111,7 +111,78 @@ func GetReqLimitPerTarget() int {
 	if reqLimiter == nil {
 		return 0
 	}
-	return reqLimiter.rate
+	reqLimiter.mu.Lock()
+	r := reqLimiter.rate
+	reqLimiter.mu.Unlock()
+	return r
+}
+
+func SetReqLimitPerTarget(rate int) {
+	if reqLimiter == nil {
+		return
+	}
+	reqLimiter.SetRate(rate)
+}
+
+func StartAutoReqLimit(stop <-chan struct{}, minRate int, maxRate int) {
+	if reqLimiter == nil {
+		return
+	}
+	if minRate <= 0 {
+		minRate = 1
+	}
+	if maxRate < minRate {
+		maxRate = minRate
+	}
+
+	go func() {
+		ticker := time.NewTicker(2 * time.Second)
+		defer ticker.Stop()
+
+		prev := GetLiveMetrics()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+			}
+
+			cur := GetLiveMetrics()
+			deltaWaitCount := cur.ReqLimitWaitCount - prev.ReqLimitWaitCount
+			deltaWaitNs := cur.ReqLimitWaitNs - prev.ReqLimitWaitNs
+			prev = cur
+
+			if deltaWaitCount <= 0 || deltaWaitNs <= 0 {
+				continue
+			}
+
+			avgWaitMs := (deltaWaitNs / int64(time.Millisecond)) / deltaWaitCount
+			if avgWaitMs < 250 {
+				continue
+			}
+
+			currentRate := GetReqLimitPerTarget()
+			if currentRate <= 0 {
+				continue
+			}
+			if currentRate >= maxRate {
+				continue
+			}
+
+			step := currentRate / 5
+			if step < 1 {
+				step = 1
+			}
+			newRate := currentRate + step
+			if newRate > maxRate {
+				newRate = maxRate
+			}
+			if newRate < minRate {
+				newRate = minRate
+			}
+			SetReqLimitPerTarget(newRate)
+		}
+	}()
 }
 
 type hostPortLimiter struct {
@@ -135,6 +206,27 @@ func newHostPortLimiter(rate int) *hostPortLimiter {
 		limiters:    make(map[string]*perKeyLimiter),
 		lastCleanup: time.Now(),
 	}
+}
+
+func (l *hostPortLimiter) SetRate(rate int) {
+	if rate <= 0 {
+		return
+	}
+	interval := time.Second / time.Duration(rate)
+	if interval <= 0 {
+		interval = time.Second
+	}
+
+	now := time.Now()
+	l.mu.Lock()
+	l.rate = rate
+	for _, pl := range l.limiters {
+		pl.mu.Lock()
+		pl.interval = interval
+		pl.lastUsed = now
+		pl.mu.Unlock()
+	}
+	l.mu.Unlock()
 }
 
 func (l *hostPortLimiter) Wait(ctx context.Context, u *url.URL) error {
