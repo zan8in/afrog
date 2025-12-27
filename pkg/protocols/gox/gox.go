@@ -226,11 +226,15 @@ func getHTTPSender(variableMap map[string]any) HTTPSender {
 }
 
 func DoHTTP(method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
-	defer cancel()
 	if variableMap == nil {
 		variableMap = make(map[string]any)
 	}
+	baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, retryhttpclient.GetDefaultTimeout())
+	defer cancel()
 	return getHTTPSender(variableMap).Do(ctx, method, target, body, headers, followRedirects, variableMap)
 }
 
@@ -238,11 +242,15 @@ func DoHTTPWithTimeout(timeout time.Duration, method string, target string, body
 	if timeout <= 0 {
 		timeout = retryhttpclient.GetDefaultTimeout()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 	if variableMap == nil {
 		variableMap = make(map[string]any)
 	}
+	baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, timeout)
+	defer cancel()
 	return getHTTPSender(variableMap).Do(ctx, method, target, body, headers, followRedirects, variableMap)
 }
 
@@ -253,7 +261,11 @@ func FetchLimited(method string, target string, body []byte, headers map[string]
 	if maxBytes <= 0 {
 		maxBytes = retryhttpclient.GetMaxDefaultBody()
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, timeout)
 	defer cancel()
 
 	var req *retryablehttp.Request

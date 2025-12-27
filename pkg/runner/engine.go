@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -231,25 +232,36 @@ func (runner *Runner) exec(tap *TransData) {
 	options := runner.options
 
 	if len(tap.Target) > 0 && len(tap.Poc.Id) > 0 {
+		baseCtx := runner.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		if baseCtx.Err() != nil {
+			return
+		}
 		atomic.AddInt64(&runner.engine.activeTasks, 1)
 		defer atomic.AddInt64(&runner.engine.activeTasks, -1)
 		if options.PocExecutionDurationMonitor {
-			timeout := make(chan bool)
-			go func(target string, poc poc.Poc) {
-				runner.executeExpression(tap.Target, &tap.Poc)
-				timeout <- true
-			}(tap.Target, tap.Poc)
+			done := make(chan struct{})
+			go func() {
+				runner.executeExpression(baseCtx, tap.Target, &tap.Poc)
+				close(done)
+			}()
 
 			select {
-			case <-timeout:
+			case <-done:
+				return
+			case <-baseCtx.Done():
 				return
 			case <-time.After(1 * time.Minute):
 				gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has been running for over [%d] minute.", tap.Target, tap.Poc.Id, 1)))
 				var num = 1
 				for {
 					select {
-					case <-timeout:
+					case <-done:
 						gologger.Info().Msg(log.LogColor.Time(fmt.Sprintf("The PoC for [%s] on [%s] has completed execution, taking over [%d] minute.", tap.Target, tap.Poc.Id, num)))
+						return
+					case <-baseCtx.Done():
 						return
 					case <-time.After(1 * time.Minute):
 						num++
@@ -258,12 +270,12 @@ func (runner *Runner) exec(tap *TransData) {
 				}
 			}
 		} else {
-			runner.executeExpression(tap.Target, &tap.Poc)
+			runner.executeExpression(baseCtx, tap.Target, &tap.Poc)
 		}
 	}
 }
 
-func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
+func (runner *Runner) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := runner.engine.AcquireChecker()
 	defer runner.engine.ReleaseChecker(c)
 
@@ -275,6 +287,9 @@ func (runner *Runner) executeExpression(target string, poc *poc.Poc) {
 		}
 	}()
 
+	if ctx != nil {
+		c.VariableMap[retryhttpclient.ContextVarKey] = ctx
+	}
 	c.Check(target, poc)
 	runner.OnResult(c.Result)
 }

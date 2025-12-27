@@ -84,7 +84,11 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 		if timeout <= 0 {
 			timeout = retryhttpclient.GetDefaultTimeout()
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(baseCtx, timeout)
 		if err := retryhttpclient.WaitHostPort(ctx, host, port); err != nil {
 			cancel()
 			return err

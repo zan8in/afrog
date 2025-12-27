@@ -1,6 +1,7 @@
 package gox
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -153,5 +154,24 @@ func TestFetchLimited_GlobalHeadersAndVars(t *testing.T) {
 	}
 	if !strings.Contains(string(req.GetRaw()), "Host: override.example\n") {
 		t.Fatalf("request.raw host mismatch: %q", string(req.GetRaw()))
+	}
+}
+
+func TestFetchLimited_ContextFromVariableMap(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	variableMap := map[string]any{retryhttpclient.ContextVarKey: ctx}
+	_, _, _, err := FetchLimited(http.MethodGet, srv.URL, nil, nil, false, 5, 0, variableMap)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
 	}
 }

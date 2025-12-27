@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,6 +44,8 @@ type Runner struct {
 	liveMu        sync.Mutex
 	livePrev      retryhttpclient.LiveMetrics
 	livePrevAt    time.Time
+	ctx           context.Context
+	cancel        context.CancelFunc
 	// OOB           *oobadapter.OOBAdapter
 }
 
@@ -57,7 +60,8 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		ReqLimitPerTarget: options.ReqLimitPerTarget,
 	})
 
-	runner := &Runner{options: options}
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := &Runner{options: options, ctx: ctx, cancel: cancel}
 
 	runner.engine = NewEngine(options)
 	if options.AutoReqLimit {
@@ -218,6 +222,9 @@ func (r *Runner) IsPaused() bool {
 }
 
 func (r *Runner) Stop() {
+	if r.cancel != nil {
+		r.cancel()
+	}
 	if r.engine != nil {
 		r.engine.Stop()
 	}

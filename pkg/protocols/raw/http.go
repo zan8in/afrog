@@ -140,7 +140,11 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, header []string, varia
 				port = "80"
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), retryhttpclient.GetDefaultTimeout())
+		baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(baseCtx, retryhttpclient.GetDefaultTimeout())
 		if err := retryhttpclient.WaitHostPort(ctx, requrl.Hostname(), port); err != nil {
 			cancel()
 			return err

@@ -50,6 +50,20 @@ type Options struct {
 	ReqLimitPerTarget int
 }
 
+const ContextVarKey = "__ctx"
+
+func ContextFromVariableMap(variableMap map[string]any) context.Context {
+	if variableMap == nil {
+		return nil
+	}
+	if v, ok := variableMap[ContextVarKey]; ok && v != nil {
+		if ctx, ok := v.(context.Context); ok {
+			return ctx
+		}
+	}
+	return nil
+}
+
 func IsCriticalHeader(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
 	case "host", "cookie", "authorization", "user-agent", "content-type":
@@ -456,7 +470,11 @@ func AddNetInflight(delta int64) {
 }
 
 func Request(target string, header []string, rule poc.Rule, variableMap map[string]any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	baseCtx := ContextFromVariableMap(variableMap)
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(baseCtx, defaultTimeout)
 	defer cancel()
 
 	variableMap["request"] = nil

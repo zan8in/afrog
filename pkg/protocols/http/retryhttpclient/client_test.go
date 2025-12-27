@@ -1,6 +1,7 @@
 package retryhttpclient
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -50,5 +51,32 @@ func TestRequest_GlobalHostHeaderAndLowercaseRequestHeaders(t *testing.T) {
 	}
 	if !strings.Contains(raw, "Host: override.example\n") {
 		t.Fatalf("raw host mismatch: %q", raw)
+	}
+}
+
+func TestRequest_ContextFromVariableMap(t *testing.T) {
+	if err := Init(&Options{Timeout: 5, Retries: 0, MaxRespBodySize: 2}); err != nil {
+		t.Fatalf("Init error: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	variableMap := map[string]any{ContextVarKey: ctx}
+	rule := poc.Rule{}
+	rule.Request.Method = http.MethodGet
+	rule.Request.Path = "/"
+	rule.Request.FollowRedirects = false
+
+	err := Request(srv.URL, nil, rule, variableMap)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
 	}
 }
