@@ -1,0 +1,130 @@
+id: sourcecode-disclosure
+
+info:
+  name: Source Code Disclosure
+  author: zan8in
+  severity: high
+  description: |
+    Source Code Disclosure
+  tags: sourcecode,disclosure
+  created: 2025/12/27
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php.bak
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r1:
+    request:
+      method: GET
+      path: /.index.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r2:
+    request:
+      method: GET
+      path: /config.inc.php.bak
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r3:
+    request:
+      method: GET
+      path: /config.php.bak
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r4:
+    request:
+      method: GET
+      path: /.config.inc.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r5:
+    request:
+      method: GET
+      path: /config/.config.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r6:
+    request:
+      method: GET
+      path: /.config.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r7:
+    request:
+      method: GET
+      path: /application/config/config.php.bak
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r8:
+    request:
+      method: GET
+      path: /application/config/database.php.bak
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r9:
+    request:
+      method: GET
+      path: /.settings.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r10:
+    request:
+      method: GET
+      path: /.database.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r11:
+    request:
+      method: GET
+      path: /.db.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+  r12:
+    request:
+      method: GET
+      path: /.mysql.php.swp
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("application/octet-stream") &&
+      response.body.bcontains(b"<?php")
+
+expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8() || r9() || r10() || r11() || r12()
