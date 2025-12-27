@@ -523,6 +523,10 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 			if len(key) == 0 {
 				continue
 			}
+			if strings.EqualFold(key, "Host") {
+				req.Request.Host = val
+				continue
+			}
 			if isCriticalHeader(key) {
 				req.Header.Set(key, val)
 			} else {
@@ -626,7 +630,7 @@ func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Reque
 	newReqHeader := make(map[string]string)
 	rawReqHeaderBuilder := strings.Builder{}
 	for k := range req.Header {
-		newReqHeader[k] = req.Header.Get(k)
+		newReqHeader[strings.ToLower(k)] = req.Header.Get(k)
 		rawReqHeaderBuilder.WriteString(k)
 		rawReqHeaderBuilder.WriteString(": ")
 		rawReqHeaderBuilder.WriteString(req.Header.Get(k))
@@ -637,7 +641,11 @@ func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Reque
 	protoReq.Body = []byte(body)
 
 	reqPath := strings.Replace(target, fmt.Sprintf("%s://%s", u.Scheme, u.Host), "", 1)
-	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + u.Host + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
+	rawHost := u.Host
+	if req.Request != nil && strings.TrimSpace(req.Request.Host) != "" {
+		rawHost = strings.TrimSpace(req.Request.Host)
+	}
+	protoReq.Raw = []byte(req.Method + " " + reqPath + " " + req.Proto + "\n" + "Host: " + rawHost + "\n" + strings.Trim(rawReqHeaderBuilder.String(), "\n") + "\n\n" + body)
 	protoReq.RawHeader = []byte(strings.Trim(rawReqHeaderBuilder.String(), "\n"))
 	variableMap["request"] = protoReq
 }
