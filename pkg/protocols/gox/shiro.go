@@ -129,25 +129,60 @@ func shiroNormalizeTarget(target string) (string, error) {
 }
 
 func shiroDetect(target string) (bool, any, any, bool, error) {
-	vmap := make(map[string]any)
-	headers := map[string]string{
-		"Cookie": "JSESSIONID=" + shiroRandLower(8) + ";rememberMe=123;",
-	}
-	resp, err := DoHTTP(http.MethodGet, target, nil, headers, true, vmap)
-	if err == nil && resp != nil && shiroHasDeleteMe(resp) {
-		return true, vmap["request"], vmap["response"], true, nil
-	}
-
-	vmap2 := make(map[string]any)
-	resp2, err2 := DoHTTP(http.MethodGet, target, nil, headers, false, vmap2)
-	if err2 == nil && resp2 != nil && shiroHasDeleteMe(resp2) {
-		return true, vmap2["request"], vmap2["response"], false, nil
-	}
-
+	ok, req, resp, err := shiroDetectWithFollow(target, true)
 	if err != nil {
-		return false, vmap["request"], vmap["response"], false, nil
+		return false, req, resp, false, err
 	}
-	return false, vmap["request"], vmap["response"], false, nil
+	if ok {
+		return true, req, resp, true, nil
+	}
+
+	ok2, req2, resp2, err2 := shiroDetectWithFollow(target, false)
+	if err2 != nil {
+		return false, req2, resp2, false, err2
+	}
+	if ok2 {
+		return true, req2, resp2, false, nil
+	}
+
+	if req != nil || resp != nil {
+		return false, req, resp, false, nil
+	}
+	return false, req2, resp2, false, nil
+}
+
+func shiroDetectWithFollow(target string, followRedirects bool) (bool, any, any, error) {
+	invalidValues := []string{"123", "1", "dGVzdA=="}
+	var anyReq any
+	var anyResp any
+	hitCount := 0
+
+	for _, v := range invalidValues {
+		vmap := make(map[string]any)
+		headers := map[string]string{
+			"Cookie": "JSESSIONID=" + shiroRandLower(8) + ";rememberMe=" + v + ";",
+		}
+		resp, err := DoHTTP(http.MethodGet, target, nil, headers, followRedirects, vmap)
+		if anyReq == nil {
+			anyReq = vmap["request"]
+		}
+		if anyResp == nil {
+			anyResp = vmap["response"]
+		}
+		if err != nil || resp == nil {
+			continue
+		}
+		if shiroHasDeleteMe(resp) {
+			hitCount++
+			anyReq = vmap["request"]
+			anyResp = vmap["response"]
+			if hitCount >= 2 {
+				return true, anyReq, anyResp, nil
+			}
+		}
+	}
+
+	return false, anyReq, anyResp, nil
 }
 
 func shiroHasDeleteMe(resp *proto.Response) bool {

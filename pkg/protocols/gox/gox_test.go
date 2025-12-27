@@ -282,6 +282,39 @@ func TestShiroKey_NoBaselineDeleteMe_NoMarker(t *testing.T) {
 	}
 }
 
+func TestShiroKey_WAFOnly123_NoMarker(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie("rememberMe")
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+			return
+		}
+		if ck.Value == "123" {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{}
+	if err := shiro_key(srv.URL, variableMap); err != nil {
+		t.Fatalf("shiro_key error: %v", err)
+	}
+
+	respV := variableMap["response"]
+	resp, ok := respV.(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("response type mismatch: %T", respV)
+	}
+	if bytes.Contains(resp.GetRaw(), []byte("ShiroKey:")) {
+		t.Fatalf("unexpected marker, raw=%q", string(resp.GetRaw()))
+	}
+}
+
 func pkcs7Unpad(in []byte, blockSize int) ([]byte, bool) {
 	if len(in) == 0 || blockSize <= 0 || len(in)%blockSize != 0 {
 		return nil, false
