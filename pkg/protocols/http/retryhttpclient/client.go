@@ -50,6 +50,45 @@ type Options struct {
 	ReqLimitPerTarget int
 }
 
+func IsCriticalHeader(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "host", "cookie", "authorization", "user-agent", "content-type":
+		return true
+	default:
+		return false
+	}
+}
+
+func ApplyHeaderLines(req *retryablehttp.Request, headerLines []string, overwrite bool) {
+	if req == nil || len(headerLines) == 0 {
+		return
+	}
+	for _, line := range headerLines {
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if key == "" {
+			continue
+		}
+		if strings.EqualFold(key, "Host") {
+			req.Request.Host = val
+			continue
+		}
+		if overwrite {
+			req.Header.Set(key, val)
+			continue
+		}
+		if IsCriticalHeader(key) || req.Header.Get(key) == "" {
+			req.Header.Set(key, val)
+		} else {
+			req.Header.Add(key, val)
+		}
+	}
+}
+
 func Init(opt *Options) (err error) {
 	po := &retryablehttp.DefaultPoolOptions
 	// 避免上游 SDK 在处理代理列表时触发并发通道错误，先不让池初始化解析代理
@@ -505,34 +544,7 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 
 	// 自定义 header，2024.04.13
 	if len(header) > 0 {
-		isCriticalHeader := func(key string) bool {
-			switch strings.ToLower(strings.TrimSpace(key)) {
-			case "host", "cookie", "authorization", "user-agent", "content-type":
-				return true
-			default:
-				return false
-			}
-		}
-		for _, va := range header {
-			parts := strings.SplitN(va, ":", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			key := strings.TrimSpace(parts[0])
-			val := strings.TrimSpace(parts[1])
-			if len(key) == 0 {
-				continue
-			}
-			if strings.EqualFold(key, "Host") {
-				req.Request.Host = val
-				continue
-			}
-			if isCriticalHeader(key) {
-				req.Header.Set(key, val)
-			} else {
-				req.Header.Add(key, val)
-			}
-		}
+		ApplyHeaderLines(req, header, false)
 	}
 
 	// 自定义 cookie 被废弃，2024.04.13

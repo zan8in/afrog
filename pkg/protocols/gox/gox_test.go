@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 )
 
@@ -101,5 +102,56 @@ func TestDoHTTP_PostDefaultContentType(t *testing.T) {
 	body := string(resp.GetBody())
 	if !strings.Contains(body, "content-type=application/x-www-form-urlencoded\n") {
 		t.Fatalf("content-type mismatch, body=%q", body)
+	}
+}
+
+func TestFetchLimited_GlobalHeadersAndVars(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/headers", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "host=%s\n", r.Host)
+		fmt.Fprintf(w, "x-foo=%s\n", strings.Join(r.Header.Values("X-Foo"), ","))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{
+		"__global_headers": []string{
+			"Host: override.example",
+			"X-Foo: v1",
+		},
+	}
+
+	data, status, _, err := FetchLimited(http.MethodGet, srv.URL+"/headers", nil, nil, false, 0, 0, variableMap)
+	if err != nil {
+		t.Fatalf("FetchLimited error: %v", err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("status mismatch: got=%d", status)
+	}
+
+	body := string(data)
+	if !strings.Contains(body, "host=override.example\n") {
+		t.Fatalf("host mismatch, body=%q", body)
+	}
+	if !strings.Contains(body, "x-foo=v1\n") {
+		t.Fatalf("x-foo mismatch, body=%q", body)
+	}
+
+	ft, _ := variableMap["fulltarget"].(string)
+	if ft != srv.URL+"/headers" {
+		t.Fatalf("fulltarget mismatch: got=%q want=%q", ft, srv.URL+"/headers")
+	}
+
+	reqV := variableMap["request"]
+	req, ok := reqV.(*proto.Request)
+	if !ok || req == nil {
+		t.Fatalf("request type mismatch: %T", reqV)
+	}
+	if req.GetHeaders()["x-foo"] != "v1" {
+		t.Fatalf("request.headers mismatch: got=%q", req.GetHeaders()["x-foo"])
+	}
+	if !strings.Contains(string(req.GetRaw()), "Host: override.example\n") {
+		t.Fatalf("request.raw host mismatch: %q", string(req.GetRaw()))
 	}
 }
