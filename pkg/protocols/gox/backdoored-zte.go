@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
-	"github.com/zan8in/pins/netx"
 
 	urlutil "github.com/zan8in/pins/url"
 )
@@ -50,33 +49,28 @@ func backdoored_zte(target string, variableMap map[string]any) error {
 }
 
 func telnet_login(host string, variableMap map[string]any) (string, error) {
-	nc, err := netxclient.NewNetClient(host, netxclient.Config{})
+	sess, err := netxclient.NewSession(host, netxclient.Config{}, variableMap)
+	if err != nil {
+		return "", err
+	}
+	defer sess.Close()
+
+	err = sess.Send([]byte("root\r\n"))
 	if err != nil {
 		return "", err
 	}
 
-	client, err := netx.NewClient(host, *nc.Config())
-	if err != nil {
-		return "", err
-	}
-	defer client.Close()
-
-	err = client.Send([]byte("root\r\n"))
+	_, err = sess.Receive()
 	if err != nil {
 		return "", err
 	}
 
-	_, err = client.Receive()
+	err = sess.Send([]byte("Zte521\r\n\r\n"))
 	if err != nil {
 		return "", err
 	}
 
-	err = client.Send([]byte("Zte521\r\n\r\n"))
-	if err != nil {
-		return "", err
-	}
-
-	data, err := client.Receive()
+	data, err := sess.Receive()
 	if err != nil {
 		return "", err
 	}

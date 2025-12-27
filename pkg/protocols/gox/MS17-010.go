@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
-	"github.com/zan8in/pins/netx"
 	urlutil "github.com/zan8in/pins/url"
 )
 
@@ -46,23 +45,18 @@ func MS17010Scan(target string, variableMap map[string]any) error {
 	setTarget(address, variableMap)
 	setFullTarget(address, variableMap)
 
-	nc, err := netxclient.NewNetClient(address, netxclient.Config{})
+	sess, err := netxclient.NewSession(address, netxclient.Config{}, variableMap)
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+
+	err = sess.Send([]byte(negotiateProtocolRequest))
 	if err != nil {
 		return err
 	}
 
-	client, err := netx.NewClient(address, *nc.Config())
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	err = client.Send([]byte(negotiateProtocolRequest))
-	if err != nil {
-		return err
-	}
-
-	data, err := client.Receive()
+	data, err := sess.Receive()
 	if err != nil || len(data) < 36 {
 		return err
 	}
@@ -72,12 +66,12 @@ func MS17010Scan(target string, variableMap map[string]any) error {
 		return err
 	}
 
-	err = client.Send([]byte(sessionSetupRequest))
+	err = sess.Send([]byte(sessionSetupRequest))
 	if err != nil {
 		return err
 	}
 
-	data, err = client.Receive()
+	data, err = sess.Receive()
 	if err != nil || len(data) < 36 {
 		return err
 	}
@@ -115,12 +109,12 @@ func MS17010Scan(target string, variableMap map[string]any) error {
 	treeConnectRequest[32] = userID[0]
 	treeConnectRequest[33] = userID[1]
 	// TODO change the ip in tree path though it doesn't matter
-	err = client.Send([]byte(treeConnectRequest))
+	err = sess.Send([]byte(treeConnectRequest))
 	if err != nil {
 		return err
 	}
 
-	data, err = client.Receive()
+	data, err = sess.Receive()
 	if err != nil || len(data) < 36 {
 		return err
 	}
@@ -131,12 +125,12 @@ func MS17010Scan(target string, variableMap map[string]any) error {
 	transNamedPipeRequest[32] = userID[0]
 	transNamedPipeRequest[33] = userID[1]
 
-	err = client.Send([]byte(transNamedPipeRequest))
+	err = sess.Send([]byte(transNamedPipeRequest))
 	if err != nil {
 		return err
 	}
 
-	data, err = client.Receive()
+	data, err = sess.Receive()
 	if err != nil || len(data) < 36 {
 		return err
 	}
@@ -161,12 +155,12 @@ func MS17010Scan(target string, variableMap map[string]any) error {
 		trans2SessionSetupRequest[32] = userID[0]
 		trans2SessionSetupRequest[33] = userID[1]
 
-		err = client.Send([]byte(trans2SessionSetupRequest))
+		err = sess.Send([]byte(trans2SessionSetupRequest))
 		if err != nil {
 			return nil
 		}
 
-		data, err = client.Receive()
+		data, err = sess.Receive()
 		if err != nil || len(data) < 36 {
 			return nil
 		}

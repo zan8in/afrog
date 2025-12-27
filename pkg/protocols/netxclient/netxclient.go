@@ -32,6 +32,12 @@ type NetClient struct {
 	netx    *netx.Client
 }
 
+type Session struct {
+	address string
+	config  netx.Config
+	client  *netx.Client
+}
+
 func (nc *NetClient) Config() *netx.Config {
 	return &nc.config
 }
@@ -63,6 +69,105 @@ func NewNetClient(address string, conf Config) (*NetClient, error) {
 	}
 
 	return &NetClient{address: address, config: netxconf}, nil
+}
+
+func NewSession(address string, conf Config, variableMap map[string]any) (*Session, error) {
+	netxconf := netx.Config{}
+	address = setVariableMap(address, variableMap)
+
+	globalTimeout := retryhttpclient.GetDefaultTimeout()
+	dialBase := 3 * time.Second
+	writeBase := 3 * time.Second
+	readBase := 6 * time.Second
+	if _, port, ok := parseHostPort(address); ok && port == "445" {
+		dialBase = 5 * time.Second
+		writeBase = 5 * time.Second
+		readBase = 10 * time.Second
+	}
+
+	dialDefault := minDuration(globalTimeout, dialBase)
+	writeDefault := minDuration(globalTimeout, writeBase)
+	readDefault := minDuration(globalTimeout, readBase)
+
+	if conf.MaxRetries != 0 {
+		netxconf.MaxRetries = conf.MaxRetries
+	}
+
+	if conf.Network != "" {
+		netxconf.Network = conf.Network
+	}
+
+	if conf.DialTimeout != 0 {
+		netxconf.DialTimeout = conf.DialTimeout
+	} else {
+		netxconf.DialTimeout = dialDefault
+	}
+
+	if conf.WriteTimeout != 0 {
+		netxconf.WriteTimeout = conf.WriteTimeout
+	} else {
+		netxconf.WriteTimeout = writeDefault
+	}
+
+	if conf.ReadTimeout != 0 {
+		netxconf.ReadTimeout = conf.ReadTimeout
+	} else {
+		netxconf.ReadTimeout = readDefault
+	}
+
+	if conf.RetryDelay != 0 {
+		netxconf.RetryDelay = conf.RetryDelay
+	}
+
+	if conf.ReadSize != 0 {
+		netxconf.ReadSize = conf.ReadSize
+	} else {
+		netxconf.ReadSize = 20480
+	}
+
+	if host, port, ok := parseHostPort(address); ok {
+		timeout := netxconf.DialTimeout
+		if timeout <= 0 {
+			timeout = retryhttpclient.GetDefaultTimeout()
+		}
+		baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(baseCtx, timeout)
+		if err := retryhttpclient.WaitHostPort(ctx, host, port); err != nil {
+			cancel()
+			return nil, err
+		}
+		cancel()
+	}
+
+	retryhttpclient.AddNetInflight(1)
+
+	client, err := netx.NewClient(address, netxconf)
+	if err != nil {
+		retryhttpclient.AddNetInflight(-1)
+		return nil, err
+	}
+
+	return &Session{
+		address: address,
+		config:  netxconf,
+		client:  client,
+	}, nil
+}
+
+func minDuration(a, b time.Duration) time.Duration {
+	if a <= 0 {
+		return b
+	}
+	if b <= 0 {
+		return a
+	}
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) error {
@@ -143,6 +248,34 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 	// fmt.Println(variableMap["response"])
 
 	return nil
+}
+
+func (s *Session) Address() string {
+	return s.address
+}
+
+func (s *Session) Send(data []byte) error {
+	if s == nil || s.client == nil {
+		return fmt.Errorf("nil session")
+	}
+	return s.client.Send(data)
+}
+
+func (s *Session) Receive() ([]byte, error) {
+	if s == nil || s.client == nil {
+		return nil, fmt.Errorf("nil session")
+	}
+	return s.client.Receive()
+}
+
+func (s *Session) Close() error {
+	if s == nil || s.client == nil {
+		return nil
+	}
+	err := s.client.Close()
+	s.client = nil
+	retryhttpclient.AddNetInflight(-1)
+	return err
 }
 
 func (nc *NetClient) sendReceiveTLS(payload []byte) ([]byte, error) {

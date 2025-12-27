@@ -84,6 +84,7 @@ type ruleAlias struct {
 type RuleRequest struct {
 	Type            string            `yaml:"type"`         // 传输方式，默认 http，可选：tcp,udp,ssl,go 等任意扩展
 	Host            string            `yaml:"host"`         // tcp/udp 请求的主机名
+	Port            int               `yaml:"port"`         // tcp/udp 端口（可选，优先级低于 host 中显式端口）
 	Data            string            `yaml:"data"`         // tcp/udp 发送的内容
 	DataType        string            `yaml:"data-type"`    // tcp/udp 发送的数据类型，默认字符串
 	ReadSize        int               `yaml:"read-size"`    // tcp/udp 读取内容的长度

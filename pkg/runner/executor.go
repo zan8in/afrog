@@ -1,6 +1,9 @@
 package runner
 
 import (
+	"net"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,7 +53,8 @@ type NetExecutor struct{}
 
 func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, vars map[string]any) error {
 	network := strings.ToLower(rule.Request.Type)
-	nc, err := netxclient.NewNetClient(rule.Request.Host, netxclient.Config{
+	address := resolveNetAddress(rule.Request.Host, rule.Request.Port)
+	nc, err := netxclient.NewNetClient(address, netxclient.Config{
 		Network:     network,
 		ReadTimeout: getDuration(rule.Request.ReadTimeout),
 		ReadSize:    rule.Request.ReadSize,
@@ -86,6 +90,33 @@ func getDuration(sec int) (d time.Duration) {
 		return 0
 	}
 	return time.Duration(sec) * time.Second
+}
+
+func resolveNetAddress(host string, port int) string {
+	host = strings.TrimSpace(host)
+	if host == "" || port <= 0 {
+		return host
+	}
+
+	if strings.Contains(host, "://") {
+		if u, err := url.Parse(host); err == nil {
+			if u.Port() != "" {
+				return u.Host
+			}
+			hn := u.Hostname()
+			if hn != "" {
+				return net.JoinHostPort(hn, strconv.Itoa(port))
+			}
+		}
+	}
+
+	if _, _, err := net.SplitHostPort(host); err == nil {
+		return host
+	}
+
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return net.JoinHostPort(host, strconv.Itoa(port))
 }
 
 // executor registry
