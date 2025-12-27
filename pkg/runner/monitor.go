@@ -2,9 +2,9 @@ package runner
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
-	"github.com/remeh/sizedwaitgroup"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
@@ -14,20 +14,77 @@ func (r *Runner) monitorTargets() {
 		return
 	}
 
-	ticker := time.NewTicker(time.Second / time.Duration(r.options.RateLimit))
-	swg := sizedwaitgroup.New(r.options.Concurrency)
-	for i := 0; i <= r.options.MaxHostError; i++ {
-		for _, v := range r.options.Targets.List() {
-			swg.Add()
-			<-ticker.C
+	rate := r.options.RateLimit
+	if rate <= 0 {
+		rate = 1
+	}
+	interval := time.Second / time.Duration(rate)
+	if interval <= 0 {
+		interval = time.Nanosecond
+	}
 
-			go func(v string) {
-				defer swg.Done()
-				r.checkURL(v)
-			}(v.(string))
+	concurrency := r.options.Concurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
+	maxHostError := r.options.MaxHostError
+	if maxHostError < 0 {
+		maxHostError = 0
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	targets := r.options.Targets.List()
+
+	jobs := make(chan string, concurrency*2)
+	var wg sync.WaitGroup
+
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-r.ctx.Done():
+					return
+				case t, ok := <-jobs:
+					if !ok {
+						return
+					}
+
+					for attempt := 0; attempt <= maxHostError; attempt++ {
+						select {
+						case <-r.ctx.Done():
+							return
+						case <-ticker.C:
+						}
+
+						_, err := r.checkURL(t)
+						if err == nil {
+							break
+						}
+						if r.options.Targets.Num(t) > maxHostError {
+							break
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	for _, v := range targets {
+		select {
+		case <-r.ctx.Done():
+			close(jobs)
+			wg.Wait()
+			return
+		case jobs <- v.(string):
 		}
 	}
-	swg.Wait()
+	close(jobs)
+	wg.Wait()
 }
 
 func (r *Runner) checkURL(target string) (string, error) {
