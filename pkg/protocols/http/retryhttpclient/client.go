@@ -505,11 +505,28 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 
 	// 自定义 header，2024.04.13
 	if len(header) > 0 {
+		isCriticalHeader := func(key string) bool {
+			switch strings.ToLower(strings.TrimSpace(key)) {
+			case "host", "cookie", "authorization", "user-agent", "content-type":
+				return true
+			default:
+				return false
+			}
+		}
 		for _, va := range header {
-			arr := strings.Split(va, ":")
-			key := strings.TrimSpace(arr[0])
-			if found, ok := strings.CutPrefix(va, key+":"); ok && len(key) > 0 {
-				req.Header.Add(key, strings.TrimSpace(found))
+			parts := strings.SplitN(va, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			if len(key) == 0 {
+				continue
+			}
+			if isCriticalHeader(key) {
+				req.Header.Set(key, val)
+			} else {
+				req.Header.Add(key, val)
 			}
 		}
 	}
@@ -565,8 +582,11 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
 	writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
 
-	// store the full target url
-	variableMap["fulltarget"] = target
+	if resp != nil && resp.Request != nil && resp.Request.URL != nil {
+		variableMap["fulltarget"] = resp.Request.URL.String()
+	} else {
+		variableMap["fulltarget"] = target
+	}
 
 	return nil
 }

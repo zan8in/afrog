@@ -109,6 +109,40 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 		return nil, errors.New("empty target")
 	}
 
+	isCriticalHeader := func(key string) bool {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "host", "cookie", "authorization", "user-agent", "content-type":
+			return true
+		default:
+			return false
+		}
+	}
+
+	applyHeaders := func(req *retryablehttp.Request, headerLines []string, overwrite bool) {
+		for _, line := range headerLines {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			val := strings.TrimSpace(parts[1])
+			if key == "" {
+				continue
+			}
+			if strings.EqualFold(key, "Host") {
+				req.Request.Host = val
+				continue
+			}
+			if overwrite {
+				req.Header.Set(key, val)
+			} else if isCriticalHeader(key) || req.Header.Get(key) == "" {
+				req.Header.Set(key, val)
+			} else {
+				req.Header.Add(key, val)
+			}
+		}
+	}
+
 	var req *retryablehttp.Request
 	var err error
 	if body == nil {
@@ -120,12 +154,24 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 		return nil, err
 	}
 
+	if variableMap != nil {
+		if v := variableMap["__global_headers"]; v != nil {
+			if headerLines, ok := v.([]string); ok && len(headerLines) > 0 {
+				applyHeaders(req, headerLines, false)
+			}
+		}
+	}
+
 	for k, v := range headers {
 		if strings.EqualFold(k, "Host") {
 			req.Request.Host = v
 			continue
 		}
 		req.Header.Set(k, v)
+	}
+
+	if strings.EqualFold(method, http.MethodPost) && len(req.Header.Get("Content-Type")) == 0 {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
 	if len(req.Header.Get("User-Agent")) == 0 {
@@ -173,7 +219,13 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 
 	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
 	retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
-	variableMap["fulltarget"] = target
+	if variableMap != nil {
+		if resp != nil && resp.Request != nil && resp.Request.URL != nil {
+			variableMap["fulltarget"] = resp.Request.URL.String()
+		} else {
+			variableMap["fulltarget"] = target
+		}
+	}
 
 	if v := variableMap["response"]; v != nil {
 		if pr, ok := v.(*proto.Response); ok {

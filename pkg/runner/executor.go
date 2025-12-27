@@ -70,6 +70,13 @@ func (e GoExecutor) Execute(target string, rule poc.Rule, opt *config.Options, v
 	vars["response"] = nil
 	vars["target"] = target
 	vars["fulltarget"] = target
+	if opt != nil && len(opt.Header) > 0 {
+		headerLines := make([]string, 0, len(opt.Header))
+		for _, h := range opt.Header {
+			headerLines = append(headerLines, h)
+		}
+		vars["__global_headers"] = headerLines
+	}
 	gox.InjectDefaultHTTPSender(vars)
 	return gox.Request(target, rule.Request.Data, vars)
 }
