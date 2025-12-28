@@ -16,6 +16,11 @@ on:
         type: string
         default: ""
         required: false
+      afrogweb_ref:
+        description: "afrogweb Git ref to build (branch, tag, or commit SHA)"
+        type: string
+        default: "main"
+        required: false
 
 jobs:
   release:
@@ -23,6 +28,7 @@ jobs:
     env:
       GOPROXY: https://proxy.golang.org,direct
       GOSUMDB: sum.golang.org
+      AFROGWEB_REF: ${{ github.event.inputs.afrogweb_ref || 'main' }}
 
     steps:
       - uses: actions/checkout@v3
@@ -35,6 +41,10 @@ jobs:
           go-version: 1.24.1
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Go modules download
         run: |
           set -euo pipefail
@@ -44,24 +54,37 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Clone afrogweb repository (假设是你的 repo；如果私有，需要添加 token)
-          git clone https://x-access-token:${{ secrets.AFROGWEB_TOKEN }}@github.com/zan8in/afrogweb.git _afrogweb_tmp
+          AFROGWEB_REPO_URL="https://x-access-token:${{ secrets.AFROGWEB_TOKEN }}@github.com/zan8in/afrogweb.git"
+          AFROGWEB_REF_EFFECTIVE="${AFROGWEB_REF}"
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ -n "${GITHUB_REF_NAME:-}" ]; then
+            if git ls-remote --exit-code --tags "${AFROGWEB_REPO_URL}" "refs/tags/${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+              AFROGWEB_REF_EFFECTIVE="${GITHUB_REF_NAME}"
+            fi
+          fi
+          echo "AFROGWEB_REF_EFFECTIVE=${AFROGWEB_REF_EFFECTIVE}"
+          git clone --depth 1 --branch "${AFROGWEB_REF_EFFECTIVE}" "${AFROGWEB_REPO_URL}" _afrogweb_tmp
 
-          # 进入 afrogweb 目录，构建
           cd _afrogweb_tmp
-          npm install
+          node -v
+          npm -v
+          git rev-parse HEAD
+          if [ -d "static/docs" ] && [ -d "../docs" ] && [ -z "$(ls -A static/docs 2>/dev/null)" ]; then
+            cp -R ../docs/* static/docs/ || true
+          fi
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
           npm run build
           cd ..
 
-          # 清理现有 webpath（如果存在），然后复制新构建的
           rm -rf pkg/web/webpath
           mkdir -p pkg/web/webpath
-          cp -r _afrogweb_tmp/build/* pkg/web/webpath/  # 调整为你的输出目录，如 build/
+          cp -r _afrogweb_tmp/build/* pkg/web/webpath/
 
-          # 清理临时目录
           rm -rf _afrogweb_tmp
 
-          # 验证复制成功
           if [ ! -d "pkg/web/webpath/_app/immutable/entry" ] || [ $(ls pkg/web/webpath/_app/immutable/entry/*.js 2>/dev/null | wc -l) -eq 0 ]; then
             echo "afrogweb build or copy failed: no JS files in entry/" >&2
             exit 1
