@@ -1,0 +1,89 @@
+id: config-file-disclosure
+
+info:
+  name: Config File Disclosure
+  author: zan8in
+  severity: info
+  description: |
+    Config File Disclosure
+  tags: config,disclosure
+  created: 2025/12/27
+
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      file:
+        - /config.php.bak
+        - /db.php.bak
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.body.bcontains(b"<?php")
+  r1:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      file:
+        - /config.inc
+        - /conf/config.ini
+        - /config.ini
+        - /config/config.ini
+        - /configuration.ini
+        - /configs/application.ini
+        - /settings.ini
+        - /application.ini
+        - /conf.ini
+        - /app.ini
+        - /config/database.yml
+        - /database.yml
+        - /db.conf
+        - /db.ini
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      response.status == 200 &&
+      !response.raw_header.bcontains(b"html") &&
+      response.body.ibcontains(b"passw")
+  r2:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      file:
+        - /config.json
+        - /sftp-config.json
+        - /vendor/composer/installed.json
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      response.status == 200 &&
+      response.raw_header.bcontains(b"application/json") &&
+      response.body.ibcontains(b"pass")
+
+  r3:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      file:
+        - /.idea/workspace.xml
+        - /.idea/modules.xml
+        - /build.xml
+        - /pom.xml
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      response.status == 200 &&
+      response.raw_header.bcontains(b"xml") &&
+      (
+        response.body.bcontains(b"<project") ||
+        response.body.bcontains(b"ProjectModuleManager") ||
+        response.body.bcontains(b"name=\"") ||
+        response.body.bcontains(b"configuration")
+      )
+expression: r0() || r1() || r2() || r3()

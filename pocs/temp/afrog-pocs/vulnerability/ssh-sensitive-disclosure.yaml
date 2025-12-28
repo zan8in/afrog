@@ -1,0 +1,27 @@
+id: ssh-sensitive-disclosure
+
+info:
+  name: SSH Sensitive Disclosure
+  author: zan8in
+  severity: high
+  description: |
+    SSH Sensitive Disclosure
+  tags: ssh,disclosure
+  created: 2025/12/27
+
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      file:
+        - /.ssh/id_rsa
+        - /id_rsa
+        - /.ssh/id_dsa
+        - /id_dsa
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b"PRIVATE KEY-")
+expression: r0()
