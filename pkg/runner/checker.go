@@ -41,6 +41,29 @@ type savedVar struct {
 	exists bool
 }
 
+func celSafeIdent(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "_"
+	}
+	b := make([]byte, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+			b = append(b, c)
+		} else {
+			b = append(b, '_')
+		}
+	}
+	if len(b) == 0 {
+		return "_"
+	}
+	if b[0] >= '0' && b[0] <= '9' {
+		b = append([]byte{'_'}, b...)
+	}
+	return string(b)
+}
+
 func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -213,8 +236,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					restoreVars(c.VariableMap, lastAttemptSnapshot)
 				}
 			}
-			c.VariableMap["__brute_truncated_"+k] = bruteTruncated
-			c.CustomLib.UpdateCompileOption("__brute_truncated_"+k, decls.Bool)
+			truncVar := "__brute_truncated_" + celSafeIdent(k)
+			c.VariableMap[truncVar] = bruteTruncated
+			c.CustomLib.UpdateCompileOption(truncVar, decls.Bool)
 			if iterErr != nil {
 				err = iterErr
 			}

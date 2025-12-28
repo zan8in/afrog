@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,16 +29,27 @@ func (c *CustomLib) CompileOptions() []cel.EnvOption {
 	opts = append(opts, c.baseEnvOptions...)
 
 	if len(c.varTypes) > 0 {
-		varDecls := make([]*exprpb.Decl, 0, len(c.varTypes))
-		for k, t := range c.varTypes {
+		keys := make([]string, 0, len(c.varTypes))
+		for k := range c.varTypes {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		varDecls := make([]*exprpb.Decl, 0, len(keys))
+		for _, k := range keys {
+			t := c.varTypes[k]
 			varDecls = append(varDecls, decls.NewVar(k, t))
 		}
 		opts = append(opts, cel.Declarations(varDecls...))
 	}
 
 	if len(c.ruleFuncs) > 0 {
-		fnDecls := make([]*exprpb.Decl, 0, len(c.ruleFuncs))
+		names := make([]string, 0, len(c.ruleFuncs))
 		for name := range c.ruleFuncs {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		fnDecls := make([]*exprpb.Decl, 0, len(names))
+		for _, name := range names {
 			fnDecls = append(fnDecls, decls.NewFunction(name,
 				decls.NewOverload(name, []*exprpb.Type{}, decls.Bool),
 			))
@@ -53,8 +65,14 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	opts = append(opts, c.baseProgramOptions...)
 
 	if len(c.ruleFuncs) > 0 {
-		overloads := make([]*functions.Overload, 0, len(c.ruleFuncs))
-		for name, ret := range c.ruleFuncs {
+		names := make([]string, 0, len(c.ruleFuncs))
+		for name := range c.ruleFuncs {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		overloads := make([]*functions.Overload, 0, len(names))
+		for _, name := range names {
+			ret := c.ruleFuncs[name]
 			fnName := name
 			fnRet := ret
 			overloads = append(overloads, &functions.Overload{
@@ -173,6 +191,9 @@ func (c *CustomLib) WriteRuleFunctionsROptions(funcName string, returnBool bool)
 }
 
 func (c *CustomLib) UpdateCompileOption(k string, t *exprpb.Type) {
+	if k == "request" || k == "response" {
+		return
+	}
 	if c.varTypes == nil {
 		c.varTypes = make(map[string]*exprpb.Type)
 	}
