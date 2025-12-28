@@ -10,43 +10,22 @@ info:
 
 rules:
   r0:
+    stop_if_match: true
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      p:
+        - /fckeditor/_samples/default.html
+        - /fckeditor/editor/filemanager/connectors/uploadtest.html
+        - /ckeditor/samples/
+        - /editor/ckeditor/samples/
+        - /ckeditor/samples/sample_posteddata.php
+        - /editor/ckeditor/samples/sample_posteddata.php
+        - /fck/editor/dialog/fck_spellerpages/spellerpages/server-scripts/spellchecker.php
+        - /fckeditor/editor/dialog/fck_spellerpages/spellerpages/server-scripts/spellcheckder.php
     request:
       method: GET
-      path: /fckeditor/_samples/default.html
+      path: "{{p}}"
     expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r1:
-    request:
-      method: GET
-      path: /fckeditor/editor/filemanager/connectors/uploadtest.html
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r2:
-    request:
-      method: GET
-      path: /ckeditor/samples/
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r3:
-    request:
-      method: GET
-      path: /editor/ckeditor/samples/
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r4:
-    request:
-      method: GET
-      path: /ckeditor/samples/sample_posteddata.php
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r5:
-    request:
-      method: GET
-      path: /editor/ckeditor/samples/sample_posteddata.php
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r6:
-    request:
-      method: GET
-      path: /fck/editor/dialog/fck_spellerpages/spellerpages/server-scripts/spellchecker.php
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-  r7:
-    request:
-      method: GET
-      path: /fckeditor/editor/dialog/fck_spellerpages/spellerpages/server-scripts/spellcheckder.php
-    expression: response.body.bcontains(b'<title>FCKeditor') || response.body.bcontains(b'<title>CKEditor Samples</title>') || response.body.bcontains(b'http://ckeditor.com</a>') || response.body.bcontains(b'Custom Uploader URL:') || response.body.bcontains(b'init_spell()') || response.body.bcontains(b"'tip':'")
-expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7()
+expression: r0()
