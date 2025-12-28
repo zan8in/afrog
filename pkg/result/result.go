@@ -29,6 +29,8 @@ type PocResult struct {
 	ResultRequest  *proto.Request
 	ResultResponse *proto.Response
 	IsVul          bool
+	BruteTruncated bool
+	BruteRequests  int
 }
 
 func (pr *PocResult) ReadFullResultRequestInfo() string {
@@ -129,4 +131,6 @@ func (pr *PocResult) Reset() {
 	pr.IsVul = false
 	pr.ResultRequest = &proto.Request{}
 	pr.ResultResponse = &proto.Response{}
+	pr.BruteTruncated = false
+	pr.BruteRequests = 0
 }

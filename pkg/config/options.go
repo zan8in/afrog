@@ -141,6 +141,8 @@ type Options struct {
 
 	MaxRespBodySize int
 
+	BruteMaxRequests int
+
 	// afrog process count (target total × pocs total)
 	ProcessTotal uint32
 
@@ -254,6 +256,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),
 		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
 		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
+		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),

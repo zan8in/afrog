@@ -101,6 +101,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		isMatch := false
 		baseReq := cloneRuleRequest(rule.Request)
 		bruteCfg, bruteVars, bruteOrder := parseBrute(rule.Brute)
+		bruteTruncated := false
+		bruteRequests := 0
 
 		if len(bruteVars) == 0 {
 			rule.Request = cloneRuleRequest(baseReq)
@@ -126,10 +128,25 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			found := false
 			iterErr := error(nil)
 			lastAttemptSnapshot := map[string]savedVar(nil)
+			winnerSnapshot := map[string]savedVar(nil)
+			reqCount := 0
+			maxReq := 0
+			if c.Options != nil {
+				maxReq = c.Options.BruteMaxRequests
+			}
+			commit := strings.ToLower(strings.TrimSpace(bruteCfg.Commit))
+			if commit == "" {
+				commit = "winner"
+			}
 			for _, key := range bruteOrder {
 				c.CustomLib.UpdateCompileOption(key, decls.String)
 			}
 			forEachBrutePayload(bruteCfg, bruteVars, bruteOrder, func(payload map[string]string) bool {
+				if maxReq > 0 && reqCount >= maxReq {
+					bruteTruncated = true
+					return true
+				}
+				reqCount++
 				attemptSnapshot := snapshotVars(c.VariableMap, append([]string{"request", "response", "fulltarget", "target"}, bruteOrder...))
 
 				for _, key := range bruteOrder {
@@ -158,18 +175,26 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					if c.evalRuleMatch(&ruleAttempt, pocItem) {
 						found = true
 						isMatch = true
-						if bruteCfg.Commit == "" || strings.EqualFold(bruteCfg.Commit, "winner") || strings.EqualFold(bruteCfg.Commit, "last") {
+						if commit == "winner" || commit == "first" {
+							if winnerSnapshot == nil {
+								winnerSnapshot = snapshotVars(c.VariableMap, append([]string{"request", "response", "fulltarget", "target"}, bruteOrder...))
+							} else {
+								restoreVars(c.VariableMap, winnerSnapshot)
+							}
 							if !bruteCfg.Continue {
 								return true
 							}
-						} else if strings.EqualFold(bruteCfg.Commit, "first") {
+						} else if commit == "last" {
 							if !bruteCfg.Continue {
 								return true
 							}
-						} else if strings.EqualFold(bruteCfg.Commit, "none") {
+						} else if commit == "none" {
 							commitSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
 							restoreVars(c.VariableMap, attemptSnapshot)
 							restoreVars(c.VariableMap, commitSnapshot)
+							if !bruteCfg.Continue {
+								return true
+							}
 						}
 					} else {
 						restoreVars(c.VariableMap, attemptSnapshot)
@@ -181,12 +206,15 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				return false
 			})
 
+			bruteRequests = reqCount
 			if !found {
 				restoreVars(c.VariableMap, coreSnapshot)
 				if lastAttemptSnapshot != nil {
 					restoreVars(c.VariableMap, lastAttemptSnapshot)
 				}
 			}
+			c.VariableMap["__brute_truncated_"+k] = bruteTruncated
+			c.CustomLib.UpdateCompileOption("__brute_truncated_"+k, decls.Bool)
 			if iterErr != nil {
 				err = iterErr
 			}
@@ -202,7 +230,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.UpdateVariableMapExtractor(rule.Extractors)
 		}
 
-		pocRstTemp := result.PocResult{IsVul: isMatch}
+		pocRstTemp := result.PocResult{IsVul: isMatch, BruteTruncated: bruteTruncated, BruteRequests: bruteRequests}
 		if c.VariableMap["response"] != nil {
 			pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
 		}

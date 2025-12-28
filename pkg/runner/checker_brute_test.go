@@ -9,8 +9,8 @@ import (
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
-	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/proto"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"gopkg.in/yaml.v2"
 )
@@ -378,5 +378,290 @@ func TestCELUpdateCompileOptionDeduplicatesByName(t *testing.T) {
 	}
 	if got, ok := val.Value().(bool); !ok || !got {
 		t.Fatalf("expected true, got %#v", val)
+	}
+}
+
+func TestHTTPBruteCommitWinnerContinueKeepsFirstMatch(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 64,
+	})
+
+	var mu sync.Mutex
+	seen := make([]string, 0, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query().Get("u")
+		mu.Lock()
+		seen = append(seen, u)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		if u == "b" || u == "c" {
+			_, _ = w.Write([]byte("WIN-" + u))
+			return
+		}
+		_, _ = w.Write([]byte("NO"))
+	}))
+	defer srv.Close()
+
+	var pocYAML = []byte(`
+id: brute-commit-winner-continue
+info:
+  name: brute-commit-winner-continue
+  author: test
+  severity: info
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: true
+      user:
+        - a
+        - b
+        - c
+    request:
+      method: GET
+      path: /?u={{user}}
+    expression: response.status == 200 && response.body.bcontains(b"WIN")
+expression: r0()
+`)
+
+	pocItem := &poc.Poc{}
+	if err := yaml.Unmarshal(pocYAML, pocItem); err != nil {
+		t.Fatalf("unmarshal poc yaml: %v", err)
+	}
+
+	opt := &config.Options{
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 64,
+		MaxHostError:    3,
+	}
+	opt.Targets.Append(srv.URL)
+	opt.Targets.SetNum(srv.URL, ActiveTarget)
+
+	c := &Checker{
+		Options:     opt,
+		VariableMap: map[string]any{},
+		Result:      &result.Result{},
+		CustomLib:   NewCustomLib(),
+	}
+
+	if err := c.Check(srv.URL, pocItem); err != nil {
+		t.Fatalf("checker check error: %v", err)
+	}
+	if !c.Result.IsVul {
+		t.Fatalf("expected IsVul=true, got false")
+	}
+
+	if v, ok := c.VariableMap["user"].(string); !ok || v != "b" {
+		t.Fatalf("expected committed user=b, got %#v", c.VariableMap["user"])
+	}
+	resp, ok := c.VariableMap["response"].(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("expected response, got %#v", c.VariableMap["response"])
+	}
+	if string(resp.GetBody()) != "WIN-b" {
+		t.Fatalf("expected committed response WIN-b, got %q", string(resp.GetBody()))
+	}
+
+	mu.Lock()
+	got := append([]string(nil), seen...)
+	mu.Unlock()
+	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+		t.Fatalf("expected brute order [a b c], got %#v", got)
+	}
+}
+
+func TestHTTPBruteCommitLastContinueKeepsLastMatch(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 64,
+	})
+
+	var mu sync.Mutex
+	seen := make([]string, 0, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query().Get("u")
+		mu.Lock()
+		seen = append(seen, u)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		if u == "b" || u == "c" {
+			_, _ = w.Write([]byte("WIN-" + u))
+			return
+		}
+		_, _ = w.Write([]byte("NO"))
+	}))
+	defer srv.Close()
+
+	var pocYAML = []byte(`
+id: brute-commit-last-continue
+info:
+  name: brute-commit-last-continue
+  author: test
+  severity: info
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      mode: clusterbomb
+      commit: last
+      continue: true
+      user:
+        - a
+        - b
+        - c
+    request:
+      method: GET
+      path: /?u={{user}}
+    expression: response.status == 200 && response.body.bcontains(b"WIN")
+expression: r0()
+`)
+
+	pocItem := &poc.Poc{}
+	if err := yaml.Unmarshal(pocYAML, pocItem); err != nil {
+		t.Fatalf("unmarshal poc yaml: %v", err)
+	}
+
+	opt := &config.Options{
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 64,
+		MaxHostError:    3,
+	}
+	opt.Targets.Append(srv.URL)
+	opt.Targets.SetNum(srv.URL, ActiveTarget)
+
+	c := &Checker{
+		Options:     opt,
+		VariableMap: map[string]any{},
+		Result:      &result.Result{},
+		CustomLib:   NewCustomLib(),
+	}
+
+	if err := c.Check(srv.URL, pocItem); err != nil {
+		t.Fatalf("checker check error: %v", err)
+	}
+	if !c.Result.IsVul {
+		t.Fatalf("expected IsVul=true, got false")
+	}
+
+	if v, ok := c.VariableMap["user"].(string); !ok || v != "c" {
+		t.Fatalf("expected committed user=c, got %#v", c.VariableMap["user"])
+	}
+	resp, ok := c.VariableMap["response"].(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("expected response, got %#v", c.VariableMap["response"])
+	}
+	if string(resp.GetBody()) != "WIN-c" {
+		t.Fatalf("expected committed response WIN-c, got %q", string(resp.GetBody()))
+	}
+
+	mu.Lock()
+	got := append([]string(nil), seen...)
+	mu.Unlock()
+	if len(got) != 3 || got[0] != "a" || got[1] != "b" || got[2] != "c" {
+		t.Fatalf("expected brute order [a b c], got %#v", got)
+	}
+}
+
+func TestHTTPBruteMaxRequestsTruncates(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 64,
+	})
+
+	var mu sync.Mutex
+	seen := make([]string, 0, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query().Get("u")
+		mu.Lock()
+		seen = append(seen, u)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("NO"))
+	}))
+	defer srv.Close()
+
+	var pocYAML = []byte(`
+id: brute-max-requests-truncates
+info:
+  name: brute-max-requests-truncates
+  author: test
+  severity: info
+rules:
+  r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: true
+      user:
+        - a
+        - b
+        - c
+        - d
+    request:
+      method: GET
+      path: /?u={{user}}
+    expression: response.status == 200 && response.body.bcontains(b"NEVER")
+expression: r0()
+`)
+
+	pocItem := &poc.Poc{}
+	if err := yaml.Unmarshal(pocYAML, pocItem); err != nil {
+		t.Fatalf("unmarshal poc yaml: %v", err)
+	}
+
+	opt := &config.Options{
+		Timeout:          5,
+		Retries:          0,
+		MaxRespBodySize:  64,
+		MaxHostError:     3,
+		BruteMaxRequests: 2,
+	}
+	opt.Targets.Append(srv.URL)
+	opt.Targets.SetNum(srv.URL, ActiveTarget)
+
+	c := &Checker{
+		Options:     opt,
+		VariableMap: map[string]any{},
+		Result:      &result.Result{},
+		CustomLib:   NewCustomLib(),
+	}
+
+	if err := c.Check(srv.URL, pocItem); err != nil {
+		t.Fatalf("checker check error: %v", err)
+	}
+	if c.Result.IsVul {
+		t.Fatalf("expected IsVul=false, got true")
+	}
+
+	mu.Lock()
+	got := append([]string(nil), seen...)
+	mu.Unlock()
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("expected only first 2 brute requests [a b], got %#v", got)
+	}
+
+	if v, ok := c.VariableMap["__brute_truncated_r0"].(bool); !ok || !v {
+		t.Fatalf("expected __brute_truncated_r0=true, got %#v", c.VariableMap["__brute_truncated_r0"])
+	}
+
+	if len(c.Result.AllPocResult) != 1 {
+		t.Fatalf("expected 1 poc result, got %d", len(c.Result.AllPocResult))
+	}
+	if !c.Result.AllPocResult[0].BruteTruncated {
+		t.Fatalf("expected poc result brute truncated true, got false")
+	}
+	if c.Result.AllPocResult[0].BruteRequests != 2 {
+		t.Fatalf("expected brute requests 2, got %d", c.Result.AllPocResult[0].BruteRequests)
 	}
 }
