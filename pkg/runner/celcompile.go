@@ -216,8 +216,3 @@ func ReadComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
 	allEnvOptions = append(allEnvOptions, NewEnvOptions...)
 	return allEnvOptions
 }
-
-// 追加rule变量到 cel options
-func WriteRuleIsVulOptions(c CustomLib, key string, isVul bool) {
-	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(key+"()", decls.Bool)))
-}

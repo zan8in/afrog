@@ -6,9 +6,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"gopkg.in/yaml.v2"
 )
@@ -204,5 +206,177 @@ expression: r0() && r1()
 		if p == "/r1" {
 			t.Fatalf("expected r1 to be skipped, got request to /r1: %#v", got)
 		}
+	}
+}
+
+func TestHTTPBruteNoMatchKeepsLastResponse(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 32,
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query().Get("u")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("u=" + u))
+	}))
+	defer srv.Close()
+
+	var pocYAML = []byte(`
+id: brute-no-match-keeps-last-response
+info:
+  name: brute-no-match-keeps-last-response
+  author: test
+  severity: info
+rules:
+  r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      user:
+        - a
+        - b
+        - c
+    request:
+      method: GET
+      path: /?u={{user}}
+    expression: response.status == 200 && response.body.bcontains(b"NEVER")
+expression: r0()
+`)
+
+	pocItem := &poc.Poc{}
+	if err := yaml.Unmarshal(pocYAML, pocItem); err != nil {
+		t.Fatalf("unmarshal poc yaml: %v", err)
+	}
+
+	opt := &config.Options{
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 32,
+		MaxHostError:    3,
+	}
+	opt.Targets.Append(srv.URL)
+	opt.Targets.SetNum(srv.URL, ActiveTarget)
+
+	c := &Checker{
+		Options:     opt,
+		VariableMap: map[string]any{},
+		Result:      &result.Result{},
+		CustomLib:   NewCustomLib(),
+	}
+
+	if err := c.Check(srv.URL, pocItem); err != nil {
+		t.Fatalf("checker check error: %v", err)
+	}
+	if c.Result.IsVul {
+		t.Fatalf("expected IsVul=false, got true")
+	}
+
+	resp, ok := c.VariableMap["response"].(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("expected response to be kept, got %#v", c.VariableMap["response"])
+	}
+	if string(resp.GetBody()) != "u=c" {
+		t.Fatalf("expected last response body u=c, got %q", string(resp.GetBody()))
+	}
+}
+
+func TestHTTPBruteCommitNoneKeepsResponseButNotPayloadVars(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 32,
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u := r.URL.Query().Get("u")
+		w.WriteHeader(http.StatusOK)
+		if u == "b" {
+			_, _ = w.Write([]byte("WIN"))
+			return
+		}
+		_, _ = w.Write([]byte("NO"))
+	}))
+	defer srv.Close()
+
+	var pocYAML = []byte(`
+id: brute-commit-none
+info:
+  name: brute-commit-none
+  author: test
+  severity: info
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      mode: clusterbomb
+      commit: none
+      continue: false
+      user:
+        - a
+        - b
+        - c
+    request:
+      method: GET
+      path: /?u={{user}}
+    expression: response.status == 200 && response.body.bcontains(b"WIN")
+expression: r0()
+`)
+
+	pocItem := &poc.Poc{}
+	if err := yaml.Unmarshal(pocYAML, pocItem); err != nil {
+		t.Fatalf("unmarshal poc yaml: %v", err)
+	}
+
+	opt := &config.Options{
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 32,
+		MaxHostError:    3,
+	}
+	opt.Targets.Append(srv.URL)
+	opt.Targets.SetNum(srv.URL, ActiveTarget)
+
+	c := &Checker{
+		Options:     opt,
+		VariableMap: map[string]any{},
+		Result:      &result.Result{},
+		CustomLib:   NewCustomLib(),
+	}
+
+	if err := c.Check(srv.URL, pocItem); err != nil {
+		t.Fatalf("checker check error: %v", err)
+	}
+	if !c.Result.IsVul {
+		t.Fatalf("expected IsVul=true, got false")
+	}
+	if _, exists := c.VariableMap["user"]; exists {
+		t.Fatalf("expected brute payload var user to not be committed")
+	}
+
+	resp, ok := c.VariableMap["response"].(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("expected response to be kept, got %#v", c.VariableMap["response"])
+	}
+	if string(resp.GetBody()) != "WIN" {
+		t.Fatalf("expected response body WIN, got %q", string(resp.GetBody()))
+	}
+}
+
+func TestCELUpdateCompileOptionDeduplicatesByName(t *testing.T) {
+	lib := NewCustomLib()
+	lib.UpdateCompileOption("x", decls.String)
+	lib.UpdateCompileOption("x", decls.Int)
+
+	val, err := lib.RunEval("x + 1 == 2", map[string]any{"x": int64(1)})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got, ok := val.Value().(bool); !ok || !got {
+		t.Fatalf("expected true, got %#v", val)
 	}
 }

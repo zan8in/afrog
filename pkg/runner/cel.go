@@ -17,16 +17,57 @@ import (
 )
 
 type CustomLib struct {
-	envOptions     []cel.EnvOption
-	programOptions []cel.ProgramOption
+	baseEnvOptions     []cel.EnvOption
+	baseProgramOptions []cel.ProgramOption
+	varTypes           map[string]*exprpb.Type
+	ruleFuncs          map[string]bool
 }
 
 func (c *CustomLib) CompileOptions() []cel.EnvOption {
-	return c.envOptions
+	opts := make([]cel.EnvOption, 0, len(c.baseEnvOptions)+2)
+	opts = append(opts, c.baseEnvOptions...)
+
+	if len(c.varTypes) > 0 {
+		varDecls := make([]*exprpb.Decl, 0, len(c.varTypes))
+		for k, t := range c.varTypes {
+			varDecls = append(varDecls, decls.NewVar(k, t))
+		}
+		opts = append(opts, cel.Declarations(varDecls...))
+	}
+
+	if len(c.ruleFuncs) > 0 {
+		fnDecls := make([]*exprpb.Decl, 0, len(c.ruleFuncs))
+		for name := range c.ruleFuncs {
+			fnDecls = append(fnDecls, decls.NewFunction(name,
+				decls.NewOverload(name, []*exprpb.Type{}, decls.Bool),
+			))
+		}
+		opts = append(opts, cel.Declarations(fnDecls...))
+	}
+
+	return opts
 }
 
 func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
-	return c.programOptions
+	opts := make([]cel.ProgramOption, 0, len(c.baseProgramOptions)+1)
+	opts = append(opts, c.baseProgramOptions...)
+
+	if len(c.ruleFuncs) > 0 {
+		overloads := make([]*functions.Overload, 0, len(c.ruleFuncs))
+		for name, ret := range c.ruleFuncs {
+			fnName := name
+			fnRet := ret
+			overloads = append(overloads, &functions.Overload{
+				Operator: fnName,
+				Function: func(values ...ref.Val) ref.Val {
+					return types.Bool(fnRet)
+				},
+			})
+		}
+		opts = append(opts, cel.Functions(overloads...))
+	}
+
+	return opts
 }
 
 func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
@@ -65,10 +106,13 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.
 }
 
 func NewCustomLib() *CustomLib {
-	c := &CustomLib{}
+	c := &CustomLib{
+		varTypes:  make(map[string]*exprpb.Type),
+		ruleFuncs: make(map[string]bool),
+	}
 	reg := types.NewEmptyRegistry()
-	c.envOptions = ReadComplieOptions(reg)
-	c.programOptions = ReadProgramOptions(reg)
+	c.baseEnvOptions = ReadComplieOptions(reg)
+	c.baseProgramOptions = ReadProgramOptions(reg)
 	return c
 }
 
@@ -101,51 +145,40 @@ func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {
 		key := v.Key.(string)
 		value := v.Value
 
-		var d *exprpb.Decl
+		var t *exprpb.Type
 		switch vv := value.(type) {
 		case int64:
-			d = decls.NewVar(key, decls.Int)
+			t = decls.Int
 		case string:
 			if strings.HasPrefix(vv, "newReverse") {
-				d = decls.NewVar(key, decls.NewObjectType("proto.Reverse"))
+				t = decls.NewObjectType("proto.Reverse")
 			} else if strings.HasPrefix(vv, "newOOB") {
-				d = decls.NewVar(key, decls.NewObjectType("proto.OOB"))
+				t = decls.NewObjectType("proto.OOB")
 			} else if strings.HasPrefix(vv, "randomInt") {
-				d = decls.NewVar(key, decls.Int)
+				t = decls.Int
 			} else {
-				d = decls.NewVar(key, decls.String)
+				t = decls.String
 			}
 		case map[string]string:
-			d = decls.NewVar(key, StrStrMapType)
+			t = StrStrMapType
 		default:
-			d = decls.NewVar(key, decls.String)
+			t = decls.String
 		}
-		c.envOptions = append(c.envOptions, cel.Declarations(d))
+		c.UpdateCompileOption(key, t)
 	}
 }
 
 func (c *CustomLib) WriteRuleFunctionsROptions(funcName string, returnBool bool) {
-	c.envOptions = append(c.envOptions, cel.Declarations(
-		decls.NewFunction(funcName,
-			decls.NewOverload(funcName,
-				[]*exprpb.Type{},
-				decls.Bool)),
-	),
-	)
-
-	c.programOptions = append(c.programOptions, cel.Functions(
-		&functions.Overload{
-			Operator: funcName,
-			Function: func(values ...ref.Val) ref.Val {
-				return types.Bool(returnBool)
-			},
-		}))
+	c.ruleFuncs[funcName] = returnBool
 }
 
 func (c *CustomLib) UpdateCompileOption(k string, t *exprpb.Type) {
-	c.envOptions = append(c.envOptions, cel.Declarations(decls.NewVar(k, t)))
+	if c.varTypes == nil {
+		c.varTypes = make(map[string]*exprpb.Type)
+	}
+	c.varTypes[k] = t
 }
 
 func (c *CustomLib) Reset() {
-	*c = CustomLib{}
+	*c = *NewCustomLib()
 }

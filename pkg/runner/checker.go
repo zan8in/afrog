@@ -125,6 +125,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 
 			found := false
 			iterErr := error(nil)
+			lastAttemptSnapshot := map[string]savedVar(nil)
 			for _, key := range bruteOrder {
 				c.CustomLib.UpdateCompileOption(key, decls.String)
 			}
@@ -152,6 +153,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					iterErr = exec.Execute(target, ruleAttempt, c.Options, c.VariableMap)
 				}
 
+				lastAttemptSnapshot = snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
 				if iterErr == nil {
 					if c.evalRuleMatch(&ruleAttempt, pocItem) {
 						found = true
@@ -165,7 +167,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 								return true
 							}
 						} else if strings.EqualFold(bruteCfg.Commit, "none") {
+							commitSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
 							restoreVars(c.VariableMap, attemptSnapshot)
+							restoreVars(c.VariableMap, commitSnapshot)
 						}
 					} else {
 						restoreVars(c.VariableMap, attemptSnapshot)
@@ -179,6 +183,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 
 			if !found {
 				restoreVars(c.VariableMap, coreSnapshot)
+				if lastAttemptSnapshot != nil {
+					restoreVars(c.VariableMap, lastAttemptSnapshot)
+				}
 			}
 			if iterErr != nil {
 				err = iterErr

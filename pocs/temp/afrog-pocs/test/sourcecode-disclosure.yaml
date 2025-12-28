@@ -35,7 +35,6 @@ rules:
       path: "{{file}}"
     expression: |
       (response.status == 200 || response.status == 206) &&
-      response.body.bcontains(b"<?php") &&
-      !response.headers["content-type"].icontains("text/html")
+      response.body.bcontains(b"<?php")
 
 expression: r0()
