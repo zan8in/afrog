@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,17 @@ type Checker struct {
 	VariableMap map[string]any
 	Result      *result.Result
 	CustomLib   *CustomLib
+}
+
+type bruteConfig struct {
+	Mode     string
+	Continue bool
+	Commit   string
+}
+
+type savedVar struct {
+	value  any
+	exists bool
 }
 
 func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
@@ -86,44 +98,90 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
 
-		// 预处理：让 rules 的 path/headers/body/host/raw/data 支持 {{...}} CEL 运算
-		c.preRenderRuleRequest(&rule.Request)
-
 		isMatch := false
-		reqType := strings.ToLower(rule.Request.Type)
+		baseReq := cloneRuleRequest(rule.Request)
+		bruteCfg, bruteVars, bruteOrder := parseBrute(rule.Brute)
 
-		if len(rule.Request.Raw) > 0 {
-			err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
-		} else {
-			exec, ok := executors[reqType]
-			if !ok {
-				exec = HTTPExecutor{}
+		if len(bruteVars) == 0 {
+			rule.Request = cloneRuleRequest(baseReq)
+			c.preRenderRuleRequest(&rule.Request)
+
+			reqType := strings.ToLower(rule.Request.Type)
+			if len(rule.Request.Raw) > 0 {
+				err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
+			} else {
+				exec, ok := executors[reqType]
+				if !ok {
+					exec = HTTPExecutor{}
+				}
+				err = exec.Execute(target, rule, c.Options, c.VariableMap)
 			}
-			err = exec.Execute(target, rule, c.Options, c.VariableMap)
-		}
 
-		if err == nil {
-			if len(rule.Expressions) > 0 {
-				// multiple expressions
-				for _, expression := range rule.Expressions {
-					evalResult, err := c.CustomLib.RunEval(expression, c.VariableMap)
-					if err == nil {
-						isMatch = evalResult.Value().(bool)
-						if isMatch {
-							if name := checkExpression(expression); len(name) > 0 {
-								pocItem.Id = name
-								pocItem.Info.Name = name
-							}
-							break
-						}
+			if err == nil {
+				isMatch = c.evalRuleMatch(&rule, pocItem)
+			}
+		} else {
+			coreSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
+
+			found := false
+			iterErr := error(nil)
+			for _, key := range bruteOrder {
+				c.CustomLib.UpdateCompileOption(key, decls.String)
+			}
+			forEachBrutePayload(bruteCfg, bruteVars, bruteOrder, func(payload map[string]string) bool {
+				attemptSnapshot := snapshotVars(c.VariableMap, append([]string{"request", "response", "fulltarget", "target"}, bruteOrder...))
+
+				for _, key := range bruteOrder {
+					if v, ok := payload[key]; ok {
+						c.VariableMap[key] = v
 					}
 				}
-			} else {
-				// single expression
-				evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
-				if err == nil {
-					isMatch = evalResult.Value().(bool)
+
+				ruleAttempt := rule
+				ruleAttempt.Request = cloneRuleRequest(baseReq)
+				c.preRenderRuleRequest(&ruleAttempt.Request)
+
+				reqType := strings.ToLower(ruleAttempt.Request.Type)
+				if len(ruleAttempt.Request.Raw) > 0 {
+					iterErr = RawHTTPExecutor{}.Execute(target, ruleAttempt, c.Options, c.VariableMap)
+				} else {
+					exec, ok := executors[reqType]
+					if !ok {
+						exec = HTTPExecutor{}
+					}
+					iterErr = exec.Execute(target, ruleAttempt, c.Options, c.VariableMap)
 				}
+
+				if iterErr == nil {
+					if c.evalRuleMatch(&ruleAttempt, pocItem) {
+						found = true
+						isMatch = true
+						if bruteCfg.Commit == "" || strings.EqualFold(bruteCfg.Commit, "winner") || strings.EqualFold(bruteCfg.Commit, "last") {
+							if !bruteCfg.Continue {
+								return true
+							}
+						} else if strings.EqualFold(bruteCfg.Commit, "first") {
+							if !bruteCfg.Continue {
+								return true
+							}
+						} else if strings.EqualFold(bruteCfg.Commit, "none") {
+							restoreVars(c.VariableMap, attemptSnapshot)
+						}
+					} else {
+						restoreVars(c.VariableMap, attemptSnapshot)
+					}
+				} else {
+					restoreVars(c.VariableMap, attemptSnapshot)
+				}
+
+				return false
+			})
+
+			if !found {
+				restoreVars(c.VariableMap, coreSnapshot)
+			}
+			if iterErr != nil {
+				err = iterErr
 			}
 		}
 
@@ -194,6 +252,184 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	c.Result.IsVul = isVul.Value().(bool)
 
 	return err
+}
+
+func cloneRuleRequest(req poc.RuleRequest) poc.RuleRequest {
+	out := req
+	if req.Headers != nil {
+		h := make(map[string]string, len(req.Headers))
+		for k, v := range req.Headers {
+			h[k] = v
+		}
+		out.Headers = h
+	}
+	return out
+}
+
+func snapshotVars(variableMap map[string]any, keys []string) map[string]savedVar {
+	out := make(map[string]savedVar, len(keys))
+	for _, k := range keys {
+		v, ok := variableMap[k]
+		out[k] = savedVar{value: v, exists: ok}
+	}
+	return out
+}
+
+func restoreVars(variableMap map[string]any, snapshot map[string]savedVar) {
+	for k, sv := range snapshot {
+		if sv.exists {
+			variableMap[k] = sv.value
+		} else {
+			delete(variableMap, k)
+		}
+	}
+}
+
+func parseBrute(brute yaml.MapSlice) (bruteConfig, map[string][]string, []string) {
+	cfg := bruteConfig{Mode: "clusterbomb", Commit: "winner"}
+	vars := map[string][]string{}
+	order := make([]string, 0, len(brute))
+
+	for _, item := range brute {
+		key, ok := item.Key.(string)
+		if !ok {
+			continue
+		}
+		kLower := strings.ToLower(strings.TrimSpace(key))
+
+		switch v := item.Value.(type) {
+		case bool:
+			if kLower == "continue" {
+				cfg.Continue = v
+				continue
+			}
+		case int:
+			if kLower == "continue" {
+				cfg.Continue = v != 0
+				continue
+			}
+		case int64:
+			if kLower == "continue" {
+				cfg.Continue = v != 0
+				continue
+			}
+		case string:
+			if kLower == "mode" {
+				cfg.Mode = strings.ToLower(strings.TrimSpace(v))
+				continue
+			}
+			if kLower == "commit" {
+				cfg.Commit = strings.ToLower(strings.TrimSpace(v))
+				continue
+			}
+			if kLower == "continue" {
+				b, _ := strconv.ParseBool(strings.TrimSpace(v))
+				cfg.Continue = b
+				continue
+			}
+		case []any:
+			list := make([]string, 0, len(v))
+			for _, it := range v {
+				if it == nil {
+					continue
+				}
+				list = append(list, fmt.Sprintf("%v", it))
+			}
+			if len(list) > 0 {
+				vars[key] = list
+				order = append(order, key)
+			}
+		case []string:
+			if len(v) > 0 {
+				vars[key] = append([]string{}, v...)
+				order = append(order, key)
+			}
+		}
+	}
+
+	return cfg, vars, order
+}
+
+func forEachBrutePayload(cfg bruteConfig, vars map[string][]string, order []string, fn func(map[string]string) bool) {
+	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
+	if mode == "" {
+		mode = "clusterbomb"
+	}
+	if len(order) == 0 {
+		return
+	}
+
+	if mode == "pitchfork" {
+		minLen := -1
+		for _, k := range order {
+			l := len(vars[k])
+			if l <= 0 {
+				return
+			}
+			if minLen == -1 || l < minLen {
+				minLen = l
+			}
+		}
+		for i := 0; i < minLen; i++ {
+			payload := make(map[string]string, len(order))
+			for _, k := range order {
+				payload[k] = vars[k][i]
+			}
+			if fn(payload) {
+				return
+			}
+		}
+		return
+	}
+
+	payload := make(map[string]string, len(order))
+	var walk func(idx int) bool
+	walk = func(idx int) bool {
+		if idx >= len(order) {
+			return fn(payload)
+		}
+		key := order[idx]
+		list := vars[key]
+		for _, v := range list {
+			payload[key] = v
+			if walk(idx + 1) {
+				return true
+			}
+		}
+		return false
+	}
+	_ = walk(0)
+}
+
+func (c *Checker) evalRuleMatch(rule *poc.Rule, pocItem *poc.Poc) bool {
+	if rule == nil {
+		return false
+	}
+
+	if len(rule.Expressions) > 0 {
+		for _, expression := range rule.Expressions {
+			evalResult, err := c.CustomLib.RunEval(expression, c.VariableMap)
+			if err == nil {
+				isMatch := evalResult.Value().(bool)
+				if isMatch {
+					if name := checkExpression(expression); len(name) > 0 {
+						pocItem.Id = name
+						pocItem.Info.Name = name
+					}
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
+	if err == nil {
+		if v, ok := evalResult.Value().(bool); ok {
+			return v
+		}
+	}
+	return false
 }
 
 func (c *Checker) checkURL(target string) (string, error) {
