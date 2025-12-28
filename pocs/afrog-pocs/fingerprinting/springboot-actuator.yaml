@@ -10,63 +10,24 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      p:
+        - /actuator
+        - /api/actuator
+        - /nacos/actuator
+        - /prod-api/actuator
+        - /dev-api/actuator
+        - /actuato%72
+        - /api/actuato%72
+        - /nacos/actuato%72
+        - /prod-api/actuato%72
+        - /dev-api/actuato%72
     request:
       method: GET
-      path: /actuator
+      path: "{{p}}"
     expression: |
       response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r1:
-    request:
-      method: GET
-      path: /api/actuator
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r2:
-    request:
-      method: GET
-      path: /nacos/actuator
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r3:
-    request:
-      method: GET
-      path: /prod-api/actuator
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r4:
-    request:
-      method: GET
-      path: /dev-api/actuator
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r00:
-    request:
-      method: GET
-      path: /actuato%72
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r01:
-    request:
-      method: GET
-      path: /api/actuato%72
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r02:
-    request:
-      method: GET
-      path: /nacos/actuato%72
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r03:
-    request:
-      method: GET
-      path: /prod-api/actuato%72
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-  r04:
-    request:
-      method: GET
-      path: /dev-api/actuato%72
-    expression: |
-      response.status == 200 && response.body.bcontains(b'"_links":') && response.body.bcontains(b'"self":') && response.body.bcontains(b'"health"')
-expression: r0() || r1() || r2() || r3() || r4() || r00() || r01() || r02() || r03() || r04()
+expression: r0()

