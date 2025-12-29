@@ -13,7 +13,6 @@ info:
 
 rules:
   r0:
-    stop_if_match: true
     brute:
       mode: clusterbomb
       commit: winner
