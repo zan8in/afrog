@@ -11,13 +11,13 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"154.92.66.253/24"}
-	opts.Ports = "top-100" // Test prioritized full scan
+	opts.Targets = []string{"183.196.31.51"}
+	opts.Ports = "full" // Test prioritized full scan
 	opts.RateLimit = 500
 	opts.Timeout = 1000 * time.Millisecond
 	opts.Retries = 2
-	opts.Debug = false
-	opts.SkipDiscovery = false
+	opts.Debug = true
+	opts.SkipDiscovery = true
 	opts.DiscoveryUDPEnabled = true
 	opts.DiscoveryUDPPorts = []int{53, 161}
 	// opts.Proxy = "http://127.0.0.1:51024"

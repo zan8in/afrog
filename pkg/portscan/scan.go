@@ -235,6 +235,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		go func() {
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()
+			lastPercent := -1
 			for {
 				select {
 				case <-ctx.Done():
@@ -245,7 +246,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 						// Wait for main thread to print 100% and stats
 						return
 					}
-					fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %.2f%%", curr, total, float64(curr)/float64(total)*100)
+					percent := int(float64(curr) * 100 / float64(total))
+					if percent != lastPercent {
+						fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %.2f%%", curr, total, float64(percent))
+						lastPercent = percent
+					}
 				}
 			}
 		}()
@@ -429,6 +434,9 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	// Callback
 	if s.options.OnResult != nil {
+		if s.options.Debug {
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		}
 		s.options.OnResult(result)
 	}
 }
