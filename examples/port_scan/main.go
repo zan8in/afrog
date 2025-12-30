@@ -16,7 +16,7 @@ func main() {
 	opts.RateLimit = 500
 	opts.Timeout = 1000 * time.Millisecond
 	opts.Retries = 2
-	opts.Debug = true
+	opts.Debug = false
 	opts.SkipDiscovery = false
 	opts.DiscoveryUDPEnabled = true
 	opts.DiscoveryUDPPorts = []int{53, 161}

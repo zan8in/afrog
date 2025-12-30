@@ -134,9 +134,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Pre-scan Host Discovery (for CIDR/List optimization)
 	// If we have more than 1 host, let's filter dead ones first
 	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
-		if s.options.Debug {
-			fmt.Fprintf(os.Stderr, "Phase 1: Host Discovery (Ping Sweep)...\n")
-		}
+		fmt.Fprintf(os.Stderr, "Phase 1: Host Discovery (Ping Sweep)...\n")
 
 		// Use high concurrency for discovery
 		aliveHosts := make([]string, 0)
@@ -220,9 +218,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 		discWg.Wait()
 
-		if s.options.Debug {
-			fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), totalOriginal)
-		}
+		fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), totalOriginal)
 
 		// Single-pass layered discovery done above; no multi-pass fallback loops
 
@@ -340,14 +336,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 
 	wg.Wait()
 
-	if s.options.Debug {
-		fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
-		fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
-		fmt.Fprintf(os.Stderr, "  - Total Targets: %d\n", hostIter.Total())
-		fmt.Fprintf(os.Stderr, "  - Total Ports:   %d\n", total)
-		fmt.Fprintf(os.Stderr, "  - Open Ports:    %d\n", atomic.LoadUint64(&s.resultsCount))
-		fmt.Fprintf(os.Stderr, "  - Duration:      %s\n", time.Since(startTime))
-	}
+	fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
+	fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
+	fmt.Fprintf(os.Stderr, "  - Total Targets: %d\n", hostIter.Total())
+	fmt.Fprintf(os.Stderr, "  - Total Ports:   %d\n", total)
+	fmt.Fprintf(os.Stderr, "  - Open Ports:    %d\n", atomic.LoadUint64(&s.resultsCount))
+	fmt.Fprintf(os.Stderr, "  - Duration:      %s\n", time.Since(startTime))
 
 	return nil
 }
