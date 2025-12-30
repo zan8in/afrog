@@ -27,6 +27,7 @@ type Scanner struct {
 	currentProgress   uint64
 	resultsCount      uint64
 	dialer            proxy.Dialer
+	adaptiveDelay     int32 // Current delay in milliseconds
 }
 
 // NewScanner creates a new scanner instance
@@ -187,11 +188,38 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		portIter.Reset()
 		for {
 			// Check for high error rate (Adaptive Mode)
-			if atomic.LoadInt32(&s.consecutiveErrors) > 20 {
-				if s.options.Debug {
-					gologger.Warning().Msgf("High error rate detected (%d consecutive errors). Pausing for 100ms...", atomic.LoadInt32(&s.consecutiveErrors))
+			// Dynamic Rate Adjustment:
+			// 1. If errors > 20, increase delay significantly (up to 1s)
+			// 2. If errors > 5, increase delay slightly
+			// 3. If NO errors for a while (successes), decrease delay (recover speed)
+
+			errCount := atomic.LoadInt32(&s.consecutiveErrors)
+			currentDelay := atomic.LoadInt32(&s.adaptiveDelay)
+
+			if errCount > 20 {
+				// Severe network congestion or block
+				newDelay := currentDelay + 100
+				if newDelay > 1000 {
+					newDelay = 1000
 				}
-				time.Sleep(100 * time.Millisecond)
+				atomic.StoreInt32(&s.adaptiveDelay, newDelay)
+
+				if s.options.Debug && errCount%10 == 0 { // Don't spam logs
+					gologger.Warning().Msgf("High error rate (%d). Increasing delay to %dms", errCount, newDelay)
+				}
+				time.Sleep(time.Duration(newDelay) * time.Millisecond)
+			} else if errCount > 5 {
+				// Mild congestion
+				atomic.CompareAndSwapInt32(&s.adaptiveDelay, 0, 10) // Init delay if 0
+				time.Sleep(time.Duration(atomic.LoadInt32(&s.adaptiveDelay)) * time.Millisecond)
+			} else {
+				// Healthy network, try to recover speed
+				if currentDelay > 0 && atomic.LoadUint64(&s.currentProgress)%50 == 0 {
+					atomic.AddInt32(&s.adaptiveDelay, -10)
+					if atomic.LoadInt32(&s.adaptiveDelay) < 0 {
+						atomic.StoreInt32(&s.adaptiveDelay, 0)
+					}
+				}
 			}
 
 			port, ok := portIter.Next()
