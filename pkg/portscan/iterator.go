@@ -23,19 +23,30 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 	}
 
 	// Handle special keywords
-	if portStr == "full" || portStr == "all" {
-		portStr = "1-65535"
-	}
 	if portStr == "top-100" {
-		// Top 100 common ports
-		ports = []int{
-			80, 443, 8080, 8443, 22, 21, 23, 25, 53, 110, 143, 389, 445, 3389, 135, 139, 8000, 8081, 9090,
-			3306, 5432, 6379, 27017, 1433, 1521, 2181, 9200, 11211, 5672, 5900, 5000, 8888, 2222, 2375,
-			8008, 8009, 8090, 8161, 8181, 9000, 10000, 4567, 1234, 5001, 5002, 5003, 5004, 5005, 5006, 5007,
-			5008, 5009, 5010, 7001, 7002, 7070, 7071, 7100, 7547, 8001, 8002, 8003, 8004, 8005, 8006, 8007,
-			8010, 8020, 8030, 8040, 8050, 8060, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8091, 8092,
-			8093, 8094, 8095, 8096, 8097, 8098, 8099, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+		ports = getTop100Ports()
+		return &PortIterator{ports: ports}, nil
+	}
+
+	if portStr == "full" || portStr == "all" {
+		// Priority Scan Strategy:
+		// 1. Scan Top 100 ports first (High Priority)
+		// 2. Scan the rest (Low Priority)
+
+		topPorts := getTop100Ports()
+		topPortsMap := make(map[int]bool)
+		for _, p := range topPorts {
+			topPortsMap[p] = true
+			ports = append(ports, p)
 		}
+
+		// Append remaining ports (1-65535)
+		for i := 1; i <= 65535; i++ {
+			if !topPortsMap[i] {
+				ports = append(ports, i)
+			}
+		}
+
 		return &PortIterator{ports: ports}, nil
 	}
 
@@ -68,6 +79,17 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 	ports = removeDuplicateInt(ports)
 
 	return &PortIterator{ports: ports}, nil
+}
+
+func getTop100Ports() []int {
+	return []int{
+		80, 443, 8080, 8443, 22, 21, 23, 25, 53, 110, 143, 389, 445, 3389, 135, 139, 8000, 8081, 9090,
+		3306, 5432, 6379, 27017, 1433, 1521, 2181, 9200, 11211, 5672, 5900, 5000, 8888, 2222, 2375,
+		8008, 8009, 8090, 8161, 8181, 9000, 10000, 4567, 1234, 5001, 5002, 5003, 5004, 5005, 5006, 5007,
+		5008, 5009, 5010, 7001, 7002, 7070, 7071, 7100, 7547, 8001, 8002, 8003, 8004, 8005, 8006, 8007,
+		8010, 8020, 8030, 8040, 8050, 8060, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 8091, 8092,
+		8093, 8094, 8095, 8096, 8097, 8098, 8099, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+	}
 }
 
 func removeDuplicateInt(intSlice []int) []int {

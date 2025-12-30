@@ -150,7 +150,25 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 	address := fmt.Sprintf("%s:%d", host, port)
 
 	// Basic Connect Scan
-	conn, err := net.DialTimeout("tcp", address, s.options.Timeout)
+	var conn net.Conn
+	var err error
+
+	for i := 0; i <= s.options.Retries; i++ {
+		conn, err = net.DialTimeout("tcp", address, s.options.Timeout)
+		if err == nil {
+			break
+		}
+		// If timeout, maybe retry (but usually timeout is long enough).
+		// If refused, no need to retry.
+		if strings.Contains(err.Error(), "refused") {
+			break
+		}
+		// For other errors or timeout, if we have retries left, wait a bit
+		if i < s.options.Retries {
+			time.Sleep(time.Duration(200*(i+1)) * time.Millisecond)
+		}
+	}
+
 	if err != nil {
 		// Only increment consecutiveErrors if it's NOT a standard port closed/filtered error.
 		// "refused" means port is closed (host is up).

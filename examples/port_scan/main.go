@@ -11,10 +11,11 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"221.194.144.136"} // Test targets
-	opts.Ports = "full"                        //"22,80,443,445,3389"          // Test ports
-	opts.RateLimit = 500
-	opts.Timeout = 3000 * time.Millisecond
+	opts.Targets = []string{"scanme.nmap.org"}
+	opts.Ports = "full" // Test prioritized full scan
+	opts.RateLimit = 1000
+	opts.Timeout = 800 * time.Millisecond
+	opts.Retries = 2
 	opts.Debug = true
 
 	// 2. Setup Callback
