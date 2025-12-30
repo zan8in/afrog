@@ -11,15 +11,16 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"154.92.77.253"}
+	opts.Targets = []string{"154.92.66.253/24"}
 	opts.Ports = "full" // Test prioritized full scan
 	opts.RateLimit = 500
 	opts.Timeout = 1000 * time.Millisecond
 	opts.Retries = 2
 	opts.Debug = true
-	// opts.Proxy = "socks5://127.0.0.1:20170"
-	// opts.RateLimit = 2000                 // Test high rate to trigger adaptive logic
-	// opts.Timeout = 800 * time.Millisecond // Relaxed timeout for honeypot or slow networks
+	opts.SkipDiscovery = false
+	opts.DiscoveryUDPEnabled = true
+	opts.DiscoveryUDPPorts = []int{53, 161}
+	// opts.Proxy = "http://127.0.0.1:51024"
 
 	// 2. Setup Callback
 	opts.OnResult = func(result *portscan.ScanResult) {

@@ -131,6 +131,104 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
 	hostIter := NewHostIterator(s.options.Targets)
 
+	// Pre-scan Host Discovery (for CIDR/List optimization)
+	// If we have more than 1 host, let's filter dead ones first
+	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
+		if s.options.Debug {
+			fmt.Fprintf(os.Stderr, "Phase 1: Host Discovery (Ping Sweep)...\n")
+		}
+
+		// Use high concurrency for discovery
+		aliveHosts := make([]string, 0)
+		var mu sync.Mutex
+		var discWg sync.WaitGroup
+		aliveSet := make(map[string]struct{})
+		origHosts := hostIter.GetHosts()
+		totalOriginal := len(origHosts)
+
+		var primaryPorts []int
+		if len(s.options.DiscoveryPorts) > 0 {
+			primaryPorts = s.options.DiscoveryPorts
+		} else {
+			primaryPorts = []int{443, 80, 22, 3389}
+		}
+		fallbackPorts := []int{21, 25, 502, 102, 123, 135, 445}
+
+		// Temporary pool for discovery
+		// Use user-defined RateLimit to avoid triggering firewalls with hardcoded high concurrency
+		limit := s.options.RateLimit
+		if limit < 100 {
+			limit = 100 // Ensure at least some concurrency for discovery
+		}
+		discPool, _ := ants.NewPoolWithFunc(limit, func(i interface{}) {
+			host := i.(string)
+			defer discWg.Done()
+			isAlive := false
+			// Layer 1: primary TCP ports
+			for _, p := range primaryPorts {
+				conn, err := s.checkPortOpen(host, p)
+				if err == nil {
+					conn.Close()
+					isAlive = true
+					fmt.Printf("[+] Alive host: %s\n", host)
+					break
+				}
+			}
+			// Layer 2: fallback TCP ports (only if not alive yet)
+			if !isAlive && s.options.DiscoveryFallback {
+				for _, p := range fallbackPorts {
+					conn, err := s.checkPortOpen(host, p)
+					if err == nil {
+						conn.Close()
+						isAlive = true
+						fmt.Printf("[+] Alive host: %s\n", host)
+						break
+					}
+				}
+			}
+			// Layer 3: UDP ports (only if not alive yet)
+			if !isAlive && s.options.DiscoveryUDPEnabled {
+				udpPorts := s.options.DiscoveryUDPPorts
+				if len(udpPorts) == 0 {
+					udpPorts = []int{53, 161}
+				}
+				for _, p := range udpPorts {
+					if s.checkUDPAlive(host, p) {
+						isAlive = true
+						fmt.Printf("[+] Alive host: %s\n", host)
+						break
+					}
+				}
+			}
+			if isAlive {
+				mu.Lock()
+				if _, ok := aliveSet[host]; !ok {
+					aliveSet[host] = struct{}{}
+					aliveHosts = append(aliveHosts, host)
+				}
+				mu.Unlock()
+			}
+		})
+		defer discPool.Release()
+
+		for _, host := range origHosts {
+			discWg.Add(1)
+			discPool.Invoke(host)
+		}
+		discWg.Wait()
+
+		if s.options.Debug {
+			fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), totalOriginal)
+		}
+
+		// Single-pass layered discovery done above; no multi-pass fallback loops
+
+		hostIter = NewHostIterator(aliveHosts)
+	}
+
+	// Shuffle hosts to avoid sequential scanning detection
+	hostIter.Shuffle()
+
 	total := hostIter.Total() * portIter.Total()
 	startTime := time.Now()
 
@@ -256,25 +354,18 @@ type scanTask struct {
 	port int
 }
 
-func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
+// checkPortOpen attempts to establish a connection to the target
+// It handles proxy, timeout, and retries.
+// Returns the open connection (if successful) or error.
+// Caller is responsible for closing the connection.
+func (s *Scanner) checkPortOpen(host string, port int) (net.Conn, error) {
 	address := fmt.Sprintf("%s:%d", host, port)
-
-	// Basic Connect Scan
 	var conn net.Conn
 	var err error
 
 	for i := 0; i <= s.options.Retries; i++ {
 		if s.dialer != nil {
-			// Use proxy dialer
-			// Note: proxy.Dialer interface typically has Dial(network, addr string) (net.Conn, error)
-			// It doesn't always support timeout directly in Dial.
-			// However, we can wrap it or just rely on the proxy's internal timeout if any.
-			// Ideally we would use a ContextDialer if available, but x/net/proxy is basic.
-			// For simplicity and timeout support, we can try to use a channel or just use the dialer.
-			// But DialTimeout is better. Let's see if we can cast or use a helper.
-			// Most simple SOCKS5 proxies support basic Dial.
-			// To implement Timeout with Proxy, we can use a goroutine race.
-
+			// Proxy Dialing
 			type dialRes struct {
 				c net.Conn
 				e error
@@ -292,39 +383,42 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 				err = fmt.Errorf("timeout")
 			}
 		} else {
+			// Direct Dialing
 			conn, err = net.DialTimeout("tcp", address, s.options.Timeout)
 		}
 
 		if err == nil {
-			break
+			return conn, nil
 		}
-		// If timeout, maybe retry (but usually timeout is long enough).
-		// If refused, no need to retry.
+
+		// Retry logic
 		if strings.Contains(err.Error(), "refused") {
-			break
+			return nil, err // Connection refused usually means host is up but port closed
 		}
-		// For other errors or timeout, if we have retries left, wait a bit
+
 		if i < s.options.Retries {
 			time.Sleep(time.Duration(200*(i+1)) * time.Millisecond)
 		}
 	}
+	return nil, err
+}
+
+func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
+	// 1. Check if port is open using shared logic
+	conn, err := s.checkPortOpen(host, port)
 
 	if err != nil {
-		// Only increment consecutiveErrors if it's NOT a standard port closed/filtered error.
-		// "refused" means port is closed (host is up).
-		// "timeout" means port is filtered (firewall) or host is down.
-		// We only want to slow down if there are system resource issues or other unexpected errors.
+		// Error handling and adaptive rate limiting logic...
 		errStr := err.Error()
 		if !strings.Contains(errStr, "refused") && !os.IsTimeout(err) {
 			atomic.AddInt32(&s.consecutiveErrors, 1)
 		} else {
-			// If it's just a closed/filtered port, we might want to reset the counter
-			// or at least not increment it.
-			// Resetting it ensures we only throttle on burst system errors.
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
 		}
-		return // Closed or filtered
+		return
 	}
+
+	// Connection successful
 	atomic.StoreInt32(&s.consecutiveErrors, 0)
 	defer conn.Close()
 
@@ -337,7 +431,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 		State: PortStateOpen,
 	}
 
-	// Service Detection (Simple Banner Grabbing)
+	// 2. Service Detection (Simple Banner Grabbing)
 	// We set a deadline for reading
 	conn.SetReadDeadline(time.Now().Add(time.Second * 2))
 
@@ -378,4 +472,42 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 func cleanBanner(banner string) string {
 	// Remove newlines and non-printable chars
 	return strings.TrimSpace(banner)
+}
+
+func (s *Scanner) checkUDPAlive(host string, port int) bool {
+	timeout := s.options.Timeout
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
+	if err != nil {
+		return false
+	}
+	conn, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	var payload []byte
+	switch port {
+	case 53:
+		// DNS query: id=0x1234, standard query, QD=1, query example.com A
+		payload = []byte{
+			0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e',
+			0x03, 'c', 'o', 'm', 0x00,
+			0x00, 0x01, 0x00, 0x01,
+		}
+	case 123:
+		b := make([]byte, 48)
+		b[0] = 0x1B
+		payload = b
+	default:
+		return false
+	}
+	if _, err := conn.Write(payload); err != nil {
+		return false
+	}
+	buf := make([]byte, 512)
+	n, _ := conn.Read(buf)
+	return n > 0
 }

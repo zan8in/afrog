@@ -2,6 +2,7 @@ package portscan
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"strconv"
 	"strings"
@@ -131,6 +132,11 @@ type HostIterator struct {
 	index int
 }
 
+func (hi *HostIterator) Reset() {
+	hi.index = 0
+}
+
+// NewHostIterator creates a new iterator from a list of targets
 func NewHostIterator(targets []string) *HostIterator {
 	var expandedHosts []string
 	for _, t := range targets {
@@ -164,6 +170,17 @@ func (hi *HostIterator) Next() (string, bool) {
 	host := hi.hosts[hi.index]
 	hi.index++
 	return host, true
+}
+
+func (hi *HostIterator) Shuffle() {
+	rand.Shuffle(len(hi.hosts), func(i, j int) {
+		hi.hosts[i], hi.hosts[j] = hi.hosts[j], hi.hosts[i]
+	})
+	hi.index = 0
+}
+
+func (hi *HostIterator) GetHosts() []string {
+	return hi.hosts
 }
 
 func (hi *HostIterator) Total() int {
