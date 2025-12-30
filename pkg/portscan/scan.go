@@ -152,7 +152,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		} else {
 			primaryPorts = []int{443, 80, 22, 3389}
 		}
-		fallbackPorts := []int{21, 25, 502, 102, 123, 135, 445}
+		fallbackPorts := s.options.DiscoveryFallbackPorts
+		if len(fallbackPorts) == 0 {
+			fallbackPorts = []int{21, 25, 502, 102, 123, 135, 445}
+		}
 
 		// Temporary pool for discovery
 		// Use user-defined RateLimit to avoid triggering firewalls with hardcoded high concurrency
