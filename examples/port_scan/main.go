@@ -11,12 +11,14 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"scanme.nmap.org"}
-	opts.Ports = "full" // Test prioritized full scan
-	opts.RateLimit = 1000
-	opts.Timeout = 800 * time.Millisecond
+	opts.Targets = []string{"221.194.144.85"}
+	opts.Ports = "top-100" // Test prioritized full scan
+	opts.RateLimit = 100
+	opts.Timeout = 1800 * time.Millisecond
 	opts.Retries = 2
 	opts.Debug = true
+	// opts.Proxy = "socks5://127.0.0.1:7890" // Example proxy
+	opts.Proxy = "socks5://111.43.114.137:1080"
 
 	// 2. Setup Callback
 	opts.OnResult = func(result *portscan.ScanResult) {
