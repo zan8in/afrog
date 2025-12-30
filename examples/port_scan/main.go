@@ -12,7 +12,7 @@ func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
 	opts.Targets = []string{"154.92.66.253/24"}
-	opts.Ports = "full" // Test prioritized full scan
+	opts.Ports = "top-100" // Test prioritized full scan
 	opts.RateLimit = 500
 	opts.Timeout = 1000 * time.Millisecond
 	opts.Retries = 2
@@ -24,7 +24,7 @@ func main() {
 
 	// 2. Setup Callback
 	opts.OnResult = func(result *portscan.ScanResult) {
-		fmt.Printf("\r[+] Open: %s:%d (%s %s)\n", result.Host, result.Port, result.Service, result.Version)
+		fmt.Printf("%s:%d\n", result.Host, result.Port)
 		// if result.Banner != "" {
 		// 	fmt.Printf("    Banner: %s\n", result.Banner)
 		// }

@@ -170,7 +170,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				if err == nil {
 					conn.Close()
 					isAlive = true
-					fmt.Printf("[+] Alive host: %s\n", host)
+					fmt.Printf("%s\n", host)
 					break
 				}
 			}
@@ -181,7 +181,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					if err == nil {
 						conn.Close()
 						isAlive = true
-						fmt.Printf("[+] Alive host: %s\n", host)
+						fmt.Printf("%s\n", host)
 						break
 					}
 				}
@@ -195,7 +195,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				for _, p := range udpPorts {
 					if s.checkUDPAlive(host, p) {
 						isAlive = true
-						fmt.Printf("[+] Alive host: %s\n", host)
+						fmt.Printf("%s\n", host)
 						break
 					}
 				}
@@ -424,43 +424,10 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	atomic.AddUint64(&s.resultsCount, 1)
 
-	// Port is open
 	result := &ScanResult{
 		Host:  host,
 		Port:  port,
 		State: PortStateOpen,
-	}
-
-	// 2. Service Detection (Simple Banner Grabbing)
-	// We set a deadline for reading
-	conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-
-	// Try to read initial banner (some services send immediately like SSH, FTP)
-	buffer := make([]byte, 1024)
-	n, _ := conn.Read(buffer)
-	if n > 0 {
-		result.Banner = string(buffer[:n])
-	} else {
-		// If no banner, try to send a generic probe (HTTP)
-		// This is a very basic example. Real service detection is more complex.
-		conn.SetWriteDeadline(time.Now().Add(time.Second))
-		conn.Write([]byte("GET / HTTP/1.0\r\n\r\n"))
-
-		conn.SetReadDeadline(time.Now().Add(time.Second * 2))
-		n, _ = conn.Read(buffer)
-		if n > 0 {
-			result.Banner = string(buffer[:n])
-		}
-	}
-
-	// Clean banner
-	result.Banner = cleanBanner(result.Banner)
-
-	// Identify Service
-	result.Fingerprint = IdentifyService(result.Banner, port)
-	if result.Fingerprint.Name != "unknown" {
-		result.Service = result.Fingerprint.Name
-		result.Version = result.Fingerprint.Version
 	}
 
 	// Callback
