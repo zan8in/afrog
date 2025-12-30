@@ -1,0 +1,36 @@
+id: shellscript-disclosure
+
+info:
+  name: Shell Script Disclosure
+  author: zan8in
+  severity: high
+  description: |
+    Shell Script Disclosure
+  tags: shellscript,disclosure
+  created: 2025/12/27
+
+rules:
+  r0:
+    brute:
+      mode: clusterbomb # pitchfork
+      commit: winner
+      continue: false
+      file:
+        - install.sh
+        - deploy.sh
+        - upload.sh
+        - setup.sh
+        - backup.sh
+        - rsync.sh
+        - linuxcnc-install.sh
+        - sync.sh
+        - test.sh
+        - run.sh
+    request:
+      method: GET
+      path: /{{file}}
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.headers['content-type'].icontains("text") &&
+      response.body.bstartsWith(b"#!/")
+expression: r0()

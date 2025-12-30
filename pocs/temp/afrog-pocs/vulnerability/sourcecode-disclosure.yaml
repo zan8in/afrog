@@ -1,0 +1,40 @@
+id: sourcecode-disclosure
+
+info:
+  name: Source Code Disclosure
+  author: zan8in
+  severity: high
+  description: |
+    Source Code Disclosure
+  tags: sourcecode,disclosure
+  created: 2025/12/27
+
+rules:
+  r0:
+    stop_if_match: true
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      file:
+        - /index.php.bak
+        - /.index.php.swp
+        - /config.inc.php.bak
+        - /config.php.bak
+        - /.config.inc.php.swp
+        - /config/.config.php.swp
+        - /.config.php.swp
+        - /application/config/config.php.bak
+        - /application/config/database.php.bak
+        - /.settings.php.swp
+        - /.database.php.swp
+        - /.db.php.swp
+        - /.mysql.php.swp
+    request:
+      method: GET
+      path: "{{file}}"
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.body.bcontains(b"<?php")
+
+expression: r0()
