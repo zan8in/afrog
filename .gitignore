@@ -39,6 +39,7 @@ web_smoke.log
 
 /afrog-pocs/
 afrogweb
+fscan
 dist
 *.afg
 
