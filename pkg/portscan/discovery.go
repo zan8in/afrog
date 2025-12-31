@@ -434,7 +434,7 @@ func countTop(list []string, top int, bSegment bool) (keys []string, vals []int)
 }
 func logHostAlive(host, proto string, opt *Options) {
 	if opt.LogDiscoveredHosts || opt.Debug {
-		fmt.Fprintf(os.Stderr, "Alive Host: %s [%s]\n", host, proto)
+		fmt.Fprintln(os.Stderr, host)
 	}
 }
 func execPing(ip string) bool {
