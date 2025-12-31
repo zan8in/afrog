@@ -25,12 +25,18 @@ type Options struct {
 // DefaultOptions returns a safe default configuration
 func DefaultOptions() *Options {
 	return &Options{
-		Ports:                  "top-100",
+		Ports:                  "full",
 		RateLimit:              500,
-		Timeout:                1500 * time.Millisecond,
+		Timeout:                1000 * time.Millisecond,
 		Retries:                2,
 		ScanMode:               ScanModeAuto,
 		DiscoveryFallback:      true,
 		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445},
 	}
+}
+
+func ApplyQuickStrategy(o *Options) {
+	o.RateLimit = 500
+	o.Timeout = 800 * time.Millisecond
+	o.Retries = 2
 }

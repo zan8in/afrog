@@ -45,7 +45,7 @@ type ServiceFingerprint struct {
 type ScanMode int
 
 const (
-	ScanModeAuto ScanMode = iota // Automatically switch based on network
-	ScanModeConnect              // TCP Connect Scan (Syscall: connect)
-	ScanModeSyn                  // TCP SYN Scan (Raw sockets) - Requires root
+	ScanModeAuto    ScanMode = iota // Automatically switch based on network
+	ScanModeConnect                 // TCP Connect Scan (Syscall: connect)
+	ScanModeSyn                     // TCP SYN Scan (Raw sockets) - Requires root
 )
