@@ -17,7 +17,7 @@ func main() {
 	opts.Timeout = 1000 * time.Millisecond
 	opts.Retries = 2
 	opts.Debug = true
-	opts.SkipDiscovery = true
+	opts.SkipDiscovery = false
 	opts.DiscoveryUDPEnabled = true
 	opts.DiscoveryUDPPorts = []int{53, 161}
 	// opts.Proxy = "http://127.0.0.1:51024"

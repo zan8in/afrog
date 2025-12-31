@@ -161,9 +161,14 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if limit < 100 {
 			limit = 100 // Ensure at least some concurrency for discovery
 		}
-		discPool, _ := ants.NewPoolWithFunc(limit, func(i interface{}) {
+		discPool, err := ants.NewPoolWithFunc(limit, func(i interface{}) {
 			host := i.(string)
 			defer discWg.Done()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			isAlive := false
 			// Layer 1: primary TCP ports
 			for _, p := range primaryPorts {
@@ -210,6 +215,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				mu.Unlock()
 			}
 		})
+		if err != nil {
+			return err
+		}
 		defer discPool.Release()
 
 		for _, host := range origHosts {
@@ -248,7 +256,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					}
 					percent := int(float64(curr) * 100 / float64(total))
 					if percent != lastPercent {
-						fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %.2f%%", curr, total, float64(percent))
+						fmt.Fprint(os.Stderr, "\r\033[2K")
+						fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%%", curr, total, percent)
 						lastPercent = percent
 					}
 				}
