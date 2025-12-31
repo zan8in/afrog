@@ -134,88 +134,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Pre-scan Host Discovery (for CIDR/List optimization)
 	// If we have more than 1 host, let's filter dead ones first
 	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
-		fmt.Fprintf(os.Stderr, "Phase 1: Host Discovery (Ping Sweep)...\n")
-
-		// Use high concurrency for discovery
-		aliveHosts := make([]string, 0)
-		var mu sync.Mutex
-		var discWg sync.WaitGroup
-		aliveSet := make(map[string]struct{})
 		origHosts := hostIter.GetHosts()
-		totalOriginal := len(origHosts)
-
-		var primaryPorts []int
-		if len(s.options.DiscoveryPorts) > 0 {
-			primaryPorts = s.options.DiscoveryPorts
-		} else {
-			primaryPorts = []int{443, 80, 22, 3389}
+		aliveHosts, derr := DiscoverAliveHosts(ctx, s.options, origHosts)
+		if derr != nil {
+			return derr
 		}
-		fallbackPorts := s.options.DiscoveryFallbackPorts
-		if len(fallbackPorts) == 0 {
-			fallbackPorts = []int{21, 25, 502, 102, 123, 135, 445}
-		}
-
-		// Temporary pool for discovery
-		// Use user-defined RateLimit to avoid triggering firewalls with hardcoded high concurrency
-		limit := s.options.RateLimit
-		if limit < 100 {
-			limit = 100 // Ensure at least some concurrency for discovery
-		}
-		discPool, err := ants.NewPoolWithFunc(limit, func(i interface{}) {
-			host := i.(string)
-			defer discWg.Done()
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			isAlive := false
-			// Layer 1: primary TCP ports
-			for _, p := range primaryPorts {
-				conn, err := s.checkPortOpen(host, p)
-				if err == nil {
-					conn.Close()
-					isAlive = true
-					fmt.Printf("%s\n", host)
-					break
-				}
-			}
-			// Layer 2: fallback TCP ports (only if not alive yet)
-			if !isAlive && s.options.DiscoveryFallback {
-				for _, p := range fallbackPorts {
-					conn, err := s.checkPortOpen(host, p)
-					if err == nil {
-						conn.Close()
-						isAlive = true
-						fmt.Printf("%s\n", host)
-						break
-					}
-				}
-			}
-			if isAlive {
-				mu.Lock()
-				if _, ok := aliveSet[host]; !ok {
-					aliveSet[host] = struct{}{}
-					aliveHosts = append(aliveHosts, host)
-				}
-				mu.Unlock()
-			}
-		})
-		if err != nil {
-			return err
-		}
-		defer discPool.Release()
-
-		for _, host := range origHosts {
-			discWg.Add(1)
-			discPool.Invoke(host)
-		}
-		discWg.Wait()
-
-		fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), totalOriginal)
-
-		// Single-pass layered discovery done above; no multi-pass fallback loops
-
+		fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), len(origHosts))
 		hostIter = NewHostIterator(aliveHosts)
 	}
 

@@ -20,6 +20,12 @@ type Options struct {
 	DiscoveryPorts         []int
 	DiscoveryFallback      bool
 	DiscoveryFallbackPorts []int
+	DiscoveryMethod        string
+	IcmpConcurrency        int
+	PingConcurrency        int
+	DiscoveryTop           int
+	DiscoveryRetries       int
+	LogDiscoveredHosts     bool
 }
 
 // DefaultOptions returns a safe default configuration
@@ -32,6 +38,12 @@ func DefaultOptions() *Options {
 		ScanMode:               ScanModeAuto,
 		DiscoveryFallback:      true,
 		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445, 8000, 8080},
+		DiscoveryMethod:        "auto",
+		IcmpConcurrency:        1000,
+		PingConcurrency:        50,
+		DiscoveryTop:           10,
+		DiscoveryRetries:       1,
+		LogDiscoveredHosts:     true,
 	}
 }
 

@@ -12,6 +12,7 @@ func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
 	opts.Targets = []string{"183.196.31.51/24"}
+	opts.DiscoveryMethod = "auto"
 	// opts.Ports = "full" // Test prioritized full scan
 	// opts.RateLimit = 300
 	// opts.Timeout = 1000 * time.Millisecond

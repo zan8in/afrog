@@ -142,9 +142,16 @@ func NewHostIterator(targets []string) *HostIterator {
 	for _, t := range targets {
 		// CIDR expansion
 		if strings.Contains(t, "/") {
-			if ips, err := ipRangeFromCIDR(t); err == nil {
-				expandedHosts = append(expandedHosts, ips...)
-				continue
+			if strings.HasSuffix(t, "/8") {
+				if ips := sampleSubnet8(t); len(ips) > 0 {
+					expandedHosts = append(expandedHosts, ips...)
+					continue
+				}
+			} else {
+				if ips, err := ipRangeFromCIDR(t); err == nil {
+					expandedHosts = append(expandedHosts, ips...)
+					continue
+				}
 			}
 		}
 		// IP Range expansion (e.g. 192.168.1.1-192.168.1.10)
@@ -245,4 +252,33 @@ func removeDuplicateStr(strSlice []string) []string {
 		}
 	}
 	return list
+}
+
+func sampleSubnet8(cidr string) []string {
+	base := cidr[:len(cidr)-2]
+	parts := strings.Split(base, ".")
+	if len(parts) != 4 {
+		return nil
+	}
+	first := parts[0]
+	var res []string
+	commonSeconds := []int{0, 1, 2, 10, 100, 200, 254}
+	for _, s := range commonSeconds {
+		for t := 0; t < 256; t += 10 {
+			res = append(res, firstDot(first, s, t, 1))
+			res = append(res, firstDot(first, s, t, 254))
+			res = append(res, firstDot(first, s, t, 2+rand.IntN(252)))
+		}
+	}
+	for s := 0; s < 256; s += 32 {
+		for t := 0; t < 256; t += 32 {
+			res = append(res, firstDot(first, s, t, 1))
+			res = append(res, firstDot(first, s, t, 2+rand.IntN(252)))
+		}
+	}
+	return res
+}
+
+func firstDot(a string, b, c, d int) string {
+	return fmt.Sprintf("%s.%d.%d.%d", a, b, c, d)
 }
