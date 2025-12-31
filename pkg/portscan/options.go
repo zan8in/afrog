@@ -31,12 +31,18 @@ func DefaultOptions() *Options {
 		Retries:                2,
 		ScanMode:               ScanModeAuto,
 		DiscoveryFallback:      true,
-		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445},
+		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445, 8000, 8080},
 	}
 }
 
 func ApplyQuickStrategy(o *Options) {
 	o.RateLimit = 500
 	o.Timeout = 800 * time.Millisecond
+	o.Retries = 2
+}
+
+func ApplyQuickestStrategy(o *Options) {
+	o.RateLimit = 2500
+	o.Timeout = 2000 * time.Millisecond
 	o.Retries = 2
 }
