@@ -18,8 +18,6 @@ func main() {
 	opts.Retries = 2
 	opts.Debug = true
 	opts.SkipDiscovery = false
-	opts.DiscoveryUDPEnabled = true
-	opts.DiscoveryUDPPorts = []int{53, 161}
 	// opts.Proxy = "http://127.0.0.1:51024"
 
 	// 2. Setup Callback

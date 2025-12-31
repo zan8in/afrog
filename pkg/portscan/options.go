@@ -19,8 +19,6 @@ type Options struct {
 	SkipDiscovery          bool // Skip host discovery phase
 	DiscoveryPorts         []int
 	DiscoveryFallback      bool
-	DiscoveryUDPEnabled    bool
-	DiscoveryUDPPorts      []int
 	DiscoveryFallbackPorts []int
 }
 
@@ -33,7 +31,6 @@ func DefaultOptions() *Options {
 		Retries:                2,
 		ScanMode:               ScanModeAuto,
 		DiscoveryFallback:      true,
-		DiscoveryUDPEnabled:    false,
 		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445},
 	}
 }

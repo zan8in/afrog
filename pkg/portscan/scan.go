@@ -192,20 +192,6 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					}
 				}
 			}
-			// Layer 3: UDP ports (only if not alive yet)
-			if !isAlive && s.options.DiscoveryUDPEnabled {
-				udpPorts := s.options.DiscoveryUDPPorts
-				if len(udpPorts) == 0 {
-					udpPorts = []int{53, 161}
-				}
-				for _, p := range udpPorts {
-					if s.checkUDPAlive(host, p) {
-						isAlive = true
-						fmt.Printf("%s\n", host)
-						break
-					}
-				}
-			}
 			if isAlive {
 				mu.Lock()
 				if _, ok := aliveSet[host]; !ok {
@@ -241,7 +227,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 
 	if s.options.Debug {
 		go func() {
-			ticker := time.NewTicker(500 * time.Millisecond)
+			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
 			lastPercent := -1
 			for {
@@ -256,8 +242,21 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					}
 					percent := int(float64(curr) * 100 / float64(total))
 					if percent != lastPercent {
+						elapsed := time.Since(startTime).Truncate(time.Second)
+						rate := float64(curr) / elapsed.Seconds()
+						remaining := float64(total - int(curr))
+						var eta time.Duration
+						if rate > 0 {
+							eta = time.Duration(remaining/rate) * time.Second
+						}
 						fmt.Fprint(os.Stderr, "\r\033[2K")
-						fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%%", curr, total, percent)
+						if eta > 0 {
+							fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%% | open: %d | rate: %.1f/s | elapsed: %s | eta: %s",
+								curr, total, percent, atomic.LoadUint64(&s.resultsCount), rate, elapsed, eta.Truncate(time.Second))
+						} else {
+							fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%% | open: %d | rate: %.1f/s | elapsed: %s",
+								curr, total, percent, atomic.LoadUint64(&s.resultsCount), rate, elapsed)
+						}
 						lastPercent = percent
 					}
 				}
@@ -453,42 +452,4 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 func cleanBanner(banner string) string {
 	// Remove newlines and non-printable chars
 	return strings.TrimSpace(banner)
-}
-
-func (s *Scanner) checkUDPAlive(host string, port int) bool {
-	timeout := s.options.Timeout
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
-	if err != nil {
-		return false
-	}
-	conn, err := net.DialUDP("udp", nil, addr)
-	if err != nil {
-		return false
-	}
-	defer conn.Close()
-	_ = conn.SetDeadline(time.Now().Add(timeout))
-	var payload []byte
-	switch port {
-	case 53:
-		// DNS query: id=0x1234, standard query, QD=1, query example.com A
-		payload = []byte{
-			0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00,
-			0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e',
-			0x03, 'c', 'o', 'm', 0x00,
-			0x00, 0x01, 0x00, 0x01,
-		}
-	case 123:
-		b := make([]byte, 48)
-		b[0] = 0x1B
-		payload = b
-	default:
-		return false
-	}
-	if _, err := conn.Write(payload); err != nil {
-		return false
-	}
-	buf := make([]byte, 512)
-	n, _ := conn.Read(buf)
-	return n > 0
 }
