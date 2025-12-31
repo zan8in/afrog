@@ -54,7 +54,7 @@ func ApplyQuickStrategy(o *Options) {
 }
 
 func ApplyQuickestStrategy(o *Options) {
-	o.RateLimit = 2500
-	o.Timeout = 2000 * time.Millisecond
+	o.RateLimit = 1500
+	o.Timeout = 1500 * time.Millisecond
 	o.Retries = 2
 }

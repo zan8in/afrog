@@ -229,11 +229,11 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string
 	var wg sync.WaitGroup
 	primary := opt.DiscoveryPorts
 	if len(primary) == 0 {
-		primary = []int{443, 80, 22, 3389}
+		primary = []int{443, 80, 22, 3389, 445, 135, 8080, 8443}
 	}
 	fallback := opt.DiscoveryFallbackPorts
 	if len(fallback) == 0 {
-		fallback = []int{21, 25, 502, 102, 123, 135, 445}
+		fallback = []int{81, 21, 25, 139, 8081, 8888, 9090, 9443, 8000, 9000, 3128}
 	}
 	limit := opt.RateLimit
 	if limit < 100 {
