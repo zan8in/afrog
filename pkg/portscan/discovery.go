@@ -102,6 +102,12 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 	seen := make(map[string]struct{})
 	var mu sync.Mutex
 	endflag := false
+	go func() {
+		select {
+		case <-ctx.Done():
+			endflag = true
+		}
+	}()
 	shuffled := append([]string(nil), hosts...)
 	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
 	go func() {
@@ -126,6 +132,9 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 		}
 	}()
 	for _, h := range shuffled {
+		if ctx.Err() != nil || endflag {
+			break
+		}
 		dst, _ := net.ResolveIPAddr("ip", h)
 		msg := makeICMPEcho(h)
 		conn.WriteTo(msg, dst)
@@ -139,7 +148,7 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 		if len(hosts) <= 256 {
 			wait = 3 * time.Second
 		}
-		if time.Since(start) > wait {
+		if time.Since(start) > wait || ctx.Err() != nil || endflag {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -162,10 +171,8 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]strin
 	var wg sync.WaitGroup
 	limiter := make(chan struct{}, num)
 	for _, h := range hosts {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			break
-		default:
 		}
 		wg.Add(1)
 		limiter <- struct{}{}
@@ -174,6 +181,11 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]strin
 				<-limiter
 				wg.Done()
 			}()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			if icmpAlive(host) {
 				mu.Lock()
 				logHostAlive(host, "icmp", opt)
@@ -198,10 +210,8 @@ func runPing(ctx context.Context, hosts []string, opt *Options) []string {
 	}
 	limiter := make(chan struct{}, limit)
 	for _, h := range hosts {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			break
-		default:
 		}
 		wg.Add(1)
 		limiter <- struct{}{}
@@ -210,6 +220,11 @@ func runPing(ctx context.Context, hosts []string, opt *Options) []string {
 				<-limiter
 				wg.Done()
 			}()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			if execPing(host) {
 				mu.Lock()
 				logHostAlive(host, "ping", opt)
@@ -241,6 +256,9 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string
 	}
 	sem := make(chan struct{}, limit)
 	for _, host := range hosts {
+		if ctx.Err() != nil {
+			break
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(h string) {
@@ -248,6 +266,11 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string
 				<-sem
 				wg.Done()
 			}()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			ok := false
 			for _, p := range primary {
 				c, e := net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(p)), opt.Timeout)
@@ -301,6 +324,9 @@ func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string
 	}
 	sem := make(chan struct{}, limit)
 	for _, host := range hosts {
+		if ctx.Err() != nil {
+			break
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(h string) {
@@ -308,6 +334,11 @@ func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string
 				<-sem
 				wg.Done()
 			}()
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			ok := false
 			for _, p := range primary {
 				if tcpOpenViaDialer(ctx, d, h, p, opt.Timeout) {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -135,10 +136,15 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// If we have more than 1 host, let's filter dead ones first
 	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
 		origHosts := hostIter.GetHosts()
-		aliveHosts, derr := DiscoverAliveHosts(ctx, s.options, origHosts)
+		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
+		aliveHosts, derr := DiscoverAliveHosts(discCtx, s.options, origHosts)
 		if derr != nil {
 			return derr
 		}
+		if discCtx.Err() != nil {
+			fmt.Fprintf(os.Stderr, "\nDiscovery interrupted, proceeding with %d alive hosts\n", len(aliveHosts))
+		}
+		discStop()
 		fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), len(origHosts))
 		hostIter = NewHostIterator(aliveHosts)
 	}
@@ -191,18 +197,19 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	var wg sync.WaitGroup
 
 	// Use ants for goroutine pooling
+	scanCtx, scanStop := signal.NotifyContext(ctx, os.Interrupt)
 	pool, err := ants.NewPoolWithFunc(s.options.RateLimit, func(i interface{}) {
 		defer wg.Done()
 		task := i.(scanTask)
 
 		// Check context
 		select {
-		case <-ctx.Done():
+		case <-scanCtx.Done():
 			return
 		default:
 		}
 
-		s.scanTarget(ctx, task.host, task.port)
+		s.scanTarget(scanCtx, task.host, task.port)
 
 		atomic.AddUint64(&s.currentProgress, 1)
 	})
@@ -272,6 +279,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	}
 
 	wg.Wait()
+
+	if scanCtx.Err() != nil {
+		fmt.Fprintln(os.Stderr, "\nPort scan interrupted, finishing with partial results")
+	}
+	scanStop()
 
 	fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
 	fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
