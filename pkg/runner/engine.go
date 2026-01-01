@@ -159,6 +159,9 @@ func (runner *Runner) Execute() {
 			}
 			open := make(map[string][]int)
 			psOpts.OnResult = func(r *portscan.ScanResult) {
+				if options.Silent {
+					gologger.Print().Msgf("%s:%d", r.Host, r.Port)
+				}
 				open[r.Host] = append(open[r.Host], r.Port)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
@@ -182,10 +185,6 @@ func (runner *Runner) Execute() {
 				}
 			}
 		}
-	}
-
-	for _, t := range runner.options.Targets.List() {
-		fmt.Println(t.(string))
 	}
 
 	options.Count += options.Targets.Len() * len(pocSlice)
