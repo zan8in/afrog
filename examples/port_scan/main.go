@@ -11,15 +11,15 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"183.196.31.51"}
+	opts.Targets = []string{"43.242.128.66/24"}
 	opts.DiscoveryMethod = "auto"
-	// opts.Ports = "full" // Test prioritized full scan
+	opts.Ports = "top-100" // Test prioritized full scan
 	// opts.RateLimit = 300
 	// opts.Timeout = 1000 * time.Millisecond
 	// opts.Retries = 2
 	opts.Debug = true
 	// opts.Proxy = "http://127.0.0.1:51024"
-	portscan.ApplyQuickestStrategy(opts)
+	// portscan.ApplyQuickestStrategy(opts)
 
 	// 2. Setup Callback
 	opts.OnResult = func(result *portscan.ScanResult) {

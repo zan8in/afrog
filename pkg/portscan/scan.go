@@ -142,10 +142,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			return derr
 		}
 		if discCtx.Err() != nil {
-			fmt.Fprintf(os.Stderr, "\nDiscovery interrupted, proceeding with %d alive hosts\n", len(aliveHosts))
+			fmt.Fprintf(os.Stderr, "\nHost discovery interrupted; continuing with %d responsive hosts\n", len(aliveHosts))
 		}
 		discStop()
-		fmt.Fprintf(os.Stderr, "Host Discovery Complete: Found %d alive hosts out of %d\n", len(aliveHosts), len(origHosts))
+		fmt.Fprintf(os.Stderr, "Host discovery completed: alive=%d/%d. Proceeding to port scanning\n", len(aliveHosts), len(origHosts))
 		hostIter = NewHostIterator(aliveHosts)
 	}
 
@@ -280,17 +280,19 @@ func (s *Scanner) Scan(ctx context.Context) error {
 
 	wg.Wait()
 
-	if scanCtx.Err() != nil {
+	if scanCtx.Err() != nil && !s.options.Quiet {
 		fmt.Fprintln(os.Stderr, "\nPort scan interrupted, finishing with partial results")
 	}
 	scanStop()
 
-	fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
-	fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
-	fmt.Fprintf(os.Stderr, "  - Total Targets: %d\n", hostIter.Total())
-	fmt.Fprintf(os.Stderr, "  - Total Ports:   %d\n", total)
-	fmt.Fprintf(os.Stderr, "  - Open Ports:    %d\n", atomic.LoadUint64(&s.resultsCount))
-	fmt.Fprintf(os.Stderr, "  - Duration:      %s\n", time.Since(startTime))
+	if !s.options.Quiet {
+		fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
+		fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
+		fmt.Fprintf(os.Stderr, "  - Total Targets: %d\n", hostIter.Total())
+		fmt.Fprintf(os.Stderr, "  - Total Ports:   %d\n", total)
+		fmt.Fprintf(os.Stderr, "  - Open Ports:    %d\n", atomic.LoadUint64(&s.resultsCount))
+		fmt.Fprintf(os.Stderr, "  - Duration:      %s\n", time.Since(startTime))
+	}
 
 	return nil
 }

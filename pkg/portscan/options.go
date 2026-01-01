@@ -15,6 +15,7 @@ type Options struct {
 	ServiceDB              string // Path to nmap-services or custom fingerprints
 	OnResult               func(*ScanResult)
 	Debug                  bool
+	Quiet                  bool
 	Proxy                  string
 	SkipDiscovery          bool // Skip host discovery phase
 	DiscoveryPorts         []int
@@ -36,6 +37,7 @@ func DefaultOptions() *Options {
 		Timeout:                1000 * time.Millisecond,
 		Retries:                2,
 		ScanMode:               ScanModeAuto,
+		Quiet:                  false,
 		DiscoveryFallback:      true,
 		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445, 8000, 8080},
 		DiscoveryMethod:        "auto",

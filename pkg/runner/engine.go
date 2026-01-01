@@ -3,19 +3,25 @@ package runner
 import (
 	"context"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"strconv"
+
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
+	sliceutil "github.com/zan8in/pins/slice"
 )
 
 var CheckerPool = sync.Pool{
@@ -101,6 +107,86 @@ func (runner *Runner) Execute() {
 	}
 
 	runner.printOOBStatus(reversePocs)
+
+	// portscan pre-scan: run after OOB status output to ensure ordering
+	if options.PortScan {
+		hostSeen := make(map[string]struct{})
+		hosts := make([]string, 0)
+		for _, t := range runner.options.Targets.List() {
+			raw := strings.TrimSpace(fmt.Sprintf("%v", t))
+			if raw == "" {
+				continue
+			}
+			h := raw
+			// 保留 CIDR 或 IP区间用于端口扫描模块内部扩展
+			if strings.Contains(raw, "/") || strings.Contains(raw, "-") {
+				h = raw
+			} else {
+				// URL 或 host:port → 归一化为主机
+				h = strings.TrimSpace(utils.ExtractHost(raw))
+			}
+			if h == "" {
+				continue
+			}
+			if _, ok := hostSeen[h]; !ok {
+				hostSeen[h] = struct{}{}
+				hosts = append(hosts, h)
+			}
+		}
+		if len(hosts) > 0 {
+			psOpts := portscan.DefaultOptions()
+			psOpts.Targets = hosts
+			psOpts.Proxy = options.Proxy
+			// Let portscan module handle its own output and progress
+			if options.PSPorts != "" {
+				psOpts.Ports = options.PSPorts
+			}
+			// Do not override module logging flags here
+			if options.PSRateLimit > 0 {
+				psOpts.RateLimit = options.PSRateLimit
+			}
+			if options.PSTimeout > 0 {
+				psOpts.Timeout = time.Duration(options.PSTimeout) * time.Millisecond
+			}
+			if options.PSRetries > 0 {
+				psOpts.Retries = options.PSRetries
+			}
+			if options.PSSkipDiscovery {
+				psOpts.SkipDiscovery = true
+			}
+			if options.PSMethod != "" {
+				psOpts.DiscoveryMethod = options.PSMethod
+			}
+			open := make(map[string][]int)
+			psOpts.OnResult = func(r *portscan.ScanResult) {
+				open[r.Host] = append(open[r.Host], r.Port)
+			}
+			if sc, err := portscan.NewScanner(psOpts); err == nil {
+				_ = sc.Scan(context.Background())
+				newTargets := make([]string, 0)
+				for host, ports := range open {
+					seenPort := make(map[int]struct{})
+					for _, p := range ports {
+						if _, ok := seenPort[p]; ok {
+							continue
+						}
+						seenPort[p] = struct{}{}
+						newTargets = append(newTargets, net.JoinHostPort(host, strconv.Itoa(p)))
+					}
+				}
+				if len(newTargets) > 0 {
+					options.Targets = sliceutil.SafeSlice{}
+					for _, nt := range newTargets {
+						options.Targets.Append(nt)
+					}
+				}
+			}
+		}
+	}
+
+	for _, t := range runner.options.Targets.List() {
+		fmt.Println(t.(string))
+	}
 
 	options.Count += options.Targets.Len() * len(pocSlice)
 
