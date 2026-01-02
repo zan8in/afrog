@@ -119,23 +119,7 @@ func main() {
 	}
 
 	var progressDone chan struct{}
-	if options.LiveStats && progressEnabled {
-		progressDone = make(chan struct{})
-		go func() {
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-progressDone:
-					return
-				case <-ticker.C:
-					lock.Lock()
-					renderProgress()
-					lock.Unlock()
-				}
-			}
-		}()
-	}
+	var progressOnce sync.Once
 
 	r.OnResult = func(result *result.Result) {
 		// add recover @edit 2025/06/12
@@ -144,6 +128,29 @@ func main() {
 				gologger.Error().Msgf("OnResult panic: %v", err)
 			}
 		}()
+
+		if options.LiveStats && progressEnabled {
+			progressOnce.Do(func() {
+				progressDone = make(chan struct{})
+				lock.Lock()
+				renderProgress()
+				lock.Unlock()
+				go func() {
+					ticker := time.NewTicker(1 * time.Second)
+					defer ticker.Stop()
+					for {
+						select {
+						case <-progressDone:
+							return
+						case <-ticker.C:
+							lock.Lock()
+							renderProgress()
+							lock.Unlock()
+						}
+					}
+				}()
+			})
+		}
 
 		defer func() {
 			atomic.AddUint32(&options.CurrentCount, 1)
