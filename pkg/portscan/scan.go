@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
+	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/gologger"
 	"golang.org/x/net/proxy"
 )
@@ -137,15 +138,23 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
 		origHosts := hostIter.GetHosts()
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
+		discStart := time.Now()
+		if !s.options.Quiet {
+			gologger.Info().Msgf("Host discovery: started (targets=%d, method=%s)", len(origHosts), s.options.DiscoveryMethod)
+		}
 		aliveHosts, derr := DiscoverAliveHosts(discCtx, s.options, origHosts)
 		if derr != nil {
 			return derr
 		}
 		if discCtx.Err() != nil {
-			fmt.Fprintf(os.Stderr, "\nHost discovery interrupted; continuing with %d responsive hosts\n", len(aliveHosts))
+			if !s.options.Quiet {
+				gologger.Warning().Msgf("Host discovery: interrupted (continuing with alive=%d)", len(aliveHosts))
+			}
 		}
 		discStop()
-		fmt.Fprintf(os.Stderr, "Host discovery completed: alive=%d/%d. Proceeding to port scanning\n", len(aliveHosts), len(origHosts))
+		if !s.options.Quiet {
+			gologger.Info().Msgf("Host discovery: completed (alive=%d/%d, duration=%s)", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
+		}
 		hostIter = NewHostIterator(aliveHosts)
 	}
 
@@ -155,40 +164,56 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	total := hostIter.Total() * portIter.Total()
 	startTime := time.Now()
 
-	if s.options.Debug {
+	if !s.options.Quiet {
+		gologger.Info().Msgf("Port scan: started (hosts=%d, ports=%s)", hostIter.Total(), s.options.Ports)
+	}
+
+	progressEnabled := s.options.Debug && !s.options.Quiet && total > 0
+	var progressDone chan struct{}
+	var lastPercent int32 = -1
+	renderProgress := func(final bool) {
+		if !progressEnabled {
+			return
+		}
+		curr := atomic.LoadUint64(&s.currentProgress)
+		if int(curr) > total {
+			curr = uint64(total)
+		}
+		percent := 0
+		if total > 0 {
+			percent = int(curr) * 100 / total
+		}
+		if final {
+			percent = 100
+			curr = uint64(total)
+		} else {
+			if int32(percent) == atomic.LoadInt32(&lastPercent) {
+				return
+			}
+			atomic.StoreInt32(&lastPercent, int32(percent))
+		}
+		elapsed := strings.Split(time.Since(startTime).String(), ".")[0] + "s"
+		suffix := ""
+		fmt.Fprint(os.Stderr, "\r\033[2K")
+		fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, curr, total, elapsed, suffix)
+		if final {
+			fmt.Fprint(os.Stderr, "\n")
+		}
+	}
+
+	if progressEnabled {
+		progressDone = make(chan struct{})
 		go func() {
 			ticker := time.NewTicker(1 * time.Second)
 			defer ticker.Stop()
-			lastPercent := -1
 			for {
 				select {
 				case <-ctx.Done():
 					return
+				case <-progressDone:
+					return
 				case <-ticker.C:
-					curr := atomic.LoadUint64(&s.currentProgress)
-					if int(curr) >= total {
-						// Wait for main thread to print 100% and stats
-						return
-					}
-					percent := int(float64(curr) * 100 / float64(total))
-					if percent != lastPercent {
-						elapsed := time.Since(startTime).Truncate(time.Second)
-						rate := float64(curr) / elapsed.Seconds()
-						remaining := float64(total - int(curr))
-						var eta time.Duration
-						if rate > 0 {
-							eta = time.Duration(remaining/rate) * time.Second
-						}
-						fmt.Fprint(os.Stderr, "\r\033[2K")
-						if eta > 0 {
-							fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%% | open: %d | rate: %.1f/s | elapsed: %s | eta: %s",
-								curr, total, percent, atomic.LoadUint64(&s.resultsCount), rate, elapsed, eta.Truncate(time.Second))
-						} else {
-							fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) %d%% | open: %d | rate: %.1f/s | elapsed: %s",
-								curr, total, percent, atomic.LoadUint64(&s.resultsCount), rate, elapsed)
-						}
-						lastPercent = percent
-					}
+					renderProgress(false)
 				}
 			}
 		}()
@@ -281,17 +306,24 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	wg.Wait()
 
 	if scanCtx.Err() != nil && !s.options.Quiet {
-		fmt.Fprintln(os.Stderr, "\nPort scan interrupted, finishing with partial results")
+		gologger.Warning().Msg("Port scan: interrupted (partial results)")
 	}
 	scanStop()
 
+	if progressDone != nil {
+		close(progressDone)
+		progressDone = nil
+	}
+	if progressEnabled {
+		renderProgress(true)
+	}
 	if !s.options.Quiet {
-		fmt.Fprintf(os.Stderr, "\rScanning ports (%d/%d) 100.00%%\n", total, total)
-		fmt.Fprintf(os.Stderr, "Scan Statistics:\n")
-		fmt.Fprintf(os.Stderr, "  - Total Targets: %d\n", hostIter.Total())
-		fmt.Fprintf(os.Stderr, "  - Total Ports:   %d\n", total)
-		fmt.Fprintf(os.Stderr, "  - Open Ports:    %d\n", atomic.LoadUint64(&s.resultsCount))
-		fmt.Fprintf(os.Stderr, "  - Duration:      %s\n", time.Since(startTime))
+		gologger.Info().Msgf("Port scan: completed (hosts=%d, tasks=%d, open=%d, duration=%s)",
+			hostIter.Total(),
+			total,
+			atomic.LoadUint64(&s.resultsCount),
+			time.Since(startTime).Truncate(time.Second),
+		)
 	}
 
 	return nil
@@ -380,7 +412,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	// Callback
 	if s.options.OnResult != nil {
-		if s.options.Debug {
+		if s.options.Debug && !s.options.Quiet {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
 		s.options.OnResult(result)

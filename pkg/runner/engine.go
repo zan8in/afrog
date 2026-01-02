@@ -138,6 +138,8 @@ func (runner *Runner) Execute() {
 			psOpts.Targets = hosts
 			psOpts.Proxy = options.Proxy
 			// Let portscan module handle its own output and progress
+			psOpts.Debug = options.PSDebug && !options.Silent
+			psOpts.Quiet = false
 			if options.PSPorts != "" {
 				psOpts.Ports = options.PSPorts
 			}
@@ -159,9 +161,7 @@ func (runner *Runner) Execute() {
 			}
 			open := make(map[string][]int)
 			psOpts.OnResult = func(r *portscan.ScanResult) {
-				if options.Silent {
-					gologger.Print().Msgf("%s:%d", r.Host, r.Port)
-				}
+				gologger.Print().Msgf("%s:%d", r.Host, r.Port)
 				open[r.Host] = append(open[r.Host], r.Port)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
@@ -184,13 +184,23 @@ func (runner *Runner) Execute() {
 					}
 				}
 			}
+		} else if !options.SDKMode {
+			gologger.Info().Msg("Host discovery: skipped (no valid hosts for pre-scan)")
+			gologger.Info().Msg("Port scan: skipped (no valid hosts for pre-scan)")
 		}
+	} else if !options.SDKMode {
+		gologger.Info().Msg("Host discovery: skipped (-ps not enabled)")
+		gologger.Info().Msg("Port scan: skipped (-ps not enabled)")
 	}
 
 	options.Count += options.Targets.Len() * len(pocSlice)
 
 	if options.Smart {
 		options.SmartControl()
+	}
+
+	if !options.SDKMode {
+		gologger.Info().Msgf("Vulnerability scan: started (targets=%d, pocs=%d, tasks=%d)", options.Targets.Len(), len(pocSlice), options.Count)
 	}
 
 	// 开始 普通POC 扫描 @edit 2024/05/30

@@ -94,6 +94,8 @@ func main() {
 		number    uint32
 	)
 
+	progressEnabled := !options.Silent
+
 	progressLine := func() string {
 		total := options.Count
 		current := atomic.LoadUint32(&options.CurrentCount)
@@ -112,12 +114,12 @@ func main() {
 
 	renderProgress := func() {
 		line := progressLine()
-		fmt.Print("\r\033[2K")
-		fmt.Printf("\r%s", line)
+		fmt.Fprint(os.Stderr, "\r\033[2K")
+		fmt.Fprintf(os.Stderr, "\r%s", line)
 	}
 
 	var progressDone chan struct{}
-	if options.LiveStats && !options.Silent {
+	if options.LiveStats && progressEnabled {
 		progressDone = make(chan struct{})
 		go func() {
 			ticker := time.NewTicker(1 * time.Second)
@@ -133,7 +135,6 @@ func main() {
 				}
 			}
 		}()
-		defer close(progressDone)
 	}
 
 	r.OnResult = func(result *result.Result) {
@@ -144,18 +145,14 @@ func main() {
 			}
 		}()
 
-		if !options.Silent {
-			defer func() {
-				atomic.AddUint32(&options.CurrentCount, 1)
-				if !options.Silent && !options.LiveStats {
-					// 花里胡哨的进度条，看起来炫，实际并没什么卵用！ @edit 2024/01/03
-					lock.Lock()
-					renderProgress()
-					lock.Unlock()
-					// fmt.Printf("\r[%s] %d%% (%d/%d), %s", progress.CreateProgressBar(pgress, 50, '▉', '░'), pgress, options.CurrentCount, options.Count, strings.Split(time.Since(starttime).String(), ".")[0]+"s")
-				}
-			}()
-		}
+		defer func() {
+			atomic.AddUint32(&options.CurrentCount, 1)
+			if progressEnabled && !options.LiveStats {
+				lock.Lock()
+				renderProgress()
+				lock.Unlock()
+			}
+		}()
 
 		if options.Debug {
 			result.Debug()
@@ -163,11 +160,11 @@ func main() {
 
 		if result.IsVul {
 			lock.Lock()
-			fmt.Print("\r\033[2K\r")
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 
 			atomic.AddUint32(&number, 1)
 			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
-			if !options.Silent {
+			if progressEnabled {
 				renderProgress()
 			}
 
@@ -234,6 +231,10 @@ func main() {
 		gologger.Error().Msgf("runner run err: %s\n", err)
 		return
 	}
+	if progressDone != nil {
+		close(progressDone)
+		progressDone = nil
+	}
 
 	if len(options.Json) > 0 || len(options.JsonAll) > 0 {
 		if err := r.JsonReport.AppendEndOfFile(); err != nil {
@@ -244,6 +245,19 @@ func main() {
 
 	time.Sleep(time.Second * 3)
 	gologger.Print().Msg("")
+
+	lock.Lock()
+	if progressEnabled {
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
+	}
+	lock.Unlock()
+
+	gologger.Info().Msgf("Vulnerability scan: completed (tasks=%d/%d, found=%d, duration=%s)",
+		atomic.LoadUint32(&options.CurrentCount),
+		options.Count,
+		atomic.LoadUint32(&number),
+		time.Since(starttime).Truncate(time.Second),
+	)
 
 	// 标记正常退出
 	normalExit = true

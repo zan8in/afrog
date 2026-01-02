@@ -13,11 +13,131 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/progress"
+	"github.com/zan8in/gologger"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/proxy"
 )
+
+type phaseProgress struct {
+	opt         *Options
+	phase       string
+	total       uint64
+	start       time.Time
+	done        uint64
+	alive       uint64
+	lastPercent int32
+	stop        chan struct{}
+	printMu     sync.Mutex
+}
+
+func newPhaseProgress(opt *Options, phase string, total int) *phaseProgress {
+	if total < 0 {
+		total = 0
+	}
+	return &phaseProgress{
+		opt:         opt,
+		phase:       phase,
+		total:       uint64(total),
+		lastPercent: -1,
+		stop:        make(chan struct{}),
+	}
+}
+
+func (p *phaseProgress) enabled() bool {
+	return p != nil && p.opt != nil && !p.opt.Quiet && p.opt.Debug && p.total > 0
+}
+
+func (p *phaseProgress) startRender(ctx context.Context) {
+	if !p.enabled() {
+		return
+	}
+	p.start = time.Now()
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-p.stop:
+				return
+			case <-ticker.C:
+				p.render(false)
+			}
+		}
+	}()
+}
+
+func (p *phaseProgress) stopRender() {
+	if p == nil {
+		return
+	}
+	select {
+	case <-p.stop:
+	default:
+		close(p.stop)
+	}
+	if p.enabled() {
+		p.render(true)
+	}
+}
+
+func (p *phaseProgress) attempt() {
+	if p == nil {
+		return
+	}
+	atomic.AddUint64(&p.done, 1)
+}
+
+func (p *phaseProgress) markAlive(host, proto string) {
+	if p == nil || p.opt == nil {
+		return
+	}
+	atomic.AddUint64(&p.alive, 1)
+	if p.opt.LogDiscoveredHosts || p.opt.Debug {
+		if p.opt.Debug && !p.opt.Quiet {
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		}
+		gologger.Print().Msg(host)
+	}
+}
+
+func (p *phaseProgress) render(final bool) {
+	if !p.enabled() {
+		return
+	}
+	p.printMu.Lock()
+	defer p.printMu.Unlock()
+
+	done := atomic.LoadUint64(&p.done)
+	total := p.total
+	if total == 0 {
+		return
+	}
+	if done > total {
+		done = total
+	}
+	percent := int(done * 100 / total)
+	if final {
+		percent = 100
+	}
+	if !final && int32(percent) == atomic.LoadInt32(&p.lastPercent) {
+		return
+	}
+	atomic.StoreInt32(&p.lastPercent, int32(percent))
+
+	elapsed := strings.Split(time.Since(p.start).String(), ".")[0] + "s"
+	suffix := ""
+	fmt.Fprint(os.Stderr, "\r\033[2K")
+	fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, done, total, elapsed, suffix)
+	if final {
+		fmt.Fprint(os.Stderr, "\n")
+	}
+}
 
 func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]string, error) {
 	if opt.SkipDiscovery || len(hosts) <= 1 {
@@ -42,7 +162,10 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 		conn, e := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 		if e == nil {
 			defer conn.Close()
-			alive, err = runICMPListen(ctx, pending, conn, opt)
+			pp := newPhaseProgress(opt, "icmp", len(pending))
+			pp.startRender(ctx)
+			alive, err = runICMPListen(ctx, pending, conn, opt, pp)
+			pp.stopRender()
 			if err == nil && len(alive) > 0 && len(alive) < len(pending) {
 				pending = diffHosts(pending, alive)
 			}
@@ -51,25 +174,37 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 			c2, e2 := net.DialTimeout("ip4:icmp", "127.0.0.1", 3*time.Second)
 			if e2 == nil {
 				c2.Close()
-				add2, _ := runICMPNoListen(ctx, pending, opt)
+				pp := newPhaseProgress(opt, "icmp", len(pending))
+				pp.startRender(ctx)
+				add2, _ := runICMPNoListen(ctx, pending, opt, pp)
+				pp.stopRender()
 				alive = mergeUnique(alive, add2)
 				pending = diffHosts(pending, add2)
 			}
 		}
 		if len(pending) > 0 {
-			add3 := runPing(ctx, pending, opt)
+			pp := newPhaseProgress(opt, "ping", len(pending))
+			pp.startRender(ctx)
+			add3 := runPing(ctx, pending, opt, pp)
+			pp.stopRender()
 			alive = mergeUnique(alive, add3)
 			pending = diffHosts(pending, add3)
 		}
 		if len(pending) > 0 && opt.DiscoveryRetries > 0 {
 			for i := 0; i < opt.DiscoveryRetries && len(pending) > 0; i++ {
-				addp := runPing(ctx, pending, opt)
+				pp := newPhaseProgress(opt, "ping", len(pending))
+				pp.startRender(ctx)
+				addp := runPing(ctx, pending, opt, pp)
+				pp.stopRender()
 				alive = mergeUnique(alive, addp)
 				pending = diffHosts(pending, addp)
 			}
 		}
 		if len(pending) > 0 {
-			add4 := runTCPDiscoveryWithDialer(ctx, opt, pending, d)
+			pp := newPhaseProgress(opt, "tcp", len(pending))
+			pp.startRender(ctx)
+			add4 := runTCPDiscoveryWithDialer(ctx, opt, pending, d, pp)
+			pp.stopRender()
 			alive = mergeUnique(alive, add4)
 		}
 		logAliveStats(alive, opt)
@@ -79,25 +214,37 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 		conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 		if err == nil {
 			defer conn.Close()
-			alive, _ := runICMPListen(ctx, hosts, conn, opt)
+			pp := newPhaseProgress(opt, "icmp", len(hosts))
+			pp.startRender(ctx)
+			alive, _ := runICMPListen(ctx, hosts, conn, opt, pp)
+			pp.stopRender()
 			logAliveStats(alive, opt)
 			return alive, nil
 		}
-		alive, _ := runICMPNoListen(ctx, hosts, opt)
+		pp := newPhaseProgress(opt, "icmp", len(hosts))
+		pp.startRender(ctx)
+		alive, _ := runICMPNoListen(ctx, hosts, opt, pp)
+		pp.stopRender()
 		logAliveStats(alive, opt)
 		return alive, nil
 	}
 	if method == "ping" {
-		res := runPing(ctx, hosts, opt)
+		pp := newPhaseProgress(opt, "ping", len(hosts))
+		pp.startRender(ctx)
+		res := runPing(ctx, hosts, opt, pp)
+		pp.stopRender()
 		logAliveStats(res, opt)
 		return res, nil
 	}
-	res := runTCPDiscovery(ctx, opt, hosts)
+	pp := newPhaseProgress(opt, "tcp", len(hosts))
+	pp.startRender(ctx)
+	res := runTCPDiscovery(ctx, opt, hosts, pp)
+	pp.stopRender()
 	logAliveStats(res, opt)
 	return res, nil
 }
 
-func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, opt *Options) ([]string, error) {
+func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, opt *Options, pp *phaseProgress) ([]string, error) {
 	var alive []string
 	seen := make(map[string]struct{})
 	var mu sync.Mutex
@@ -125,7 +272,11 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 			mu.Lock()
 			if _, ok := seen[ip]; !ok && containsHost(hosts, ip) {
 				seen[ip] = struct{}{}
-				logHostAlive(ip, "icmp-listen", opt)
+				if pp != nil {
+					pp.markAlive(ip, "icmp-listen")
+				} else {
+					logHostAlive(ip, "icmp-listen", opt)
+				}
 				alive = append(alive, ip)
 			}
 			mu.Unlock()
@@ -134,6 +285,9 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 	for _, h := range shuffled {
 		if ctx.Err() != nil || endflag {
 			break
+		}
+		if pp != nil {
+			pp.attempt()
 		}
 		dst, _ := net.ResolveIPAddr("ip", h)
 		msg := makeICMPEcho(h)
@@ -154,11 +308,10 @@ func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, o
 		time.Sleep(50 * time.Millisecond)
 	}
 	endflag = true
-	logAliveStats(alive, opt)
 	return alive, nil
 }
 
-func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]string, error) {
+func runICMPNoListen(ctx context.Context, hosts []string, opt *Options, pp *phaseProgress) ([]string, error) {
 	num := opt.IcmpConcurrency
 	if num <= 0 {
 		num = 1000
@@ -181,6 +334,9 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]strin
 				<-limiter
 				wg.Done()
 			}()
+			if pp != nil {
+				pp.attempt()
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -188,7 +344,11 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]strin
 			}
 			if icmpAlive(host) {
 				mu.Lock()
-				logHostAlive(host, "icmp", opt)
+				if pp != nil {
+					pp.markAlive(host, "icmp")
+				} else {
+					logHostAlive(host, "icmp", opt)
+				}
 				alive = append(alive, host)
 				mu.Unlock()
 			}
@@ -196,11 +356,10 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options) ([]strin
 	}
 	wg.Wait()
 	close(limiter)
-	logAliveStats(alive, opt)
 	return alive, nil
 }
 
-func runPing(ctx context.Context, hosts []string, opt *Options) []string {
+func runPing(ctx context.Context, hosts []string, opt *Options, pp *phaseProgress) []string {
 	var alive []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -220,6 +379,9 @@ func runPing(ctx context.Context, hosts []string, opt *Options) []string {
 				<-limiter
 				wg.Done()
 			}()
+			if pp != nil {
+				pp.attempt()
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -227,18 +389,21 @@ func runPing(ctx context.Context, hosts []string, opt *Options) []string {
 			}
 			if execPing(host) {
 				mu.Lock()
-				logHostAlive(host, "ping", opt)
+				if pp != nil {
+					pp.markAlive(host, "ping")
+				} else {
+					logHostAlive(host, "ping", opt)
+				}
 				alive = append(alive, host)
 				mu.Unlock()
 			}
 		}(h)
 	}
 	wg.Wait()
-	logAliveStats(alive, opt)
 	return alive
 }
 
-func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string {
+func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phaseProgress) []string {
 	var alive []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -266,6 +431,9 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string
 				<-sem
 				wg.Done()
 			}()
+			if pp != nil {
+				pp.attempt()
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -292,20 +460,23 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string) []string
 			}
 			if ok {
 				mu.Lock()
-				logHostAlive(h, "tcp", opt)
+				if pp != nil {
+					pp.markAlive(h, "tcp")
+				} else {
+					logHostAlive(h, "tcp", opt)
+				}
 				alive = append(alive, h)
 				mu.Unlock()
 			}
 		}(host)
 	}
 	wg.Wait()
-	logAliveStats(alive, opt)
 	return alive
 }
 
-func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string, d proxy.Dialer) []string {
+func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string, d proxy.Dialer, pp *phaseProgress) []string {
 	if d == nil {
-		return runTCPDiscovery(ctx, opt, hosts)
+		return runTCPDiscovery(ctx, opt, hosts, pp)
 	}
 	var alive []string
 	var mu sync.Mutex
@@ -334,6 +505,9 @@ func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string
 				<-sem
 				wg.Done()
 			}()
+			if pp != nil {
+				pp.attempt()
+			}
 			select {
 			case <-ctx.Done():
 				return
@@ -356,14 +530,17 @@ func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string
 			}
 			if ok {
 				mu.Lock()
-				logHostAlive(h, "tcp", opt)
+				if pp != nil {
+					pp.markAlive(h, "tcp")
+				} else {
+					logHostAlive(h, "tcp", opt)
+				}
 				alive = append(alive, h)
 				mu.Unlock()
 			}
 		}(host)
 	}
 	wg.Wait()
-	logAliveStats(alive, opt)
 	return alive
 }
 
@@ -412,6 +589,9 @@ func icmpAlive(host string) bool {
 }
 
 func logAliveStats(alive []string, opt *Options) {
+	if opt == nil || opt.Quiet || !opt.Debug {
+		return
+	}
 	top := opt.DiscoveryTop
 	if top <= 0 {
 		top = 10
@@ -419,17 +599,16 @@ func logAliveStats(alive []string, opt *Options) {
 	if len(alive) > 1000 {
 		at, al := countTop(alive, top, true)
 		for i := 0; i < len(at); i++ {
-			fmt.Fprintf(os.Stderr, "Alive /16: %s => %d\n", at[i], al[i])
+			gologger.Debug().Msgf("Alive /16: %s => %d", at[i], al[i])
 		}
 	}
 	if len(alive) > 256 {
 		at, al := countTop(alive, top, false)
 		for i := 0; i < len(at); i++ {
-			fmt.Fprintf(os.Stderr, "Alive /24: %s => %d\n", at[i], al[i])
+			gologger.Debug().Msgf("Alive /24: %s => %d", at[i], al[i])
 		}
 	}
 }
-
 func countTop(list []string, top int, bSegment bool) (keys []string, vals []int) {
 	m := make(map[string]int)
 	for _, ip := range list {
@@ -465,7 +644,7 @@ func countTop(list []string, top int, bSegment bool) (keys []string, vals []int)
 }
 func logHostAlive(host, proto string, opt *Options) {
 	if opt.LogDiscoveredHosts || opt.Debug {
-		fmt.Fprintln(os.Stderr, host)
+		gologger.Print().Msg(host)
 	}
 }
 func execPing(ip string) bool {
