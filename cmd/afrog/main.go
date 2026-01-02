@@ -259,8 +259,8 @@ func main() {
 	}
 	lock.Unlock()
 
-	gologger.Info().Msgf("%-18s | %-9s | tasks=%d/%d found=%d duration=%s",
-		"Vulnerability scan",
+	gologger.Info().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
+		utils.StageVulnScan,
 		"completed",
 		atomic.LoadUint32(&options.CurrentCount),
 		options.Count,

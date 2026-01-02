@@ -185,12 +185,12 @@ func (runner *Runner) Execute() {
 				}
 			}
 		} else if !options.SDKMode {
-			gologger.Info().Msgf("%-18s | %-9s | no valid hosts for pre-scan", "Host discovery", "skipped")
-			gologger.Info().Msgf("%-18s | %-9s | no valid hosts for pre-scan", "Port scan", "skipped")
+			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
+			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
 		}
 	} else if !options.SDKMode {
-		gologger.Info().Msgf("%-18s | %-9s | -ps not enabled", "Host discovery", "skipped")
-		gologger.Info().Msgf("%-18s | %-9s | -ps not enabled", "Port scan", "skipped")
+		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
+		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
 	}
 
 	options.Count += options.Targets.Len() * len(pocSlice)
@@ -200,7 +200,7 @@ func (runner *Runner) Execute() {
 	}
 
 	if !options.SDKMode {
-		gologger.Info().Msgf("%-18s | %-9s | targets=%d pocs=%d tasks=%d", "Vulnerability scan", "started", options.Targets.Len(), len(pocSlice), options.Count)
+		gologger.Info().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), len(pocSlice), options.Count)
 	}
 
 	// 开始 普通POC 扫描 @edit 2024/05/30

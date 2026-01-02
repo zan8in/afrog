@@ -16,6 +16,7 @@ import (
 
 	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/v3/pkg/progress"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	"golang.org/x/net/proxy"
 )
@@ -140,7 +141,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
 		discStart := time.Now()
 		if !s.options.Quiet {
-			gologger.Info().Msgf("%-18s | %-9s | targets=%d method=%s", "Host discovery", "started", len(origHosts), s.options.DiscoveryMethod)
+			gologger.Info().Msgf("%-9s | %-9s | targets=%d method=%s", utils.StageHostDiscovery, "started", len(origHosts), s.options.DiscoveryMethod)
 		}
 		aliveHosts, derr := DiscoverAliveHosts(discCtx, s.options, origHosts)
 		if derr != nil {
@@ -148,12 +149,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 		if discCtx.Err() != nil {
 			if !s.options.Quiet {
-				gologger.Warning().Msgf("%-18s | %-9s | alive=%d", "Host discovery", "interrupted", len(aliveHosts))
+				gologger.Warning().Msgf("%-9s | %-9s | alive=%d", utils.StageHostDiscovery, "interrupted", len(aliveHosts))
 			}
 		}
 		discStop()
 		if !s.options.Quiet {
-			gologger.Info().Msgf("%-18s | %-9s | alive=%d/%d duration=%s", "Host discovery", "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
+			gologger.Info().Msgf("%-9s | %-9s | alive=%d/%d duration=%s", utils.StageHostDiscovery, "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
 		}
 		hostIter = NewHostIterator(aliveHosts)
 	}
@@ -165,7 +166,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	startTime := time.Now()
 
 	if !s.options.Quiet {
-		gologger.Info().Msgf("%-18s | %-9s | hosts=%d ports=%s", "Port scan", "started", hostIter.Total(), s.options.Ports)
+		gologger.Info().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
 	}
 
 	progressEnabled := s.options.Debug && !s.options.Quiet && total > 0
@@ -306,7 +307,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if progressEnabled {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
-		gologger.Warning().Msgf("%-18s | %-9s | partial results", "Port scan", "interrupted")
+		gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
 	}
 	scanStop()
 
@@ -319,8 +320,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		fmt.Fprint(os.Stderr, "\r\033[2K\r")
 	}
 	if !s.options.Quiet {
-		gologger.Info().Msgf("%-18s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
-			"Port scan",
+		gologger.Info().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
+			utils.StagePortScan,
 			"completed",
 			hostIter.Total(),
 			total,
