@@ -196,9 +196,6 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		suffix := ""
 		fmt.Fprint(os.Stderr, "\r\033[2K")
 		fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, curr, total, elapsed, suffix)
-		if final {
-			fmt.Fprint(os.Stderr, "\n")
-		}
 	}
 
 	if progressEnabled {
@@ -306,6 +303,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	wg.Wait()
 
 	if scanCtx.Err() != nil && !s.options.Quiet {
+		if progressEnabled {
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		}
 		gologger.Warning().Msgf("%-18s | %-9s | partial results", "Port scan", "interrupted")
 	}
 	scanStop()
@@ -316,6 +316,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	}
 	if progressEnabled {
 		renderProgress(true)
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
 	}
 	if !s.options.Quiet {
 		gologger.Info().Msgf("%-18s | %-9s | hosts=%d tasks=%d open=%d duration=%s",

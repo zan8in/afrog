@@ -83,6 +83,7 @@ func (p *phaseProgress) stopRender() {
 	}
 	if p.enabled() {
 		p.render(true)
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
 	}
 }
 
@@ -134,9 +135,6 @@ func (p *phaseProgress) render(final bool) {
 	suffix := ""
 	fmt.Fprint(os.Stderr, "\r\033[2K")
 	fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, done, total, elapsed, suffix)
-	if final {
-		fmt.Fprint(os.Stderr, "\n")
-	}
 }
 
 func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]string, error) {
