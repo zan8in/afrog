@@ -296,7 +296,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("portscan", "PortScan",
 		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
-		flagSet.StringVarP(&options.PSPorts, "ports", "p", "full", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top-100' or 'full'"),
+		flagSet.StringVarP(&options.PSPorts, "ports", "p", "full", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full'"),
 		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
 		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),

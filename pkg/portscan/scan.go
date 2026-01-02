@@ -166,6 +166,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	startTime := time.Now()
 
 	if !s.options.Quiet {
+		if isBuiltinPortsSpec(s.options.Ports) {
+			gologger.Info().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
+		}
 		gologger.Info().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
 	}
 

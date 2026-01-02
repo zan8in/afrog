@@ -7,7 +7,7 @@ import (
 // Options configuration for the port scanner
 type Options struct {
 	Targets                []string // List of IPs, CIDRs, or ranges
-	Ports                  string   // Port range string (e.g., "80,443,1000-2000" or "top-100")
+	Ports                  string   // Port range string (e.g., "80,443,1000-2000" or "top")
 	RateLimit              int      // Packets per second (approx) or concurrency limit
 	Timeout                time.Duration
 	Retries                int
