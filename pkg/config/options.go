@@ -200,8 +200,6 @@ type Options struct {
 	PSTimeout       int
 	PSRetries       int
 	PSSkipDiscovery bool
-	PSMethod        string
-	PSDebug         bool
 
 	// path to the afrog configuration file
 	ConfigFile string
@@ -298,13 +296,11 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("portscan", "PortScan",
 		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
-		flagSet.StringVar(&options.PSPorts, "ps-ports", "", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top-100' or 'full'"),
-		flagSet.IntVar(&options.PSRateLimit, "ps-rate", 0, "port pre-scan rate limit"),
-		flagSet.IntVar(&options.PSTimeout, "ps-timeout-ms", 0, "port pre-scan timeout in milliseconds"),
-		flagSet.IntVar(&options.PSRetries, "ps-retries", 0, "port pre-scan retries"),
-		flagSet.BoolVar(&options.PSSkipDiscovery, "ps-skip-discovery", false, "skip host discovery before port pre-scan"),
-		flagSet.StringVar(&options.PSMethod, "ps-discovery-method", "auto", "host discovery method: auto|icmp|ping|tcp"),
-		flagSet.BoolVar(&options.PSDebug, "ps-debug", true, "show port pre-scan progress"),
+		flagSet.StringVarP(&options.PSPorts, "ports", "p", "full", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top-100' or 'full'"),
+		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
+		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
+		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
+		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
 	)
 
 	flagSet.CreateGroup("webhook", "Webhook",

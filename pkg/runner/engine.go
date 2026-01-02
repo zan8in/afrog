@@ -112,19 +112,34 @@ func (runner *Runner) Execute() {
 	if options.PortScan {
 		hostSeen := make(map[string]struct{})
 		hosts := make([]string, 0)
+		normalizePreScanTarget := func(raw string) string {
+			raw = strings.TrimSpace(raw)
+			if raw == "" {
+				return ""
+			}
+			if strings.Contains(raw, "://") {
+				return strings.TrimSpace(utils.ExtractHost(raw))
+			}
+			if strings.Contains(raw, "/") {
+				if _, _, err := net.ParseCIDR(raw); err == nil {
+					return raw
+				}
+				return strings.TrimSpace(utils.ExtractHost(raw))
+			}
+			if strings.Contains(raw, "-") {
+				parts := strings.Split(raw, "-")
+				if len(parts) == 2 && net.ParseIP(strings.TrimSpace(parts[0])) != nil && net.ParseIP(strings.TrimSpace(parts[1])) != nil {
+					return raw
+				}
+			}
+			return strings.TrimSpace(utils.ExtractHost(raw))
+		}
 		for _, t := range runner.options.Targets.List() {
 			raw := strings.TrimSpace(fmt.Sprintf("%v", t))
 			if raw == "" {
 				continue
 			}
-			h := raw
-			// 保留 CIDR 或 IP区间用于端口扫描模块内部扩展
-			if strings.Contains(raw, "/") || strings.Contains(raw, "-") {
-				h = raw
-			} else {
-				// URL 或 host:port → 归一化为主机
-				h = strings.TrimSpace(utils.ExtractHost(raw))
-			}
+			h := normalizePreScanTarget(raw)
 			if h == "" {
 				continue
 			}
@@ -138,7 +153,7 @@ func (runner *Runner) Execute() {
 			psOpts.Targets = hosts
 			psOpts.Proxy = options.Proxy
 			// Let portscan module handle its own output and progress
-			psOpts.Debug = options.PSDebug && !options.Silent
+			psOpts.Debug = !options.Silent
 			psOpts.Quiet = false
 			if options.PSPorts != "" {
 				psOpts.Ports = options.PSPorts
@@ -155,9 +170,6 @@ func (runner *Runner) Execute() {
 			}
 			if options.PSSkipDiscovery {
 				psOpts.SkipDiscovery = true
-			}
-			if options.PSMethod != "" {
-				psOpts.DiscoveryMethod = options.PSMethod
 			}
 			open := make(map[string][]int)
 			psOpts.OnResult = func(r *portscan.ScanResult) {
