@@ -21,7 +21,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
-	sliceutil "github.com/zan8in/pins/slice"
 )
 
 var CheckerPool = sync.Pool{
@@ -110,6 +109,13 @@ func (runner *Runner) Execute() {
 
 	// portscan pre-scan: run after OOB status output to ensure ordering
 	if options.PortScan {
+		origTargets := runner.options.Targets.List()
+		origSeen := make(map[string]struct{}, len(origTargets))
+		for _, t := range origTargets {
+			if s, ok := t.(string); ok && s != "" {
+				origSeen[s] = struct{}{}
+			}
+		}
 		hostSeen := make(map[string]struct{})
 		hosts := make([]string, 0)
 		normalizePreScanTarget := func(raw string) string {
@@ -194,8 +200,11 @@ func (runner *Runner) Execute() {
 					}
 				}
 				if len(newTargets) > 0 {
-					options.Targets = sliceutil.SafeSlice{}
 					for _, nt := range newTargets {
+						if _, ok := origSeen[nt]; ok {
+							continue
+						}
+						origSeen[nt] = struct{}{}
 						options.Targets.Append(nt)
 					}
 				}
