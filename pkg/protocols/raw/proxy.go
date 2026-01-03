@@ -75,40 +75,40 @@ func LoadProxyServers(proxy string) error {
 }
 
 func processProxyList() error {
-    if len(proxyURLList) == 0 {
-        return fmt.Errorf("could not find any valid proxy")
-    }
+	if len(proxyURLList) == 0 {
+		return fmt.Errorf("could not find any valid proxy")
+	}
 
-    done := make(chan struct{})
-    exitCounter := make(chan struct{})
-    total := len(proxyURLList)
+	done := make(chan struct{})
+	exitCounter := make(chan struct{})
+	total := len(proxyURLList)
 
-    for _, p := range proxyURLList {
-        go runProxyConnectivity(p, done, exitCounter)
-    }
+	for _, p := range proxyURLList {
+		go runProxyConnectivity(p, done, exitCounter)
+	}
 
-    checked := 0
-    for {
-        select {
-        case <-done:
-            return nil
-        case <-exitCounter:
-            checked++
-            if checked == total {
-                return errors.New("no reachable proxy found")
-            }
-        }
-    }
+	checked := 0
+	for {
+		select {
+		case <-done:
+			return nil
+		case <-exitCounter:
+			checked++
+			if checked == total {
+				return errors.New("no reachable proxy found")
+			}
+		}
+	}
 }
 
 func runProxyConnectivity(proxyURL url.URL, done chan struct{}, exitCounter chan struct{}) {
-    if err := testProxyConnection(proxyURL, DefaultTimeout); err == nil {
-        if ProxyURL == "" && ProxySocksURL == "" {
-            assignProxyURL(proxyURL)
-            done <- struct{}{}
-        }
-    }
-    exitCounter <- struct{}{}
+	if err := testProxyConnection(proxyURL, DefaultTimeout); err == nil {
+		if ProxyURL == "" && ProxySocksURL == "" {
+			assignProxyURL(proxyURL)
+			done <- struct{}{}
+		}
+	}
+	exitCounter <- struct{}{}
 }
 
 func testProxyConnection(proxyURL url.URL, timeoutDelay int) error {
