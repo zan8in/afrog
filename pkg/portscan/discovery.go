@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -19,7 +18,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/gologger"
 	"golang.org/x/net/icmp"
-	"golang.org/x/net/proxy"
 )
 
 type phaseProgress struct {
@@ -146,17 +144,6 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 		var alive []string
 		var err error
 		pending := hosts
-		var d proxy.Dialer
-		if opt.Proxy != "" {
-			u, perr := url.Parse(opt.Proxy)
-			if perr == nil {
-				if u.Scheme == "http" {
-					d = NewHttpProxyDialer(u)
-				} else {
-					d, _ = proxy.FromURL(u, proxy.Direct)
-				}
-			}
-		}
 		conn, e := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 		if e == nil {
 			defer conn.Close()
@@ -201,7 +188,7 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 		if len(pending) > 0 {
 			pp := newPhaseProgress(opt, "tcp", len(pending))
 			pp.startRender(ctx)
-			add4 := runTCPDiscoveryWithDialer(ctx, opt, pending, d, pp)
+			add4 := runTCPDiscovery(ctx, opt, pending, pp)
 			pp.stopRender()
 			alive = mergeUnique(alive, add4)
 		}
@@ -470,99 +457,6 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 	}
 	wg.Wait()
 	return alive
-}
-
-func runTCPDiscoveryWithDialer(ctx context.Context, opt *Options, hosts []string, d proxy.Dialer, pp *phaseProgress) []string {
-	if d == nil {
-		return runTCPDiscovery(ctx, opt, hosts, pp)
-	}
-	var alive []string
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	primary := opt.DiscoveryPorts
-	if len(primary) == 0 {
-		primary = []int{443, 80, 22, 3389}
-	}
-	fallback := opt.DiscoveryFallbackPorts
-	if len(fallback) == 0 {
-		fallback = []int{21, 25, 502, 102, 123, 135, 445}
-	}
-	limit := opt.RateLimit
-	if limit < 100 {
-		limit = 100
-	}
-	sem := make(chan struct{}, limit)
-	for _, host := range hosts {
-		if ctx.Err() != nil {
-			break
-		}
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(h string) {
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
-			if pp != nil {
-				pp.attempt()
-			}
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			ok := false
-			for _, p := range primary {
-				if tcpOpenViaDialer(ctx, d, h, p, opt.Timeout) {
-					ok = true
-					break
-				}
-			}
-			if !ok && opt.DiscoveryFallback {
-				for _, p := range fallback {
-					if tcpOpenViaDialer(ctx, d, h, p, opt.Timeout) {
-						ok = true
-						break
-					}
-				}
-			}
-			if ok {
-				mu.Lock()
-				if pp != nil {
-					pp.markAlive(h, "tcp")
-				} else {
-					logHostAlive(h, "tcp", opt)
-				}
-				alive = append(alive, h)
-				mu.Unlock()
-			}
-		}(host)
-	}
-	wg.Wait()
-	return alive
-}
-
-func tcpOpenViaDialer(ctx context.Context, d proxy.Dialer, host string, port int, to time.Duration) bool {
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	type res struct {
-		c net.Conn
-		e error
-	}
-	ch := make(chan res, 1)
-	go func() {
-		c, e := d.Dial("tcp", addr)
-		ch <- res{c, e}
-	}()
-	select {
-	case r := <-ch:
-		if r.e == nil {
-			r.c.Close()
-			return true
-		}
-		return false
-	case <-time.After(to):
-		return false
-	}
 }
 
 func icmpAlive(host string) bool {

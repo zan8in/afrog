@@ -36,6 +36,33 @@ var CheckerPool = sync.Pool{
 	},
 }
 
+type openPortsCollector struct {
+	mu   sync.Mutex
+	open map[string][]int
+}
+
+func newOpenPortsCollector() *openPortsCollector {
+	return &openPortsCollector{
+		open: make(map[string][]int),
+	}
+}
+
+func (c *openPortsCollector) Add(host string, port int) {
+	c.mu.Lock()
+	c.open[host] = append(c.open[host], port)
+	c.mu.Unlock()
+}
+
+func (c *openPortsCollector) Snapshot() map[string][]int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cp := make(map[string][]int, len(c.open))
+	for host, ports := range c.open {
+		cp[host] = append([]int(nil), ports...)
+	}
+	return cp
+}
+
 func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
@@ -139,7 +166,6 @@ func (runner *Runner) Execute() {
 		if len(hosts) > 0 {
 			psOpts := portscan.DefaultOptions()
 			psOpts.Targets = hosts
-			psOpts.Proxy = options.Proxy
 			// Let portscan module handle its own output and progress
 			psOpts.Debug = !options.Silent
 			psOpts.LiveStats = options.LiveStats
@@ -163,15 +189,15 @@ func (runner *Runner) Execute() {
 			if options.PSS4Chunk != 0 {
 				psOpts.S4ChunkSize = options.PSS4Chunk
 			}
-			open := make(map[string][]int)
+			collector := newOpenPortsCollector()
 			psOpts.OnResult = func(r *portscan.ScanResult) {
 				gologger.Print().Msgf("%s:%d", r.Host, r.Port)
-				open[r.Host] = append(open[r.Host], r.Port)
+				collector.Add(r.Host, r.Port)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
 				_ = sc.Scan(context.Background())
 				newTargets := make([]string, 0)
-				for host, ports := range open {
+				for host, ports := range collector.Snapshot() {
 					seenPort := make(map[int]struct{})
 					for _, p := range ports {
 						if _, ok := seenPort[p]; ok {

@@ -18,7 +18,6 @@ type Options struct {
 	Debug                  bool
 	LiveStats              bool
 	Quiet                  bool
-	Proxy                  string
 	SkipDiscovery          bool // Skip host discovery phase
 	DiscoveryPorts         []int
 	DiscoveryFallback      bool

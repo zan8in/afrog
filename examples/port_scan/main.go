@@ -19,7 +19,6 @@ func main() {
 	// opts.Timeout = 1000 * time.Millisecond
 	// opts.Retries = 2
 	opts.Debug = true
-	// opts.Proxy = "http://127.0.0.1:51024"
 	// portscan.ApplyQuickestStrategy(opts)
 
 	// 2. Setup Callback

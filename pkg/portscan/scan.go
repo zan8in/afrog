@@ -1,12 +1,9 @@
 package portscan
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -18,7 +15,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
-	"golang.org/x/net/proxy"
 )
 
 // Scanner is the main entry point for port scanning
@@ -29,7 +25,6 @@ type Scanner struct {
 	consecutiveErrors int32
 	currentProgress   uint64
 	resultsCount      uint64
-	dialer            proxy.Dialer
 	adaptiveDelay     int32 // Current delay in milliseconds
 }
 
@@ -43,84 +38,7 @@ func NewScanner(opt *Options) (*Scanner, error) {
 		options: opt,
 	}
 
-	if opt.Proxy != "" {
-		proxyURL, err := url.Parse(opt.Proxy)
-		if err != nil {
-			return nil, fmt.Errorf("invalid proxy URL: %v", err)
-		}
-
-		switch proxyURL.Scheme {
-		case "http":
-			scanner.dialer = NewHttpProxyDialer(proxyURL)
-		case "socks5":
-			dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create proxy dialer: %v", err)
-			}
-			scanner.dialer = dialer
-		default:
-			// Try default for others
-			dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create proxy dialer: %v", err)
-			}
-			scanner.dialer = dialer
-		}
-	}
-
 	return scanner, nil
-}
-
-type httpProxyDialer struct {
-	proxyAddr string
-}
-
-func NewHttpProxyDialer(proxyURL *url.URL) *httpProxyDialer {
-	return &httpProxyDialer{
-		proxyAddr: proxyURL.Host,
-	}
-}
-
-func (h *httpProxyDialer) Dial(network, addr string) (net.Conn, error) {
-	conn, err := net.Dial("tcp", h.proxyAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	req := &http.Request{
-		Method: "CONNECT",
-		URL:    &url.URL{Opaque: addr},
-		Host:   addr,
-		Header: make(http.Header),
-	}
-	// Basic implementation, no auth support yet
-	err = req.Write(conn)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	br := bufio.NewReader(conn)
-	resp, err := http.ReadResponse(br, req)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	if resp.StatusCode != 200 {
-		conn.Close()
-		return nil, fmt.Errorf("proxy refused connection: %s", resp.Status)
-	}
-
-	return &bufferedConn{Conn: conn, r: br}, nil
-}
-
-type bufferedConn struct {
-	net.Conn
-	r *bufio.Reader
-}
-
-func (c *bufferedConn) Read(b []byte) (int, error) {
-	return c.r.Read(b)
 }
 
 // Scan starts the scanning process
@@ -466,28 +384,7 @@ func (s *Scanner) checkPortOpen(host string, port int) (net.Conn, error) {
 	var err error
 
 	for i := 0; i <= s.options.Retries; i++ {
-		if s.dialer != nil {
-			// Proxy Dialing
-			type dialRes struct {
-				c net.Conn
-				e error
-			}
-			ch := make(chan dialRes, 1)
-			go func() {
-				c, e := s.dialer.Dial("tcp", address)
-				ch <- dialRes{c, e}
-			}()
-
-			select {
-			case res := <-ch:
-				conn, err = res.c, res.e
-			case <-time.After(s.options.Timeout):
-				err = fmt.Errorf("timeout")
-			}
-		} else {
-			// Direct Dialing
-			conn, err = net.DialTimeout("tcp", address, s.options.Timeout)
-		}
+		conn, err = net.DialTimeout("tcp", address, s.options.Timeout)
 
 		if err == nil {
 			return conn, nil
