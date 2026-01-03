@@ -28,7 +28,7 @@ rules:
         - /swagger/v1/swagger.yaml
         - /api/index.html
         - /api/docs/
-        - /api_docs
+        - /webjars/swagger-ui/index.html
         - /api/swagger-ui.html
     request:
       method: GET
@@ -51,7 +51,8 @@ rules:
         - /jeecg-boot/v2/api-docs
         - /jeecg-boot/v3/api-docs
         - /v3/api-docs
-        - /webjars/swagger-ui/index.html
+        - /api_docs
+        - /api-docs
     request:
       method: GET
       path: "{{p}}"
