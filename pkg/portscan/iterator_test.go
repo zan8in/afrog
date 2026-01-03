@@ -77,3 +77,20 @@ func TestS3Parts(t *testing.T) {
 		}
 	}
 }
+
+func TestNewPortIterator_FullAliasDash(t *testing.T) {
+	fullIter, err := NewPortIterator("full")
+	if err != nil {
+		t.Fatalf("NewPortIterator full error: %v", err)
+	}
+	dashIter, err := NewPortIterator("-")
+	if err != nil {
+		t.Fatalf("NewPortIterator '-' error: %v", err)
+	}
+	if dashIter.Total() != fullIter.Total() {
+		t.Fatalf("'-' total mismatch: got=%d want=%d", dashIter.Total(), fullIter.Total())
+	}
+	if dashIter.Total() != 65535 {
+		t.Fatalf("'-' expected full port count: got=%d want=%d", dashIter.Total(), 65535)
+	}
+}

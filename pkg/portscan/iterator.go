@@ -89,7 +89,7 @@ func getBuiltinTopNPorts(n int) []int {
 
 func isBuiltinPortsSpec(portStr string) bool {
 	switch strings.ToLower(strings.TrimSpace(portStr)) {
-	case "top", "full", "all", "s1", "s2", "s3", "s4", "stage1", "stage2", "stage3", "stage4", "stage-1", "stage-2", "stage-3", "stage-4",
+	case "-", "top", "full", "all", "s1", "s2", "s3", "s4", "stage1", "stage2", "stage3", "stage4", "stage-1", "stage-2", "stage-3", "stage-4",
 		"s3-1", "s3-2", "s3-3", "s3-4", "s3-5", "s3-6",
 		"stage3-1", "stage3-2", "stage3-3", "stage3-4", "stage3-5", "stage3-6",
 		"stage-3-1", "stage-3-2", "stage-3-3", "stage-3-4", "stage-3-5", "stage-3-6":
@@ -110,6 +110,9 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 
 	// Handle special keywords
 	normalized := strings.ToLower(strings.TrimSpace(portStr))
+	if normalized == "-" {
+		normalized = "full"
+	}
 	if normalized == "top-100" {
 		return nil, fmt.Errorf("unsupported ports keyword 'top-100', use 'top'")
 	}
