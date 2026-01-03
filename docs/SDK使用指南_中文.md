@@ -81,6 +81,15 @@ type SDKOptions struct {
     Retries      int // 重试次数 (默认: 1)
     Timeout      int // 超时时间秒 (默认: 10)
     MaxHostError int // 主机最大错误数 (默认: 3)
+
+    // ========== PortScan 预扫描配置 ==========
+    PortScan        bool   // 启用端口预扫描（等价于 CLI 的 -ps）
+    PSPorts         string // 预扫描端口定义：top/full/all/80,443/1-1024 等（等价于 -p）
+    PSRateLimit     int    // 预扫描速率限制（等价于 -prate）
+    PSTimeout       int    // 预扫描超时（毫秒，等价于 -ptimeout）
+    PSRetries       int    // 预扫描重试（等价于 -ptries）
+    PSSkipDiscovery bool   // 跳过存活探测（等价于 -Pn）
+    PSS4Chunk       int    // 全端口扫描 chunk（等价于 --ps-s4-chunk）
     
     // ========== 网络配置 ==========
     Proxy string // HTTP/SOCKS5 代理
@@ -222,6 +231,36 @@ if oobEnabled, oobStatus := scanner.GetOOBStatus(); oobEnabled {
 }
 ```
 
+### 5. 端口预扫描（PortScan）
+
+SDK 支持在 PoC 扫描之前做一次端口预扫描：扫描到的开放端口会自动追加进内部 Targets（以 `host:port` 形式），后续 PoC 会按新的目标集合执行。
+
+SDK 模式下不会默认把开放端口输出到控制台，可以通过回调或获取结果来消费。
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"1.2.3.4"}
+options.PocFile = pocPath
+
+options.PortScan = true
+options.PSPorts = "top" // 或 "full"/"all"/"80,443"/"1-1024"
+options.PSSkipDiscovery = true
+options.PSTimeout = 500
+
+scanner, _ := afrog.NewSDKScanner(options)
+
+scanner.OnPort = func(host string, port int) {
+    fmt.Printf("open: %s:%d\n", host, port)
+}
+
+scanner.Run()
+
+open := scanner.GetOpenPorts()
+_ = open
+```
+
+也可以直接运行示例：`examples/sdk_portscan/`。
+
 ## API 方法参考
 
 ### SDKScanner 核心方法
@@ -232,6 +271,7 @@ if oobEnabled, oobStatus := scanner.GetOOBStatus(); oobEnabled {
 | `Run()` | 同步执行扫描 | `error` |
 | `RunAsync()` | 异步执行扫描 | `error` |
 | `GetResults()` | 获取所有扫描结果 | `[]*result.Result` |
+| `GetOpenPorts()` | 获取预扫描开放端口 | `map[string][]int` |
 | `GetStats()` | 获取扫描统计信息 | `ScanStats` |
 | `GetProgress()` | 获取扫描进度(0-100) | `float64` |
 | `GetVulnerabilityCount()` | 获取漏洞数量 | `int` |

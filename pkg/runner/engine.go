@@ -191,7 +191,12 @@ func (runner *Runner) Execute() {
 			}
 			collector := newOpenPortsCollector()
 			psOpts.OnResult = func(r *portscan.ScanResult) {
-				gologger.Print().Msgf("%s:%d", r.Host, r.Port)
+				if options.OnPortScanResult != nil {
+					options.OnPortScanResult(r.Host, r.Port)
+				}
+				if !options.SDKMode {
+					gologger.Print().Msgf("%s:%d", r.Host, r.Port)
+				}
 				collector.Add(r.Host, r.Port)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {

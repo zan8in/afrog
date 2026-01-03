@@ -193,6 +193,8 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		}
 	}
 
+	runner.catalog = catalog.New(runner.options.PocsDirectory.String())
+
 	allPocsYamlSlice := runner.catalog.GetPocsPath(runner.options.PocsDirectory)
 
 	if len(allPocsYamlSlice) == 0 && len(pocs.EmbedFileList) == 0 {

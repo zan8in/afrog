@@ -194,13 +194,14 @@ type Options struct {
 	EnableOOB bool
 
 	// enable pre-scan host port scanning
-	PortScan        bool
-	PSPorts         string
-	PSRateLimit     int
-	PSTimeout       int
-	PSRetries       int
-	PSSkipDiscovery bool
-	PSS4Chunk       int
+	PortScan         bool
+	PSPorts          string
+	PSRateLimit      int
+	PSTimeout        int
+	PSRetries        int
+	PSSkipDiscovery  bool
+	PSS4Chunk        int
+	OnPortScanResult func(host string, port int)
 
 	// path to the afrog configuration file
 	ConfigFile string

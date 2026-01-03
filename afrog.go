@@ -31,6 +31,9 @@ type SDKScanner struct {
 	// mu 用于保护results的并发访问
 	mu sync.Mutex
 
+	openPortsMu sync.Mutex
+	openPorts   map[string]map[int]struct{}
+
 	// options 存储扫描配置选项
 	options *config.Options
 
@@ -39,6 +42,8 @@ type SDKScanner struct {
 
 	// 实时结果回调（同步版本）
 	OnResult func(*result.Result)
+
+	OnPort func(host string, port int)
 
 	// 实时结果通道（流式版本）
 	ResultChan chan *result.Result
@@ -83,6 +88,14 @@ type SDKOptions struct {
 	MaxHostError      int // 主机最大错误数 (默认: 3)
 	Smart             bool
 
+	PortScan        bool
+	PSPorts         string
+	PSRateLimit     int
+	PSTimeout       int
+	PSRetries       int
+	PSSkipDiscovery bool
+	PSS4Chunk       int
+
 	// ========== 网络配置 ==========
 	Proxy   string // HTTP/SOCKS5代理
 	Headers []string
@@ -107,6 +120,8 @@ func NewSDKOptions() *SDKOptions {
 		Retries:      1,
 		Timeout:      10,
 		MaxHostError: 3,
+		PSPorts:      "top",
+		PSS4Chunk:    1000,
 	}
 }
 
@@ -190,15 +205,31 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	scanner := &SDKScanner{
-		runner:  r,
-		results: make([]*result.Result, 0),
-		options: options,
-		sdkOpts: opts,
-		ctx:     ctx,
-		cancel:  cancel,
+		runner:    r,
+		results:   make([]*result.Result, 0),
+		options:   options,
+		sdkOpts:   opts,
+		ctx:       ctx,
+		cancel:    cancel,
+		openPorts: make(map[string]map[int]struct{}),
 		stats: &ScanStats{
 			StartTime: time.Now(),
 		},
+	}
+
+	options.OnPortScanResult = func(host string, port int) {
+		scanner.openPortsMu.Lock()
+		pm, ok := scanner.openPorts[host]
+		if !ok {
+			pm = make(map[int]struct{})
+			scanner.openPorts[host] = pm
+		}
+		pm[port] = struct{}{}
+		scanner.openPortsMu.Unlock()
+
+		if scanner.OnPort != nil {
+			scanner.OnPort(host, port)
+		}
 	}
 
 	// 如果启用流式输出，创建结果通道
@@ -285,6 +316,24 @@ func (s *SDKScanner) GetResults() []*result.Result {
 	results := make([]*result.Result, len(s.results))
 	copy(results, s.results)
 	return results
+}
+
+func (s *SDKScanner) GetOpenPorts() map[string][]int {
+	s.openPortsMu.Lock()
+	defer s.openPortsMu.Unlock()
+
+	out := make(map[string][]int, len(s.openPorts))
+	for host, ports := range s.openPorts {
+		if len(ports) == 0 {
+			continue
+		}
+		dst := make([]int, 0, len(ports))
+		for p := range ports {
+			dst = append(dst, p)
+		}
+		out[host] = dst
+	}
+	return out
 }
 
 // GetStats 获取扫描统计信息
@@ -545,6 +594,13 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 		OOBRateLimit:      50,
 		OOBConcurrency:    20,
 		Smart:             opts.Smart,
+		PortScan:          opts.PortScan,
+		PSPorts:           opts.PSPorts,
+		PSRateLimit:       opts.PSRateLimit,
+		PSTimeout:         opts.PSTimeout,
+		PSRetries:         opts.PSRetries,
+		PSSkipDiscovery:   opts.PSSkipDiscovery,
+		PSS4Chunk:         opts.PSS4Chunk,
 	}
 
 	if len(opts.Headers) > 0 {

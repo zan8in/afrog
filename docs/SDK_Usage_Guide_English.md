@@ -81,6 +81,15 @@ type SDKOptions struct {
     Retries      int // Retry attempts (default: 1)
     Timeout      int // Timeout in seconds (default: 10)
     MaxHostError int // Max errors per host (default: 3)
+
+    // ========== PortScan Pre-scan Configuration ==========
+    PortScan        bool   // Enable port pre-scan (same as CLI -ps)
+    PSPorts         string // Ports definition: top/full/all/80,443/1-1024 etc. (same as -p)
+    PSRateLimit     int    // Pre-scan rate limit (same as -prate)
+    PSTimeout       int    // Pre-scan timeout in milliseconds (same as -ptimeout)
+    PSRetries       int    // Pre-scan retries (same as -ptries)
+    PSSkipDiscovery bool   // Skip host discovery (same as -Pn)
+    PSS4Chunk       int    // Chunk size when ports=full (same as --ps-s4-chunk)
     
     // ========== Network Configuration ==========
     Proxy string // HTTP/SOCKS5 proxy
@@ -222,6 +231,36 @@ if oobEnabled, oobStatus := scanner.GetOOBStatus(); oobEnabled {
 }
 ```
 
+### 5. Port Pre-scan (PortScan)
+
+The SDK can perform a port pre-scan before running PoCs. Discovered open ports will be appended to the internal Targets (as `host:port`), and subsequent PoC scans will run against the updated target set.
+
+In SDK mode, open ports are not printed by default. Consume them via callback or by retrieving the collected results.
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"1.2.3.4"}
+options.PocFile = pocPath
+
+options.PortScan = true
+options.PSPorts = "top" // or "full"/"all"/"80,443"/"1-1024"
+options.PSSkipDiscovery = true
+options.PSTimeout = 500
+
+scanner, _ := afrog.NewSDKScanner(options)
+
+scanner.OnPort = func(host string, port int) {
+    fmt.Printf("open: %s:%d\n", host, port)
+}
+
+scanner.Run()
+
+open := scanner.GetOpenPorts()
+_ = open
+```
+
+You can also run the example: `examples/sdk_portscan/`.
+
 ## API Method Reference
 
 ### SDKScanner Core Methods
@@ -232,6 +271,7 @@ if oobEnabled, oobStatus := scanner.GetOOBStatus(); oobEnabled {
 | `Run()` | Execute scan synchronously | `error` |
 | `RunAsync()` | Execute scan asynchronously | `error` |
 | `GetResults()` | Get all scan results | `[]*result.Result` |
+| `GetOpenPorts()` | Get open ports discovered by pre-scan | `map[string][]int` |
 | `GetStats()` | Get scan statistics | `ScanStats` |
 | `GetProgress()` | Get scan progress (0-100) | `float64` |
 | `GetVulnerabilityCount()` | Get vulnerability count | `int` |
