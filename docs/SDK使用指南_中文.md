@@ -259,6 +259,23 @@ open := scanner.GetOpenPorts()
 _ = open
 ```
 
+也可以通过 `PortChan` 异步消费端口预扫描结果：启用 `PortScan` 时会自动初始化该通道，扫描结束后会自动关闭。
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"1.2.3.4"}
+options.PocFile = pocPath
+options.PortScan = true
+
+scanner, _ := afrog.NewSDKScanner(options)
+
+_ = scanner.RunAsync()
+
+for r := range scanner.PortChan {
+    fmt.Printf("open: %s:%d\n", r.Host, r.Port)
+}
+```
+
 也可以直接运行示例：`examples/sdk_portscan/`。
 
 ## API 方法参考

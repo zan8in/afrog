@@ -17,6 +17,7 @@ func main() {
 		pocsPath   string
 		ports      string
 		enablePS   bool
+		async      bool
 		search     string
 		severity   string
 	)
@@ -26,6 +27,7 @@ func main() {
 	flag.StringVar(&pocsPath, "pocs", "", "pocs directory")
 	flag.StringVar(&ports, "p", "top", "ports definition for pre-scan")
 	flag.BoolVar(&enablePS, "ps", true, "enable pre-scan port scanning")
+	flag.BoolVar(&async, "async", false, "use async scan and consume PortChan")
 	flag.StringVar(&search, "s", "__no_such_poc__", "poc search keyword")
 	flag.StringVar(&severity, "S", "", "poc severity filter")
 	flag.Parse()
@@ -62,12 +64,20 @@ func main() {
 	}
 	defer sc.Close()
 
-	sc.OnPort = func(host string, port int) {
-		fmt.Printf("[open] %s:%d\n", host, port)
-	}
-
-	if err := sc.Run(); err != nil {
-		log.Printf("Run: %v", err)
+	if async {
+		if err := sc.RunAsync(); err != nil {
+			log.Printf("RunAsync: %v", err)
+		}
+		for r := range sc.PortChan {
+			fmt.Printf("[open] %s:%d\n", r.Host, r.Port)
+		}
+	} else {
+		sc.OnPort = func(host string, port int) {
+			fmt.Printf("[open] %s:%d\n", host, port)
+		}
+		if err := sc.Run(); err != nil {
+			log.Printf("Run: %v", err)
+		}
 	}
 
 	open := sc.GetOpenPorts()

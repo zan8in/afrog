@@ -48,6 +48,10 @@ type SDKScanner struct {
 	// 实时结果通道（流式版本）
 	ResultChan chan *result.Result
 
+	PortChan chan PortScanResult
+
+	closeChansOnce sync.Once
+
 	// 控制流式输出的context
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -65,6 +69,11 @@ type ScanStats struct {
 	TotalScans     int
 	CompletedScans int32
 	FoundVulns     int32
+}
+
+type PortScanResult struct {
+	Host string
+	Port int
 }
 
 // SDKOptions SDK扫描配置选项（优化版）
@@ -227,6 +236,15 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		pm[port] = struct{}{}
 		scanner.openPortsMu.Unlock()
 
+		if scanner.PortChan != nil {
+			select {
+			case scanner.PortChan <- PortScanResult{Host: host, Port: port}:
+			case <-scanner.ctx.Done():
+				return
+			default:
+			}
+		}
+
 		if scanner.OnPort != nil {
 			scanner.OnPort(host, port)
 		}
@@ -235,6 +253,10 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	// 如果启用流式输出，创建结果通道
 	if opts.EnableStream {
 		scanner.ResultChan = make(chan *result.Result, 100)
+	}
+
+	if opts.PortScan {
+		scanner.PortChan = make(chan PortScanResult, 100)
 	}
 
 	// 计算扫描统计
@@ -250,7 +272,9 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 func (s *SDKScanner) Run() error {
 	// 在扫描开始前输出基本信息
 	s.printScanInfo()
-	return s.run()
+	err := s.run()
+	s.closeChans()
+	return err
 }
 
 // RunAsync 执行扫描（异步版本）
@@ -259,11 +283,20 @@ func (s *SDKScanner) RunAsync() error {
 		// 在扫描开始前输出基本信息
 		s.printScanInfo()
 		s.run()
+		s.closeChans()
+	}()
+	return nil
+}
+
+func (s *SDKScanner) closeChans() {
+	s.closeChansOnce.Do(func() {
 		if s.ResultChan != nil {
 			close(s.ResultChan)
 		}
-	}()
-	return nil
+		if s.PortChan != nil {
+			close(s.PortChan)
+		}
+	})
 }
 
 // run 内部扫描执行
@@ -365,9 +398,7 @@ func (s *SDKScanner) Stop() {
 // Close 关闭扫描器，释放资源
 func (s *SDKScanner) Close() {
 	s.cancel()
-	if s.ResultChan != nil {
-		close(s.ResultChan)
-	}
+	s.closeChans()
 	s.results = nil
 }
 

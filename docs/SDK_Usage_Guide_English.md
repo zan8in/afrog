@@ -259,6 +259,23 @@ open := scanner.GetOpenPorts()
 _ = open
 ```
 
+You can also consume port pre-scan results asynchronously via `PortChan`. It is initialized when `PortScan` is enabled and will be closed automatically after the scan finishes.
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"1.2.3.4"}
+options.PocFile = pocPath
+options.PortScan = true
+
+scanner, _ := afrog.NewSDKScanner(options)
+
+_ = scanner.RunAsync()
+
+for r := range scanner.PortChan {
+    fmt.Printf("open: %s:%d\n", r.Host, r.Port)
+}
+```
+
 You can also run the example: `examples/sdk_portscan/`.
 
 ## API Method Reference
