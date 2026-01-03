@@ -200,6 +200,7 @@ type Options struct {
 	PSTimeout       int
 	PSRetries       int
 	PSSkipDiscovery bool
+	PSS4Chunk       int
 
 	// path to the afrog configuration file
 	ConfigFile string
@@ -301,6 +302,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
 		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
+		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
 	)
 
 	flagSet.CreateGroup("webhook", "Webhook",

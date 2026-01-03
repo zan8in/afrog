@@ -89,7 +89,10 @@ func getBuiltinTopNPorts(n int) []int {
 
 func isBuiltinPortsSpec(portStr string) bool {
 	switch strings.ToLower(strings.TrimSpace(portStr)) {
-	case "top", "full", "all", "s1", "s2", "s3", "s4", "stage1", "stage2", "stage3", "stage4", "stage-1", "stage-2", "stage-3", "stage-4":
+	case "top", "full", "all", "s1", "s2", "s3", "s4", "stage1", "stage2", "stage3", "stage4", "stage-1", "stage-2", "stage-3", "stage-4",
+		"s3-1", "s3-2", "s3-3", "s3-4", "s3-5", "s3-6",
+		"stage3-1", "stage3-2", "stage3-3", "stage3-4", "stage3-5", "stage3-6",
+		"stage-3-1", "stage-3-2", "stage-3-3", "stage-3-4", "stage-3-5", "stage-3-6":
 		return true
 	default:
 		return false
@@ -132,6 +135,34 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 	if normalized == "s2" || normalized == "stage2" || normalized == "stage-2" {
 		_, s2, _, _ := BuildStagePorts(nil)
 		return &PortIterator{ports: s2}, nil
+	}
+
+	if strings.HasPrefix(normalized, "s3-") {
+		partIdx, err := strconv.Atoi(strings.TrimPrefix(normalized, "s3-"))
+		if err == nil && partIdx >= 1 && partIdx <= 6 {
+			_, _, s3Parts, _ := buildStagePortsWithS3Parts(nil)
+			if len(s3Parts) >= partIdx {
+				return &PortIterator{ports: s3Parts[partIdx-1]}, nil
+			}
+		}
+	}
+	if strings.HasPrefix(normalized, "stage3-") {
+		partIdx, err := strconv.Atoi(strings.TrimPrefix(normalized, "stage3-"))
+		if err == nil && partIdx >= 1 && partIdx <= 6 {
+			_, _, s3Parts, _ := buildStagePortsWithS3Parts(nil)
+			if len(s3Parts) >= partIdx {
+				return &PortIterator{ports: s3Parts[partIdx-1]}, nil
+			}
+		}
+	}
+	if strings.HasPrefix(normalized, "stage-3-") {
+		partIdx, err := strconv.Atoi(strings.TrimPrefix(normalized, "stage-3-"))
+		if err == nil && partIdx >= 1 && partIdx <= 6 {
+			_, _, s3Parts, _ := buildStagePortsWithS3Parts(nil)
+			if len(s3Parts) >= partIdx {
+				return &PortIterator{ports: s3Parts[partIdx-1]}, nil
+			}
+		}
 	}
 
 	if normalized == "s3" || normalized == "stage3" || normalized == "stage-3" {
@@ -1686,36 +1717,93 @@ func ParseRankedPorts(s string) []int {
 	return out
 }
 
-func BuildStagePorts(rankedPorts []int) (s1 []int, s2 []int, s3 []int, s4 []int) {
+func getThirdLayerPortsParts() [][]int {
+	ports := getThirdLayerPorts()
+	if len(ports) == 0 {
+		return nil
+	}
+
+	startMarkers := []int{8013, 8301, 8900, 10003, 20001}
+	bounds := make([]int, 0, 7)
+	bounds = append(bounds, 0)
+	for _, m := range startMarkers {
+		idx := -1
+		for i, p := range ports {
+			if p == m {
+				idx = i
+				break
+			}
+		}
+		if idx <= 0 {
+			bounds = nil
+			break
+		}
+		bounds = append(bounds, idx)
+	}
+	if bounds != nil {
+		bounds = append(bounds, len(ports))
+		for i := 1; i < len(bounds); i++ {
+			if bounds[i] <= bounds[i-1] {
+				bounds = nil
+				break
+			}
+		}
+	}
+
+	if bounds == nil {
+		out := make([][]int, 0, 6)
+		for i := 0; i < 6; i++ {
+			start := i * len(ports) / 6
+			end := (i + 1) * len(ports) / 6
+			out = append(out, ports[start:end])
+		}
+		return out
+	}
+
+	out := make([][]int, 0, 6)
+	for i := 0; i < 6; i++ {
+		out = append(out, ports[bounds[i]:bounds[i+1]])
+	}
+	return out
+}
+
+func buildStagePortsWithS3Parts(rankedPorts []int) (s1 []int, s2 []int, s3Parts [][]int, s4 []int) {
 	_ = rankedPorts
 	s1 = removeDuplicateInt(getTop100Ports())
 
-	s1Set := intSetFromSlice(s1)
-	s2 = diffPorts(removeDuplicateInt(getTop600Ports()), s1Set)
-
-	union12 := intSetFromSlice(s1)
+	union := intSetFromSlice(s1)
+	s2 = diffPorts(removeDuplicateInt(getTop600Ports()), union)
 	for _, p := range s2 {
-		union12[p] = struct{}{}
-	}
-	s3 = diffPorts(removeDuplicateInt(getThirdLayerPorts()), union12)
-
-	union123 := intSetFromSlice(s1)
-	for _, p := range s2 {
-		union123[p] = struct{}{}
-	}
-	for _, p := range s3 {
-		union123[p] = struct{}{}
+		union[p] = struct{}{}
 	}
 
-	s4 = make([]int, 0, 65535-len(union123))
+	rawParts := getThirdLayerPortsParts()
+	s3Parts = make([][]int, 0, 6)
+	for _, part := range rawParts {
+		partPorts := diffPorts(removeDuplicateInt(part), union)
+		s3Parts = append(s3Parts, partPorts)
+		for _, p := range partPorts {
+			union[p] = struct{}{}
+		}
+	}
+
+	s4 = make([]int, 0, 65535-len(union))
 	for p := 1; p <= 65535; p++ {
-		if _, ok := union123[p]; ok {
+		if _, ok := union[p]; ok {
 			continue
 		}
 		s4 = append(s4, p)
 	}
 
 	return
+}
+
+func BuildStagePorts(rankedPorts []int) (s1 []int, s2 []int, s3 []int, s4 []int) {
+	s1, s2, s3Parts, s4 := buildStagePortsWithS3Parts(rankedPorts)
+	for _, part := range s3Parts {
+		s3 = append(s3, part...)
+	}
+	return s1, s2, s3, s4
 }
 
 func ChunkPorts(ports []int, chunkSize int) [][]int {

@@ -171,6 +171,9 @@ func (runner *Runner) Execute() {
 			if options.PSSkipDiscovery {
 				psOpts.SkipDiscovery = true
 			}
+			if options.PSS4Chunk != 0 {
+				psOpts.S4ChunkSize = options.PSS4Chunk
+			}
 			open := make(map[string][]int)
 			psOpts.OnResult = func(r *portscan.ScanResult) {
 				gologger.Print().Msgf("%s:%d", r.Host, r.Port)

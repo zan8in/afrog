@@ -125,10 +125,54 @@ func (c *bufferedConn) Read(b []byte) (int, error) {
 
 // Scan starts the scanning process
 func (s *Scanner) Scan(ctx context.Context) error {
-	// Parse ports
-	portIter, err := NewPortIterator(s.options.Ports)
-	if err != nil {
-		return err
+	normalizedPorts := strings.ToLower(strings.TrimSpace(s.options.Ports))
+	stageMajor := normalizedPorts == "full" || normalizedPorts == "all"
+
+	type stagePlan struct {
+		label     string
+		ports     []int
+		s4Chunk   int
+		s4Chunks  int
+		isS4Chunk bool
+	}
+
+	var (
+		portIter   *PortIterator
+		stagePlans []stagePlan
+		portTotal  int
+	)
+
+	if stageMajor {
+		s1, s2, s3Parts, s4 := buildStagePortsWithS3Parts(nil)
+		stagePlans = append(stagePlans, stagePlan{label: "S1", ports: s1})
+		stagePlans = append(stagePlans, stagePlan{label: "S2", ports: s2})
+		for i, part := range s3Parts {
+			stagePlans = append(stagePlans, stagePlan{label: fmt.Sprintf("S3-%d", i+1), ports: part})
+		}
+
+		s4Chunks := ChunkPorts(s4, s.options.S4ChunkSize)
+		for i, chunk := range s4Chunks {
+			stagePlans = append(stagePlans, stagePlan{
+				label:     "S4",
+				ports:     chunk,
+				s4Chunk:   i + 1,
+				s4Chunks:  len(s4Chunks),
+				isS4Chunk: true,
+			})
+		}
+		s3Total := 0
+		for _, p := range s3Parts {
+			s3Total += len(p)
+		}
+		portTotal = len(s1) + len(s2) + s3Total + len(s4)
+	} else {
+		// Parse ports
+		var err error
+		portIter, err = NewPortIterator(s.options.Ports)
+		if err != nil {
+			return err
+		}
+		portTotal = portIter.Total()
 	}
 
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
@@ -161,8 +205,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 
 	// Shuffle hosts to avoid sequential scanning detection
 	hostIter.Shuffle()
+	hosts := hostIter.GetHosts()
 
-	total := hostIter.Total() * portIter.Total()
+	total := hostIter.Total() * portTotal
 	startTime := time.Now()
 
 	if !s.options.Quiet {
@@ -245,61 +290,92 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	defer pool.Release()
 
 	// Iterate and submit tasks
-	for {
-		host, ok := hostIter.Next()
-		if !ok {
-			break
-		}
+	var stageCursor string
+	if stageMajor {
+	StageLoop:
+		for _, st := range stagePlans {
+			select {
+			case <-scanCtx.Done():
+				break StageLoop
+			default:
+			}
 
-		// Reset port iterator for each host
-		portIter.Reset()
-		for {
-			// Check for high error rate (Adaptive Mode)
-			// Dynamic Rate Adjustment:
-			// 1. If errors > 20, increase delay significantly (up to 1s)
-			// 2. If errors > 5, increase delay slightly
-			// 3. If NO errors for a while (successes), decrease delay (recover speed)
+			stageCursor = st.label
+			stageStart := time.Now()
 
-			errCount := atomic.LoadInt32(&s.consecutiveErrors)
-			currentDelay := atomic.LoadInt32(&s.adaptiveDelay)
-
-			if errCount > 20 {
-				// Severe network congestion or block
-				newDelay := currentDelay + 100
-				if newDelay > 1000 {
-					newDelay = 1000
+			if !s.options.Quiet {
+				if st.isS4Chunk {
+					gologger.Info().Msgf("%-9s | %-9s | stage=%s chunk=%d/%d ports=%d", utils.StagePortScan, "stage", st.label, st.s4Chunk, st.s4Chunks, len(st.ports))
+				} else {
+					gologger.Info().Msgf("%-9s | %-9s | stage=%s ports=%d", utils.StagePortScan, "stage", st.label, len(st.ports))
 				}
-				atomic.StoreInt32(&s.adaptiveDelay, newDelay)
+			}
 
-				if s.options.Debug && errCount%10 == 0 { // Don't spam logs
-					gologger.Warning().Msgf("High error rate (%d). Increasing delay to %dms", errCount, newDelay)
+		SubmitLoop:
+			for _, host := range hosts {
+				select {
+				case <-scanCtx.Done():
+					break SubmitLoop
+				default:
 				}
-				time.Sleep(time.Duration(newDelay) * time.Millisecond)
-			} else if errCount > 5 {
-				// Mild congestion
-				atomic.CompareAndSwapInt32(&s.adaptiveDelay, 0, 10) // Init delay if 0
-				time.Sleep(time.Duration(atomic.LoadInt32(&s.adaptiveDelay)) * time.Millisecond)
-			} else {
-				// Healthy network, try to recover speed
-				if currentDelay > 0 && atomic.LoadUint64(&s.currentProgress)%50 == 0 {
-					atomic.AddInt32(&s.adaptiveDelay, -10)
-					if atomic.LoadInt32(&s.adaptiveDelay) < 0 {
-						atomic.StoreInt32(&s.adaptiveDelay, 0)
+
+				for _, port := range st.ports {
+					select {
+					case <-scanCtx.Done():
+						break SubmitLoop
+					default:
+					}
+
+					s.maybeAdaptiveDelay()
+					wg.Add(1)
+					err := pool.Invoke(scanTask{host: host, port: port})
+					if err != nil {
+						wg.Done()
+						time.Sleep(10 * time.Millisecond)
 					}
 				}
 			}
 
-			port, ok := portIter.Next()
-			if !ok {
+			wg.Wait()
+			if scanCtx.Err() != nil {
+				break StageLoop
+			}
+			if !s.options.Quiet {
+				if st.isS4Chunk {
+					gologger.Info().Msgf("%-9s | %-9s | stage=%s chunk=%d/%d duration=%s", utils.StagePortScan, "done", st.label, st.s4Chunk, st.s4Chunks, time.Since(stageStart).Truncate(time.Second))
+				} else {
+					gologger.Info().Msgf("%-9s | %-9s | stage=%s duration=%s", utils.StagePortScan, "done", st.label, time.Since(stageStart).Truncate(time.Second))
+				}
+			}
+		}
+	} else {
+		for _, host := range hosts {
+			select {
+			case <-scanCtx.Done():
 				break
+			default:
 			}
 
-			wg.Add(1)
-			err := pool.Invoke(scanTask{host: host, port: port})
-			if err != nil {
-				wg.Done()
-				// Handle pool overload or error
-				time.Sleep(10 * time.Millisecond)
+			portIter.Reset()
+			for {
+				select {
+				case <-scanCtx.Done():
+					break
+				default:
+				}
+
+				s.maybeAdaptiveDelay()
+				port, ok := portIter.Next()
+				if !ok {
+					break
+				}
+
+				wg.Add(1)
+				err := pool.Invoke(scanTask{host: host, port: port})
+				if err != nil {
+					wg.Done()
+					time.Sleep(10 * time.Millisecond)
+				}
 			}
 		}
 	}
@@ -310,7 +386,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if progressEnabled {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
-		gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
+		if stageCursor != "" {
+			gologger.Warning().Msgf("%-9s | %-9s | stage=%s partial results", utils.StagePortScan, "interrupted", stageCursor)
+		} else {
+			gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
+		}
 	}
 	scanStop()
 
@@ -339,6 +419,38 @@ func (s *Scanner) Scan(ctx context.Context) error {
 type scanTask struct {
 	host string
 	port int
+}
+
+func (s *Scanner) maybeAdaptiveDelay() {
+	errCount := atomic.LoadInt32(&s.consecutiveErrors)
+	currentDelay := atomic.LoadInt32(&s.adaptiveDelay)
+
+	if errCount > 20 {
+		newDelay := currentDelay + 100
+		if newDelay > 1000 {
+			newDelay = 1000
+		}
+		atomic.StoreInt32(&s.adaptiveDelay, newDelay)
+
+		if s.options.Debug && errCount%10 == 0 {
+			gologger.Warning().Msgf("High error rate (%d). Increasing delay to %dms", errCount, newDelay)
+		}
+		time.Sleep(time.Duration(newDelay) * time.Millisecond)
+		return
+	}
+
+	if errCount > 5 {
+		atomic.CompareAndSwapInt32(&s.adaptiveDelay, 0, 10)
+		time.Sleep(time.Duration(atomic.LoadInt32(&s.adaptiveDelay)) * time.Millisecond)
+		return
+	}
+
+	if currentDelay > 0 && atomic.LoadUint64(&s.currentProgress)%50 == 0 {
+		atomic.AddInt32(&s.adaptiveDelay, -10)
+		if atomic.LoadInt32(&s.adaptiveDelay) < 0 {
+			atomic.StoreInt32(&s.adaptiveDelay, 0)
+		}
+	}
 }
 
 // checkPortOpen attempts to establish a connection to the target

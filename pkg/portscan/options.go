@@ -8,7 +8,8 @@ import (
 type Options struct {
 	Targets                []string // List of IPs, CIDRs, or ranges
 	Ports                  string   // Port range string (e.g., "80,443,1000-2000" or "top")
-	RateLimit              int      // Packets per second (approx) or concurrency limit
+	S4ChunkSize            int
+	RateLimit              int // Packets per second (approx) or concurrency limit
 	Timeout                time.Duration
 	Retries                int
 	ScanMode               ScanMode
@@ -33,6 +34,7 @@ type Options struct {
 func DefaultOptions() *Options {
 	return &Options{
 		Ports:                  "full",
+		S4ChunkSize:            1000,
 		RateLimit:              500,
 		Timeout:                1000 * time.Millisecond,
 		Retries:                2,
