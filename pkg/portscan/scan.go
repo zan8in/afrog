@@ -137,9 +137,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	}
 
 	var (
-		portIter   *PortIterator
-		stagePlans []stagePlan
-		portTotal  int
+		portIter    *PortIterator
+		stagePlans  []stagePlan
+		portTotal   int
+		stageCursor atomic.Value
 	)
 
 	if stageMajor {
@@ -211,13 +212,15 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	startTime := time.Now()
 
 	if !s.options.Quiet {
-		if isBuiltinPortsSpec(s.options.Ports) {
-			gologger.Info().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
+		if !s.options.LiveStats {
+			if isBuiltinPortsSpec(s.options.Ports) {
+				gologger.Info().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
+			}
+			gologger.Info().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
 		}
-		gologger.Info().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
 	}
 
-	progressEnabled := s.options.Debug && !s.options.Quiet && total > 0
+	progressEnabled := (s.options.Debug || s.options.LiveStats) && !s.options.Quiet && total > 0
 	var progressDone chan struct{}
 	var lastPercent int32 = -1
 	renderProgress := func(final bool) {
@@ -243,6 +246,13 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 		elapsed := strings.Split(time.Since(startTime).String(), ".")[0] + "s"
 		suffix := ""
+		if s.options.LiveStats {
+			if v := stageCursor.Load(); v != nil {
+				if cur, ok := v.(string); ok && cur != "" {
+					suffix = " " + cur
+				}
+			}
+		}
 		fmt.Fprint(os.Stderr, "\r\033[2K")
 		fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, curr, total, elapsed, suffix)
 	}
@@ -290,7 +300,6 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	defer pool.Release()
 
 	// Iterate and submit tasks
-	var stageCursor string
 	if stageMajor {
 	StageLoop:
 		for _, st := range stagePlans {
@@ -300,15 +309,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			default:
 			}
 
-			stageCursor = st.label
-			stageStart := time.Now()
-
-			if !s.options.Quiet {
-				if st.isS4Chunk {
-					gologger.Info().Msgf("%-9s | %-9s | stage=%s chunk=%d/%d ports=%d", utils.StagePortScan, "stage", st.label, st.s4Chunk, st.s4Chunks, len(st.ports))
-				} else {
-					gologger.Info().Msgf("%-9s | %-9s | stage=%s ports=%d", utils.StagePortScan, "stage", st.label, len(st.ports))
-				}
+			if st.isS4Chunk {
+				stageCursor.Store(fmt.Sprintf("stage=%s chunk=%d/%d", st.label, st.s4Chunk, st.s4Chunks))
+			} else {
+				stageCursor.Store(fmt.Sprintf("stage=%s", st.label))
 			}
 
 		SubmitLoop:
@@ -339,13 +343,6 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			wg.Wait()
 			if scanCtx.Err() != nil {
 				break StageLoop
-			}
-			if !s.options.Quiet {
-				if st.isS4Chunk {
-					gologger.Info().Msgf("%-9s | %-9s | stage=%s chunk=%d/%d duration=%s", utils.StagePortScan, "done", st.label, st.s4Chunk, st.s4Chunks, time.Since(stageStart).Truncate(time.Second))
-				} else {
-					gologger.Info().Msgf("%-9s | %-9s | stage=%s duration=%s", utils.StagePortScan, "done", st.label, time.Since(stageStart).Truncate(time.Second))
-				}
 			}
 		}
 	} else {
@@ -386,8 +383,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if progressEnabled {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
-		if stageCursor != "" {
-			gologger.Warning().Msgf("%-9s | %-9s | stage=%s partial results", utils.StagePortScan, "interrupted", stageCursor)
+		if v := stageCursor.Load(); v != nil {
+			if cur, ok := v.(string); ok && cur != "" {
+				gologger.Warning().Msgf("%-9s | %-9s | %s partial results", utils.StagePortScan, "interrupted", cur)
+			} else {
+				gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
+			}
 		} else {
 			gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
 		}
@@ -403,14 +404,16 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		fmt.Fprint(os.Stderr, "\r\033[2K\r")
 	}
 	if !s.options.Quiet {
-		gologger.Info().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
-			utils.StagePortScan,
-			"completed",
-			hostIter.Total(),
-			total,
-			atomic.LoadUint64(&s.resultsCount),
-			time.Since(startTime).Truncate(time.Second),
-		)
+		if !s.options.LiveStats {
+			gologger.Info().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
+				utils.StagePortScan,
+				"completed",
+				hostIter.Total(),
+				total,
+				atomic.LoadUint64(&s.resultsCount),
+				time.Since(startTime).Truncate(time.Second),
+			)
+		}
 	}
 
 	return nil

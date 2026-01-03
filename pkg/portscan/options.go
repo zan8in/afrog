@@ -16,6 +16,7 @@ type Options struct {
 	ServiceDB              string // Path to nmap-services or custom fingerprints
 	OnResult               func(*ScanResult)
 	Debug                  bool
+	LiveStats              bool
 	Quiet                  bool
 	Proxy                  string
 	SkipDiscovery          bool // Skip host discovery phase

@@ -154,6 +154,7 @@ func (runner *Runner) Execute() {
 			psOpts.Proxy = options.Proxy
 			// Let portscan module handle its own output and progress
 			psOpts.Debug = !options.Silent
+			psOpts.LiveStats = options.LiveStats
 			psOpts.Quiet = false
 			if options.PSPorts != "" {
 				psOpts.Ports = options.PSPorts
