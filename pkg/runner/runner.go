@@ -16,6 +16,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/report"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v3/pocs"
@@ -41,6 +42,7 @@ type Runner struct {
 	Ding          *dingtalk.Dingtalk
 	ScanProgress  *ScanProgress
 	Cyberspace    *cyberspace.Cyberspace
+	TargetIndex   *targets.TargetIndex
 	liveMu        sync.Mutex
 	livePrev      retryhttpclient.LiveMetrics
 	livePrevAt    time.Time
@@ -158,6 +160,20 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	if runner.options.Targets.Len() == 0 && runner.Cyberspace == nil {
 		return runner, errors.New("target not found")
 	}
+
+	targetSeeds := make([]string, 0, runner.options.Targets.Len())
+	for _, t := range runner.options.Targets.List() {
+		s, ok := t.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		targetSeeds = append(targetSeeds, s)
+	}
+	runner.TargetIndex = targets.BuildTargetIndex(targetSeeds)
 
 	// init pocs
 	if len(runner.options.PocFile) > 0 {

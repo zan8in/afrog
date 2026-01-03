@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
@@ -116,44 +117,25 @@ func (runner *Runner) Execute() {
 				origSeen[s] = struct{}{}
 			}
 		}
-		hostSeen := make(map[string]struct{})
-		hosts := make([]string, 0)
-		normalizePreScanTarget := func(raw string) string {
-			raw = strings.TrimSpace(raw)
-			if raw == "" {
-				return ""
-			}
-			if strings.Contains(raw, "://") {
-				return strings.TrimSpace(utils.ExtractHost(raw))
-			}
-			if strings.Contains(raw, "/") {
-				if _, _, err := net.ParseCIDR(raw); err == nil {
-					return raw
-				}
-				return strings.TrimSpace(utils.ExtractHost(raw))
-			}
-			if strings.Contains(raw, "-") {
-				parts := strings.Split(raw, "-")
-				if len(parts) == 2 && net.ParseIP(strings.TrimSpace(parts[0])) != nil && net.ParseIP(strings.TrimSpace(parts[1])) != nil {
-					return raw
+
+		var idx *targets.TargetIndex
+		if runner.TargetIndex != nil {
+			idx = runner.TargetIndex
+		} else {
+			seeds := make([]string, 0, runner.options.Targets.Len())
+			for _, t := range runner.options.Targets.List() {
+				if s, ok := t.(string); ok {
+					s = strings.TrimSpace(s)
+					if s != "" {
+						seeds = append(seeds, s)
+					}
 				}
 			}
-			return strings.TrimSpace(utils.ExtractHost(raw))
+			idx = targets.BuildTargetIndex(seeds)
+			runner.TargetIndex = idx
 		}
-		for _, t := range runner.options.Targets.List() {
-			raw := strings.TrimSpace(fmt.Sprintf("%v", t))
-			if raw == "" {
-				continue
-			}
-			h := normalizePreScanTarget(raw)
-			if h == "" {
-				continue
-			}
-			if _, ok := hostSeen[h]; !ok {
-				hostSeen[h] = struct{}{}
-				hosts = append(hosts, h)
-			}
-		}
+
+		hosts := idx.PreScanTargets()
 		if len(hosts) > 0 {
 			psOpts := portscan.DefaultOptions()
 			psOpts.Targets = hosts
@@ -206,6 +188,9 @@ func (runner *Runner) Execute() {
 						}
 						origSeen[nt] = struct{}{}
 						options.Targets.Append(nt)
+						if runner.TargetIndex != nil {
+							runner.TargetIndex.Add(nt)
+						}
 					}
 				}
 			}
@@ -218,7 +203,57 @@ func (runner *Runner) Execute() {
 		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
 	}
 
-	options.Count += options.Targets.Len() * len(pocSlice)
+	allTargets := make([]string, 0, runner.options.Targets.Len())
+	for _, t := range runner.options.Targets.List() {
+		s, ok := t.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		allTargets = append(allTargets, s)
+	}
+
+	idx := runner.TargetIndex
+	if idx == nil {
+		idx = targets.BuildTargetIndex(allTargets)
+		runner.TargetIndex = idx
+	}
+	netTargets := idx.NetTargets()
+	isNetOnlyPoc := func(p poc.Poc) bool {
+		hasHTTP := false
+		hasNet := false
+		hasGo := false
+		for _, rm := range p.Rules {
+			t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
+			switch t {
+			case "", poc.HTTP_Type, poc.HTTPS_Type:
+				hasHTTP = true
+			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
+				hasNet = true
+			case poc.GO_Type:
+				hasGo = true
+			default:
+				hasHTTP = true
+			}
+		}
+		if hasGo {
+			return false
+		}
+		return hasNet && !hasHTTP
+	}
+
+	taskCount := 0
+	for _, p := range pocSlice {
+		if !isNetOnlyPoc(p) {
+			taskCount += len(allTargets)
+		} else {
+			taskCount += len(netTargets)
+		}
+	}
+	options.Count += taskCount
 
 	if options.Smart {
 		options.SmartControl()
@@ -263,7 +298,11 @@ func (runner *Runner) Execute() {
 			if options.VulnerabilityScannerBreakpoint {
 				break
 			}
-			for _, t := range runner.options.Targets.List() {
+			targetView := allTargets
+			if isNetOnlyPoc(poc) {
+				targetView = netTargets
+			}
+			for _, t := range targetView {
 				// check resume
 				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
 					runner.NotVulCallback()
@@ -274,7 +313,7 @@ func (runner *Runner) Execute() {
 					break
 				}
 				wg.Add(1)
-				p.Invoke(&TransData{Target: t.(string), Poc: poc})
+				p.Invoke(&TransData{Target: t, Poc: poc})
 			}
 			// Record PoC completion progress
 			runner.ScanProgress.Increment(poc.Id)
@@ -327,7 +366,11 @@ func (runner *Runner) Execute() {
 			if options.VulnerabilityScannerBreakpoint {
 				break
 			}
-			for _, t := range runner.options.Targets.List() {
+			targetView := allTargets
+			if isNetOnlyPoc(poc) {
+				targetView = netTargets
+			}
+			for _, t := range targetView {
 				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
 					runner.NotVulCallback()
 					continue
@@ -337,7 +380,7 @@ func (runner *Runner) Execute() {
 					break
 				}
 				wg.Add(1)
-				p.Invoke(&TransData{Target: t.(string), Poc: poc})
+				p.Invoke(&TransData{Target: t, Poc: poc})
 			}
 			// Record PoC completion progress
 			runner.ScanProgress.Increment(poc.Id)
