@@ -454,6 +454,7 @@ afrog is a high-performance vulnerability scanner that is fast and stable. It su
 - [x] Fast, stable, with low false positives
 - [x] Detailed HTML vulnerability reports
 - [x] Customizable and stably updatable PoCs
+- [x] Port pre-scan (PortScan) for open port discovery
 - [x] Active community exchange group
 
 ## Installation
@@ -505,6 +506,7 @@ By default, afrog scans all built-in PoCs, and if it finds any vulnerabilities, 
 afrog -t https://example.com
 ```
 
+
 **Warning occurs when running afrog**
 
 If you see an error message saying:
@@ -538,6 +540,34 @@ You can scan multiple URLs at the same time as well.
 ```sh
 afrog -T urls.txt
 ```
+
+### Port Pre-scan (PortScan)
+
+PortScan runs before PoC scanning to discover open ports. Discovered ports will be appended to the scan target set (as `host:port`), and subsequent PoCs will run against the updated targets.
+
+```sh
+# Single-target full port scan
+afrog -t 1.2.3.4 -ps -p all
+
+# Network segment scan (host discovery + common port scan)
+afrog -t 1.2.3.4/24 -ps
+
+# Skip host discovery (assume target is reachable)
+afrog -T targets.txt -ps -Pn
+
+# Scan only specified ports
+afrog -t example.com -ps -p 80,443,8080
+```
+
+Common flags:
+
+- `-ps` / `--portscan`: enable port pre-scan
+- `-p` / `--ports`: ports definition (e.g. `top`, `full`, `all`, `80,443`, `1-1024`)
+- `-Pn` / `--ps-skip-discovery`: skip host discovery
+- `-prate` / `--ps-rate`: portscan rate limit
+- `-ptimeout` / `--ps-timeout-ms`: portscan timeout (ms)
+- `-ptries` / `--ps-retries`: portscan retries
+- `--ps-s4-chunk`: chunk size when ports=`full`
 
 ## -web Command
 
@@ -653,6 +683,7 @@ For comprehensive SDK documentation:
 - [Async scanner](examples/async_scan/main.go)  
 - [OOB scanner](examples/oob_scan/main.go)
 - [Progress scanner](examples/progress_scan/main.go)
+- [SDK PortScan (sync/async)](examples/sdk_portscan/main.go)
 
 
 
