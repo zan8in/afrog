@@ -97,35 +97,34 @@ func (report *Report) Write(data string) error {
 	}
 
 	report.Lock()
+	defer report.Unlock()
 
-	var f *os.File
+	flag := os.O_WRONLY | os.O_CREATE
 	if report.of == nil {
-		f, err := os.OpenFile(report.ReportFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
-		if err != nil {
-			report.Unlock()
-			return err
-		}
-
-		report.of = f
-
-		header := report.header()
-		wbuf := bufio.NewWriterSize(report.of, len(header))
-		wbuf.WriteString(header)
-		wbuf.Flush()
+		flag |= os.O_TRUNC
+	} else {
+		flag |= os.O_APPEND
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func(f *os.File) {
-		defer report.Unlock()
-		defer f.Close()
-		defer wg.Done()
+	f, err := os.OpenFile(report.ReportFile, flag, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-		wbuf := bufio.NewWriterSize(report.of, len(data))
-		wbuf.WriteString(data)
-		wbuf.Flush()
-	}(f)
-	wg.Wait()
+	if report.of == nil {
+		report.of = f
+		header := report.header()
+		if len(header) > 0 {
+			wbuf := bufio.NewWriterSize(f, len(header))
+			wbuf.WriteString(header)
+			wbuf.Flush()
+		}
+	}
+
+	wbuf := bufio.NewWriterSize(f, len(data))
+	wbuf.WriteString(data)
+	wbuf.Flush()
 
 	return nil
 }

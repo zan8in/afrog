@@ -64,6 +64,7 @@ func main() {
 
 	// 添加正常退出标记
 	var normalExit bool
+	var interrupted atomic.Bool
 	defer func() {
 		// 正常退出时删除自动保存文件
 		if normalExit {
@@ -175,7 +176,7 @@ func main() {
 				renderProgress()
 			}
 
-			go sqlite.SetResultX(result)
+			sqlite.SetResultX(result)
 
 			if options.Dingtalk {
 				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget))
@@ -203,10 +204,22 @@ func main() {
 	c := make(chan os.Signal, 1)
 	defer close(c)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	var signalOnce sync.Once
 	go func(runner *runner.Runner) {
 		for range c {
+			handled := false
+			signalOnce.Do(func() {
+				handled = true
+			})
+			if !handled {
+				os.Exit(1)
+			}
+
 			gologger.Print().Msg("")
 			gologger.Info().Msg("Scan termination signal received")
+
+			interrupted.Store(true)
+			runner.Stop()
 
 			// 立即保存进度
 			if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
@@ -215,11 +228,6 @@ func main() {
 				gologger.Info().Msgf("Scan state archived: %s\n", autoSaveFile)
 				// gologger.Info().Msgf("Resume command: afrog -T urls.txt -resume %s\n", autoSaveFile)
 			}
-
-			// 直接退出不触发正常清理
-			sqlite.CloseX()
-			// gologger.Info().Msg("Process terminated (exit code 1)")
-			os.Exit(1)
 		}
 	}(r)
 
@@ -250,7 +258,7 @@ func main() {
 		}
 	}
 
-	time.Sleep(time.Second * 3)
+	sqlite.CloseX()
 	gologger.Print().Msg("")
 
 	lock.Lock()
@@ -259,9 +267,13 @@ func main() {
 	}
 	lock.Unlock()
 
+	status := "completed"
+	if interrupted.Load() {
+		status = "stopped"
+	}
 	gologger.Info().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
 		utils.StageVulnScan,
-		"completed",
+		status,
 		atomic.LoadUint32(&options.CurrentCount),
 		options.Count,
 		atomic.LoadUint32(&number),
@@ -269,5 +281,5 @@ func main() {
 	)
 
 	// 标记正常退出
-	normalExit = true
+	normalExit = !interrupted.Load()
 }
