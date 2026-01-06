@@ -7,9 +7,9 @@ info:
   verified: true
   description: |
     云时空 社会化商业ERP系统存在SQL注入漏洞，攻击者通过漏洞可以获取数据库敏感信息
-    FOFA: title="云时空社会化商业ERP"
-  reference:
-    - https://wiki.peiqi.tech/wiki/webapp/云时空ERP/云时空%20社会化商业ERP系统%20validateLoginName%20SQL注入漏洞.html
+    fofa: title="云时空社会化商业ERP"
+  tags: yunshikong,erp,sql-injection,sqli
+  created: 2025/03/13
 
 rules:
   r0:

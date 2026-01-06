@@ -7,9 +7,11 @@ info:
   verified: false
   description: |
     致翔OA msglog.aspx文件存在SQL注入漏洞，攻击者通过漏洞可获取敏感信息。
-    fofa：app="致翔软件-致翔OA"
+    fofa: app="致翔软件-致翔OA"
   reference:
     - https://mp.weixin.qq.com/s/wDiwf3QjUkYfKlOHL8G-Qg
+  tags: zhixiang,oa,msglog,aspx,sqli
+  created: 2025/03/13
 
 set:
   randstr: randomLowercase(28)

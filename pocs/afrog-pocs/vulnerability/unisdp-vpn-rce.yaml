@@ -7,7 +7,9 @@ info:
   verified: true
   description: |
     联软安界UniSDP软件定义边界系统是基于零信任的下一代VPN，该系统2021.04.28版本中TunnelGateway某接口存在安全漏洞，漏洞允许攻击者将特制请求发送到服务器并远程命令执行。
-    title="UniSSOView"
+    fofa: title="UniSSOView"
+  tags: unisdp,vpn,rce
+  created: 2025/03/13
 
 rules:
   r0:

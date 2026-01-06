@@ -4,6 +4,12 @@ info:
   name: WEB-INF Disclosure
   author: zan8in
   severity: high
+  verified: false
+  description: |
+    WEB-INF目录下的web.xml文件包含了应用程序的配置信息，包括Servlet、Filter、Listener等组件的配置。
+    攻击者可以通过访问该文件获取应用程序的配置信息，从而导致信息泄露。
+  tags: web-inf,webxml,disclosure
+  created: 2025/03/13
 
 rules:
   r0:

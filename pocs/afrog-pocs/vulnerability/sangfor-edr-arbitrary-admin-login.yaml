@@ -1,19 +1,21 @@
 id: sangfor-edr-arbitrary-admin-login
 
 info:
-    name: sangfor-edr-arbitrary-admin-login
-    author: hilson
-    severity: high
-    description: 终端检测响应平台EDR
-    reference:
-        - https://mp.weixin.qq.com/s/6aUrXcnab_EScoc0-6OKfA
+  name: sangfor-edr-arbitrary-admin-login
+  author: hilson
+  severity: high
+  description: |
+    终端检测响应平台EDR
+  reference:
+    - https://mp.weixin.qq.com/s/6aUrXcnab_EScoc0-6OKfA
+  tags: sangfor,edr,login
+  created: 2023/05/26
 
 rules:
-    r0:
-        request:
-            method: GET
-            path: /ui/login.php?user=admin
-            follow_redirects: false
-        expression: response.status == 302 && response.body.bcontains(b"/download/edr_installer_") && response.headers["set-cookie"] != ""
+  r0:
+    request:
+      method: GET
+      path: /ui/login.php?user=admin
+      follow_redirects: false
+    expression: response.status == 302 && response.body.bcontains(b"/download/edr_installer_") && response.headers["set-cookie"] != ""
 expression: r0()
-

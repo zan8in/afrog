@@ -3,12 +3,14 @@ id: tongda-path-traversal
 info:
   name: Office Anywhere TongDa - Path Traversal
   author: pikpikcu
-  severity: critical
+  severity: high
   verified: true
   description: |
     Office Anywhere (OA) is susceptible to path traversal vulnerabilities which can be leveraged to perform remote code execution.
   reference:
     - https://github.com/jas502n/OA-tongda-RCE
+  tags: tongda,oa,path,traversal
+  created: 2025/03/13
 
 rules:
   r0:

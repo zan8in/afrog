@@ -7,12 +7,12 @@ info:
   verified: true
   description: |
     通达OA v11.6 insert参数包含SQL注入漏洞，攻击者通过漏洞可获取数据库敏感信息
-    app="TDXK-通达OA"
+    fofa: app="TDXK-通达OA"
     发送请求包判断漏洞 /general/document/index.php/recv/register/insert 返回302则是存在漏洞，返回500则不存在
   reference:
-    - http://wiki.peiqi.tech/wiki/oa/%E9%80%9A%E8%BE%BEOA/%E9%80%9A%E8%BE%BEOA%20v11.6%20insert%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.html
     - https://blog.csdn.net/weixin_39779975/article/details/111091529
-
+  tags: tongda,oa,insert,sql,inject,getshell
+  created: 2025/03/13
 
 set:
   filename: randomLowercase(8) + ".php"

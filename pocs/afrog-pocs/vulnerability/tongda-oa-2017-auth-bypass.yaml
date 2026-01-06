@@ -6,10 +6,9 @@ info:
   severity: high
   verified: true
   description: |
-    2022 HW 
     fofa: app="通达OA网络智能办公系统"
-  reference:
-    - https://github.com/Phuong39/2022-HW-POC/blob/main/%E9%80%9A%E8%BE%BEOA%E7%99%BB%E5%BD%95%E8%AE%A4%E8%AF%81%E7%BB%95%E8%BF%87.md
+  tags: tongda,oa,auth,bypass
+  created: 2025/03/13
 
 rules:
   r0:

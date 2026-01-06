@@ -7,9 +7,11 @@ info:
   verified: false
   description: |
     西迪特提供的Wireless解决方案为客户提供一套云管理,可靠性高,覆盖范围广的无线组网产品。旨在解决用户网络覆盖信号范围小,信号低,网络不稳定,组网困难等问题。西迪特Wi-Fi Web管理系统存在未授权远程代码执行漏洞，攻击者通过漏洞可以获取服务器权限。
-    fofa-query: title=="Wi-Fi Web管理"
+    fofa: title="Wi-Fi Web管理"
   reference:
     - https://mp.weixin.qq.com/s/IIphedK_Npni5bJsQHfD0A
+  tags: xidite,wifi,web,cookie,bypass,rce
+  created: 2025/03/13
 
 rules:
   r0:

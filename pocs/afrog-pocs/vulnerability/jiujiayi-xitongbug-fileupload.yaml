@@ -7,6 +7,8 @@ info:
   verified: false
   description: |
     fofa: body="4008-820-967"
+  tags: jiujiayi,fileupload
+  created: 2023/05/26
 
 set:
   rfilename: randomLowercase(20)

