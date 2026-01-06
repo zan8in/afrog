@@ -10,6 +10,7 @@ info:
     fofa: title="互联世界 物联未来-登录"
   reference:
     - https://mp.weixin.qq.com/s/HgwGxIiIj4XrvNS_AvoruA
+  tags: cve,cve2023,info-leak
   created: 2023/05/26
 
 rules:

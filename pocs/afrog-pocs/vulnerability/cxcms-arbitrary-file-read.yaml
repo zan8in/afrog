@@ -1,4 +1,4 @@
-id: cxcms-arbitrary-file-read
+id: cxcms-arbitrary-fileread
 
 info:
   name: CxCMS Resource.ashx 任意文件读取漏洞
@@ -7,9 +7,11 @@ info:
   verified: true
   description: |
     CxCMS存在任意文件读取，由于/Sys/Handler/Resource.ashx页面 _FilePath参数过滤不严，导致可以读取系统敏感文件。
-    fofa-query: "Powered by CxCms"
+    fofa: "Powered by CxCms"
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/CxCMS%20Resource.ashx%20%E4%BB%BB%E6%84%8F%E6%96%87%E4%BB%B6%E8%AF%BB%E5%8F%96%E6%BC%8F%E6%B4%9E.md
+  tags: cve,cve2023,fileread
+  created: 2023/05/26
 
 rules:
   r0:
