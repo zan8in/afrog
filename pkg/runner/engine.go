@@ -11,7 +11,6 @@ import (
 
 	"strconv"
 
-	"github.com/panjf2000/ants/v2"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -294,132 +293,132 @@ func (runner *Runner) Execute() {
 		gologger.Info().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), len(pocSlice), options.Count)
 	}
 
-	// 开始 普通POC 扫描 @edit 2024/05/30
-	rwg := sync.WaitGroup{}
-	rwg.Add(1)
-	go func() {
-		defer rwg.Done()
-
-		rate := options.RateLimit
+	runStage := func(pocs []poc.Poc, rate, concurrency int) {
+		if runner.engine == nil || runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+			return
+		}
 		if rate <= 0 {
 			rate = 1
 		}
+		if concurrency <= 0 {
+			concurrency = 1
+		}
+
 		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(rate))
-		var wg sync.WaitGroup
+		defer func() {
+			if runner.engine.ticker != nil {
+				runner.engine.ticker.Stop()
+				runner.engine.ticker = nil
+			}
+		}()
 
-		con := options.Concurrency
-		if con <= 0 {
-			con = 1
+		type stageTask struct {
+			tap   *TransData
+			pocID string
 		}
-		p, _ := ants.NewPoolWithFunc(con, func(p any) {
 
-			defer wg.Done()
-			runner.engine.waitTick()
-			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+		tasks := make(chan stageTask, concurrency*4)
+		var workers sync.WaitGroup
+
+		var counters sync.Map // map[string]*atomic.Int64
+		getCounter := func(pocID string) *atomic.Int64 {
+			if v, ok := counters.Load(pocID); ok {
+				return v.(*atomic.Int64)
+			}
+			c := &atomic.Int64{}
+			actual, _ := counters.LoadOrStore(pocID, c)
+			return actual.(*atomic.Int64)
+		}
+		finish := func(pocID string) {
+			v, ok := counters.Load(pocID)
+			if !ok {
 				return
 			}
+			if v.(*atomic.Int64).Add(-1) == 0 {
+				runner.ScanProgress.Increment(pocID)
+			}
+		}
 
-			tap := p.(*TransData)
-			runner.exec(tap)
+		for i := 0; i < concurrency; i++ {
+			workers.Add(1)
+			go func() {
+				defer workers.Done()
+				for {
+					select {
+					case <-runner.engine.quit:
+						return
+					case <-runner.ctx.Done():
+						return
+					case task, ok := <-tasks:
+						if !ok {
+							return
+						}
+						runner.engine.waitTick()
+						if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+							finish(task.pocID)
+							continue
+						}
+						runner.exec(task.tap)
+						finish(task.pocID)
+					}
+				}
+			}()
+		}
 
-		})
-		defer p.Release()
-
-		for _, poc := range otherPocs {
-			if options.VulnerabilityScannerBreakpoint {
+		for _, pocItem := range pocs {
+			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 				break
 			}
 			targetView := allTargets
-			if isNetOnlyPoc(poc) {
+			if isNetOnlyPoc(pocItem) {
 				targetView = netTargets
 			}
-			for _, t := range targetView {
-				// check resume
-				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
-					runner.NotVulCallback()
-					continue
-				}
 
-				if options.VulnerabilityScannerBreakpoint {
+			if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(pocItem.Id) {
+				for range targetView {
+					runner.NotVulCallback()
+				}
+				continue
+			}
+
+			scheduled := 0
+			for _, t := range targetView {
+				if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 					break
 				}
-				wg.Add(1)
-				p.Invoke(&TransData{Target: t, Poc: poc})
-			}
-			// Record PoC completion progress
-			runner.ScanProgress.Increment(poc.Id)
-		}
 
-		wg.Wait()
-	}()
-	rwg.Wait()
+				getCounter(pocItem.Id).Add(1)
+				scheduled++
 
-	// 开始 OOB POC 扫描  @edit 2024/05/30
-	rwg = sync.WaitGroup{}
-	rwg.Add(1)
-	go func() {
-		defer rwg.Done()
-
-		oobRate := options.OOBRateLimit
-		if oobRate <= 0 {
-			baseRate := options.RateLimit
-			if baseRate <= 0 {
-				baseRate = 1
-			}
-			oobRate = baseRate
-		}
-		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(oobRate))
-		var wg sync.WaitGroup
-
-		oobCon := options.OOBConcurrency
-		if oobCon <= 0 {
-			baseCon := options.Concurrency
-			if baseCon <= 0 {
-				baseCon = 1
-			}
-			oobCon = baseCon
-		}
-		p, _ := ants.NewPoolWithFunc(oobCon, func(p any) {
-
-			defer wg.Done()
-			runner.engine.waitTick()
-			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
-				return
-			}
-
-			tap := p.(*TransData)
-			runner.exec(tap)
-
-		})
-		defer p.Release()
-
-		for _, poc := range reversePocs {
-			if options.VulnerabilityScannerBreakpoint {
-				break
-			}
-			targetView := allTargets
-			if isNetOnlyPoc(poc) {
-				targetView = netTargets
-			}
-			for _, t := range targetView {
-				if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(poc.Id) {
-					runner.NotVulCallback()
-					continue
+				task := stageTask{tap: &TransData{Target: t, Poc: pocItem}, pocID: pocItem.Id}
+				select {
+				case <-runner.engine.quit:
+					finish(task.pocID)
+				case <-runner.ctx.Done():
+					finish(task.pocID)
+				case tasks <- task:
 				}
-
-				if options.VulnerabilityScannerBreakpoint {
-					break
-				}
-				wg.Add(1)
-				p.Invoke(&TransData{Target: t, Poc: poc})
 			}
-			// Record PoC completion progress
-			runner.ScanProgress.Increment(poc.Id)
+			if scheduled == 0 {
+				runner.ScanProgress.Increment(pocItem.Id)
+			}
 		}
-		wg.Wait()
 
-	}()
-	rwg.Wait()
+		close(tasks)
+		workers.Wait()
+	}
+
+	runStage(otherPocs, options.RateLimit, options.Concurrency)
+
+	oobRate := options.OOBRateLimit
+	if oobRate <= 0 {
+		oobRate = options.RateLimit
+	}
+	oobCon := options.OOBConcurrency
+	if oobCon <= 0 {
+		oobCon = options.Concurrency
+	}
+	runStage(reversePocs, oobRate, oobCon)
 }
 
 func (runner *Runner) exec(tap *TransData) {
