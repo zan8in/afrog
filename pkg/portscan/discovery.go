@@ -3,6 +3,7 @@ package portscan
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/progress"
@@ -432,12 +434,20 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 					ok = true
 					break
 				}
+				if isConnRefused(e) {
+					ok = true
+					break
+				}
 			}
 			if !ok && opt.DiscoveryFallback {
 				for _, p := range fallback {
 					c, e := net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(p)), opt.Timeout)
 					if e == nil {
 						c.Close()
+						ok = true
+						break
+					}
+					if isConnRefused(e) {
 						ok = true
 						break
 					}
@@ -457,6 +467,27 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 	}
 	wg.Wait()
 	return alive
+}
+
+func isConnRefused(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		if errors.Is(opErr.Err, syscall.ECONNREFUSED) {
+			return true
+		}
+		var sysErr *os.SyscallError
+		if errors.As(opErr.Err, &sysErr) {
+			if errors.Is(sysErr.Err, syscall.ECONNREFUSED) {
+				return true
+			}
+		}
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "refused")
 }
 
 func icmpAlive(host string) bool {
