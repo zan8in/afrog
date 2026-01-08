@@ -41,6 +41,7 @@ web_smoke.log
 afrogweb
 fscan
 naabu
+nuclei
 dist
 *.afg
 
