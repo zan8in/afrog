@@ -51,6 +51,15 @@ type Runner struct {
 	// OOB           *oobadapter.OOBAdapter
 }
 
+func (r *Runner) Done() <-chan struct{} {
+	if r == nil || r.ctx == nil {
+		ch := make(chan struct{})
+		close(ch)
+		return ch
+	}
+	return r.ctx.Done()
+}
+
 func NewRunner(options *config.Options) (*Runner, error) {
 	var err error
 

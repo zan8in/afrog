@@ -199,7 +199,11 @@ func (runner *Runner) Execute() {
 				collector.Add(r.Host, r.Port)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
-				_ = sc.Scan(context.Background())
+				baseCtx := runner.ctx
+				if baseCtx == nil {
+					baseCtx = context.Background()
+				}
+				_ = sc.Scan(baseCtx)
 				newTargets := make([]string, 0)
 				for host, ports := range collector.Snapshot() {
 					seenPort := make(map[int]struct{})

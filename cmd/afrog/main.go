@@ -235,9 +235,14 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
-				gologger.Debug().Msgf("auto save file failed: %s", err)
+		for {
+			select {
+			case <-r.Done():
+				return
+			case <-ticker.C:
+				if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
+					gologger.Debug().Msgf("auto save file failed: %s", err)
+				}
 			}
 		}
 	}()
