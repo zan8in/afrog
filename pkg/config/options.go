@@ -152,7 +152,8 @@ type Options struct {
 
 	// Cookie string
 
-	Header goflags.StringSlice
+	Header        goflags.StringSlice
+	DefaultAccept bool
 
 	Version bool
 
@@ -272,6 +273,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 		// flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
 		flagSet.StringSliceVarP(&options.Header, "header", "H", nil, "custom header/cookie to include in all http request in key:value format (comma separated), eg: -H 'X-Forwarded-For: 1.1.1.1' -H 'Cookie: JSESSION=xxx;'", goflags.StringSliceOptions),
+		flagSet.BoolVar(&options.DefaultAccept, "http-default-accept", true, "add Accept: */* when PoC doesn't set Accept"),
 		flagSet.StringVar(&options.Sort, "sort", "", "Scan sorting, default security level scanning, `-sort a-z` scan in alphabetical order"),
 	)
 

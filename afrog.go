@@ -444,6 +444,7 @@ func (s *SDKScanner) SetProxy(proxy string) {
 		Retries:           s.options.Retries,
 		MaxRespBodySize:   s.options.MaxRespBodySize,
 		ReqLimitPerTarget: s.options.ReqLimitPerTarget,
+		DefaultAccept:     s.options.DefaultAccept,
 	})
 }
 
@@ -682,6 +683,7 @@ func createSDKRunner(options *config.Options) (*runner.Runner, error) {
 		Retries:           options.Retries,
 		MaxRespBodySize:   options.MaxRespBodySize,
 		ReqLimitPerTarget: options.ReqLimitPerTarget,
+		DefaultAccept:     options.DefaultAccept,
 	})
 
 	// 处理目标

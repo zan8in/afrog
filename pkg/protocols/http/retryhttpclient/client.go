@@ -31,6 +31,8 @@ var (
 
 	maxDefaultBody int64
 
+	defaultAccept bool
+
 	reqLimiter *hostPortLimiter
 
 	httpInflight      int64
@@ -48,6 +50,7 @@ type Options struct {
 	Retries           int
 	MaxRespBodySize   int
 	ReqLimitPerTarget int
+	DefaultAccept     bool
 }
 
 const ContextVarKey = "__ctx"
@@ -66,7 +69,7 @@ func ContextFromVariableMap(variableMap map[string]any) context.Context {
 
 func IsCriticalHeader(key string) bool {
 	switch strings.ToLower(strings.TrimSpace(key)) {
-	case "host", "cookie", "authorization", "user-agent", "content-type":
+	case "host", "cookie", "authorization", "user-agent", "content-type", "accept":
 		return true
 	default:
 		return false
@@ -114,6 +117,7 @@ func Init(opt *Options) (err error) {
 
 	// -timeout 参数默认是 50s @editor 2024/11/03
 	defaultTimeout = time.Duration(opt.Timeout) * time.Second
+	defaultAccept = opt.DefaultAccept
 
 	// 保持查询参数顺序，避免因重新排序导致的漏洞触发失败 @editor 2025/11/25
 	retryablehttpurlutil.PreserveQueryOrder = true
@@ -549,6 +553,10 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 
 	for k, v := range rule.Request.Headers {
 		req.Header.Add(k, setVariableMap(v, variableMap))
+	}
+
+	if defaultAccept && len(req.Header.Get("Accept")) == 0 {
+		req.Header.Add("Accept", "*/*")
 	}
 
 	if len(req.Header.Get("User-Agent")) == 0 {
@@ -1021,4 +1029,8 @@ func GetMaxDefaultBody() int64 {
 	}
 
 	return maxDefaultBody
+}
+
+func DefaultAcceptEnabled() bool {
+	return defaultAccept
 }

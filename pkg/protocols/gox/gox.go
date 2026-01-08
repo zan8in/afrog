@@ -136,6 +136,10 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 		req.Header.Set(k, v)
 	}
 
+	if retryhttpclient.DefaultAcceptEnabled() && len(req.Header.Get("Accept")) == 0 {
+		req.Header.Add("Accept", "*/*")
+	}
+
 	if strings.EqualFold(method, http.MethodPost) && len(req.Header.Get("Content-Type")) == 0 {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -294,6 +298,11 @@ func FetchLimited(method string, target string, body []byte, headers map[string]
 		}
 		req.Header.Set(k, v)
 	}
+
+	if retryhttpclient.DefaultAcceptEnabled() && len(req.Header.Get("Accept")) == 0 {
+		req.Header.Add("Accept", "*/*")
+	}
+
 	if strings.EqualFold(method, http.MethodPost) && len(req.Header.Get("Content-Type")) == 0 {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}

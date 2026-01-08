@@ -69,6 +69,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		Retries:           options.Retries,
 		MaxRespBodySize:   options.MaxRespBodySize,
 		ReqLimitPerTarget: options.ReqLimitPerTarget,
+		DefaultAccept:     options.DefaultAccept,
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
