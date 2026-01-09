@@ -14,6 +14,8 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
@@ -121,6 +123,81 @@ func main() {
 
 	var progressDone chan struct{}
 	var progressOnce sync.Once
+
+	r.OnFingerprint = func(targetKey string, hits []fingerprint.Hit) {
+		if len(hits) == 0 {
+			return
+		}
+		for _, hit := range hits {
+			sev := strings.TrimSpace(hit.Severity)
+			if sev == "" {
+				sev = "info"
+			}
+			name := strings.TrimSpace(hit.Name)
+			if name == "" {
+				name = strings.TrimSpace(hit.ID)
+			}
+
+			rst := r.FingerprintResult(targetKey, hit.ID)
+			if rst == nil {
+				rst = &result.Result{
+					IsVul:      true,
+					Target:     targetKey,
+					FullTarget: targetKey,
+					PocInfo: &poc.Poc{
+						Id: hit.ID,
+						Info: poc.Info{
+							Name:     name,
+							Severity: sev,
+							Tags:     hit.Tags,
+						},
+					},
+					FingerResult: []fingerprint.Hit{hit},
+				}
+			} else {
+				rst.IsVul = true
+				if rst.PocInfo == nil {
+					rst.PocInfo = &poc.Poc{Id: hit.ID}
+				} else {
+					rst.PocInfo.Id = hit.ID
+				}
+				rst.PocInfo.Info.Name = name
+				rst.PocInfo.Info.Severity = sev
+				rst.PocInfo.Info.Tags = hit.Tags
+				rst.FingerResult = []fingerprint.Hit{hit}
+			}
+			if strings.TrimSpace(rst.FullTarget) == "" {
+				rst.FullTarget = rst.Target
+			}
+
+			lock.Lock()
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+
+			atomic.AddUint32(&number, 1)
+			rst.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			if progressEnabled {
+				renderProgress()
+			}
+
+			sqlite.SetResultX(rst)
+
+			if options.Dingtalk {
+				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(rst.PocInfo.Id, rst.PocInfo.Info.Severity, rst.FullTarget))
+			}
+
+			if !options.DisableOutputHtml {
+				r.Report.SetResult(rst)
+				r.Report.Append(utils.GetNumberText(int(number)))
+			}
+
+			if len(options.Json) > 0 || len(options.JsonAll) > 0 {
+				r.JsonReport.SetResult(rst)
+				r.JsonReport.Append()
+			}
+
+			lock.Unlock()
+		}
+	}
 
 	r.OnResult = func(result *result.Result) {
 		// add recover @edit 2025/06/12

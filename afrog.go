@@ -89,13 +89,14 @@ type SDKOptions struct {
 	Severity  string   // 严重程度过滤
 
 	// ========== 性能配置 ==========
-	RateLimit         int // 请求速率限制 (默认: 150)
-	ReqLimitPerTarget int
-	Concurrency       int // 并发数 (默认: 25)
-	Retries           int // 重试次数 (默认: 1)
-	Timeout           int // 超时时间秒 (默认: 10)
-	MaxHostError      int // 主机最大错误数 (默认: 3)
-	Smart             bool
+	RateLimit          int // 请求速率限制 (默认: 150)
+	ReqLimitPerTarget  int
+	Concurrency        int // 并发数 (默认: 25)
+	Retries            int // 重试次数 (默认: 1)
+	Timeout            int // 超时时间秒 (默认: 10)
+	MaxHostError       int // 主机最大错误数 (默认: 3)
+	Smart              bool
+	DisableFingerprint bool
 
 	PortScan        bool
 	PSPorts         string
@@ -610,29 +611,30 @@ func (s *SDKScanner) printScanInfo() {
 // convertSDKOptions 转换SDK配置到内部配置
 func convertSDKOptions(opts *SDKOptions) *config.Options {
 	options := &config.Options{
-		TargetsFile:       opts.TargetsFile,
-		PocFile:           opts.PocFile,
-		AppendPoc:         opts.AppendPoc,
-		Search:            opts.Search,
-		Severity:          opts.Severity,
-		RateLimit:         opts.RateLimit,
-		ReqLimitPerTarget: opts.ReqLimitPerTarget,
-		Concurrency:       opts.Concurrency,
-		Retries:           opts.Retries,
-		Timeout:           opts.Timeout,
-		MaxHostError:      opts.MaxHostError,
-		Proxy:             opts.Proxy,
-		MaxRespBodySize:   2,
-		OOBRateLimit:      50,
-		OOBConcurrency:    20,
-		Smart:             opts.Smart,
-		PortScan:          opts.PortScan,
-		PSPorts:           opts.PSPorts,
-		PSRateLimit:       opts.PSRateLimit,
-		PSTimeout:         opts.PSTimeout,
-		PSRetries:         opts.PSRetries,
-		PSSkipDiscovery:   opts.PSSkipDiscovery,
-		PSS4Chunk:         opts.PSS4Chunk,
+		TargetsFile:        opts.TargetsFile,
+		PocFile:            opts.PocFile,
+		AppendPoc:          opts.AppendPoc,
+		Search:             opts.Search,
+		Severity:           opts.Severity,
+		RateLimit:          opts.RateLimit,
+		ReqLimitPerTarget:  opts.ReqLimitPerTarget,
+		Concurrency:        opts.Concurrency,
+		Retries:            opts.Retries,
+		Timeout:            opts.Timeout,
+		MaxHostError:       opts.MaxHostError,
+		Proxy:              opts.Proxy,
+		MaxRespBodySize:    2,
+		OOBRateLimit:       50,
+		OOBConcurrency:     20,
+		Smart:              opts.Smart,
+		DisableFingerprint: opts.DisableFingerprint,
+		PortScan:           opts.PortScan,
+		PSPorts:            opts.PSPorts,
+		PSRateLimit:        opts.PSRateLimit,
+		PSTimeout:          opts.PSTimeout,
+		PSRetries:          opts.PSRetries,
+		PSSkipDiscovery:    opts.PSSkipDiscovery,
+		PSS4Chunk:          opts.PSS4Chunk,
 	}
 
 	if len(opts.Headers) > 0 {

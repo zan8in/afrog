@@ -1,0 +1,26 @@
+id: 1panel-detect
+
+info:
+  name: 1Panel 面板识别
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    fofa: app="1Panel-面板"
+  tags: 1panel,fingerprint
+  created: 2026/01/09
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expression: |
+      response.status == 200 &&
+      (
+        response.body.ibcontains(b"<title>1panel</title>") ||
+        response.body.ibcontains(b">1panel<") ||
+        (response.body.ibcontains(b"1panel") && response.body.ibcontains(b"/login"))
+      )
+
+expression: r0()

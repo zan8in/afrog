@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/cyberspace"
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/report"
@@ -31,23 +32,28 @@ var (
 )
 
 type Runner struct {
-	options       *config.Options
-	catalog       *catalog.Catalog
-	Report        *report.Report
-	JsonReport    *report.JsonReport
-	OnResult      OnResult
-	PocsYaml      utils.StringSlice
-	PocsEmbedYaml utils.StringSlice
-	engine        *Engine
-	Ding          *dingtalk.Dingtalk
-	ScanProgress  *ScanProgress
-	Cyberspace    *cyberspace.Cyberspace
-	TargetIndex   *targets.TargetIndex
-	liveMu        sync.Mutex
-	livePrev      retryhttpclient.LiveMetrics
-	livePrevAt    time.Time
-	ctx           context.Context
-	cancel        context.CancelFunc
+	options           *config.Options
+	catalog           *catalog.Catalog
+	Report            *report.Report
+	JsonReport        *report.JsonReport
+	OnResult          OnResult
+	OnFingerprint     func(targetKey string, hits []fingerprint.Hit)
+	PocsYaml          utils.StringSlice
+	PocsEmbedYaml     utils.StringSlice
+	engine            *Engine
+	Ding              *dingtalk.Dingtalk
+	ScanProgress      *ScanProgress
+	Cyberspace        *cyberspace.Cyberspace
+	TargetIndex       *targets.TargetIndex
+	fingerMu          sync.Mutex
+	fingerByKey       map[string][]fingerprint.Hit
+	fingerResultMu    sync.Mutex
+	fingerResultByKey map[string]map[string]*result.Result
+	liveMu            sync.Mutex
+	livePrev          retryhttpclient.LiveMetrics
+	livePrevAt        time.Time
+	ctx               context.Context
+	cancel            context.CancelFunc
 	// OOB           *oobadapter.OOBAdapter
 }
 
@@ -73,7 +79,13 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
-	runner := &Runner{options: options, ctx: ctx, cancel: cancel}
+	runner := &Runner{
+		options:           options,
+		ctx:               ctx,
+		cancel:            cancel,
+		fingerByKey:       make(map[string][]fingerprint.Hit),
+		fingerResultByKey: make(map[string]map[string]*result.Result),
+	}
 
 	runner.engine = NewEngine(options)
 	if options.AutoReqLimit {
@@ -304,6 +316,52 @@ func (r *Runner) LiveStatsSuffix() string {
 		reqWaitMsPerSec,
 		reqWaitPerSec,
 	)
+}
+
+func (r *Runner) setFingerprintResult(targetKey, pocID string, res *result.Result) {
+	if r == nil || res == nil {
+		return
+	}
+	targetKey = strings.TrimSpace(targetKey)
+	pocID = strings.TrimSpace(pocID)
+	if targetKey == "" || pocID == "" {
+		return
+	}
+	r.fingerResultMu.Lock()
+	pm := r.fingerResultByKey[targetKey]
+	if pm == nil {
+		pm = make(map[string]*result.Result)
+		r.fingerResultByKey[targetKey] = pm
+	}
+	pm[pocID] = res
+	r.fingerResultMu.Unlock()
+}
+
+func (r *Runner) FingerprintResult(targetKey, pocID string) *result.Result {
+	if r == nil {
+		return nil
+	}
+	targetKey = strings.TrimSpace(targetKey)
+	pocID = strings.TrimSpace(pocID)
+	if targetKey == "" || pocID == "" {
+		return nil
+	}
+	r.fingerResultMu.Lock()
+	pm := r.fingerResultByKey[targetKey]
+	res := (*result.Result)(nil)
+	if pm != nil {
+		res = pm[pocID]
+	}
+	r.fingerResultMu.Unlock()
+	if res == nil {
+		return nil
+	}
+	cp := *res
+	if cp.PocInfo != nil {
+		po := *cp.PocInfo
+		cp.PocInfo = &po
+	}
+	return &cp
 }
 
 // func checkReversePlatform() {

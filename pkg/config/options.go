@@ -125,7 +125,8 @@ type Options struct {
 	OOBConcurrency int
 
 	// Smart Control Concurrency
-	Smart bool
+	Smart              bool
+	DisableFingerprint bool
 
 	// number of times to retry a failed request (default 1)
 	Retries int
@@ -269,6 +270,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
 		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
+		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 		// flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
@@ -549,6 +551,76 @@ func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, severity string) b
 	return isShow
 }
 
+func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocName, pocSeverity, pocTags string) bool {
+	searchKeywords := make([]string, 0)
+	if strings.TrimSpace(search) != "" {
+		for _, v := range strings.Split(search, ",") {
+			k := strings.ToLower(strings.TrimSpace(v))
+			if k == "" {
+				continue
+			}
+			searchKeywords = append(searchKeywords, k)
+		}
+	}
+	severityKeywords := make([]string, 0)
+	if strings.TrimSpace(severityFilter) != "" {
+		for _, v := range strings.Split(severityFilter, ",") {
+			k := strings.ToLower(strings.TrimSpace(v))
+			if k == "" {
+				continue
+			}
+			severityKeywords = append(severityKeywords, k)
+		}
+	}
+
+	isFingerprint := func(tags string) bool {
+		for _, t := range strings.Split(strings.ToLower(tags), ",") {
+			if strings.TrimSpace(t) == "fingerprint" {
+				return true
+			}
+		}
+		return false
+	}
+
+	matchKeyword := func(id, name string) bool {
+		if len(searchKeywords) == 0 {
+			return true
+		}
+		idLower := strings.ToLower(id)
+		nameLower := strings.ToLower(name)
+		for _, k := range searchKeywords {
+			if strings.Contains(idLower, k) || strings.Contains(nameLower, k) {
+				return true
+			}
+		}
+		return false
+	}
+
+	matchSeverity := func(sev string) bool {
+		if len(severityKeywords) == 0 {
+			return true
+		}
+		sevLower := strings.ToLower(strings.TrimSpace(sev))
+		for _, s := range severityKeywords {
+			if sevLower == s {
+				return true
+			}
+		}
+		return false
+	}
+
+	if len(searchKeywords) == 0 && len(severityKeywords) == 0 {
+		return true
+	}
+	if !matchKeyword(pocID, pocName) {
+		return false
+	}
+	if matchSeverity(pocSeverity) {
+		return true
+	}
+	return isFingerprint(pocTags)
+}
+
 func (o *Options) PrintPocList() error {
 	// 使用仓库层统一路径整合（包含 curated/my/append/local/builtin），仅按元信息读取，避免全量解析带来的 YAML panic
 	pathItems, _ := pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
@@ -746,6 +818,28 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 	return result, other
 }
 
+func (o *Options) FingerprintPoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
+	finger := make([]poc.Poc, 0)
+	other := make([]poc.Poc, 0)
+
+	for _, p := range allpocs {
+		tags := strings.Split(strings.ToLower(p.Info.Tags), ",")
+		isFinger := false
+		for _, t := range tags {
+			if strings.TrimSpace(t) == "fingerprint" {
+				isFinger = true
+				break
+			}
+		}
+		if isFinger {
+			finger = append(finger, p)
+		} else {
+			other = append(other, p)
+		}
+	}
+	return finger, other
+}
+
 func (o *Options) CreatePocList() []poc.Poc {
 	var pocSlice []poc.Poc
 
@@ -785,7 +879,7 @@ func (o *Options) CreatePocList() []poc.Poc {
 
 	newPocSlice := []poc.Poc{}
 	for _, pp := range pocSlice {
-		if o.FilterPocSeveritySearch(pp.Id, pp.Info.Name, pp.Info.Severity) {
+		if filterPocSeveritySearchWithFingerprint(o.Search, o.Severity, pp.Id, pp.Info.Name, pp.Info.Severity, pp.Info.Tags) {
 			newPocSlice = append(newPocSlice, pp)
 		}
 	}

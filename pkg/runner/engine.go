@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
@@ -100,6 +102,7 @@ func (runner *Runner) Execute() {
 	options := runner.options
 
 	pocSlice := options.CreatePocList()
+	fingerprintPocs, pocSlice := options.FingerprintPoCs(pocSlice)
 
 	reversePocs, otherPocs := options.ReversePoCs(pocSlice)
 
@@ -251,11 +254,13 @@ func (runner *Runner) Execute() {
 	}
 
 	idx := runner.TargetIndex
+
 	if idx == nil {
 		idx = targets.BuildTargetIndex(allTargets)
 		runner.TargetIndex = idx
 	}
 	netTargets := idx.NetTargets()
+
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false
 		hasNet := false
@@ -280,6 +285,9 @@ func (runner *Runner) Execute() {
 	}
 
 	taskCount := 0
+	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+		taskCount += len(fingerprintPocs) * len(allTargets)
+	}
 	for _, p := range pocSlice {
 		if !isNetOnlyPoc(p) {
 			taskCount += len(allTargets)
@@ -294,7 +302,131 @@ func (runner *Runner) Execute() {
 	}
 
 	if !options.SDKMode {
-		gologger.Info().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), len(pocSlice), options.Count)
+		pocTotal := len(pocSlice)
+		if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+			pocTotal += len(fingerprintPocs)
+		}
+		gologger.Info().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), pocTotal, options.Count)
+	}
+
+	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+		baseCtx := runner.ctx
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		runner.runFingerprintStage(baseCtx, allTargets, fingerprintPocs)
+	}
+
+	normalizeTags := func(tags string, skipFingerprint bool) map[string]struct{} {
+		tags = strings.TrimSpace(tags)
+		if tags == "" {
+			return nil
+		}
+		out := make(map[string]struct{})
+		for _, t := range strings.Split(strings.ToLower(tags), ",") {
+			tt := strings.TrimSpace(t)
+			if tt == "" {
+				continue
+			}
+			if skipFingerprint && tt == "fingerprint" {
+				continue
+			}
+			out[tt] = struct{}{}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+
+	keyForTarget := func(target string) string {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			return ""
+		}
+		if strings.Contains(target, "://") {
+			return fingerprint.KeyFromTarget(target)
+		}
+		host, port, err := net.SplitHostPort(target)
+		if err == nil && host != "" && port != "" {
+			return net.JoinHostPort(host, port)
+		}
+		return ""
+	}
+
+	fingerTagsByKey := make(map[string]map[string]struct{})
+	globalFingerTags := make(map[string]struct{})
+	{
+		runner.fingerMu.Lock()
+		fingerSnap := make(map[string][]fingerprint.Hit, len(runner.fingerByKey))
+		for k, v := range runner.fingerByKey {
+			if len(v) == 0 {
+				continue
+			}
+			vv := make([]fingerprint.Hit, len(v))
+			copy(vv, v)
+			fingerSnap[k] = vv
+		}
+		runner.fingerMu.Unlock()
+
+		for k, hits := range fingerSnap {
+			tagSet := make(map[string]struct{})
+			for _, h := range hits {
+				hs := normalizeTags(h.Tags, true)
+				for t := range hs {
+					tagSet[t] = struct{}{}
+				}
+			}
+			if len(tagSet) == 0 {
+				continue
+			}
+			fingerTagsByKey[k] = tagSet
+			for t := range tagSet {
+				globalFingerTags[t] = struct{}{}
+			}
+		}
+	}
+
+	pocTagsCache := make(map[string]map[string]struct{})
+	shouldSkipFingerprintFiltered := func(target string, p poc.Poc) bool {
+		if len(globalFingerTags) == 0 {
+			return false
+		}
+		if isNetOnlyPoc(p) {
+			return false
+		}
+		pt, ok := pocTagsCache[p.Id]
+		if !ok {
+			pt = normalizeTags(p.Info.Tags, true)
+			pocTagsCache[p.Id] = pt
+		}
+		if len(pt) == 0 {
+			return false
+		}
+		appSpecific := false
+		for t := range pt {
+			if _, ok := globalFingerTags[t]; ok {
+				appSpecific = true
+				break
+			}
+		}
+		if !appSpecific {
+			return false
+		}
+		key := keyForTarget(target)
+		if key == "" {
+			return false
+		}
+		tts := fingerTagsByKey[key]
+		if len(tts) == 0 {
+			return true
+		}
+		for t := range pt {
+			if _, ok := tts[t]; ok {
+				return false
+			}
+		}
+		return true
 	}
 
 	runStage := func(pocs []poc.Poc, rate, concurrency int) {
@@ -389,6 +521,11 @@ func (runner *Runner) Execute() {
 			for _, t := range targetView {
 				if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 					break
+				}
+
+				if shouldSkipFingerprintFiltered(t, pocItem) {
+					runner.NotVulCallback()
+					continue
 				}
 
 				getCounter(pocItem.Id).Add(1)
@@ -488,7 +625,101 @@ func (runner *Runner) executeExpression(ctx context.Context, target string, poc 
 		c.VariableMap[retryhttpclient.ContextVarKey] = ctx
 	}
 	c.Check(target, poc)
+	if c.Result != nil {
+		c.Result.FingerResult = runner.fingerprintForTarget(c.Result.Target)
+	}
 	runner.OnResult(c.Result)
+}
+
+type runnerFingerprintExecutor struct {
+	runner *Runner
+}
+
+func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *poc.Poc) (matched bool, resolvedTarget string, err error) {
+	if e.runner == nil || e.runner.engine == nil {
+		return false, "", nil
+	}
+	c := e.runner.engine.AcquireChecker()
+	defer e.runner.engine.ReleaseChecker(c)
+	defer e.runner.NotVulCallback()
+
+	if ctx != nil {
+		c.VariableMap[retryhttpclient.ContextVarKey] = ctx
+	}
+	err = c.Check(target, p)
+	if c.Result == nil {
+		return false, "", err
+	}
+	if c.Result.IsVul {
+		key := fingerprint.KeyFromTarget(c.Result.Target)
+		if key == "" {
+			key = fingerprint.KeyFromTarget(target)
+		}
+		if key != "" {
+			e.runner.setFingerprintResult(key, p.Id, c.Result)
+		}
+	}
+	return c.Result.IsVul, c.Result.Target, err
+}
+
+func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string, pocs []poc.Poc) {
+	if runner == nil || runner.engine == nil || runner.engine.stopped {
+		return
+	}
+	if len(targets) == 0 || len(pocs) == 0 {
+		return
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
+
+	e := &fingerprint.Engine{Rate: runner.options.RateLimit, Concurrency: runner.options.Concurrency}
+	res := e.Run(ctx, targets, pocs, runnerFingerprintExecutor{runner: runner})
+
+	if runner.OnFingerprint != nil && len(res) > 0 {
+		keys := make([]string, 0, len(res))
+		for k, v := range res {
+			if k == "" || len(v) == 0 {
+				continue
+			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			hits := res[k]
+			if len(hits) == 0 {
+				continue
+			}
+			cp := make([]fingerprint.Hit, len(hits))
+			copy(cp, hits)
+			runner.OnFingerprint(k, cp)
+		}
+	}
+
+	runner.fingerMu.Lock()
+	for k, v := range res {
+		if len(v) == 0 {
+			continue
+		}
+		runner.fingerByKey[k] = append(runner.fingerByKey[k], v...)
+	}
+	runner.fingerMu.Unlock()
+}
+
+func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {
+	key := fingerprint.KeyFromTarget(target)
+	if key == "" {
+		return nil
+	}
+	runner.fingerMu.Lock()
+	hits := runner.fingerByKey[key]
+	runner.fingerMu.Unlock()
+	if len(hits) == 0 {
+		return nil
+	}
+	out := make([]fingerprint.Hit, len(hits))
+	copy(out, hits)
+	return out
 }
 
 func (e *Engine) waitTick() {

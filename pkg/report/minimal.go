@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	timeutil "github.com/zan8in/pins/time"
 )
 
@@ -59,6 +60,20 @@ func (report *Report) minimalHtml(line string) string {
 
 	if len(htResult.PocInfo.Info.Created) > 0 {
 		info += fmt.Sprintf(`<p><strong>创建时间:</strong> %s</p>`, htResult.PocInfo.Info.Created)
+	}
+	if hits, ok := htResult.FingerResult.([]fingerprint.Hit); ok && len(hits) > 0 {
+		items := make([]string, 0, len(hits))
+		for _, h := range hits {
+			item := strings.TrimSpace(h.ID)
+			if strings.TrimSpace(h.Name) != "" {
+				item = h.Name
+			}
+			if strings.TrimSpace(h.Tags) != "" {
+				item = item + " (" + h.Tags + ")"
+			}
+			items = append(items, xssfilter(item))
+		}
+		info += fmt.Sprintf(`<p><strong>指纹:</strong> %s</p>`, strings.Join(items, ", "))
 	}
 
 	info += `</div>`

@@ -101,7 +101,8 @@ var (
 	  CREATE INDEX IF NOT EXISTS "idx_vulid"
 	  ON "result" (
 		"vulid"
-	  );`
+	  );
+	  `
 
 	TaskID string
 )

