@@ -1,0 +1,32 @@
+id: n8n-panel
+
+info:
+  name: n8n Panel - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |
+    shodan: http.favicon.hash:-831756631
+    fofa: app="n8n"
+  tags: n8n,panel
+  created: 2026/01/08
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /signin
+    expression: |
+      response.status == 200 && response.body.ibcontains(b'<title>n8n.io')
+    output:
+      search: |
+        '<meta name="n8n:config:sentry" content="(?P<b64>[A-Za-z0-9+/=]+)"'.bsubmatch(response.body)
+      decoded: base64Decode(search["b64"])
+      version: |
+        'n8n@(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)'.submatch(decoded)
+
+extractors:
+  - type: regex
+    extractor:
+      ver: version["version"]
+expression: r0()
