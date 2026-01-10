@@ -8,7 +8,7 @@ info:
     MongoDB build and server information was detected.
   reference:
     - https://nmap.org/nsedoc/scripts/mongodb-info.html
-  tags: network,mongodb,enum
+  tags: network,mongodb,enum,fingerprint
   created: 2024/01/05
 
 set:

@@ -1,0 +1,22 @@
+id: vnc-detect
+
+info:
+  name: VNC Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    VNC service was detected.
+  tags: network,vnc,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "\n"
+    expression: response.raw.bcontains(b"RFB ")
+expression: r0()

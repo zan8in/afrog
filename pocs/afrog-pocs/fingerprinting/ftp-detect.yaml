@@ -1,0 +1,22 @@
+id: ftp-detect
+
+info:
+  name: FTP Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    FTP service was detected.
+  tags: network,ftp,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "\n"
+    expression: response.raw.bcontains(b"220") && response.raw.ibcontains(b"ftp")
+expression: r0()

@@ -7,23 +7,16 @@ info:
   verified: true
   description: |-
     Redis service was detected.
-  tags: network,redis
+  tags: network,redis,fingerprint
   created: 2023/08/07
 
 set:
-  hostname: request.url.host
-  host: request.url.domain
+  host: request.url.host
 rules:
   r0:
     request:
       type: tcp
-      host: "{{hostname}}"
+      host: "{{host}}"
       data: "*1\r\n$4\r\ninfo\r\n"
     expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication') || response.raw.bcontains(b'72656469735f76657273696f6')
-  r1:
-    request:
-      type: tcp
-      host: "{{host}}:6379"
-      data: "*1\r\n$4\r\ninfo\r\n"
-    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication') || response.raw.bcontains(b'72656469735f76657273696f6')
-expression: r0() || r1()
+expression: r0()

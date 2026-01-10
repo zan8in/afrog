@@ -11,7 +11,7 @@ info:
     zoomeye: app:"DMSQL"
   reference:
     - https://www.dameng.com/
-  tags: network,db,dameng
+  tags: network,db,dameng,fingerprint
   created: 2023/12/22
 
 set:

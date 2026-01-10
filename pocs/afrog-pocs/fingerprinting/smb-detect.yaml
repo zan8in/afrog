@@ -1,0 +1,23 @@
+id: smb-detect
+
+info:
+  name: SMB Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    SMB service was detected.
+  tags: network,smb,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "00000066fe534d42400000000000000000003f0000000000000000000000000000000000fffe000000000000000000000000000000000000000000000000000000000000000000000000240001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      data-type: hex
+    expression: response.raw.bcontains(b"\xfeSMB")
+expression: r0()

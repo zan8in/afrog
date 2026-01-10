@@ -1,0 +1,29 @@
+id: pop3-detect
+
+info:
+  name: POP3 Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    POP3 service was detected.
+  tags: network,pop3,fingerprint
+  created: 2026/01/09
+
+set:
+  hostname: request.url.host
+  host: request.url.domain
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{hostname}}"
+      data: "\n"
+    expression: response.raw.bcontains(b"+OK") && response.raw.ibcontains(b"pop")
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}:110"
+      data: "\n"
+    expression: response.raw.bcontains(b"+OK") && response.raw.ibcontains(b"pop")
+expression: r0() || r1()

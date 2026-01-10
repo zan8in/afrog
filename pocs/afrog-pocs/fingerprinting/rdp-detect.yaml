@@ -1,0 +1,23 @@
+id: rdp-detect
+
+info:
+  name: RDP Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    RDP service was detected.
+  tags: network,rdp,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "030000130ee000000000000100080003000000"
+      data-type: hex
+    expression: response.raw.bcontains(b"\x03\x00\x00") && response.raw.bcontains(b"\x0e\xd0")
+expression: r0()

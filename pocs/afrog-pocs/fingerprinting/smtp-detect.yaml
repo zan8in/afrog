@@ -1,0 +1,22 @@
+id: smtp-detect
+
+info:
+  name: SMTP Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    SMTP service was detected.
+  tags: network,smtp,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "\n"
+    expression: response.raw.bcontains(b"220") && (response.raw.ibcontains(b"smtp") || response.raw.ibcontains(b"esmtp"))
+expression: r0()

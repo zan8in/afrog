@@ -9,23 +9,16 @@ info:
     shodan: product:"RabbitMQ"
   reference:
     - https://nmap.org/nsedoc/scripts/amqp-info.html
-  tags: network,rabbitmq,oss
+  tags: network,rabbitmq,oss,fingerprint
   created: 2023/08/07
 
 set:
-  hostname: request.url.host
-  host: request.url.domain
+  host: request.url.host
 rules:
   r0:
     request:
       type: tcp
-      host: "{{hostname}}"
+      host: "{{host}}"
       data: "AMQP\u0000\u0000\t\u0001"
     expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
-  r1:
-    request:
-      type: tcp
-      host: "{{host}}:5672"
-      data: "AMQP\u0000\u0000\t\u0001"
-    expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
-expression: r0() || r1()
+expression: r0()

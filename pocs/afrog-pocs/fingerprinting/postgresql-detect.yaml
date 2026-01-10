@@ -1,0 +1,23 @@
+id: postgresql-detect
+
+info:
+  name: PostgreSQL Service - Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    PostgreSQL service was detected.
+  tags: network,db,postgresql,postgres,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "0000000804d2162f"
+      data-type: hex
+    expression: response.raw == b"S" || response.raw == b"N"
+expression: r0()

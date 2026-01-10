@@ -14,9 +14,11 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
+	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
@@ -261,10 +263,67 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	}
 
 	// 计算扫描统计
-	scanner.stats.TotalTargets = options.Targets.Len()
 	pocSlice := options.CreatePocList()
-	scanner.stats.TotalPocs = len(pocSlice)
-	scanner.stats.TotalScans = scanner.stats.TotalTargets * scanner.stats.TotalPocs
+	fingerprintPocs, pocSlice := options.FingerprintPoCs(pocSlice)
+
+	allTargets := make([]string, 0, options.Targets.Len())
+	for _, t := range options.Targets.List() {
+		s, ok := t.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		allTargets = append(allTargets, s)
+	}
+	idx := targets.BuildTargetIndex(allTargets)
+	netTargets := idx.NetTargets()
+
+	isNetOnlyPoc := func(p poc.Poc) bool {
+		hasHTTP := false
+		hasNet := false
+		hasGo := false
+		for _, rm := range p.Rules {
+			t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
+			switch t {
+			case "", poc.HTTP_Type, poc.HTTPS_Type:
+				hasHTTP = true
+			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
+				hasNet = true
+			case poc.GO_Type:
+				hasGo = true
+			default:
+				hasHTTP = true
+			}
+		}
+		if hasGo {
+			return false
+		}
+		return hasNet && !hasHTTP
+	}
+
+	taskCount := 0
+	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+		taskCount += len(fingerprintPocs) * len(allTargets)
+	}
+	for _, p := range pocSlice {
+		if !isNetOnlyPoc(p) {
+			taskCount += len(allTargets)
+		} else {
+			taskCount += len(netTargets)
+		}
+	}
+
+	pocTotal := len(pocSlice)
+	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+		pocTotal += len(fingerprintPocs)
+	}
+
+	scanner.stats.TotalTargets = len(allTargets)
+	scanner.stats.TotalPocs = pocTotal
+	scanner.stats.TotalScans = taskCount
 
 	return scanner, nil
 }

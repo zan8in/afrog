@@ -1,0 +1,23 @@
+id: oracle-tns-detect
+
+info:
+  name: Oracle TNS Listener - Detect
+  author: zan8in
+  severity: info
+  verified: false
+  description: |-
+    Oracle TNS listener was detected.
+  tags: network,db,oracle,tns,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "0000002a0100000001000000000000080000000000000000010000000000000000000000000000000000"
+      data-type: hex
+    expression: response.raw.ibcontains(b"tns") || response.raw.ibcontains(b"tnslsnr") || response.raw.ibcontains(b"oracle")
+expression: r0()
