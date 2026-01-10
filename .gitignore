@@ -43,6 +43,7 @@ fscan
 naabu
 nuclei
 dist
+.sandbox_home
 *.afg
 
 /afrog.wiki

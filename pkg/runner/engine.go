@@ -702,6 +702,27 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 	if c.Result == nil {
 		return false, "", err
 	}
+	if e.runner.options != nil && e.runner.options.Debug {
+		pocID := ""
+		if c.Result.PocInfo != nil {
+			pocID = c.Result.PocInfo.Id
+		}
+		for i, pr := range c.Result.AllPocResult {
+			idx := i + 1
+			gologger.Info().Msgf("[%d][%s] Dumped Request\n", idx, pocID)
+			if pr != nil && pr.ResultRequest != nil {
+				gologger.Print().Msgf("%s\n", pr.ResultRequest.GetRaw())
+			} else {
+				gologger.Print().Msgf("%s\n", []byte{})
+			}
+			gologger.Info().Msgf("[%d][%s] Dumped Response\n", idx, pocID)
+			if pr != nil && pr.ResultResponse != nil {
+				gologger.Print().Msgf("%s\n", pr.ResultResponse.GetRaw())
+			} else {
+				gologger.Print().Msgf("%s\n", []byte{})
+			}
+		}
+	}
 	if c.Result.IsVul {
 		key := fingerprint.KeyFromTarget(c.Result.Target)
 		if key == "" {

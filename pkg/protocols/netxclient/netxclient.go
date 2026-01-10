@@ -45,6 +45,20 @@ func (nc *NetClient) Config() *netx.Config {
 func NewNetClient(address string, conf Config) (*NetClient, error) {
 	netxconf := netx.Config{}
 
+	globalTimeout := retryhttpclient.GetDefaultTimeout()
+	dialBase := 3 * time.Second
+	writeBase := 3 * time.Second
+	readBase := 6 * time.Second
+	if _, port, ok := parseHostPort(address); ok && port == "445" {
+		dialBase = 5 * time.Second
+		writeBase = 5 * time.Second
+		readBase = 10 * time.Second
+	}
+
+	dialDefault := minDuration(globalTimeout, dialBase)
+	writeDefault := minDuration(globalTimeout, writeBase)
+	readDefault := minDuration(globalTimeout, readBase)
+
 	if conf.MaxRetries != 0 {
 		netxconf.MaxRetries = conf.MaxRetries
 	}
@@ -52,20 +66,32 @@ func NewNetClient(address string, conf Config) (*NetClient, error) {
 	if conf.Network != "" {
 		netxconf.Network = conf.Network
 	}
+
 	if conf.DialTimeout != 0 {
 		netxconf.DialTimeout = conf.DialTimeout
+	} else {
+		netxconf.DialTimeout = dialDefault
 	}
+
 	if conf.WriteTimeout != 0 {
 		netxconf.WriteTimeout = conf.WriteTimeout
+	} else {
+		netxconf.WriteTimeout = writeDefault
 	}
+
 	if conf.ReadTimeout != 0 {
 		netxconf.ReadTimeout = conf.ReadTimeout
+	} else {
+		netxconf.ReadTimeout = readDefault
 	}
+
 	if conf.RetryDelay != 0 {
 		netxconf.RetryDelay = conf.RetryDelay
 	}
 	if conf.ReadSize != 0 {
 		netxconf.ReadSize = conf.ReadSize
+	} else {
+		netxconf.ReadSize = 20480
 	}
 
 	return &NetClient{address: address, config: netxconf}, nil
@@ -216,6 +242,17 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 		return nil
 	}
 
+	if strings.ToLower(nc.config.Network) == "tcp" {
+		body, err := nc.sendReceiveTCP([]byte(data))
+		if err != nil {
+			return err
+		}
+		variableMap["request"] = &proto.Request{Raw: []byte(nc.address + "\r\n" + data)}
+		variableMap["response"] = &proto.Response{Raw: body, Body: body}
+		variableMap["fulltarget"] = nc.address
+		return nil
+	}
+
 	var err error
 	nc.netx, err = netx.NewClient(nc.address, nc.config)
 	if err != nil {
@@ -230,7 +267,11 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 
 	body, err := nc.netx.Receive()
 	if err != nil {
-		return err
+		if ne, ok := err.(net.Error); ok && ne.Timeout() && len(body) > 0 {
+			err = nil
+		} else {
+			return err
+		}
 	}
 
 	variableMap["request"] = &proto.Request{
@@ -248,6 +289,71 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 	// fmt.Println(variableMap["response"])
 
 	return nil
+}
+
+func (nc *NetClient) sendReceiveTCP(payload []byte) ([]byte, error) {
+	dialer := &net.Dialer{}
+	if nc.config.DialTimeout != 0 {
+		dialer.Timeout = nc.config.DialTimeout
+	}
+
+	conn, err := dialer.Dial("tcp", nc.address)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	if nc.config.WriteTimeout != 0 {
+		_ = conn.SetWriteDeadline(time.Now().Add(nc.config.WriteTimeout))
+	}
+	if len(payload) > 0 {
+		if _, err = conn.Write(payload); err != nil {
+			return nil, err
+		}
+	}
+
+	if nc.config.ReadTimeout != 0 {
+		_ = conn.SetReadDeadline(time.Now().Add(nc.config.ReadTimeout))
+	}
+
+	maxSize := nc.config.ReadSize
+	if maxSize <= 0 {
+		maxSize = 20480
+	}
+
+	chunk := 4096
+	if chunk > maxSize {
+		chunk = maxSize
+	}
+	buf := make([]byte, chunk)
+	out := make([]byte, 0, chunk)
+	for {
+		remaining := maxSize - len(out)
+		if remaining <= 0 {
+			break
+		}
+		if remaining < len(buf) {
+			buf = buf[:remaining]
+		}
+
+		n, rerr := conn.Read(buf)
+		if n > 0 {
+			out = append(out, buf[:n]...)
+		}
+		if rerr != nil {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+				break
+			}
+			if len(out) > 0 {
+				break
+			}
+			return nil, rerr
+		}
+		if n == 0 {
+			break
+		}
+	}
+	return out, nil
 }
 
 func (s *Session) Address() string {
@@ -284,7 +390,14 @@ func (nc *NetClient) sendReceiveTLS(payload []byte) ([]byte, error) {
 		dialer.Timeout = nc.config.DialTimeout
 	}
 
-	conn, err := tls.DialWithDialer(dialer, "tcp", nc.address, &tls.Config{InsecureSkipVerify: true})
+	tlsCfg := &tls.Config{InsecureSkipVerify: true}
+	if host, _, ok := parseHostPort(nc.address); ok {
+		if host != "" && net.ParseIP(host) == nil {
+			tlsCfg.ServerName = host
+		}
+	}
+
+	conn, err := tls.DialWithDialer(dialer, "tcp", nc.address, tlsCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -293,24 +406,54 @@ func (nc *NetClient) sendReceiveTLS(payload []byte) ([]byte, error) {
 	if nc.config.WriteTimeout != 0 {
 		_ = conn.SetWriteDeadline(time.Now().Add(nc.config.WriteTimeout))
 	}
-	if _, err = conn.Write(payload); err != nil {
-		return nil, err
+	if len(payload) > 0 {
+		if _, err = conn.Write(payload); err != nil {
+			return nil, err
+		}
 	}
 
 	if nc.config.ReadTimeout != 0 {
 		_ = conn.SetReadDeadline(time.Now().Add(nc.config.ReadTimeout))
 	}
 
-	size := nc.config.ReadSize
-	if size <= 0 {
-		size = 20480
+	maxSize := nc.config.ReadSize
+	if maxSize <= 0 {
+		maxSize = 20480
 	}
-	buf := make([]byte, size)
-	n, err := conn.Read(buf)
-	if err != nil {
-		return nil, err
+
+	chunk := 4096
+	if chunk > maxSize {
+		chunk = maxSize
 	}
-	return buf[:n], nil
+	buf := make([]byte, chunk)
+	out := make([]byte, 0, chunk)
+	for {
+		remaining := maxSize - len(out)
+		if remaining <= 0 {
+			break
+		}
+		if remaining < len(buf) {
+			buf = buf[:remaining]
+		}
+
+		n, rerr := conn.Read(buf)
+		if n > 0 {
+			out = append(out, buf[:n]...)
+		}
+		if rerr != nil {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+				break
+			}
+			if len(out) > 0 {
+				break
+			}
+			return nil, rerr
+		}
+		if n == 0 {
+			break
+		}
+	}
+	return out, nil
 }
 
 func (nc *NetClient) Close() error {

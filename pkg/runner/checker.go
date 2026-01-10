@@ -17,6 +17,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/gologger"
 	"gopkg.in/yaml.v2"
 )
 
@@ -142,6 +143,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				err = exec.Execute(target, rule, c.Options, c.VariableMap)
 			}
 
+			if err != nil && c.Options != nil && c.Options.Debug {
+				gologger.Error().Msgf("[%s] request failed: %v", k, err)
+			}
 			if err == nil {
 				isMatch = c.evalRuleMatch(&rule, pocItem)
 			}
@@ -749,7 +753,7 @@ func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
 	req.Host = c.renderCELPlaceholders(strings.TrimSpace(req.Host))
 	req.Body = c.renderCELPlaceholders(strings.TrimSpace(req.Body))
 	req.Raw = c.renderCELPlaceholders(strings.TrimSpace(req.Raw))
-	req.Data = c.renderCELPlaceholders(strings.TrimSpace(req.Data))
+	req.Data = c.renderCELPlaceholders(req.Data)
 
 	// CEL 渲染后做一次简单 {{var}} 替换作为兜底
 	req.Path = setVariableMap(req.Path, c.VariableMap)

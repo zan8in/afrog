@@ -19,4 +19,17 @@ rules:
       host: "{{host}}"
       data: "version\r\n"
     expression: response.raw.bcontains(b"VERSION")
-expression: r0()
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data: "stats\r\n"
+    expression: response.raw.ibcontains(b"STAT version") || response.raw.ibcontains(b"STAT pid")
+  r2:
+    request:
+      type: tcp
+      host: "{{host}}"
+      data-type: hex
+      data: "800b000000000000000000000000000000000000000000"
+    expression: response.raw.bstartsWith(b"\x81\x0b")
+expression: r0() || r1() || r2()
