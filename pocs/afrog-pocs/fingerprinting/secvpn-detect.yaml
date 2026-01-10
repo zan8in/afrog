@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: info
   verified: true
-  tags: secvpn,fingerprint
+  tags: secvpn
   created: 2023/09/06
 
 rules:

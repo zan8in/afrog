@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     fofa: app="1Panel-面板"
-  tags: 1panel,fingerprint
+  tags: 1panel
   created: 2026/01/09
 
 rules:
