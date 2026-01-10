@@ -529,6 +529,15 @@ afrog -t https://example.com -S high,critical
 afrog -T urls.txt
 ```
 
+### 指纹门控（requires）
+
+弱口令/爆破/默认口令等高成本 PoC 通常建议只在命中指定指纹后执行。Afrog 支持在 PoC `info` 中声明以下字段：
+
+- `requires`：依赖的指纹标签（例如 `mysql`、`ftp`、`nacos`）
+- `requires-mode`：门控模式（`strict`/`opportunistic`），默认 `strict`
+
+当 PoC 使用 `requires-mode: strict` 时，如果运行时禁用了指纹阶段（`-nf`），或目标未命中对应指纹，该 PoC 将被跳过。完整用法与问题排查请参考：[requires 指纹门控：用法教程与问题答疑](requires-gating-guide.md)
+
 ## -web 命令
 
 `-web` 命令允许将 afrog 扫描的漏洞持久存储到 SQLite3 数据库中。通过浏览器访问 http://x.x.x.x:16868 可以访问漏洞报告网页，用户可以进行简单的关键词搜索并按漏洞严重程度过滤结果。

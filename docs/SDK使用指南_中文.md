@@ -569,6 +569,9 @@ func main() {
 
 ## 常见问题解答
 
+### Q: 如何让弱口令/默认口令 PoC 仅在命中指纹后执行？
+A: 在 PoC 的 `info` 中使用 `requires` 与 `requires-mode` 声明指纹依赖，并使用 `requires-mode: strict` 实现“先指纹后执行”。完整用法与排障请参考：[requires 指纹门控：用法教程与问题答疑](requires-gating-guide.md)
+
 ### Q: 如何处理大量目标的扫描？
 A: 使用流式输出和适当的并发控制：
 ```go

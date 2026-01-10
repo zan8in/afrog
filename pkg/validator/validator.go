@@ -222,6 +222,17 @@ func validatePocStructure(pocData *poc.Poc, filePath string) []ValidationError {
 		}
 	}
 
+	if len(pocData.Info.Requires) > 0 {
+		mode := strings.ToLower(strings.TrimSpace(pocData.Info.RequiresMode))
+		if mode != "" && mode != "strict" && mode != "opportunistic" {
+			errors = append(errors, ValidationError{
+				File: filePath,
+				Message: fmt.Sprintf("invalid requires-mode '%s', must be one of: strict, opportunistic",
+					pocData.Info.RequiresMode),
+			})
+		}
+	}
+
 	return errors
 }
 

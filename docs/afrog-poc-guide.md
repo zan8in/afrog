@@ -142,8 +142,10 @@ expression: ping() && version()
 ### Info 信息定义
 字段与语义必须严格遵循 Afrog：
 - 必填：`name`, `author`, `severity`
-- 可选：`description`, `tags`, `created`, `reference`, `verified`
+- 可选：`description`, `tags`, `created`, `reference`, `verified`, `requires`, `requires-mode`
 - 严重级别：`critical | high | medium | low | info`
+
+`requires`/`requires-mode` 用于声明 PoC 的指纹依赖（常用于弱口令/爆破类 PoC 的“先指纹后执行”流程）。详细说明与排障请参考：[requires 指纹门控：用法教程与问题答疑](requires-gating-guide.md)
 
 简单示例：
 ```yaml
@@ -759,7 +761,7 @@ expression: r0()
 
 ### 语法参考与字段清单
 - 顶级键：`id`, `info`, `set`, `rules`, `expression`
-- `info` 字段：`name`, `author`, `severity`, `description`, `tags`, `created`, `reference`, `verified`
+- `info` 字段：`name`, `author`, `severity`, `description`, `tags`, `created`, `reference`, `verified`, `requires`, `requires-mode`
 - HTTP 请求：`method`, `path`, `headers`, `body`, `follow_redirects`
 - Raw HTTP：`raw`
 - TCP 请求：`type: tcp`, `host`, `port`, `data`
@@ -777,6 +779,8 @@ expression: r0()
 - 表达式错误：
   - 使用 `==` 而非 `=`
   - 合理使用逻辑运算符（`&&`、`||`、`!`）
+- 高成本 PoC 执行收敛：
+  - 弱口令/爆破/默认口令建议使用 `requires`/`requires-mode: strict`，实现“先指纹后执行”，参考：[requires 指纹门控：用法教程与问题答疑](requires-gating-guide.md)
 - 空值防护：
   ```yaml
   expression: response.headers["server"] != "" && response.headers["server"].icontains("server")

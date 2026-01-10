@@ -64,6 +64,54 @@ func (c *openPortsCollector) Snapshot() map[string][]int {
 	return cp
 }
 
+func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}) bool {
+	if len(p.Info.Requires) == 0 {
+		return false
+	}
+	reqSet := make(map[string]struct{}, len(p.Info.Requires))
+	for _, r := range p.Info.Requires {
+		rr := strings.ToLower(strings.TrimSpace(r))
+		if rr == "" {
+			continue
+		}
+		reqSet[rr] = struct{}{}
+	}
+	if len(reqSet) == 0 {
+		return false
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(p.Info.RequiresMode))
+	if mode == "" {
+		mode = "strict"
+	}
+	if mode != "strict" && mode != "opportunistic" {
+		mode = "strict"
+	}
+
+	if len(fingerTagsByKey) == 0 {
+		return mode == "strict"
+	}
+
+	key := ""
+	if keyForTarget != nil {
+		key = keyForTarget(target)
+	}
+	if key == "" {
+		return mode == "strict"
+	}
+
+	tts := fingerTagsByKey[key]
+	if len(tts) == 0 {
+		return mode == "strict"
+	}
+	for r := range reqSet {
+		if _, ok := tts[r]; ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
@@ -521,6 +569,11 @@ func (runner *Runner) Execute() {
 			for _, t := range targetView {
 				if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 					break
+				}
+
+				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey) {
+					runner.NotVulCallback()
+					continue
 				}
 
 				if shouldSkipFingerprintFiltered(t, pocItem) {

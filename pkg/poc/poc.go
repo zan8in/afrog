@@ -1,14 +1,14 @@
 package poc
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
-    "sort"
-    "strings"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
-    "github.com/zan8in/afrog/v3/pkg/utils"
-    "gopkg.in/yaml.v2"
+	"github.com/zan8in/afrog/v3/pkg/utils"
+	"gopkg.in/yaml.v2"
 )
 
 // https://docs.xray.cool/#/guide/poc/v2
@@ -117,8 +117,113 @@ type Info struct {
 	Affected       string         `yaml:"affected"`  // 影响版本
 	Solutions      string         `yaml:"solutions"` // 解决方案
 	Tags           string         `yaml:"tags"`      // 标签
+	Requires       []string       `yaml:"requires"`
+	RequiresMode   string         `yaml:"requires-mode"`
 	Classification Classification `yaml:"classification"`
 	Created        string         `yaml:"created"` // create time
+}
+
+func (i *Info) UnmarshalYAML(unmarshal func(any) error) error {
+	type infoYAML struct {
+		Name           string         `yaml:"name"`
+		Author         string         `yaml:"author"`
+		Severity       string         `yaml:"severity"`
+		Verified       bool           `yaml:"verified"`
+		Description    string         `yaml:"description"`
+		Reference      []string       `yaml:"reference"`
+		Affected       string         `yaml:"affected"`
+		Solutions      string         `yaml:"solutions"`
+		Tags           string         `yaml:"tags"`
+		Requires       any            `yaml:"requires"`
+		RequiresMode   string         `yaml:"requires-mode"`
+		RequiresMode2  string         `yaml:"requiresMode"`
+		RequiresMode3  string         `yaml:"requires_mode"`
+		Classification Classification `yaml:"classification"`
+		Created        string         `yaml:"created"`
+	}
+	var tmp infoYAML
+	if err := unmarshal(&tmp); err != nil {
+		return err
+	}
+
+	i.Name = tmp.Name
+	i.Author = tmp.Author
+	i.Severity = tmp.Severity
+	i.Verified = tmp.Verified
+	i.Description = tmp.Description
+	i.Reference = tmp.Reference
+	i.Affected = tmp.Affected
+	i.Solutions = tmp.Solutions
+	i.Tags = tmp.Tags
+	i.Classification = tmp.Classification
+	i.Created = tmp.Created
+
+	i.Requires = normalizeRequires(tmp.Requires)
+	i.RequiresMode = firstNonEmpty(tmp.RequiresMode, tmp.RequiresMode2, tmp.RequiresMode3)
+	return nil
+}
+
+func normalizeRequires(v any) []string {
+	if v == nil {
+		return nil
+	}
+	out := make([]string, 0)
+	switch vv := v.(type) {
+	case string:
+		s := strings.TrimSpace(vv)
+		if s == "" {
+			return nil
+		}
+		parts := strings.Split(s, ",")
+		for _, p := range parts {
+			pp := strings.ToLower(strings.TrimSpace(p))
+			if pp == "" {
+				continue
+			}
+			out = append(out, pp)
+		}
+	case []any:
+		for _, it := range vv {
+			ss, ok := it.(string)
+			if !ok {
+				continue
+			}
+			ss = strings.ToLower(strings.TrimSpace(ss))
+			if ss == "" {
+				continue
+			}
+			out = append(out, ss)
+		}
+	default:
+		return nil
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	sort.Strings(out)
+	dedup := out[:0]
+	var prev string
+	for _, s := range out {
+		if s == prev {
+			continue
+		}
+		dedup = append(dedup, s)
+		prev = s
+	}
+	if len(dedup) == 0 {
+		return nil
+	}
+	return append([]string(nil), dedup...)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 type Classification struct {
@@ -131,18 +236,18 @@ type Classification struct {
 const DefaultLocalPocDirectory = "pocs"
 
 var (
-    LocalFileList   []string
-    LocalAppendList []string
-    LocalTestList   []string
+	LocalFileList   []string
+	LocalAppendList []string
+	LocalTestList   []string
 )
 var LocalPocDirectory string
 
 func init() {
-    LocalPocDirectory, _ = InitPocHomeDirectory()
-    LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
+	LocalPocDirectory, _ = InitPocHomeDirectory()
+	LocalFileList, _ = LocalWalkFiles(LocalPocDirectory)
 
-    // 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
-    EnsureCuratedAndMyPocDirectories()
+	// 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
+	EnsureCuratedAndMyPocDirectories()
 }
 
 func InitLocalAppendList(pathFolder []string) {
@@ -211,17 +316,17 @@ func LocalReadContentByName(name string) ([]byte, error) {
 // Initialize afrog-pocs directory
 // @return pocsDir {{UserHomeDir}}/afrog-pocs
 func InitPocHomeDirectory() (string, error) {
-    homeDir, err := os.UserHomeDir()
-    if err != nil {
-        return "", err
-    }
-    configDir := filepath.Join(homeDir, ".config", "afrog")
-    _ = os.MkdirAll(configDir, 0755)
-    pocsDir := filepath.Join(configDir, DefaultLocalPocDirectory)
-    if _, err := os.Stat(pocsDir); err != nil {
-        _ = os.MkdirAll(pocsDir, 0755)
-    }
-    return pocsDir, nil
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	configDir := filepath.Join(homeDir, ".config", "afrog")
+	_ = os.MkdirAll(configDir, 0755)
+	pocsDir := filepath.Join(configDir, DefaultLocalPocDirectory)
+	if _, err := os.Stat(pocsDir); err != nil {
+		_ = os.MkdirAll(pocsDir, 0755)
+	}
+	return pocsDir, nil
 }
 
 func GetPocVersionNumber() (string, error) {
@@ -290,31 +395,31 @@ func (r *Rule) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 func (m *RuleMapSlice) UnmarshalYAML(unmarshal func(any) error) error {
-    order = 0
+	order = 0
 
-    tempMap := make(map[string]Rule, 1)
-    if err := unmarshal(&tempMap); err != nil {
-        return err
-    }
+	tempMap := make(map[string]Rule, 1)
+	if err := unmarshal(&tempMap); err != nil {
+		return err
+	}
 
-    type pair struct {
-        name string
-        rule Rule
-    }
-    arr := make([]pair, 0, len(tempMap))
-    for name, rule := range tempMap {
-        arr = append(arr, pair{name: name, rule: rule})
-    }
+	type pair struct {
+		name string
+		rule Rule
+	}
+	arr := make([]pair, 0, len(tempMap))
+	for name, rule := range tempMap {
+		arr = append(arr, pair{name: name, rule: rule})
+	}
 
-    sort.Slice(arr, func(i, j int) bool { return arr[i].rule.order < arr[j].rule.order })
+	sort.Slice(arr, func(i, j int) bool { return arr[i].rule.order < arr[j].rule.order })
 
-    newRuleSlice := make([]RuleMap, 0, len(arr))
-    for _, p := range arr {
-        newRuleSlice = append(newRuleSlice, RuleMap{Key: p.name, Value: p.rule})
-    }
+	newRuleSlice := make([]RuleMap, 0, len(arr))
+	for _, p := range arr {
+		newRuleSlice = append(newRuleSlice, RuleMap{Key: p.name, Value: p.rule})
+	}
 
-    *m = RuleMapSlice(newRuleSlice)
-    return nil
+	*m = RuleMapSlice(newRuleSlice)
+	return nil
 }
 
 func (poc *Poc) Reset() {
@@ -338,20 +443,20 @@ func (poc *Poc) IsHTTPType() bool {
 }
 
 func (poc *Poc) IsReverse() bool {
-    // ... existing code ...
-    for _, set := range poc.Set {
-        k := set.Key.(string)
-        vStr, ok := set.Value.(string)
-        if !ok {
-            // 值不是字符串时无需参与反连判断，直接跳过
-            continue
-        }
-        if strings.Contains(k, "reverse") || strings.Contains(vStr, "reverse.url") {
-            return true
-        }
-    }
+	// ... existing code ...
+	for _, set := range poc.Set {
+		k := set.Key.(string)
+		vStr, ok := set.Value.(string)
+		if !ok {
+			// 值不是字符串时无需参与反连判断，直接跳过
+			continue
+		}
+		if strings.Contains(k, "reverse") || strings.Contains(vStr, "reverse.url") {
+			return true
+		}
+	}
 
-    return false
+	return false
 }
 
 type Extractors struct {
@@ -418,21 +523,21 @@ func getFileNameFromPath(filePath string) string {
 // EnsureCuratedAndMyPocDirectories
 // 启动时确保在用户家目录下创建 afrog-curated-pocs 和 afrog-my-pocs 两个目录（若不存在则创建）
 func EnsureCuratedAndMyPocDirectories() {
-    homeDir, err := os.UserHomeDir()
-    if err != nil {
-        return
-    }
-    configDir := filepath.Join(homeDir, ".config", "afrog")
-    _ = os.MkdirAll(configDir, 0755)
-    dirs := []string{
-        filepath.Join(configDir, "pocs-curated"),
-        filepath.Join(configDir, "pocs-my"),
-    }
-    for _, dir := range dirs {
-        if _, err := os.Stat(dir); err != nil {
-            _ = os.MkdirAll(dir, 0755)
-        }
-    }
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	configDir := filepath.Join(homeDir, ".config", "afrog")
+	_ = os.MkdirAll(configDir, 0755)
+	dirs := []string{
+		filepath.Join(configDir, "pocs-curated"),
+		filepath.Join(configDir, "pocs-my"),
+	}
+	for _, dir := range dirs {
+		if _, err := os.Stat(dir); err != nil {
+			_ = os.MkdirAll(dir, 0755)
+		}
+	}
 }
 
 // 仅解析 POC 元数据，避免解析 rules 触发 RuleMapSlice 的 Unmarshal
