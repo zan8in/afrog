@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -710,6 +709,18 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 		}
 		if key != "" {
 			e.runner.setFingerprintResult(key, p.Id, c.Result)
+			hit := fingerprint.Hit{
+				ID:       p.Id,
+				Name:     p.Info.Name,
+				Tags:     p.Info.Tags,
+				Severity: p.Info.Severity,
+			}
+			e.runner.fingerMu.Lock()
+			e.runner.fingerByKey[key] = append(e.runner.fingerByKey[key], hit)
+			e.runner.fingerMu.Unlock()
+			if e.runner.OnFingerprint != nil {
+				e.runner.OnFingerprint(key, []fingerprint.Hit{hit})
+			}
 		}
 	}
 	return c.Result.IsVul, c.Result.Target, err
@@ -727,36 +738,7 @@ func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string,
 	}
 
 	e := &fingerprint.Engine{Rate: runner.options.RateLimit, Concurrency: runner.options.Concurrency}
-	res := e.Run(ctx, targets, pocs, runnerFingerprintExecutor{runner: runner})
-
-	if runner.OnFingerprint != nil && len(res) > 0 {
-		keys := make([]string, 0, len(res))
-		for k, v := range res {
-			if k == "" || len(v) == 0 {
-				continue
-			}
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		for _, k := range keys {
-			hits := res[k]
-			if len(hits) == 0 {
-				continue
-			}
-			cp := make([]fingerprint.Hit, len(hits))
-			copy(cp, hits)
-			runner.OnFingerprint(k, cp)
-		}
-	}
-
-	runner.fingerMu.Lock()
-	for k, v := range res {
-		if len(v) == 0 {
-			continue
-		}
-		runner.fingerByKey[k] = append(runner.fingerByKey[k], v...)
-	}
-	runner.fingerMu.Unlock()
+	e.Run(ctx, targets, pocs, runnerFingerprintExecutor{runner: runner})
 }
 
 func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {
