@@ -19,10 +19,13 @@ rules:
       host: "{{host}}"
       steps:
         - write:
-            data: "0000000804d2162f"
+            data: "00000029000300007573657200706f73746772657300646174616261736500706f7374677265730000"
             data-type: hex
         - read:
-            read-size: 1024
+            read-size: 4096
             read-timeout: 3
-    expression: response.raw == b"S" || response.raw == b"N"
+    expression: |
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x0c") ||
+      response.raw.bstartsWith(b"E\x00\x00\x00")
 expression: r0()
