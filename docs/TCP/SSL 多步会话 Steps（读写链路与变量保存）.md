@@ -2,7 +2,7 @@
           
 **这次新增的功能是什么**
 - 以前 `tcp/ssl` 规则只能用 `request.data` 发一次、读一次，拿到的只是一段“单次响应”。
-- 现在支持 `request.steps`：在同一条连接里按顺序执行多次 `read` / `write`，并且每次 `read` 的结果可以用 `save-as` 保存成变量，供后续表达式或其他逻辑使用。示例就是你打开的 [pop3-detect.yaml](../pocs/afrog-pocs/fingerprinting/pop3-detect.yaml)。
+- 现在支持 `request.steps`：在同一条连接里按顺序执行多次 `read` / `write`，并且每次 `read` 的结果可以用 `save-as` 保存成变量，供后续表达式或其他逻辑使用。示例就是你打开的 [pop3-detect.yaml](https://github.com/zan8in/afrog/blob/main/pocs/afrog-pocs/fingerprinting/pop3-detect.yaml)。
 
 ---
 
