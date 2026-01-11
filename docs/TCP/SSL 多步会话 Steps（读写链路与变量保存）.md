@@ -18,7 +18,6 @@ POP3 的真实交互一般是：
 
 **pop3-detect.yaml 逐段讲解**
 
-文件位置：[pop3-detect.yaml](../pocs/afrog-pocs/fingerprinting/pop3-detect.yaml)
 
 ```yaml
 request:
@@ -43,10 +42,10 @@ expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
 ```
 
 - `type: tcp`
-  - 表示走 TCP（如果是 `ssl` 则走 TLS 连接），这条规则仍然用原来的 `type` 选择协议执行器：[executor.go](../pkg/runner/executor.go#L56-L157)
+  - 表示走 TCP（如果是 `ssl` 则走 TLS 连接），这条规则仍然用原来的 `type` 选择协议执行器
 
 - `steps:`（核心）
-  - 是一个数组，按顺序执行，每个元素要么是 `read:`，要么是 `write:`（结构定义在 [poc.go](../pkg/poc/poc.go#L101-L117)）
+  - 是一个数组，按顺序执行，每个元素要么是 `read:`，要么是 `write:`
 
 1) 第一步 `read`：读 banner
 - `read-size: 4096`
@@ -55,10 +54,10 @@ expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
   - 本次读最多等 3 秒（有数据就读；超时也会返回已读到的数据）
 - `read-until: "\r\n"`
   - 读到分隔符为止（会把 `\r\n` 转成真正的 CRLF），并在分隔符处截断返回数据
-  - 这个能力由 `ReceiveUntil` 实现：[netxclient.go](../pkg/protocols/netxclient/netxclient.go#L447-L520)
+  - 这个能力由 `ReceiveUntil` 
 - `read-type: bytes`
   - 把 `save-as` 的变量类型设为 bytes，这样表达式里可以直接用 `bcontains/ibcontains` 之类的 bytes 函数
-  - 对应的 CEL 类型声明会跟着变成 bytes：[checker.go](../pkg/runner/checker.go#L125-L148)
+  - 对应的 CEL 类型声明会跟着变成 bytes
 - `save-as: banner`
   - 把本次读到的数据保存到变量 `banner`
   - 注意：`banner` 是你自定义变量名，后面表达式就直接引用它
@@ -67,7 +66,7 @@ expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
 - `data: "CAPA\r\n"`
   - 写入的内容，会做变量渲染（例如 `{{xxx}}` 会替换）
 - `data-type`（这里没写，默认 string）
-  - 如果写 `data-type: hex`，则会把 data 按十六进制解码后发送（执行逻辑在 [executor.go](../pkg/runner/executor.go#L72-L108)）
+  - 如果写 `data-type: hex`，则会把 data 按十六进制解码后发送
 
 3) 第三步 `read`：读 CAPA 多行响应
 - `read-until: "\r\n.\r\n"`
@@ -92,10 +91,6 @@ expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
   - `save-as` 得到的是 `proto.Response` 对象（和原来 `response` 变量类型一致）
   - 适合你想用 `saveAs.body` / `saveAs.raw` 这种结构化字段（取决于 proto.Response 暴露的字段）
 
-实现位置：
-- 保存行为：[executor.go](../pkg/runner/executor.go#L119-L132)
-- CEL 类型声明跟随 read-type：[checker.go](../pkg/runner/checker.go#L125-L148)
-
 ---
 
 **`read-until` 的行为边界（写 PoC 时最常踩坑）**
@@ -103,7 +98,7 @@ expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
 - 如果没找到分隔符：
   - 读到 `read-size` 上限就停
   - 或者 `read-timeout` 超时（但已读到数据）也会返回
-- `read-until` 支持常见转义：`\r` `\n` `\t`，例如 `"\r\n.\r\n"`、`"\r\n"`（解析由 [unescapeCommon](../pkg/protocols/netxclient/netxclient.go#L662-L670) 处理）
+- `read-until` 支持常见转义：`\r` `\n` `\t`，例如 `"\r\n.\r\n"`、`"\r\n"`
 
 ---
 
