@@ -17,7 +17,11 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "\n"
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
     expression: '"(?i)SSH-".bmatches(response.raw)'
     extractors:
       - type: regex

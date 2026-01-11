@@ -20,7 +20,12 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "030000130ee000000000000100080003000000"
-      data-type: hex
+      steps:
+        - write:
+            data: "030000130ee000000000000100080003000000"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
     expression: response.raw.bcontains(b"\x03\x00\x00") && response.raw.bcontains(b"\x0e\xd0")
 expression: r0()

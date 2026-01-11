@@ -17,8 +17,13 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
-      data-type: hex
+      steps:
+        - write:
+            data: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
     expression: |
       response.raw.ibcontains(b"tnslsnr") ||
       (response.raw.ibcontains(b"oracle") && response.raw.ibcontains(b"version"))

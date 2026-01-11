@@ -17,6 +17,9 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "\n"
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
     expression: response.raw.bcontains(b"\xff\xfb") || response.raw.bcontains(b"\xff\xfd") || response.raw.ibcontains(b"telnet")
 expression: r0()

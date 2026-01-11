@@ -17,14 +17,21 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "\n"
+      steps:
+        - write:
+            data: "\n"
+        - read:
+            read-size: 4096
+            read-timeout: 3
     expression: |
-      response.raw.ibcontains(b"mysql") || 
-      response.raw.ibcontains(b"mariadb")
+      response.raw.ibcontains(b"mariadb") ||
+      response.raw.ibcontains(b"mysql") ||
+      response.raw.ibcontains(b"mysql_native_password") ||
+      "\\x0a[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}".bmatches(response.raw)
     extractors:
       - type: regex
         extractor:
-          ext: '"(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
+          ext: '"\\x0a(?P<mysql>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2})".bsubmatch(response.raw)'
           mysql: ext["mysql"]
 
 expression: r0()

@@ -17,7 +17,12 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "0000000804d2162f"
-      data-type: hex
+      steps:
+        - write:
+            data: "0000000804d2162f"
+            data-type: hex
+        - read:
+            read-size: 1024
+            read-timeout: 3
     expression: response.raw == b"S" || response.raw == b"N"
 expression: r0()

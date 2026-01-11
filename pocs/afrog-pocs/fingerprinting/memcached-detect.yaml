@@ -17,7 +17,13 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "version\r\n"
+      steps:
+        - write:
+            data: "version\r\n"
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
     expression: response.raw.bcontains(b"VERSION")
     extractors:
       - type: regex
@@ -28,13 +34,24 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "stats\r\n"
+      steps:
+        - write:
+            data: "stats\r\n"
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-until: "END\r\n"
     expression: response.raw.ibcontains(b"STAT version") || response.raw.ibcontains(b"STAT pid")
   r2:
     request:
       type: tcp
       host: "{{host}}"
-      data-type: hex
-      data: "800b000000000000000000000000000000000000000000"
+      steps:
+        - write:
+            data: "800b000000000000000000000000000000000000000000"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
     expression: response.raw.bstartsWith(b"\x81\x0b")
 expression: r0() || r1() || r2()

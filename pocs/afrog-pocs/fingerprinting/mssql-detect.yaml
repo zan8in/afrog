@@ -17,7 +17,12 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "1201005e00000100000024000601002a000102002b000103002c0004040030000105003100240600550001ff04081252000001000001397c005363526ed6eae44faa28695c803ba6b8527b3c7cab692b4a96b0d698c7a15d890201000001"
-      data-type: hex
+      steps:
+        - write:
+            data: "1201005e00000100000024000601002a000102002b000103002c0004040030000105003100240600550001ff04081252000001000001397c005363526ed6eae44faa28695c803ba6b8527b3c7cab692b4a96b0d698c7a15d890201000001"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
     expression: response.raw.bcontains(b"\x04\x01") && response.raw.bcontains(b"\xff")
 expression: r0()

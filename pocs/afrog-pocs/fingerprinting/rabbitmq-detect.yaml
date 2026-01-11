@@ -19,6 +19,11 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "AMQP\u0000\u0000\t\u0001"
+      steps:
+        - write:
+            data: "AMQP\u0000\u0000\t\u0001"
+        - read:
+            read-size: 20480
+            read-timeout: 3
     expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
 expression: r0()
