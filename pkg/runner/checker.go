@@ -122,6 +122,30 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			time.Sleep(time.Duration(rule.BeforeSleep) * time.Second)
 		}
 
+		stepVars := make([]string, 0)
+		if len(rule.Request.Steps) > 0 {
+			for i := range rule.Request.Steps {
+				if rule.Request.Steps[i].Read == nil {
+					continue
+				}
+				saveAs := strings.TrimSpace(rule.Request.Steps[i].Read.SaveAs)
+				if saveAs == "" {
+					continue
+				}
+				safe := celSafeIdent(saveAs)
+				rule.Request.Steps[i].Read.SaveAs = safe
+				stepVars = append(stepVars, safe)
+				readType := strings.ToLower(strings.TrimSpace(rule.Request.Steps[i].Read.ReadType))
+				if readType == "bytes" {
+					c.CustomLib.UpdateCompileOption(safe, decls.Bytes)
+				} else if readType == "string" {
+					c.CustomLib.UpdateCompileOption(safe, decls.String)
+				} else {
+					c.CustomLib.UpdateCompileOption(safe, decls.NewObjectType("proto.Response"))
+				}
+			}
+		}
+
 		isMatch := false
 		baseReq := cloneRuleRequest(rule.Request)
 		bruteCfg, bruteVars, bruteOrder := parseBrute(rule.Brute)
@@ -150,7 +174,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				isMatch = c.evalRuleMatch(&rule, pocItem)
 			}
 		} else {
-			coreSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
+			coreKeys := []string{"request", "response", "fulltarget", "target"}
+			if len(stepVars) > 0 {
+				coreKeys = append(coreKeys, stepVars...)
+			}
+			coreSnapshot := snapshotVars(c.VariableMap, coreKeys)
 
 			found := false
 			iterErr := error(nil)
@@ -174,7 +202,13 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					return true
 				}
 				reqCount++
-				attemptSnapshot := snapshotVars(c.VariableMap, append([]string{"request", "response", "fulltarget", "target"}, bruteOrder...))
+				attemptKeys := make([]string, 0, 4+len(stepVars)+len(bruteOrder))
+				attemptKeys = append(attemptKeys, "request", "response", "fulltarget", "target")
+				if len(stepVars) > 0 {
+					attemptKeys = append(attemptKeys, stepVars...)
+				}
+				attemptKeys = append(attemptKeys, bruteOrder...)
+				attemptSnapshot := snapshotVars(c.VariableMap, attemptKeys)
 
 				for _, key := range bruteOrder {
 					if v, ok := payload[key]; ok {
@@ -197,14 +231,14 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 					iterErr = exec.Execute(target, ruleAttempt, c.Options, c.VariableMap)
 				}
 
-				lastAttemptSnapshot = snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
+				lastAttemptSnapshot = snapshotVars(c.VariableMap, coreKeys)
 				if iterErr == nil {
 					if c.evalRuleMatch(&ruleAttempt, pocItem) {
 						found = true
 						isMatch = true
 						if commit == "winner" || commit == "first" {
 							if winnerSnapshot == nil {
-								winnerSnapshot = snapshotVars(c.VariableMap, append([]string{"request", "response", "fulltarget", "target"}, bruteOrder...))
+								winnerSnapshot = snapshotVars(c.VariableMap, attemptKeys)
 							} else {
 								restoreVars(c.VariableMap, winnerSnapshot)
 							}

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/hex"
 	"net"
 	"net/url"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
@@ -54,6 +56,100 @@ type NetExecutor struct{}
 func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, vars map[string]any) error {
 	network := strings.ToLower(rule.Request.Type)
 	address := resolveNetAddress(rule.Request.Host, rule.Request.Port)
+
+	if len(rule.Request.Steps) > 0 {
+		sess, err := netxclient.NewConnSession(address, netxclient.Config{
+			Network:     network,
+			ReadTimeout: getDuration(rule.Request.ReadTimeout),
+			ReadSize:    rule.Request.ReadSize,
+			MaxRetries:  1,
+		}, vars)
+		if err != nil {
+			return err
+		}
+		defer sess.Close()
+
+		lastWrite := ""
+		for _, st := range rule.Request.Steps {
+			if st.Write != nil {
+				data := st.Write.Data
+				if data == "" {
+					data = rule.Request.Data
+				}
+				data = netxclient.Render(data, vars)
+				dataType := strings.TrimSpace(st.Write.DataType)
+				if dataType == "" {
+					dataType = strings.TrimSpace(rule.Request.DataType)
+				}
+
+				payload := []byte(data)
+				if strings.EqualFold(dataType, "hex") {
+					clean := strings.TrimSpace(data)
+					clean = strings.ReplaceAll(clean, "0x", "")
+					clean = strings.ReplaceAll(clean, " ", "")
+					clean = strings.ReplaceAll(clean, "\r", "")
+					clean = strings.ReplaceAll(clean, "\n", "")
+					clean = strings.ReplaceAll(clean, "\t", "")
+					if len(clean)%2 == 1 {
+						clean = "0" + clean
+					}
+					decoded, derr := hex.DecodeString(clean)
+					if derr != nil {
+						return derr
+					}
+					payload = decoded
+				}
+
+				if err := sess.Send(payload); err != nil {
+					return err
+				}
+				lastWrite = data
+			}
+
+			if st.Read != nil {
+				readSize := st.Read.ReadSize
+				if readSize <= 0 {
+					readSize = rule.Request.ReadSize
+				}
+				readTimeout := getDuration(st.Read.ReadTimeout)
+				if readTimeout <= 0 {
+					readTimeout = getDuration(rule.Request.ReadTimeout)
+				}
+
+				body, err := sess.ReceiveUntil(readSize, readTimeout, st.Read.ReadUntil)
+				if err != nil {
+					return err
+				}
+				resp := &proto.Response{Raw: body, Body: body}
+				vars["response"] = resp
+				vars["fulltarget"] = sess.Address()
+
+				saveAs := strings.TrimSpace(st.Read.SaveAs)
+				if saveAs != "" {
+					readType := strings.ToLower(strings.TrimSpace(st.Read.ReadType))
+					if readType == "bytes" {
+						vars[saveAs] = body
+					} else if readType == "string" {
+						vars[saveAs] = string(body)
+					} else {
+						vars[saveAs] = resp
+					}
+				}
+			}
+		}
+
+		if vars["response"] == nil {
+			vars["response"] = &proto.Response{Raw: []byte{}, Body: []byte{}}
+		}
+		reqRaw := sess.Address()
+		if lastWrite != "" {
+			reqRaw += "\r\n" + lastWrite
+		}
+		vars["request"] = &proto.Request{Raw: []byte(reqRaw), Body: []byte(lastWrite)}
+		vars["fulltarget"] = sess.Address()
+		return nil
+	}
+
 	nc, err := netxclient.NewNetClient(address, netxclient.Config{
 		Network:     network,
 		ReadTimeout: getDuration(rule.Request.ReadTimeout),

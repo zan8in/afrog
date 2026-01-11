@@ -1,6 +1,7 @@
 package netxclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -36,6 +37,13 @@ type Session struct {
 	address string
 	config  netx.Config
 	client  *netx.Client
+}
+
+type ConnSession struct {
+	address string
+	network string
+	conn    net.Conn
+	config  Config
 }
 
 func (nc *NetClient) Config() *netx.Config {
@@ -183,6 +191,81 @@ func NewSession(address string, conf Config, variableMap map[string]any) (*Sessi
 	}, nil
 }
 
+func NewConnSession(address string, conf Config, variableMap map[string]any) (*ConnSession, error) {
+	address = setVariableMap(address, variableMap)
+	network := strings.ToLower(strings.TrimSpace(conf.Network))
+	if network == "" {
+		network = "tcp"
+	}
+
+	globalTimeout := retryhttpclient.GetDefaultTimeout()
+	dialBase := 3 * time.Second
+	writeBase := 3 * time.Second
+	readBase := 6 * time.Second
+	if _, port, ok := parseHostPort(address); ok && port == "445" {
+		dialBase = 5 * time.Second
+		writeBase = 5 * time.Second
+		readBase = 10 * time.Second
+	}
+
+	dialDefault := minDuration(globalTimeout, dialBase)
+	writeDefault := minDuration(globalTimeout, writeBase)
+	readDefault := minDuration(globalTimeout, readBase)
+
+	cfg := conf
+	if cfg.DialTimeout <= 0 {
+		cfg.DialTimeout = dialDefault
+	}
+	if cfg.WriteTimeout <= 0 {
+		cfg.WriteTimeout = writeDefault
+	}
+	if cfg.ReadTimeout <= 0 {
+		cfg.ReadTimeout = readDefault
+	}
+	if cfg.ReadSize <= 0 {
+		cfg.ReadSize = 20480
+	}
+
+	if host, port, ok := parseHostPort(address); ok {
+		timeout := cfg.DialTimeout
+		if timeout <= 0 {
+			timeout = retryhttpclient.GetDefaultTimeout()
+		}
+		baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+		if baseCtx == nil {
+			baseCtx = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(baseCtx, timeout)
+		if err := retryhttpclient.WaitHostPort(ctx, host, port); err != nil {
+			cancel()
+			return nil, err
+		}
+		cancel()
+	}
+
+	dialer := &net.Dialer{Timeout: cfg.DialTimeout}
+	var c net.Conn
+	var err error
+
+	if network == "ssl" {
+		tlsCfg := &tls.Config{InsecureSkipVerify: true}
+		if host, _, ok := parseHostPort(address); ok {
+			if host != "" && net.ParseIP(host) == nil {
+				tlsCfg.ServerName = host
+			}
+		}
+		c, err = tls.DialWithDialer(dialer, "tcp", address, tlsCfg)
+	} else {
+		c, err = dialer.Dial("tcp", address)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	retryhttpclient.AddNetInflight(1)
+	return &ConnSession{address: address, network: network, conn: c, config: cfg}, nil
+}
+
 func minDuration(a, b time.Duration) time.Duration {
 	if a <= 0 {
 		return b
@@ -289,6 +372,158 @@ func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) 
 	// fmt.Println(variableMap["response"])
 
 	return nil
+}
+
+func (s *ConnSession) Address() string {
+	if s == nil {
+		return ""
+	}
+	return s.address
+}
+
+func (s *ConnSession) Send(payload []byte) error {
+	if s == nil || s.conn == nil {
+		return fmt.Errorf("nil session")
+	}
+	if s.config.WriteTimeout > 0 {
+		_ = s.conn.SetWriteDeadline(time.Now().Add(s.config.WriteTimeout))
+	}
+	if len(payload) == 0 {
+		return nil
+	}
+	_, err := s.conn.Write(payload)
+	return err
+}
+
+func (s *ConnSession) Receive(readSize int, readTimeout time.Duration) ([]byte, error) {
+	if s == nil || s.conn == nil {
+		return nil, fmt.Errorf("nil session")
+	}
+	if readSize <= 0 {
+		readSize = s.config.ReadSize
+	}
+	if readSize <= 0 {
+		readSize = 20480
+	}
+	if readTimeout <= 0 {
+		readTimeout = s.config.ReadTimeout
+	}
+	if readTimeout > 0 {
+		_ = s.conn.SetReadDeadline(time.Now().Add(readTimeout))
+	}
+
+	chunk := 4096
+	if chunk > readSize {
+		chunk = readSize
+	}
+	buf := make([]byte, chunk)
+	out := make([]byte, 0, chunk)
+	for {
+		remaining := readSize - len(out)
+		if remaining <= 0 {
+			break
+		}
+		if remaining < len(buf) {
+			buf = buf[:remaining]
+		}
+		n, rerr := s.conn.Read(buf)
+		if n > 0 {
+			out = append(out, buf[:n]...)
+		}
+		if rerr != nil {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+				break
+			}
+			if len(out) > 0 {
+				break
+			}
+			return nil, rerr
+		}
+		if n == 0 {
+			break
+		}
+	}
+	return out, nil
+}
+
+func (s *ConnSession) ReceiveUntil(readSize int, readTimeout time.Duration, until string) ([]byte, error) {
+	if s == nil || s.conn == nil {
+		return nil, fmt.Errorf("nil session")
+	}
+	if strings.TrimSpace(until) == "" {
+		return s.Receive(readSize, readTimeout)
+	}
+	if readSize <= 0 {
+		readSize = s.config.ReadSize
+	}
+	if readSize <= 0 {
+		readSize = 20480
+	}
+	if readTimeout <= 0 {
+		readTimeout = s.config.ReadTimeout
+	}
+	if readTimeout > 0 {
+		_ = s.conn.SetReadDeadline(time.Now().Add(readTimeout))
+	}
+
+	until = unescapeCommon(until)
+	delim := []byte(until)
+	if len(delim) == 0 {
+		return s.Receive(readSize, readTimeout)
+	}
+
+	chunk := 4096
+	if chunk > readSize {
+		chunk = readSize
+	}
+	buf := make([]byte, chunk)
+	out := make([]byte, 0, chunk)
+	for {
+		if bytes.Contains(out, delim) {
+			idx := bytes.Index(out, delim)
+			if idx >= 0 {
+				end := idx + len(delim)
+				if end < len(out) {
+					out = out[:end]
+				}
+			}
+			break
+		}
+
+		remaining := readSize - len(out)
+		if remaining <= 0 {
+			break
+		}
+		if remaining < len(buf) {
+			buf = buf[:remaining]
+		}
+		n, rerr := s.conn.Read(buf)
+		if n > 0 {
+			out = append(out, buf[:n]...)
+			continue
+		}
+		if rerr != nil {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+				break
+			}
+			if len(out) > 0 {
+				break
+			}
+			return nil, rerr
+		}
+		break
+	}
+	return out, nil
+}
+
+func (s *ConnSession) Close() error {
+	if s == nil || s.conn == nil {
+		return nil
+	}
+	err := s.conn.Close()
+	s.conn = nil
+	retryhttpclient.AddNetInflight(-1)
+	return err
 }
 
 func (nc *NetClient) sendReceiveTCP(payload []byte) ([]byte, error) {
@@ -479,12 +714,28 @@ func setVariableMap(find string, variableMap map[string]any) string {
 	return find
 }
 
+func Render(find string, variableMap map[string]any) string {
+	return setVariableMap(find, variableMap)
+}
+
 func fromHex(data string) string {
 	new, err := hex.DecodeString(data)
 	if err == nil {
 		return string(new)
 	}
 	return data
+}
+
+func unescapeCommon(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+	s = strings.ReplaceAll(s, `\\`, `\`)
+	s = strings.ReplaceAll(s, `\r`, "\r")
+	s = strings.ReplaceAll(s, `\n`, "\n")
+	s = strings.ReplaceAll(s, `\t`, "\t")
+	return s
 }
 
 func parseHostPort(address string) (string, string, bool) {

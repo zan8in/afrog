@@ -26,6 +26,12 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "\n"
-    expression: response.raw.bcontains(b"220") && (response.raw.ibcontains(b"smtp") || response.raw.ibcontains(b"esmtp"))
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: banner
+    expression: banner.bcontains(b"220") && (banner.ibcontains(b"smtp") || banner.ibcontains(b"esmtp"))
 expression: r0()

@@ -27,6 +27,20 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "CAPA\r\n"
-    expression: response.raw.bcontains(b"+OK")
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: banner
+        - write:
+            data: "CAPA\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+            read-until: "\r\n.\r\n"
+            read-type: bytes
+            save-as: capa
+    expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
 expression: r0()

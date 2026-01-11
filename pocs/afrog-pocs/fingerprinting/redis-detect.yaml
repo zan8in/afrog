@@ -17,6 +17,13 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "*1\r\n$4\r\ninfo\r\n"
-    expression: response.raw.bcontains(b'DENIED Redis') || response.raw.bcontains(b'CONFIG REWRITE') || response.raw.bcontains(b'NOAUTH Authentication') || response.raw.bcontains(b'72656469735f76657273696f6')
+      steps:
+        - write:
+            data: "*1\r\n$4\r\ninfo\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+            read-type: bytes
+            save-as: reply
+    expression: reply.bcontains(b'DENIED Redis') || reply.bcontains(b'CONFIG REWRITE') || reply.bcontains(b'NOAUTH Authentication') || reply.bcontains(b'72656469735f76657273696f6')
 expression: r0()

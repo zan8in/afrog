@@ -125,8 +125,8 @@ type Options struct {
 	OOBConcurrency int
 
 	// Smart Control Concurrency
-	Smart              bool
-	DisableFingerprint bool
+	Smart                 bool
+	DisableFingerprint    bool
 	FingerprintFilterMode string
 
 	// number of times to retry a failed request (default 1)

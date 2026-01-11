@@ -23,12 +23,24 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "\r\n"
-    expression: response.body.bcontains(b"* OK") && response.body.ibcontains(b"imap")
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: banner
+    expression: banner.bcontains(b"* OK") && banner.ibcontains(b"imap")
   r1:
     request:
       type: ssl
       host: "{{host}}"
-      data: "\r\n"
-    expression: response.body.bcontains(b"* OK") && response.body.ibcontains(b"imap")
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: banner
+    expression: banner.bcontains(b"* OK") && banner.ibcontains(b"imap")
 expression: r0() || r1()

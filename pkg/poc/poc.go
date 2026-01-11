@@ -89,12 +89,31 @@ type RuleRequest struct {
 	DataType        string            `yaml:"data-type"`    // tcp/udp 发送的数据类型，默认字符串
 	ReadSize        int               `yaml:"read-size"`    // tcp/udp 读取内容的长度
 	ReadTimeout     int               `yaml:"read-timeout"` // tcp/udp专用
-	Raw             string            `yaml:"raw"`          // raw 专用
+	Steps           []NetStep         `yaml:"steps"`
+	Raw             string            `yaml:"raw"` // raw 专用
 	Method          string            `yaml:"method"`
 	Path            string            `yaml:"path"`
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
+}
+
+type NetStep struct {
+	Read  *NetReadStep  `yaml:"read,omitempty"`
+	Write *NetWriteStep `yaml:"write,omitempty"`
+}
+
+type NetReadStep struct {
+	ReadSize    int    `yaml:"read-size"`
+	ReadTimeout int    `yaml:"read-timeout"`
+	ReadUntil   string `yaml:"read-until,omitempty"`
+	ReadType    string `yaml:"read-type,omitempty"`
+	SaveAs      string `yaml:"save-as"`
+}
+
+type NetWriteStep struct {
+	Data     string `yaml:"data"`
+	DataType string `yaml:"data-type"`
 }
 
 const (
