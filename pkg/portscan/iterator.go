@@ -205,6 +205,12 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 		}
 	}
 
+	if len(ports) > 0 {
+		s1, s2, _, _ := BuildStagePorts(nil)
+		ports = append(ports, s1...)
+		ports = append(ports, s2...)
+	}
+
 	// Remove duplicates
 	ports = removeDuplicateInt(ports)
 
