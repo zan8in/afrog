@@ -1,22 +1,27 @@
 id: winrm-detect
 
 info:
-  name: WinRM Service - Detect
+  name: Windows Remote Management - Detection
   author: zan8in
   severity: info
   verified: true
   description: |-
-    WinRM service was detected.
+    WinRM 是微软为实现 WS-Management 协议而开发的服务。简单说，它是Windows系统的 “官方远程命令行管理协议”。
+    默认端口： HTTP 5985 / HTTPS 5986
+    核心功能： 允许管理员从远程计算机使用命令行（主要通过 PowerShell Remoting）执行管理任务。它是 Invoke-Command、Enter-PSSession 等PowerShell命令的底层传输机制。
+    类比： 你可以把它看作Windows世界的 “SSH”，但基于HTTP/S协议，更侧重于与PowerShell的深度集成。
+    fofa: "WinRM"
   tags: network,winrm,fingerprint
   created: 2026/01/09
 
-set:
-  host: request.url.host
 rules:
   r0:
     request:
-      type: tcp
-      host: "{{host}}"
-      data: "GET /wsman HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
-    expression: response.raw.ibcontains(b"microsoft-httpapi") && response.raw.ibcontains(b"wsman")
+      method: POST
+      path: /wsman
+    expression: |
+      response.status == 401 &&
+      response.raw_header.ibcontains(b'Microsoft-HTTPAPI') &&
+      (response.headers['www-authenticate'].icontains('NTLM') ||
+      response.headers['www-authenticate'].icontains('Negotiate'))
 expression: r0()

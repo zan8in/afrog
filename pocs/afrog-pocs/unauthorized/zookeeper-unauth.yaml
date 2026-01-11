@@ -13,19 +13,12 @@ info:
   tags: network,zookeeper,unauth
 
 set:
-  hostname: request.url.host
-  host: request.url.domain
+  host: request.url.host
 rules:
   r0:
     request:
       type: tcp
-      host: "{{hostname}}"
+      host: "{{host}}"
       data: "envi\r\nquit\r\n"
     expression: response.raw.bcontains(b'zookeeper.version') && response.raw.bcontains(b'Environment')
-  r1:
-    request:
-      type: tcp
-      host: "{{host}}:2181"
-      data: "envi\r\nquit\r\n"
-    expression: response.raw.bcontains(b'zookeeper.version') && response.raw.bcontains(b'Environment')
-expression: r0() || r1()
+expression: r0()

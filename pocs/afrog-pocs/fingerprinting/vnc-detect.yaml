@@ -19,4 +19,9 @@ rules:
       host: "{{host}}"
       data: "\n"
     expression: response.raw.bcontains(b"RFB ")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)(?P<vnc>RFB ([0-9.]+))".bsubmatch(response.raw)'
+          vnc: ext["vnc"]
 expression: r0()
