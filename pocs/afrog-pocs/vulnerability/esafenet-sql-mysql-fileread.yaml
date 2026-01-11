@@ -9,7 +9,7 @@ info:
   created: 2024/01/03
 
 rules:
-  r0: 
+  r0:
     request:
       method: GET
       path: /CDGServer3/SQL/MYSQL/create_SmartSec_mysql.sql

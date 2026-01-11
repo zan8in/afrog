@@ -1,0 +1,27 @@
+id: mysql-weak-login
+
+info:
+  name: MySQL Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    MySQL weak credentials were discovered (dictionary brute-force in go).
+  tags: network,db,mysql,default-login,weak-login
+  requires: [mysql]
+  created: 2026/01/11
+
+rules:
+  r0:
+    request:
+      type: go
+      data: mysql-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()
