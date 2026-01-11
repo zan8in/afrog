@@ -18,5 +18,10 @@ rules:
       type: tcp
       host: "{{host}}"
       data: "\n"
-    expression: response.raw.bcontains(b"SSH-")
+    expression: '"(?i)SSH-".bmatches(response.raw)'
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)(?P<ssh>SSH-[^\\r\\n]+)".bsubmatch(response.raw)'
+          ssh: ext["ssh"]
 expression: r0()

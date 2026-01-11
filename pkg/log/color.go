@@ -36,7 +36,7 @@ func init() {
 
 func NewColor() *Color {
 	return &Color{
-		Info:      color.FgDarkGray.Render,
+		Info:      color.FgLightBlue.Render,
 		Low:       color.Cyan.Render,
 		Midium:    color.Yellow.Render,
 		High:      color.LightRed.Render,

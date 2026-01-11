@@ -1,4 +1,4 @@
-id: sqlserver-detect
+id: mssql-detect
 
 info:
   name: Microsoft SQL Server - Detect
