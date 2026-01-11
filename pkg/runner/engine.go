@@ -111,6 +111,38 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 	return true
 }
 
+func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[string]struct{}, targetTags map[string]struct{}, pocTags map[string]struct{}) bool {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode == "" {
+		mode = "strict"
+	}
+	if mode != "strict" && mode != "opportunistic" {
+		mode = "strict"
+	}
+	if len(globalFingerTags) == 0 || len(pocTags) == 0 {
+		return false
+	}
+	appSpecific := false
+	for t := range pocTags {
+		if _, ok := globalFingerTags[t]; ok {
+			appSpecific = true
+			break
+		}
+	}
+	if !appSpecific {
+		return false
+	}
+	if len(targetTags) == 0 {
+		return mode == "strict"
+	}
+	for t := range pocTags {
+		if _, ok := targetTags[t]; ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
@@ -436,10 +468,10 @@ func (runner *Runner) Execute() {
 
 	pocTagsCache := make(map[string]map[string]struct{})
 	shouldSkipFingerprintFiltered := func(target string, p poc.Poc) bool {
-		if len(globalFingerTags) == 0 {
+		if isNetOnlyPoc(p) {
 			return false
 		}
-		if isNetOnlyPoc(p) {
+		if len(globalFingerTags) == 0 {
 			return false
 		}
 		pt, ok := pocTagsCache[p.Id]
@@ -465,15 +497,7 @@ func (runner *Runner) Execute() {
 			return false
 		}
 		tts := fingerTagsByKey[key]
-		if len(tts) == 0 {
-			return true
-		}
-		for t := range pt {
-			if _, ok := tts[t]; ok {
-				return false
-			}
-		}
-		return true
+		return shouldSkipFingerprintFilteredByMode(options.FingerprintFilterMode, globalFingerTags, tts, pt)
 	}
 
 	runStage := func(pocs []poc.Poc, rate, concurrency int) {

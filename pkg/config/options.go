@@ -127,6 +127,7 @@ type Options struct {
 	// Smart Control Concurrency
 	Smart              bool
 	DisableFingerprint bool
+	FingerprintFilterMode string
 
 	// number of times to retry a failed request (default 1)
 	Retries int
@@ -271,6 +272,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
+		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 		// flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
@@ -370,6 +372,14 @@ func (opt *Options) VerifyOptions() error {
 
 	if opt.Web {
 		return nil
+	}
+
+	opt.FingerprintFilterMode = strings.ToLower(strings.TrimSpace(opt.FingerprintFilterMode))
+	if opt.FingerprintFilterMode == "" {
+		opt.FingerprintFilterMode = "strict"
+	}
+	if opt.FingerprintFilterMode != "strict" && opt.FingerprintFilterMode != "opportunistic" {
+		opt.FingerprintFilterMode = "strict"
 	}
 
 	limitModeCount := 0

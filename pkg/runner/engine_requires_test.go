@@ -50,3 +50,36 @@ func TestShouldSkipRequires_Strict_EmptyKey(t *testing.T) {
 	}
 }
 
+func TestShouldSkipFingerprintFilteredByMode_Strict_EmptyTargetTags(t *testing.T) {
+	global := map[string]struct{}{"redis": {}}
+	pocTags := map[string]struct{}{"redis": {}}
+	if !shouldSkipFingerprintFilteredByMode("strict", global, nil, pocTags) {
+		t.Fatalf("expected skip when strict and target has no fingerprint tags")
+	}
+}
+
+func TestShouldSkipFingerprintFilteredByMode_Opportunistic_EmptyTargetTags(t *testing.T) {
+	global := map[string]struct{}{"redis": {}}
+	pocTags := map[string]struct{}{"redis": {}}
+	if shouldSkipFingerprintFilteredByMode("opportunistic", global, nil, pocTags) {
+		t.Fatalf("expected not skip when opportunistic and target has no fingerprint tags")
+	}
+}
+
+func TestShouldSkipFingerprintFilteredByMode_MismatchWithEvidence(t *testing.T) {
+	global := map[string]struct{}{"redis": {}, "mysql": {}}
+	targetTags := map[string]struct{}{"mysql": {}}
+	pocTags := map[string]struct{}{"redis": {}}
+	if !shouldSkipFingerprintFilteredByMode("opportunistic", global, targetTags, pocTags) {
+		t.Fatalf("expected skip when target fingerprint tags do not match poc tags")
+	}
+}
+
+func TestShouldSkipFingerprintFilteredByMode_NotAppSpecific(t *testing.T) {
+	global := map[string]struct{}{"redis": {}}
+	targetTags := map[string]struct{}{}
+	pocTags := map[string]struct{}{"weird": {}}
+	if shouldSkipFingerprintFilteredByMode("strict", global, targetTags, pocTags) {
+		t.Fatalf("expected not skip when poc is not app-specific")
+	}
+}
