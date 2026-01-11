@@ -24,4 +24,9 @@ rules:
       data: "00000000c8005100000000000000000000000099000000000000000001020000000000000000000000000000000000000000000000000000000000000000000008000000382e312e312e34390040000000068149bbe004a62fb45552831704c802d4d802b4579cb045b3c6100880725ececf148a7c9205047caccadfef5ff264460d11092a3b483bf9d24382dea1dc43e7"
       data-type: hex
     expression: response.body.bcontains(b"\x00\x00\x00\x00\xe4\x00") || response.body.bcontains(b"\x40\x00\x00\x00")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?P<dameng>[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{1,3})".bsubmatch(response.raw)'
+          dameng: ext["dameng"]
 expression: r0()

@@ -19,6 +19,11 @@ rules:
       host: "{{host}}"
       data: "version\r\n"
     expression: response.raw.bcontains(b"VERSION")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"VERSION[^0-9]{0,20}(?P<memcached>[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)".bsubmatch(response.raw)'
+          memcached: ext["memcached"]
   r1:
     request:
       type: tcp

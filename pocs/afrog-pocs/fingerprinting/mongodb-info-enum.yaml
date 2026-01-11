@@ -21,4 +21,9 @@ rules:
       data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
       data-type: hex
     expression: response.raw.ibcontains(b"version") && response.raw.ibcontains(b"maxBsonObjectSize")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"version[^0-9]{0,20}(?P<mongodb>[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)[^a-zA-Z0-9]{0,20}gitVersion".bsubmatch(response.raw)'
+          mongodb: ext["mongodb"]
 expression: r0()
