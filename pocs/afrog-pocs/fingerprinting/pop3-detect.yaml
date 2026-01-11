@@ -6,24 +6,27 @@ info:
   severity: info
   verified: true
   description: |-
-    POP3 service was detected.
+    POP3 的全称是 Post Office Protocol version 3。
+    它是一种非常经典且简单的 电子邮件接收协议，用于从邮件服务器下载邮件到本地设备。
+    连接服务器：您的邮件客户端（如 Outlook、Foxmail、系统自带的邮件应用）使用 110 端口（默认，非加密） 或 995 端口（SSL/TLS 加密） 连接到 POP3 邮件服务器。
+    身份验证：输入用户名和密码。
+    下载邮件：服务器会将所有新邮件一次性下载到您的本地设备（电脑、手机）。
+    （默认）删除服务器副本：邮件下载完成后，默认情况下，服务器上的邮件会被删除。这样做的初衷是节省服务器空间，并且所有邮件都保存在本地。
+    断开连接：操作完成，连接断开。
+    默认端口
+    POP3 非加密端口：110
+    POP3 over SSL/TLS 加密端口：995（现代邮件服务都强制使用加密端口，以保证密码和邮件的安全）
+    fofa: protocol="pop3"
   tags: network,pop3,fingerprint
   created: 2026/01/09
 
 set:
-  hostname: request.url.host
-  host: request.url.domain
+  host: request.url.host
 rules:
   r0:
     request:
       type: tcp
-      host: "{{hostname}}"
-      data: "\n"
-    expression: response.raw.bcontains(b"+OK") && response.raw.ibcontains(b"pop")
-  r1:
-    request:
-      type: tcp
-      host: "{{host}}:110"
-      data: "\n"
-    expression: response.raw.bcontains(b"+OK") && response.raw.ibcontains(b"pop")
-expression: r0() || r1()
+      host: "{{host}}"
+      data: "CAPA\r\n"
+    expression: response.raw.bcontains(b"+OK")
+expression: r0()

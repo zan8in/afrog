@@ -6,7 +6,10 @@ info:
   severity: info
   verified: true
   description: |-
-    RDP service was detected.
+    RDP 的全称是 Remote Desktop Protocol。
+    它是微软开发的一种专有协议，允许用户远程连接并控制另一台计算机的图形化桌面，就像坐在那台电脑前一样。
+    它传输屏幕图像、键盘和鼠标操作，并支持声音重定向、打印机映射、驱动器共享等高级功能。
+    fofa: protocol="rdp"
   tags: network,rdp,fingerprint
   created: 2026/01/09
 

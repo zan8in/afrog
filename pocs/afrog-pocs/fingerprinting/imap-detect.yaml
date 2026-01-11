@@ -6,7 +6,13 @@ info:
   severity: info
   verified: true
   description: |-
-    IMAP service was detected.
+    IMAP 的全称是 Internet Message Access Protocol。
+    它是一种用于访问和管理电子邮件服务器上邮件的协议。
+    与 POP3 不同，IMAP 允许用户在多个设备上同步查看和管理邮件，而无需下载到本地设备。
+    默认端口
+    IMAP 非加密端口：143
+    IMAP over SSL/TLS 加密端口：993（现代绝对的标准和必选项）
+    fofa: protocol="imap"
   tags: network,imap,fingerprint
   created: 2026/01/09
 

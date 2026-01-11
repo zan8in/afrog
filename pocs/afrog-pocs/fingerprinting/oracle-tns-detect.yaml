@@ -17,7 +17,14 @@ rules:
     request:
       type: tcp
       host: "{{host}}"
-      data: "0000002a0100000001000000000000080000000000000000010000000000000000000000000000000000"
+      data: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
       data-type: hex
-    expression: response.raw.ibcontains(b"tns") || response.raw.ibcontains(b"tnslsnr") || response.raw.ibcontains(b"oracle")
+    expression: |
+      response.raw.ibcontains(b"tnslsnr") ||
+      (response.raw.ibcontains(b"oracle") && response.raw.ibcontains(b"version"))
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"Version\\s+(?P<oracle>[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)".bsubmatch(response.raw)'
+          oracle: ext["oracle"]
 expression: r0()

@@ -6,7 +6,10 @@ info:
   severity: info
   verified: true
   description: |-
-    SMB service was detected.
+    SMB 的全称是 Server Message Block。
+    它是一种网络文件共享协议，主要用于在计算机之间共享文件、打印机、串行端口等资源，并进行网络通信。
+    简单理解，它就是让您能在“网络邻居”或通过 \\192.168.1.100 这样的路径访问另一台电脑上文件夹的技术基础。
+    fofa: protocol="smb"
   tags: network,smb,fingerprint
   created: 2026/01/09
 

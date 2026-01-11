@@ -6,7 +6,16 @@ info:
   severity: info
   verified: true
   description: |-
-    SMTP service was detected.
+    SMTP 的全称是 Simple Mail Transfer Protocol（简单邮件传输协议）。
+    它是专门用于发送电子邮件以及在邮件服务器之间传递邮件的协议。
+    关键点：SMTP 是 “发信”协议，而 POP3/IMAP 是 “收信”协议。一个完整的邮件流程需要两者配合。
+    默认端口
+    SMTP 非加密端口：25
+    SMTP over SSL/TLS 加密端口：465（现代邮件服务都强制使用加密端口，以保证密码和邮件的安全）
+    发邮件用 SMTP（端口 587/465）
+    收邮件用 POP3/IMAP（端口 995/993）
+    一个完整的邮件服务 = SMTP（发） + POP3/IMAP（收）
+    fofa: protocol="smtp"
   tags: network,smtp,fingerprint
   created: 2026/01/09
 
