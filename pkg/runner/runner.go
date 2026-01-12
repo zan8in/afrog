@@ -49,12 +49,22 @@ type Runner struct {
 	fingerByKey       map[string][]fingerprint.Hit
 	fingerResultMu    sync.Mutex
 	fingerResultByKey map[string]map[string]*result.Result
+	webMu             sync.Mutex
+	webURLByKey       map[string]string
+	webMetaByKey      map[string]WebMeta
 	liveMu            sync.Mutex
 	livePrev          retryhttpclient.LiveMetrics
 	livePrevAt        time.Time
 	ctx               context.Context
 	cancel            context.CancelFunc
 	// OOB           *oobadapter.OOBAdapter
+}
+
+type WebMeta struct {
+	URL       string
+	Title     string
+	Server    string
+	PoweredBy string
 }
 
 func (r *Runner) Done() <-chan struct{} {
@@ -85,6 +95,8 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		cancel:            cancel,
 		fingerByKey:       make(map[string][]fingerprint.Hit),
 		fingerResultByKey: make(map[string]map[string]*result.Result),
+		webURLByKey:       make(map[string]string),
+		webMetaByKey:      make(map[string]WebMeta),
 	}
 
 	runner.engine = NewEngine(options)

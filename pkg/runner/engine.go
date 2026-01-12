@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/targets"
@@ -36,6 +38,8 @@ var CheckerPool = sync.Pool{
 	},
 }
 
+var titleExtractRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+
 type openPortsCollector struct {
 	mu   sync.Mutex
 	open map[string][]int
@@ -45,6 +49,178 @@ func newOpenPortsCollector() *openPortsCollector {
 	return &openPortsCollector{
 		open: make(map[string][]int),
 	}
+}
+
+func extractTitle(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	m := titleExtractRe.FindSubmatch(body)
+	if len(m) < 2 {
+		return ""
+	}
+	t := strings.TrimSpace(string(m[1]))
+	if t == "" {
+		return ""
+	}
+	t = strings.Join(strings.Fields(t), " ")
+	return t
+}
+
+func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []string {
+	if runner == nil || idx == nil || runner.options == nil {
+		return nil
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	candidates := make([]string, 0, len(idx.URLs)+len(idx.HostPorts)+len(idx.Hosts))
+	add := func(s string) {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		candidates = append(candidates, s)
+	}
+	for _, u := range idx.URLs {
+		add(u)
+	}
+	for _, hp := range idx.HostPorts {
+		add(hp)
+	}
+	for _, h := range idx.Hosts {
+		add(h)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	rate := runner.options.RateLimit
+	if rate <= 0 {
+		rate = 1
+	}
+	con := runner.options.Concurrency
+	if con <= 0 {
+		con = 1
+	}
+
+	ticker := time.NewTicker(time.Second / time.Duration(rate))
+	defer ticker.Stop()
+
+	type task struct {
+		raw string
+	}
+	tasks := make(chan task, con*4)
+	var wg sync.WaitGroup
+
+	var mu sync.Mutex
+	webURLs := make([]string, 0)
+	webURLByKey := make(map[string]string)
+	webMetaByKey := make(map[string]WebMeta)
+
+	record := func(urlStr string, meta WebMeta) {
+		key := fingerprint.KeyFromTarget(urlStr)
+		if key == "" {
+			return
+		}
+		mu.Lock()
+		if _, ok := webURLByKey[key]; ok {
+			mu.Unlock()
+			return
+		}
+		webURLByKey[key] = urlStr
+		webMetaByKey[key] = meta
+		webURLs = append(webURLs, urlStr)
+		mu.Unlock()
+	}
+
+	fetchMeta := func(urlStr string) WebMeta {
+		vm := make(map[string]any, 4)
+		if ctx != nil {
+			vm[retryhttpclient.ContextVarKey] = ctx
+		}
+		rule := poc.Rule{}
+		rule.Request.Method = "GET"
+		rule.Request.Path = "/"
+		rule.Request.FollowRedirects = true
+		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
+
+		meta := WebMeta{URL: urlStr}
+		resp, _ := vm["response"].(*proto.Response)
+		if resp == nil {
+			return meta
+		}
+		if len(resp.Headers) > 0 {
+			meta.Server = strings.TrimSpace(resp.Headers["server"])
+			meta.PoweredBy = strings.TrimSpace(resp.Headers["x-powered-by"])
+		}
+		meta.Title = extractTitle(resp.Body)
+		return meta
+	}
+
+	for i := 0; i < con; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-runner.ctx.Done():
+					return
+				case <-ctx.Done():
+					return
+				case it, ok := <-tasks:
+					if !ok {
+						return
+					}
+					select {
+					case <-runner.ctx.Done():
+						return
+					case <-ctx.Done():
+						return
+					case <-ticker.C:
+					}
+					u, err := retryhttpclient.CheckProtocol(it.raw)
+					if err != nil || strings.TrimSpace(u) == "" {
+						continue
+					}
+					meta := fetchMeta(u)
+					record(u, meta)
+				}
+			}
+		}()
+	}
+
+	for _, c := range candidates {
+		if runner.ctx.Err() != nil || (ctx != nil && ctx.Err() != nil) {
+			break
+		}
+		select {
+		case <-runner.ctx.Done():
+			break
+		case <-ctx.Done():
+			break
+		case tasks <- task{raw: c}:
+		}
+	}
+	close(tasks)
+	wg.Wait()
+
+	runner.webMu.Lock()
+	for k, v := range webURLByKey {
+		runner.webURLByKey[k] = v
+	}
+	for k, v := range webMetaByKey {
+		runner.webMetaByKey[k] = v
+	}
+	runner.webMu.Unlock()
+
+	return webURLs
 }
 
 func (c *openPortsCollector) Add(host string, port int) {
@@ -338,7 +514,31 @@ func (runner *Runner) Execute() {
 		idx = targets.BuildTargetIndex(allTargets)
 		runner.TargetIndex = idx
 	}
-	netTargets := idx.NetTargets()
+	baseCtx := runner.ctx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	netTargetsStrict := append([]string(nil), idx.HostPorts...)
+	webTargets := runner.webProbe(baseCtx, idx)
+	mergeTargets := func(parts ...[]string) []string {
+		seen := make(map[string]struct{})
+		out := make([]string, 0)
+		for _, p := range parts {
+			for _, t := range p {
+				t = strings.TrimSpace(t)
+				if t == "" {
+					continue
+				}
+				if _, ok := seen[t]; ok {
+					continue
+				}
+				seen[t] = struct{}{}
+				out = append(out, t)
+			}
+		}
+		return out
+	}
+	webScanTargets := mergeTargets(idx.URLs, idx.Hosts, webTargets)
 
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false
@@ -365,13 +565,27 @@ func (runner *Runner) Execute() {
 
 	taskCount := 0
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
-		taskCount += len(fingerprintPocs) * len(allTargets)
+		fingerNet := make([]poc.Poc, 0)
+		fingerWeb := make([]poc.Poc, 0)
+		for _, p := range fingerprintPocs {
+			if isNetOnlyPoc(p) {
+				fingerNet = append(fingerNet, p)
+			} else {
+				fingerWeb = append(fingerWeb, p)
+			}
+		}
+		if len(fingerNet) > 0 {
+			taskCount += len(fingerNet) * len(netTargetsStrict)
+		}
+		if len(fingerWeb) > 0 {
+			taskCount += len(fingerWeb) * len(webScanTargets)
+		}
 	}
 	for _, p := range pocSlice {
 		if !isNetOnlyPoc(p) {
-			taskCount += len(allTargets)
+			taskCount += len(webScanTargets)
 		} else {
-			taskCount += len(netTargets)
+			taskCount += len(netTargetsStrict)
 		}
 	}
 	options.Count += taskCount
@@ -389,11 +603,21 @@ func (runner *Runner) Execute() {
 	}
 
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
-		baseCtx := runner.ctx
-		if baseCtx == nil {
-			baseCtx = context.Background()
+		fingerNet := make([]poc.Poc, 0)
+		fingerWeb := make([]poc.Poc, 0)
+		for _, p := range fingerprintPocs {
+			if isNetOnlyPoc(p) {
+				fingerNet = append(fingerNet, p)
+			} else {
+				fingerWeb = append(fingerWeb, p)
+			}
 		}
-		runner.runFingerprintStage(baseCtx, allTargets, fingerprintPocs)
+		if len(fingerNet) > 0 && len(netTargetsStrict) > 0 {
+			runner.runFingerprintStage(baseCtx, netTargetsStrict, fingerNet)
+		}
+		if len(fingerWeb) > 0 && len(webScanTargets) > 0 {
+			runner.runFingerprintStage(baseCtx, webScanTargets, fingerWeb)
+		}
 	}
 
 	normalizeTags := func(tags string, skipFingerprint bool) map[string]struct{} {
@@ -576,9 +800,9 @@ func (runner *Runner) Execute() {
 			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 				break
 			}
-			targetView := allTargets
+			targetView := webScanTargets
 			if isNetOnlyPoc(pocItem) {
-				targetView = netTargets
+				targetView = netTargetsStrict
 			}
 
 			if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(pocItem.Id) {

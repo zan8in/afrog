@@ -11,10 +11,10 @@ import (
 func main() {
 	// 1. Setup Options
 	opts := portscan.DefaultOptions()
-	opts.Targets = []string{"imap.brutalnature.com", "47.102.209.132"}
+	opts.Targets = []string{"8.152.216.157", "60.247.152.241"}
 	opts.DiscoveryMethod = "auto"
-	opts.Ports = "full" // Test prioritized full scan
-	opts.SkipDiscovery = false
+	opts.Ports = "top" // Test prioritized full scan
+	opts.SkipDiscovery = true
 	// opts.RateLimit = 300
 	// opts.Timeout = 1000 * time.Millisecond
 	// opts.Retries = 2
