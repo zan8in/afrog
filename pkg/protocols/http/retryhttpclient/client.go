@@ -865,6 +865,7 @@ func CheckProtocol(host string) (string, error) {
 		err       error
 		result    string
 		parsePort string
+		lastErr   error
 	)
 
 	if len(strings.TrimSpace(host)) == 0 {
@@ -874,6 +875,7 @@ func CheckProtocol(host string) (string, error) {
 	if strings.HasPrefix(host, HTTPS_PREFIX) {
 		_, err := checkTarget(host)
 		if err != nil {
+			lastErr = err
 			return result, err
 		}
 
@@ -883,6 +885,7 @@ func CheckProtocol(host string) (string, error) {
 	if strings.HasPrefix(host, HTTP_PREFIX) {
 		_, err := checkTarget(host)
 		if err != nil {
+			lastErr = err
 			return result, err
 		}
 
@@ -899,6 +902,7 @@ func CheckProtocol(host string) (string, error) {
 	case parsePort == "80":
 		_, err := checkTarget(HTTP_PREFIX + host)
 		if err != nil {
+			lastErr = err
 			return result, err
 		}
 
@@ -907,6 +911,7 @@ func CheckProtocol(host string) (string, error) {
 	case parsePort == "443":
 		_, err := checkTarget(HTTPS_PREFIX + host)
 		if err != nil {
+			lastErr = err
 			return result, err
 		}
 
@@ -915,8 +920,9 @@ func CheckProtocol(host string) (string, error) {
 	default:
 		_, err := checkTarget(HTTPS_PREFIX + host)
 		if err == nil {
-			return HTTPS_PREFIX + host, err
+			return HTTPS_PREFIX + host, nil
 		}
+		lastErr = err
 
 		body, err := checkTarget(HTTP_PREFIX + host)
 		if err == nil {
@@ -925,10 +931,14 @@ func CheckProtocol(host string) (string, error) {
 			}
 			return HTTP_PREFIX + host, nil
 		}
+		lastErr = err
 
 	}
 
-	return "", fmt.Errorf("host %q is empty", host)
+	if lastErr != nil {
+		return "", fmt.Errorf("check protocol failed for %q: %w", host, lastErr)
+	}
+	return "", fmt.Errorf("check protocol failed for %q", host)
 }
 
 func checkTarget(target string) (string, error) {
@@ -951,7 +961,11 @@ func checkTarget(target string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	reader := io.LimitReader(resp.Body, maxDefaultBody)
+	maxRead := int64(8192)
+	if maxDefaultBody > 0 && maxDefaultBody < maxRead {
+		maxRead = maxDefaultBody
+	}
+	reader := io.LimitReader(resp.Body, maxRead)
 	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		return "", err
