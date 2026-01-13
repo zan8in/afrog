@@ -549,10 +549,7 @@ func (c *Checker) checkURL(target string) (string, error) {
 	// if target is not url, then check again
 	if !utils.IsURL(target) {
 		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
-			if k := c.Options.Targets.Key(target); k >= 0 {
-				c.Options.Targets.Update(k, newtarget)
-				c.Options.Targets.SetNum(newtarget, ActiveTarget)
-			}
+			c.Options.Targets.SetNum(newtarget, ActiveTarget)
 			return newtarget, nil
 		} else if shouldCountHostError(err) {
 			c.Options.Targets.UpdateNum(target, 1)
@@ -576,6 +573,9 @@ func (c *Checker) checkURL(target string) (string, error) {
 
 func shouldCountHostError(err error) bool {
 	if err == nil {
+		return false
+	}
+	if retryhttpclient.IsCheckProtocolSuppressed(err) {
 		return false
 	}
 	if errors.Is(err, context.Canceled) {

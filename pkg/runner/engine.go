@@ -554,7 +554,57 @@ func (runner *Runner) Execute() {
 		resolvedHosts = append(resolvedHosts, h)
 	}
 	runner.webMu.Unlock()
-	webScanTargets := mergeTargets(idx.URLs, resolvedHosts, webTargets)
+
+	keyForWebDedup := func(target string) string {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			return ""
+		}
+		if strings.Contains(target, "://") {
+			return fingerprint.KeyFromTarget(target)
+		}
+		host, port, err := net.SplitHostPort(target)
+		if err == nil && host != "" && port != "" {
+			return net.JoinHostPort(host, port)
+		}
+		return ""
+	}
+
+	dedupWebTargets := func(in []string) []string {
+		bestByKey := make(map[string]string)
+		out := make([]string, 0, len(in))
+		seenLoose := make(map[string]struct{})
+		for _, raw := range in {
+			raw = strings.TrimSpace(raw)
+			if raw == "" {
+				continue
+			}
+			key := keyForWebDedup(raw)
+			if key == "" {
+				if _, ok := seenLoose[raw]; ok {
+					continue
+				}
+				seenLoose[raw] = struct{}{}
+				out = append(out, raw)
+				continue
+			}
+			if prev, ok := bestByKey[key]; ok {
+				prevIsURL := strings.Contains(prev, "://")
+				rawIsURL := strings.Contains(raw, "://")
+				if !prevIsURL && rawIsURL {
+					bestByKey[key] = raw
+				}
+				continue
+			}
+			bestByKey[key] = raw
+		}
+		for _, v := range bestByKey {
+			out = append(out, v)
+		}
+		return out
+	}
+
+	webScanTargets := dedupWebTargets(mergeTargets(idx.URLs, resolvedHosts, webTargets, idx.HostPorts))
 
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false

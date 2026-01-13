@@ -864,16 +864,79 @@ type probeCall struct {
 	err    error
 }
 
+type probeMemo struct {
+	okURL       string
+	okAt        time.Time
+	failUntil   time.Time
+	attempts    int
+	windowStart time.Time
+}
+
+type checkProtocolSuppressedError struct {
+	host  string
+	until time.Time
+}
+
+func (e *checkProtocolSuppressedError) Error() string {
+	if e == nil {
+		return "check protocol suppressed"
+	}
+	if !e.until.IsZero() {
+		return fmt.Sprintf("check protocol suppressed for %q until %s", e.host, e.until.UTC().Format(time.RFC3339Nano))
+	}
+	return fmt.Sprintf("check protocol suppressed for %q", e.host)
+}
+
+func IsCheckProtocolSuppressed(err error) bool {
+	var se *checkProtocolSuppressedError
+	return errors.As(err, &se)
+}
+
 var (
 	probeMu    sync.Mutex
 	probeCalls = make(map[string]*probeCall)
+	probeMemos = make(map[string]*probeMemo)
+)
+
+var (
+	checkProtocolAttemptWindow        = 10 * time.Minute
+	checkProtocolMaxAttemptsPerWindow = 1
+	checkProtocolFailCooldownBase     = 30 * time.Second
+	checkProtocolFailCooldownMax      = 10 * time.Minute
 )
 
 func CheckProtocol(host string) (string, error) {
-	key := strings.TrimSpace(host)
-	if key == "" {
+	trimmed := strings.TrimSpace(host)
+	if trimmed == "" {
 		return "", fmt.Errorf("host %q is empty", host)
 	}
+	key := strings.ToLower(trimmed)
+
+	now := time.Now()
+	probeMu.Lock()
+	if memo := probeMemos[key]; memo != nil {
+		if u := strings.TrimSpace(memo.okURL); u != "" {
+			probeMu.Unlock()
+			return u, nil
+		}
+		if !memo.failUntil.IsZero() && now.Before(memo.failUntil) {
+			until := memo.failUntil
+			probeMu.Unlock()
+			return "", &checkProtocolSuppressedError{host: trimmed, until: until}
+		}
+		if checkProtocolMaxAttemptsPerWindow > 0 {
+			if memo.windowStart.IsZero() || now.Sub(memo.windowStart) >= checkProtocolAttemptWindow {
+				memo.windowStart = now
+				memo.attempts = 0
+			}
+			if memo.attempts >= checkProtocolMaxAttemptsPerWindow {
+				until := memo.windowStart.Add(checkProtocolAttemptWindow)
+				probeMu.Unlock()
+				return "", &checkProtocolSuppressedError{host: trimmed, until: until}
+			}
+		}
+	}
+	probeMu.Unlock()
 
 	probeMu.Lock()
 	if c := probeCalls[key]; c != nil {
@@ -881,6 +944,19 @@ func CheckProtocol(host string) (string, error) {
 		<-c.done
 		return c.result, c.err
 	}
+	memo := probeMemos[key]
+	if memo == nil {
+		memo = &probeMemo{}
+		probeMemos[key] = memo
+	}
+	if checkProtocolMaxAttemptsPerWindow > 0 {
+		if memo.windowStart.IsZero() || now.Sub(memo.windowStart) >= checkProtocolAttemptWindow {
+			memo.windowStart = now
+			memo.attempts = 0
+		}
+		memo.attempts++
+	}
+
 	c := &probeCall{done: make(chan struct{})}
 	probeCalls[key] = c
 	probeMu.Unlock()
@@ -900,6 +976,36 @@ func CheckProtocol(host string) (string, error) {
 	c.err = err
 
 	probeMu.Lock()
+	if memo := probeMemos[key]; memo != nil {
+		if err == nil && strings.TrimSpace(result) != "" {
+			memo.okURL = result
+			memo.okAt = time.Now()
+			memo.failUntil = time.Time{}
+		} else {
+			attempt := memo.attempts
+			if attempt <= 0 {
+				attempt = 1
+			}
+			cooldown := checkProtocolFailCooldownBase
+			if attempt > 1 {
+				for i := 1; i < attempt; i++ {
+					if cooldown >= checkProtocolFailCooldownMax {
+						cooldown = checkProtocolFailCooldownMax
+						break
+					}
+					cooldown *= 2
+					if cooldown > checkProtocolFailCooldownMax {
+						cooldown = checkProtocolFailCooldownMax
+						break
+					}
+				}
+			}
+			if cooldown <= 0 {
+				cooldown = 30 * time.Second
+			}
+			memo.failUntil = time.Now().Add(cooldown)
+		}
+	}
 	delete(probeCalls, key)
 	probeMu.Unlock()
 	close(c.done)
