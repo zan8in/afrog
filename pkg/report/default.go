@@ -281,6 +281,15 @@ func defaultHeader() string {
 				background-color: rgba(92, 184, 92, 0.9);
 				/* 鼠标悬停时的背景颜色 */
 			}
+			.webprobe-td{padding:0 !important}
+			.webprobe-list{width:100%}
+			.webprobe-item{display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid #60786F;background:#223B46;color:#DDE2DE;font-family:'Consolas','Menlo','Liberation Mono','DejaVu Sans Mono',monospace;font-size:12px;line-height:1.6;flex-wrap:wrap}
+			.webprobe-item:hover{background:#1d313a}
+			.webprobe-no{color:#61D6D6;min-width:42px;font-variant-numeric:tabular-nums}
+			.webprobe-url{color:#DDE2DE;text-decoration:none;word-break:break-all;flex:0 1 auto}
+			.webprobe-url:hover{text-decoration:underline}
+			.webprobe-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-start}
+			.webprobe-badge{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.08);color:#B4C1C3;font-size:11px;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 		</style>
 		<script>
 			/*! jQuery v1.11.1 | (c) 2005, 2014 jQuery Foundation, Inc. | jquery.org/license */

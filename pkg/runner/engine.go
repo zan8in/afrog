@@ -13,12 +13,15 @@ import (
 	"strconv"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
+	db2 "github.com/zan8in/afrog/v3/pkg/db"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/report"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
@@ -74,6 +77,8 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	if ctx != nil && ctx.Err() != nil {
 		return nil
 	}
+
+	var printSeq uint64
 
 	seen := make(map[string]struct{})
 	candidates := make([]string, 0, len(idx.URLs)+len(idx.HostPorts)+len(idx.Hosts))
@@ -141,6 +146,34 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		webMetaByKey[key] = meta
 		webURLs = append(webURLs, urlStr)
 		mu.Unlock()
+		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
+			extinfo := ""
+			if t := strings.TrimSpace(meta.Title); t != "" {
+				extinfo += "[" + log.LogColor.Title(t) + "]"
+			}
+			serverOrPowered := ""
+			if s := strings.TrimSpace(meta.Server); s != "" {
+				serverOrPowered = s
+			}
+			if p := strings.TrimSpace(meta.PoweredBy); p != "" {
+				if serverOrPowered == "" {
+					serverOrPowered = p
+				} else {
+					serverOrPowered += "," + p
+				}
+			}
+			if serverOrPowered != "" {
+				extinfo += "[" + log.LogColor.DarkGray(serverOrPowered) + "]"
+			}
+
+			number := utils.GetNumberText(int(atomic.AddUint64(&printSeq, 1)))
+			seq := log.LogColor.Time(number)
+			if extinfo == "" {
+				fmt.Printf("\r%v %s\r\n", seq, urlStr)
+			} else {
+				fmt.Printf("\r%v %s %s\r\n", seq, urlStr, extinfo)
+			}
+		}
 	}
 
 	fetchMeta := func(urlStr string) WebMeta {
@@ -523,6 +556,46 @@ func (runner *Runner) Execute() {
 	}
 	netTargetsStrict := append([]string(nil), idx.HostPorts...)
 	webTargets := runner.webProbe(baseCtx, idx)
+	if !runner.options.SDKMode {
+		webMetas := make([]WebMeta, 0, len(webTargets))
+		runner.webMu.Lock()
+		for _, u := range webTargets {
+			key := fingerprint.KeyFromTarget(u)
+			if key == "" {
+				continue
+			}
+			meta, ok := runner.webMetaByKey[key]
+			if !ok {
+				continue
+			}
+			if strings.TrimSpace(meta.URL) == "" {
+				meta.URL = u
+			}
+			webMetas = append(webMetas, meta)
+		}
+		runner.webMu.Unlock()
+		if len(webMetas) > 0 {
+			_, _ = sqlite.InsertWebProbeSummary(db2.TaskID, "webprobe", "webprobe", "webprobe", "webprobe", webMetas)
+			if runner.Report != nil {
+				entries := make([]report.WebProbeEntry, 0, len(webMetas))
+				for i, meta := range webMetas {
+					urlStr := strings.TrimSpace(meta.URL)
+					if urlStr == "" {
+						continue
+					}
+					number := utils.GetNumberText(i + 1)
+					entries = append(entries, report.WebProbeEntry{
+						Number:    number,
+						URL:       urlStr,
+						Title:     strings.TrimSpace(meta.Title),
+						Server:    strings.TrimSpace(meta.Server),
+						PoweredBy: strings.TrimSpace(meta.PoweredBy),
+					})
+				}
+				_ = runner.Report.AppendWebProbeEntries(entries)
+			}
+		}
+	}
 	mergeTargets := func(parts ...[]string) []string {
 		seen := make(map[string]struct{})
 		out := make([]string, 0)

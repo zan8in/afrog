@@ -265,6 +265,38 @@ func InsertResultWithTaskID(r *result.Result, taskID string) (int64, error) {
 	return id, nil
 }
 
+func InsertWebProbeSummary(taskID, vulID, vulName, target, fullTarget string, fingerprint any) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+
+	insertSQL := "INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+	currentTime := time.Now()
+	createdTime := currentTime.Format("2006-01-02 15:04:05")
+
+	fingerBytes, _ := json.Marshal(fingerprint)
+	id := db2.SnowFlake.NextID()
+
+	c := 0
+	for {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := dbx.ExecContext(ctx, insertSQL, id, taskID, vulID, vulName, target, fullTarget, "info", "", "", createdTime, fingerBytes, "")
+		cancel()
+		if err != nil {
+			if strings.Contains(err.Error(), "database is locked") && c < 5 {
+				c++
+				randutil.RandSleep(1000)
+				continue
+			}
+			return 0, err
+		}
+		break
+	}
+
+	return id, nil
+}
+
 func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 
 	var err error
