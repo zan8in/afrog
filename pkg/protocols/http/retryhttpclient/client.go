@@ -872,8 +872,13 @@ func CheckProtocol(host string) (string, error) {
 		return result, fmt.Errorf("host %q is empty", host)
 	}
 
+	probeTimeout := defaultTimeout
+	if probeTimeout > 5*time.Second {
+		probeTimeout = 5 * time.Second
+	}
+
 	if strings.HasPrefix(host, HTTPS_PREFIX) {
-		_, err := checkTarget(host)
+		_, err := checkTarget(host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
@@ -883,7 +888,7 @@ func CheckProtocol(host string) (string, error) {
 	}
 
 	if strings.HasPrefix(host, HTTP_PREFIX) {
-		_, err := checkTarget(host)
+		_, err := checkTarget(host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
@@ -900,7 +905,7 @@ func CheckProtocol(host string) (string, error) {
 
 	switch {
 	case parsePort == "80":
-		_, err := checkTarget(HTTP_PREFIX + host)
+		_, err := checkTarget(HTTP_PREFIX+host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
@@ -909,7 +914,7 @@ func CheckProtocol(host string) (string, error) {
 		return HTTP_PREFIX + host, nil
 
 	case parsePort == "443":
-		_, err := checkTarget(HTTPS_PREFIX + host)
+		_, err := checkTarget(HTTPS_PREFIX+host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
@@ -918,18 +923,38 @@ func CheckProtocol(host string) (string, error) {
 		return HTTPS_PREFIX + host, nil
 
 	default:
-		_, err := checkTarget(HTTPS_PREFIX + host)
+		preferHTTPS := false
+		if parsePort == "" {
+			preferHTTPS = true
+		} else {
+			switch parsePort {
+			case "443", "8443", "9443", "10443":
+				preferHTTPS = true
+			}
+		}
+
+		tryFirst := HTTP_PREFIX
+		trySecond := HTTPS_PREFIX
+		if preferHTTPS {
+			tryFirst = HTTPS_PREFIX
+			trySecond = HTTP_PREFIX
+		}
+
+		body, err := checkTarget(tryFirst+host, probeTimeout)
 		if err == nil {
-			return HTTPS_PREFIX + host, nil
+			if tryFirst == HTTP_PREFIX && strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
+				return HTTPS_PREFIX + host, nil
+			}
+			return tryFirst + host, nil
 		}
 		lastErr = err
 
-		body, err := checkTarget(HTTP_PREFIX + host)
+		body, err = checkTarget(trySecond+host, probeTimeout)
 		if err == nil {
-			if strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
+			if trySecond == HTTP_PREFIX && strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
 				return HTTPS_PREFIX + host, nil
 			}
-			return HTTP_PREFIX + host, nil
+			return trySecond + host, nil
 		}
 		lastErr = err
 
@@ -941,8 +966,11 @@ func CheckProtocol(host string) (string, error) {
 	return "", fmt.Errorf("check protocol failed for %q", host)
 }
 
-func checkTarget(target string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+func checkTarget(target string, timeout time.Duration) (string, error) {
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, target, nil)

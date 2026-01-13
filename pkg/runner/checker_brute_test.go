@@ -1,8 +1,12 @@
 package runner
 
 import (
+	"context"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 
@@ -571,7 +575,7 @@ expression: r0()
 	}
 }
 
-func TestHTTPBruteMaxRequestsTruncates(t *testing.T) {
+func TestHTTPBruteMaxRequestsTruncated(t *testing.T) {
 	retryhttpclient.Init(&retryhttpclient.Options{
 		Proxy:           "",
 		Timeout:         5,
@@ -663,5 +667,30 @@ expression: r0()
 	}
 	if c.Result.AllPocResult[0].BruteRequests != 2 {
 		t.Fatalf("expected brute requests 2, got %d", c.Result.AllPocResult[0].BruteRequests)
+	}
+}
+
+func TestShouldCountHostError(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "context canceled", err: context.Canceled, want: false},
+		{name: "deadline exceeded", err: context.DeadlineExceeded, want: true},
+		{name: "url deadline exceeded", err: &url.Error{Op: "Get", URL: "http://example.com", Err: context.DeadlineExceeded}, want: true},
+		{name: "net op error", err: &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")}, want: true},
+		{name: "eof string", err: errors.New("EOF"), want: true},
+		{name: "status not live", err: errors.New("status code is not live 500"), want: false},
+		{name: "parse error", err: errors.New("parse \"http://[::1\": missing ']' in host"), want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldCountHostError(tc.err); got != tc.want {
+				t.Fatalf("shouldCountHostError(%v)=%v, want %v", tc.err, got, tc.want)
+			}
+		})
 	}
 }

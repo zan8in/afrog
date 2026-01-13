@@ -129,6 +129,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		if key == "" {
 			return
 		}
+		if runner.options != nil {
+			runner.options.Targets.SetNum(urlStr, ActiveTarget)
+		}
 		mu.Lock()
 		if _, ok := webURLByKey[key]; ok {
 			mu.Unlock()
@@ -538,7 +541,20 @@ func (runner *Runner) Execute() {
 		}
 		return out
 	}
-	webScanTargets := mergeTargets(idx.URLs, idx.Hosts, webTargets)
+	resolvedHosts := make([]string, 0, len(idx.Hosts))
+	runner.webMu.Lock()
+	for _, h := range idx.Hosts {
+		key := fingerprint.KeyFromTarget(h)
+		if key != "" {
+			if u := strings.TrimSpace(runner.webURLByKey[key]); u != "" {
+				resolvedHosts = append(resolvedHosts, u)
+				continue
+			}
+		}
+		resolvedHosts = append(resolvedHosts, h)
+	}
+	runner.webMu.Unlock()
+	webScanTargets := mergeTargets(idx.URLs, resolvedHosts, webTargets)
 
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false

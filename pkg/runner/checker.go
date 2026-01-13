@@ -1,8 +1,12 @@
 package runner
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -550,9 +554,9 @@ func (c *Checker) checkURL(target string) (string, error) {
 				c.Options.Targets.SetNum(newtarget, ActiveTarget)
 			}
 			return newtarget, nil
+		} else if shouldCountHostError(err) {
+			c.Options.Targets.UpdateNum(target, 1)
 		}
-
-		c.Options.Targets.UpdateNum(target, 1)
 		return target, fmt.Errorf("%s check protocol falied", target)
 	}
 
@@ -561,13 +565,59 @@ func (c *Checker) checkURL(target string) (string, error) {
 		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
 			c.Options.Targets.SetNum(newtarget, ActiveTarget)
 			return newtarget, nil
+		} else if shouldCountHostError(err) {
+			c.Options.Targets.UpdateNum(target, 1)
 		}
-
-		c.Options.Targets.UpdateNum(target, 1)
 		return target, fmt.Errorf("%s no response", target)
 	}
 
 	return target, nil
+}
+
+func shouldCountHostError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if urlErr.Timeout() {
+			return true
+		}
+		if urlErr.Err != nil {
+			return shouldCountHostError(urlErr.Err)
+		}
+	}
+
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "tls") ||
+		strings.Contains(msg, "x509") ||
+		strings.Contains(msg, "handshake") ||
+		strings.Contains(msg, "eof") ||
+		strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "proxyconnect") {
+		return true
+	}
+	return false
 }
 
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {

@@ -107,9 +107,9 @@ func (r *Runner) checkURL(target string) (string, error) {
 				r.options.Targets.SetNum(newtarget, ActiveTarget)
 			}
 			return newtarget, nil
+		} else if shouldCountHostError(err) {
+			r.options.Targets.UpdateNum(target, 1)
 		}
-
-		r.options.Targets.UpdateNum(target, 1)
 		return target, fmt.Errorf("%s check protocol falied", target)
 	}
 
@@ -118,9 +118,9 @@ func (r *Runner) checkURL(target string) (string, error) {
 		if newtarget, err := retryhttpclient.CheckProtocol(target); err == nil {
 			r.options.Targets.SetNum(newtarget, ActiveTarget)
 			return newtarget, nil
+		} else if shouldCountHostError(err) {
+			r.options.Targets.UpdateNum(target, 1)
 		}
-
-		r.options.Targets.UpdateNum(target, 1)
 		return target, fmt.Errorf("%s no response", target)
 	}
 
