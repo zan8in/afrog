@@ -275,7 +275,10 @@ func InsertWebProbeSummary(taskID, vulID, vulName, target, fullTarget string, fi
 	currentTime := time.Now()
 	createdTime := currentTime.Format("2006-01-02 15:04:05")
 
-	fingerBytes, _ := json.Marshal(fingerprint)
+	fingerBytes, err := json.Marshal(fingerprint)
+	if err != nil {
+		return 0, err
+	}
 	id := db2.SnowFlake.NextID()
 
 	c := 0

@@ -74,7 +74,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	if runner == nil || idx == nil || runner.options == nil {
 		return nil
 	}
-	if ctx != nil && ctx.Err() != nil {
+	if ctx == nil {
+		ctx = context.Background()
+	} else if ctx.Err() != nil {
 		return nil
 	}
 

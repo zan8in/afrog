@@ -277,6 +277,10 @@ func (report *Report) webProbeDefaultHtmlEntries(entries []WebProbeEntry) string
 	if len(entries) == 0 {
 		return ""
 	}
+	isSafeHref := func(s string) bool {
+		s = strings.TrimSpace(strings.ToLower(s))
+		return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
+	}
 	escapeAttr := func(s string) string {
 		s = xssfilter(s)
 		s = strings.ReplaceAll(s, `"`, "%22")
@@ -315,11 +319,17 @@ func (report *Report) webProbeDefaultHtmlEntries(entries []WebProbeEntry) string
 			b.WriteString(xssfilter(no))
 			b.WriteString(`</span>`)
 		}
-		b.WriteString(`<a class="webprobe-url" href="`)
-		b.WriteString(escapeAttr(urlStr))
-		b.WriteString(`" target="_blank">`)
-		b.WriteString(xssfilter(urlStr))
-		b.WriteString(`</a>`)
+		if isSafeHref(urlStr) {
+			b.WriteString(`<a class="webprobe-url" href="`)
+			b.WriteString(escapeAttr(urlStr))
+			b.WriteString(`" target="_blank">`)
+			b.WriteString(xssfilter(urlStr))
+			b.WriteString(`</a>`)
+		} else {
+			b.WriteString(`<span class="webprobe-url">`)
+			b.WriteString(xssfilter(urlStr))
+			b.WriteString(`</span>`)
+		}
 		if title != "" || serverOrPowered != "" {
 			b.WriteString(`<span class="webprobe-badges">`)
 			if title != "" {
