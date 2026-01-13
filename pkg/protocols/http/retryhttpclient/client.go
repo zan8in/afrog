@@ -858,9 +858,56 @@ var (
 	HTTPS_PREFIX = "https://"
 )
 
-// return error if host is not living
-// or if host is live return http(s) url
+type probeCall struct {
+	done   chan struct{}
+	result string
+	err    error
+}
+
+var (
+	probeMu    sync.Mutex
+	probeCalls = make(map[string]*probeCall)
+)
+
 func CheckProtocol(host string) (string, error) {
+	key := strings.TrimSpace(host)
+	if key == "" {
+		return "", fmt.Errorf("host %q is empty", host)
+	}
+
+	probeMu.Lock()
+	if c := probeCalls[key]; c != nil {
+		probeMu.Unlock()
+		<-c.done
+		return c.result, c.err
+	}
+	c := &probeCall{done: make(chan struct{})}
+	probeCalls[key] = c
+	probeMu.Unlock()
+
+	var result string
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("check protocol failed for %q", host)
+			}
+		}()
+		result, err = checkProtocolDirect(host)
+	}()
+
+	c.result = result
+	c.err = err
+
+	probeMu.Lock()
+	delete(probeCalls, key)
+	probeMu.Unlock()
+	close(c.done)
+
+	return result, err
+}
+
+func checkProtocolDirect(host string) (string, error) {
 	var (
 		err       error
 		result    string
