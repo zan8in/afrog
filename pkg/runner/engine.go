@@ -341,8 +341,8 @@ type Engine struct {
 	options     *config.Options
 	ticker      *time.Ticker
 	mu          sync.Mutex
-	paused      bool
-	stopped     bool
+	paused      uint32
+	stopped     uint32
 	quit        chan struct{}
 	activeTasks int64
 }
@@ -791,7 +791,7 @@ func (runner *Runner) Execute() {
 	}
 
 	runStage := func(pocs []poc.Poc, rate, concurrency int) {
-		if runner.engine == nil || runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+		if runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
 			return
 		}
 		if rate <= 0 {
@@ -851,7 +851,7 @@ func (runner *Runner) Execute() {
 							return
 						}
 						runner.engine.waitTick()
-						if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint {
+						if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
 							finish(task.pocID)
 							continue
 						}
@@ -863,7 +863,7 @@ func (runner *Runner) Execute() {
 		}
 
 		for _, pocItem := range pocs {
-			if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 				break
 			}
 			targetView := webScanTargets
@@ -880,7 +880,7 @@ func (runner *Runner) Execute() {
 
 			scheduled := 0
 			for _, t := range targetView {
-				if runner.engine.stopped || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+				if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 					break
 				}
 
@@ -1062,7 +1062,7 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 }
 
 func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string, pocs []poc.Poc) {
-	if runner == nil || runner.engine == nil || runner.engine.stopped {
+	if runner == nil || runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 {
 		return
 	}
 	if len(targets) == 0 || len(pocs) == 0 {
@@ -1103,46 +1103,40 @@ func (e *Engine) waitTick() {
 		return
 	}
 	retryhttpclient.AddTaskGateWait(time.Since(start))
-	e.mu.Lock()
-	for e.paused {
-		e.mu.Unlock()
+	for atomic.LoadUint32(&e.paused) != 0 {
+		select {
+		case <-e.quit:
+			return
+		default:
+		}
 		time.Sleep(100 * time.Millisecond)
-		e.mu.Lock()
 	}
-	e.mu.Unlock()
 }
 
 func (e *Engine) Pause() {
-	e.mu.Lock()
-	e.paused = true
-	e.mu.Unlock()
+	atomic.StoreUint32(&e.paused, 1)
 	gologger.Debug().Msgf("engine paused: ticker gated")
 }
 
 func (e *Engine) Resume() {
-	e.mu.Lock()
-	e.paused = false
-	e.mu.Unlock()
+	atomic.StoreUint32(&e.paused, 0)
 	gologger.Debug().Msgf("engine resumed: ticker released")
 }
 
 func (e *Engine) IsPaused() bool {
-	e.mu.Lock()
-	p := e.paused
-	e.mu.Unlock()
-	return p
+	return atomic.LoadUint32(&e.paused) != 0
 }
 
 func (e *Engine) Stop() {
+	if !atomic.CompareAndSwapUint32(&e.stopped, 0, 1) {
+		return
+	}
 	e.mu.Lock()
-	if !e.stopped {
-		e.stopped = true
-		if e.ticker != nil {
-			e.ticker.Stop()
-		}
-		close(e.quit)
+	if e.ticker != nil {
+		e.ticker.Stop()
 	}
 	e.mu.Unlock()
+	close(e.quit)
 	gologger.Debug().Msgf("engine stopped: ticker stopped and scheduling halted")
 }
 

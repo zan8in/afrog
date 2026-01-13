@@ -54,6 +54,11 @@ type SDKScanner struct {
 
 	closeChansOnce sync.Once
 
+	runStartOnce sync.Once
+	runDoneOnce  sync.Once
+	runStarted   chan struct{}
+	runDone      chan struct{}
+
 	// 控制流式输出的context
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -217,13 +222,15 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	scanner := &SDKScanner{
-		runner:    r,
-		results:   make([]*result.Result, 0),
-		options:   options,
-		sdkOpts:   opts,
-		ctx:       ctx,
-		cancel:    cancel,
-		openPorts: make(map[string]map[int]struct{}),
+		runner:     r,
+		results:    make([]*result.Result, 0),
+		options:    options,
+		sdkOpts:    opts,
+		ctx:        ctx,
+		cancel:     cancel,
+		openPorts:  make(map[string]map[int]struct{}),
+		runStarted: make(chan struct{}),
+		runDone:    make(chan struct{}),
 		stats: &ScanStats{
 			StartTime: time.Now(),
 		},
@@ -240,12 +247,16 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		scanner.openPortsMu.Unlock()
 
 		if scanner.PortChan != nil {
-			select {
-			case scanner.PortChan <- PortScanResult{Host: host, Port: port}:
-			case <-scanner.ctx.Done():
-				return
-			default:
-			}
+			ch := scanner.PortChan
+			func() {
+				defer func() { _ = recover() }()
+				select {
+				case ch <- PortScanResult{Host: host, Port: port}:
+				case <-scanner.ctx.Done():
+					return
+				default:
+				}
+			}()
 		}
 
 		if scanner.OnPort != nil {
@@ -361,6 +372,13 @@ func (s *SDKScanner) closeChans() {
 
 // run 内部扫描执行
 func (s *SDKScanner) run() error {
+	s.runStartOnce.Do(func() {
+		close(s.runStarted)
+	})
+	defer s.runDoneOnce.Do(func() {
+		close(s.runDone)
+	})
+
 	// 设置结果处理器
 	s.runner.OnResult = func(r *result.Result) {
 		atomic.AddInt32(&s.stats.CompletedScans, 1)
@@ -378,13 +396,16 @@ func (s *SDKScanner) run() error {
 
 			// 流式输出
 			if s.ResultChan != nil {
-				select {
-				case s.ResultChan <- r:
-				case <-s.ctx.Done():
-					return
-				default:
-					// 通道满了，跳过
-				}
+				ch := s.ResultChan
+				func() {
+					defer func() { _ = recover() }()
+					select {
+					case ch <- r:
+					case <-s.ctx.Done():
+						return
+					default:
+					}
+				}()
 			}
 
 			// 如果设置了发现漏洞即停止
@@ -457,7 +478,16 @@ func (s *SDKScanner) Stop() {
 
 // Close 关闭扫描器，释放资源
 func (s *SDKScanner) Close() {
-	s.cancel()
+	s.Stop()
+	if s.runStarted != nil {
+		select {
+		case <-s.runStarted:
+			if s.runDone != nil {
+				<-s.runDone
+			}
+		default:
+		}
+	}
 	s.closeChans()
 	s.results = nil
 }
