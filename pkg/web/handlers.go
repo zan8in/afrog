@@ -567,18 +567,21 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// expand 解析（详情默认全展开）
 	expandRaw := strings.TrimSpace(r.URL.Query().Get("expand"))
-	expandPoc, expandResult := true, true
+	expandPoc, expandResult, expandFingerprint := true, true, true
 	if expandRaw != "" {
-		expandPoc, expandResult = false, false
+		expandPoc, expandResult, expandFingerprint = false, false, false
 		for _, e := range strings.Split(expandRaw, ",") {
 			switch strings.ToLower(strings.TrimSpace(e)) {
 			case "pocinfo":
 				expandPoc = true
 			case "resultlist":
 				expandResult = true
+			case "fingerprint":
+				expandFingerprint = true
 			case "all":
 				expandPoc = true
 				expandResult = true
+				expandFingerprint = true
 			}
 		}
 	}
@@ -600,6 +603,17 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		FullTarget: row.FullTarget,
 		Severity:   row.Severity,
 		Created:    row.Created,
+	}
+	if expandFingerprint {
+		raw := strings.TrimSpace(row.FingerPrint)
+		if raw != "" {
+			var v any
+			if json.Unmarshal([]byte(raw), &v) == nil {
+				item.Fingerprint = v
+			} else {
+				item.Fingerprint = raw
+			}
+		}
 	}
 	if expandPoc {
 		item.PocInfo = row.PocInfo
