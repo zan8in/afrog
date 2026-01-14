@@ -557,7 +557,10 @@ func (runner *Runner) Execute() {
 		baseCtx = context.Background()
 	}
 	netTargetsStrict := append([]string(nil), idx.HostPorts...)
-	webTargets := runner.webProbe(baseCtx, idx)
+	var webTargets []string
+	if options.EnableWebProbe {
+		webTargets = runner.webProbe(baseCtx, idx)
+	}
 	if !runner.options.SDKMode {
 		webMetas := make([]WebMeta, 0, len(webTargets))
 		runner.webMu.Lock()

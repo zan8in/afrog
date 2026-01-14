@@ -127,6 +127,7 @@ type Options struct {
 	// Smart Control Concurrency
 	Smart                 bool
 	DisableFingerprint    bool
+	EnableWebProbe        bool
 	FingerprintFilterMode string
 
 	// number of times to retry a failed request (default 1)
@@ -272,6 +273,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
+		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
