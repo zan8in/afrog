@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     fofa: app="APACHE-Shiro"
-  tags: shiro,detect
+  tags: shiro,detect,fingerprint
   created: 2023/07/01
 
 set:
