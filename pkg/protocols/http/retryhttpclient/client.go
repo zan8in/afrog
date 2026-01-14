@@ -914,7 +914,19 @@ func CheckProtocol(host string) (string, error) {
 
 	now := time.Now()
 	probeMu.Lock()
-	if memo := probeMemos[key]; memo != nil {
+
+	// 1. Check for ongoing probe calls first.
+	// If a probe is already in progress, wait for it to complete and share the result.
+	// This prevents concurrent requests from being rejected by the attempts limit before they even start.
+	if c := probeCalls[key]; c != nil {
+		probeMu.Unlock()
+		<-c.done
+		return c.result, c.err
+	}
+
+	// 2. Check memo (history) for cached results or suppression.
+	memo := probeMemos[key]
+	if memo != nil {
 		if u := strings.TrimSpace(memo.okURL); u != "" {
 			probeMu.Unlock()
 			return u, nil
@@ -935,20 +947,12 @@ func CheckProtocol(host string) (string, error) {
 				return "", &checkProtocolSuppressedError{host: trimmed, until: until}
 			}
 		}
-	}
-	probeMu.Unlock()
-
-	probeMu.Lock()
-	if c := probeCalls[key]; c != nil {
-		probeMu.Unlock()
-		<-c.done
-		return c.result, c.err
-	}
-	memo := probeMemos[key]
-	if memo == nil {
+	} else {
 		memo = &probeMemo{}
 		probeMemos[key] = memo
 	}
+
+	// 3. Start a new probe call.
 	if checkProtocolMaxAttemptsPerWindow > 0 {
 		if memo.windowStart.IsZero() || now.Sub(memo.windowStart) >= checkProtocolAttemptWindow {
 			memo.windowStart = now
@@ -976,35 +980,36 @@ func CheckProtocol(host string) (string, error) {
 	c.err = err
 
 	probeMu.Lock()
-	if memo := probeMemos[key]; memo != nil {
-		if err == nil && strings.TrimSpace(result) != "" {
-			memo.okURL = result
-			memo.okAt = time.Now()
-			memo.failUntil = time.Time{}
-		} else {
-			attempt := memo.attempts
-			if attempt <= 0 {
-				attempt = 1
-			}
-			cooldown := checkProtocolFailCooldownBase
-			if attempt > 1 {
-				for i := 1; i < attempt; i++ {
-					if cooldown >= checkProtocolFailCooldownMax {
-						cooldown = checkProtocolFailCooldownMax
-						break
-					}
-					cooldown *= 2
-					if cooldown > checkProtocolFailCooldownMax {
-						cooldown = checkProtocolFailCooldownMax
-						break
-					}
+	// Update memo with result
+	// We need to fetch memo again? No, we have the pointer 'memo'.
+	// But is it safe? Yes, probeMemos[key] still points to it (unless deleted, but we don't delete memos).
+	if err == nil && strings.TrimSpace(result) != "" {
+		memo.okURL = result
+		memo.okAt = time.Now()
+		memo.failUntil = time.Time{}
+	} else {
+		attempt := memo.attempts
+		if attempt <= 0 {
+			attempt = 1
+		}
+		cooldown := checkProtocolFailCooldownBase
+		if attempt > 1 {
+			for i := 1; i < attempt; i++ {
+				if cooldown >= checkProtocolFailCooldownMax {
+					cooldown = checkProtocolFailCooldownMax
+					break
+				}
+				cooldown *= 2
+				if cooldown > checkProtocolFailCooldownMax {
+					cooldown = checkProtocolFailCooldownMax
+					break
 				}
 			}
-			if cooldown <= 0 {
-				cooldown = 30 * time.Second
-			}
-			memo.failUntil = time.Now().Add(cooldown)
 		}
+		if cooldown <= 0 {
+			cooldown = 30 * time.Second
+		}
+		memo.failUntil = time.Now().Add(cooldown)
 	}
 	delete(probeCalls, key)
 	probeMu.Unlock()
