@@ -30,7 +30,7 @@ func (report *Report) defaultHmtl(line string) string {
 		htResult.PocInfo.Info.Name, htResult.PocInfo.Info.Author, htResult.PocInfo.Info.Severity,
 	)
 	if len(htResult.PocInfo.Info.Description) > 0 {
-		info += "<br/><b>description:</b> " + strings.ReplaceAll(htResult.PocInfo.Info.Description, "\n", "<br/>")
+		info += "<br/><b>description:</b><br/>" + strings.ReplaceAll(htResult.PocInfo.Info.Description, "\n", "<br/>")
 	}
 	if len(htResult.PocInfo.Info.Reference) > 0 {
 		info += "<br/><b>reference:</b> "
