@@ -1,8 +1,10 @@
 package gox
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "gitee.com/chunanyong/dm"
 	urlutil "github.com/zan8in/pins/url"
@@ -60,33 +62,17 @@ func dameng_weak_login(target string, variableMap map[string]any) error {
 }
 
 func damengAuthAttempt(host, username, password string) bool {
-	dsn := fmt.Sprintf("dm://%s:%s@%s?connectTimeout=3000", username, password, host)
+	dsn := fmt.Sprintf("dm://%s:%s@%s?connectTimeout=5000", username, password, host)
 	db, err := sql.Open("dm", dsn)
 	if err != nil {
 		return false
 	}
 	defer db.Close()
 
-	// Set a timeout for the Ping operation
-	// Although connectTimeout is set in DSN, Ping context is better if supported,
-	// but sql.DB.Ping doesn't take context. sql.DB.PingContext does.
-	// However, simple Ping is fine for now as we set connectTimeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Create a channel to handle Ping timeout manually if driver doesn't respect it well
-	// But usually drivers do. Let's trust the driver for now or use PingContext.
-
-	// Using PingContext with timeout
-	// db.PingContext is available in Go 1.8+
-	// We need a context
-	// ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	// defer cancel()
-	// err = db.PingContext(ctx)
-
-	// But to keep it simple and match imports (I didn't import context), I'll stick to Ping.
-	// Re-checking imports, I didn't import context. Let's add it if I need it.
-	// Or just rely on connectTimeout in DSN.
-
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	return err == nil
 }
 

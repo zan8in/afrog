@@ -1,21 +1,21 @@
-id: ftp-weak-login
+id: imap-weak-login
 
 info:
-  name: FTP Weak Login
+  name: IMAP Weak Login
   author: zan8in
   severity: high
   verified: true
   description: |-
-    FTP weak credentials were discovered (dictionary brute-force in go).
-  tags: network,ftp,default-login,weak-login
-  requires: [ftp]
+    IMAP weak credentials were discovered (dictionary brute-force in go).
+  tags: network,imap,default-login,weak-login
+  requires: [imap]
   created: 2026/01/16
 
 rules:
   r0:
     request:
       type: go
-      data: ftp-weak-login
+      data: imap-weak-login
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex
