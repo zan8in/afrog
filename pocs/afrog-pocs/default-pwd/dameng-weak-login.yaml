@@ -1,0 +1,28 @@
+id: dameng-weak-login
+
+info:
+  name: Dameng Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Dameng database weak credentials were discovered (dictionary brute-force in go).
+  tags: network,db,dameng,default-login,weak-login
+  requires: [dameng]
+  requires-mode: opportunistic
+  created: 2026/01/16
+
+rules:
+  r0:
+    request:
+      type: go
+      data: dameng-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()
