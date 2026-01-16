@@ -1,21 +1,21 @@
-id: dameng-weak-login
+id: ftp-weak-login
 
 info:
-  name: Dameng Weak Login
+  name: FTP Weak Login
   author: zan8in
   severity: high
   verified: true
   description: |-
-    Dameng database weak credentials were discovered (dictionary brute-force in go).
-  tags: network,db,dameng,default-login,weak-login
-  requires: [dameng]
+    FTP weak credentials were discovered (dictionary brute-force in go).
+  tags: network,ftp,default-login,weak-login
+  # requires: [ftp]
   created: 2026/01/16
 
 rules:
   r0:
     request:
       type: go
-      data: dameng-weak-login
+      data: ftp-weak-login
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex
