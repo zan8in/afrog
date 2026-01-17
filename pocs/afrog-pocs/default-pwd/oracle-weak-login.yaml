@@ -1,0 +1,27 @@
+id: oracle-weak-login
+
+info:
+  name: Oracle Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    Oracle weak credentials were discovered (dictionary brute-force in go).
+  tags: network,oracle,default-login,weak-login
+  # requires: [oracle]
+  created: 2026/01/17
+
+rules:
+  r0:
+    request:
+      type: go
+      data: oracle-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>[^;]*);service=(?P<service>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()
