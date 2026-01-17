@@ -8,7 +8,7 @@ info:
   description: |-
     Oracle weak credentials were discovered (dictionary brute-force in go).
   tags: network,oracle,default-login,weak-login
-  # requires: [oracle]
+  requires: [oracle]
   created: 2026/01/17
 
 rules:

@@ -1,0 +1,27 @@
+id: pop3-weak-login
+
+info:
+  name: POP3 Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    POP3 weak credentials were discovered (dictionary brute-force in go).
+  tags: network,pop3,default-login,weak-login
+  requires: [pop3]
+  created: 2026/01/17
+
+rules:
+  r0:
+    request:
+      type: go
+      data: pop3-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()

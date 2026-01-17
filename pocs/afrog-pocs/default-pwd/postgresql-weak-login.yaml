@@ -1,0 +1,28 @@
+id: postgresql-weak-login
+
+info:
+  name: PostgreSQL Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    PostgreSQL weak credentials were discovered (dictionary brute-force in go).
+  tags: network,postgresql,default-login,weak-login
+  requires: [postgresql]
+  created: 2026/01/17
+
+rules:
+  r0:
+    request:
+      type: go
+      data: postgresql-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>[^;]*);db=(?P<db>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+          db: ext["db"]
+
+expression: r0()
