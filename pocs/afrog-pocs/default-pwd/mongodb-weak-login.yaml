@@ -1,21 +1,21 @@
-id: memcached-weak-login
+id: mongodb-weak-login
 
 info:
-  name: Memcached Weak Login
+  name: MongoDB Weak Login
   author: zan8in
   severity: high
   verified: true
   description: |-
-    Memcached weak credentials or unauthorized access were discovered (dictionary brute-force in go).
-  tags: network,memcached,default-login,weak-login
-  requires: [memcached]
-  created: 2026/01/16
+    MongoDB weak credentials or unauthorized access were discovered (dictionary brute-force in go).
+  tags: network,mongodb,default-login,weak-login
+  requires: [mongodb]
+  created: 2026/01/17
 
 rules:
   r0:
     request:
       type: go
-      data: memcached-weak-login
+      data: mongodb-weak-login
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex
