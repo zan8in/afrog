@@ -1,0 +1,28 @@
+id: ssh-weak-login
+
+info:
+  name: SSH Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    SSH weak credentials were discovered (dictionary brute-force in go).
+    ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -p 22222 root@yourip
+  tags: network,ssh,default-login,weak-login
+  requires: [ssh]
+  created: 2026/01/17
+
+rules:
+  r0:
+    request:
+      type: go
+      data: ssh-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()
