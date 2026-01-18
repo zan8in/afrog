@@ -8,7 +8,7 @@ info:
   description: |-
     ZooKeeper digest weak credentials were discovered (dictionary brute-force in go).
   tags: network,zookeeper,default-login,weak-login
-  # requires: [zookeeper]
+  requires: [zookeeper]
   created: 2026/01/18
 
 rules:
