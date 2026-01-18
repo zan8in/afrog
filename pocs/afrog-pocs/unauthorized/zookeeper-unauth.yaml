@@ -11,6 +11,8 @@ info:
   reference:
     - https://zookeeper.apache.org/security.html
   tags: network,zookeeper,unauth
+  created: 2026/01/09
+  requires: [zookeeper]
 
 set:
   host: request.url.host

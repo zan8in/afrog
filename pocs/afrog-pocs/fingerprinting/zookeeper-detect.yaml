@@ -23,6 +23,27 @@ rules:
         - read:
             read-size: 4096
             read-timeout: 3
-            read-until: "\n"
-    expression: response.raw.bcontains(b"imok")
-expression: r0()
+    expression: response.raw.bcontains(b"imok") || response.raw.ibcontains(b"not in the whitelist") || response.raw.ibcontains(b"not currently serving requests")
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "stat\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+    expression: response.raw.ibcontains(b"zookeeper version")
+  r2:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "envi\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+    expression: response.raw.ibcontains(b"zookeeper.version")
+expression: r0() || r1() || r2()

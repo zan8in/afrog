@@ -1,0 +1,27 @@
+id: winrm-weak-login
+
+info:
+  name: WinRM Weak Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    WinRM weak credentials were discovered (dictionary brute-force in go).
+  tags: network,winrm,default-login,weak-login
+  requires: [winrm]
+  created: 2026/01/18
+
+rules:
+  r0:
+    request:
+      type: go
+      data: winrm-weak-login
+    expression: response.raw.bcontains(b"success;")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
+          username: ext["username"]
+          password: ext["password"]
+
+expression: r0()
