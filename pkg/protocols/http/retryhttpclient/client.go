@@ -3,6 +3,7 @@ package retryhttpclient
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -138,14 +139,26 @@ func Init(opt *Options) (err error) {
 	if len(strings.TrimSpace(opt.Proxy)) > 0 {
 		if u, perr := url.Parse(opt.Proxy); perr == nil {
 			switch strings.ToLower(u.Scheme) {
-			case "http", "https":
-				t1 := &http.Transport{Proxy: http.ProxyURL(u)}
-				t2 := &http.Transport{Proxy: http.ProxyURL(u)}
+			case "http", "https", "socks5":
 				if RtryNoRedirect != nil && RtryNoRedirect.HTTPClient != nil {
-					RtryNoRedirect.HTTPClient.Transport = t1
+					if t, ok := RtryNoRedirect.HTTPClient.Transport.(*http.Transport); ok {
+						t.Proxy = http.ProxyURL(u)
+						if t.TLSClientConfig == nil {
+							t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+						} else {
+							t.TLSClientConfig.InsecureSkipVerify = true
+						}
+					}
 				}
 				if RtryRedirect != nil && RtryRedirect.HTTPClient != nil {
-					RtryRedirect.HTTPClient.Transport = t2
+					if t, ok := RtryRedirect.HTTPClient.Transport.(*http.Transport); ok {
+						t.Proxy = http.ProxyURL(u)
+						if t.TLSClientConfig == nil {
+							t.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+						} else {
+							t.TLSClientConfig.InsecureSkipVerify = true
+						}
+					}
 				}
 			}
 		}
