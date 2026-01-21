@@ -196,6 +196,15 @@ r1: toLower("Admin")
 admin
 ```
 
+### toUtf8
+
+将字符串或字节流转换为 UTF-8 字符串
+
+```
+toUtf8(response.body).icontains("致远")
+toUtf8("中文")
+```
+
 ### md5
 
 md5 加密
@@ -1058,5 +1067,4 @@ afrog -validate pocs/cve-2024-1061.yaml
 ```
 afrog -validate pocs/
 ```
-
 

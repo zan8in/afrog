@@ -151,6 +151,26 @@ var (
 					return types.String(strings.ToLower(string(v)))
 				},
 			},
+			&functions.Overload{
+				Operator: "toUtf8_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toUtf8_string", value.Type())
+					}
+					return types.String(utils.Str2UTF8(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "toUtf8_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toUtf8_bytes", value.Type())
+					}
+					return types.String(utils.Str2UTF8(string(v)))
+				},
+			},
 
 			// []byte
 			&functions.Overload{

@@ -630,8 +630,8 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	// respbody gbk to utf8 encoding
 	utf8RespBody := ""
 	if len(respBody) > 0 {
-		utf8RespBody = utils.Str2UTF8(string(respBody))
-		// utf8RespBody := string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
+		// utf8RespBody = utils.Str2UTF8(string(respBody))
+		utf8RespBody = string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
 	}
 
 	writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
