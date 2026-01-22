@@ -1101,13 +1101,15 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 		}
 		for i, pr := range c.Result.AllPocResult {
 			idx := i + 1
-			gologger.Info().Msgf("\r\n[%d][%s] Dumped Request\n", idx, pocID)
+			gologger.Print().Msgf("\n")
+			gologger.Info().Msgf("[%d][%s] Dumped Request\n", idx, pocID)
 			if pr != nil && pr.ResultRequest != nil {
 				gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(pr.ResultRequest.GetRaw())))
 			} else {
 				gologger.Print().Msgf("%s\n", "")
 			}
-			gologger.Info().Msgf("\r\n[%d][%s] Dumped Response\n", idx, pocID)
+			gologger.Print().Msgf("\n")
+			gologger.Info().Msgf("[%d][%s] Dumped Response\n", idx, pocID)
 			if pr != nil && pr.ResultResponse != nil {
 				gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(pr.ResultResponse.GetRaw())))
 			} else {
