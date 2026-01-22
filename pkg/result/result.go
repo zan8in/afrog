@@ -110,12 +110,10 @@ func (r *Result) Debug() {
 
 	for k, v := range r.AllPocResult {
 		k++
-		gologger.Print().Msgf("\n")
-		gologger.Info().Msgf("[%d][%s] Dumped Request\n", k, r.PocInfo.Id)
+		gologger.Info().Msgf("\r\n[%d][%s] Dumped Request\n", k, r.PocInfo.Id)
 		gologger.Print().Msgf("%s\n", v.ResultRequest.GetRaw())
 
-		gologger.Print().Msgf("\n")
-		gologger.Info().Msgf("[%d][%s] Dumped Response\n", k, r.PocInfo.Id)
+		gologger.Info().Msgf("\r\n[%d][%s] Dumped Response\n", k, r.PocInfo.Id)
 		gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(v.ResultResponse.GetRaw())))
 	}
 

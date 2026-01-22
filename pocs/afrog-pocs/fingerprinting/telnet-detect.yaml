@@ -12,6 +12,7 @@ info:
 
 set:
   host: request.url.host
+  port: request.url.port
 rules:
   r0:
     request:
@@ -20,6 +21,66 @@ rules:
       steps:
         - read:
             read-size: 4096
-            read-timeout: 3
-    expression: response.raw.bcontains(b"\xff\xfb") || response.raw.bcontains(b"\xff\xfd") || response.raw.ibcontains(b"telnet")
+            read-timeout: 10
+    expression: |
+      response.raw.bcontains(b"\xff\xfb") || 
+      response.raw.bcontains(b"\xff\xfd") || 
+      response.raw.ibcontains(b"telnet") ||
+      response.raw.ibcontains(b"login:") ||
+      response.raw.ibcontains(b"password:") ||
+      response.raw.ibcontains(b"username:") ||
+      response.raw.ibcontains(b"welcome") ||
+      response.raw.ibcontains(b"ubuntu") ||
+      response.raw.ibcontains(b"centos") ||
+      response.raw.ibcontains(b"debian") ||
+      response.raw.ibcontains(b"fedora") ||
+      response.raw.ibcontains(b"openbsd") ||
+      response.raw.ibcontains(b"freebsd") ||
+      response.raw.ibcontains(b"netbsd") ||
+      response.raw.ibcontains(b"sunos") ||
+      response.raw.ibcontains(b"aix") ||
+      response.raw.ibcontains(b"hp-ux") ||
+      response.raw.ibcontains(b"irix") ||
+      response.raw.ibcontains(b"osf1") ||
+      response.raw.ibcontains(b"os/2") ||
+      response.raw.ibcontains(b"windows") ||
+      response.raw.ibcontains(b"microsoft") ||
+      response.raw.ibcontains(b"cygwin") ||
+      response.raw.ibcontains(b"mingw") ||
+      response.raw.ibcontains(b"msys") ||
+      response.raw.ibcontains(b"git-bash") ||
+      response.raw.ibcontains(b"bash") ||
+      response.raw.ibcontains(b"sh") ||
+      response.raw.ibcontains(b"ksh") ||
+      response.raw.ibcontains(b"cisco") ||
+      response.raw.ibcontains(b"huawei") ||
+      response.raw.ibcontains(b"juniper") ||
+      response.raw.ibcontains(b"h3c") ||
+      response.raw.ibcontains(b"alcatel") ||
+      response.raw.ibcontains(b"last login") ||
+      response.raw.ibcontains(b"authorization") ||
+      response.raw.ibcontains(b"hp") ||
+      response.raw.ibcontains(b"d-link") ||
+      response.raw.ibcontains(b"tp-link") ||
+      response.raw.ibcontains(b"netgear") ||
+      response.raw.ibcontains(b"dell") ||
+      response.raw.ibcontains(b"lenovo") ||
+      response.raw.ibcontains(b"ibm") ||
+      response.raw.ibcontains(b"hp") ||
+      response.raw.ibcontains(b"fujitsu") ||
+      response.raw.ibcontains(b"toshiba") ||
+      response.raw.ibcontains(b"acer") ||
+      response.raw.ibcontains(b"asus") ||
+      response.raw.ibcontains(b"msi") ||
+      response.raw.ibcontains(b"lenovo") ||
+      response.raw.ibcontains(b"thinkpad") ||
+      response.raw.ibcontains(b"thinkcentre") ||
+      response.raw.ibcontains(b"thinkpad") ||
+      response.raw.ibcontains(b"thinkcentre") ||
+      response.raw.ibcontains(b"thinkpad") ||
+      response.raw.ibcontains(b"thinkcentre") ||
+      response.raw.ibcontains(b"solaris") ||
+      response.raw.ibcontains(b"ios") ||
+      response.raw.ibcontains(b"busyBox")
+
 expression: r0()

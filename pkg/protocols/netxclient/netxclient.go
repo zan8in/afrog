@@ -431,7 +431,7 @@ func (s *ConnSession) Receive(readSize int, readTimeout time.Duration) ([]byte, 
 			out = append(out, buf[:n]...)
 		}
 		if rerr != nil {
-			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() {
 				break
 			}
 			if len(out) > 0 {
@@ -503,7 +503,7 @@ func (s *ConnSession) ReceiveUntil(readSize int, readTimeout time.Duration, unti
 			continue
 		}
 		if rerr != nil {
-			if ne, ok := rerr.(net.Error); ok && ne.Timeout() && len(out) > 0 {
+			if ne, ok := rerr.(net.Error); ok && ne.Timeout() {
 				break
 			}
 			if len(out) > 0 {
