@@ -85,6 +85,9 @@ func setResponse(data string, vmap map[string]any) {
 		Raw:  []byte(data),
 		Body: []byte(data),
 	}
+	if vmap != nil {
+		vmap["response_text"] = utils.Str2UTF8(data)
+	}
 }
 
 func setFullTarget(data string, vmap map[string]any) {
@@ -182,12 +185,15 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 	resp.Body.Close()
 	respBody := buf.Bytes()
 
-	utf8RespBody := ""
+	responseText := ""
 	if len(respBody) > 0 {
-		utf8RespBody = utils.Str2UTF8(string(respBody))
+		responseText = utils.Str2UTF8(string(respBody))
 	}
 
-	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+	if variableMap != nil {
+		variableMap["response_text"] = responseText
+	}
+	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, respBody, milliseconds)
 	retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
 	if variableMap != nil {
 		if resp != nil && resp.Request != nil && resp.Request.URL != nil {
@@ -340,11 +346,12 @@ func FetchLimited(method string, target string, body []byte, headers map[string]
 	}
 
 	if variableMap != nil {
-		utf8RespBody := ""
+		responseText := ""
 		if len(data) > 0 {
-			utf8RespBody = utils.Str2UTF8(string(data))
+			responseText = utils.Str2UTF8(string(data))
 		}
-		retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+		variableMap["response_text"] = responseText
+		retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, data, milliseconds)
 		retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
 		if resp != nil && resp.Request != nil && resp.Request.URL != nil {
 			variableMap["fulltarget"] = resp.Request.URL.String()

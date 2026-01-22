@@ -50,7 +50,7 @@ func (pr *PocResult) ReadFullResultRequestInfo() string {
 }
 
 func (pr *PocResult) ReadFullResultResponseInfo() string {
-	return string(pr.ResultResponse.GetRaw())
+	return utils.Str2UTF8(string(pr.ResultResponse.GetRaw()))
 }
 
 func (r *Result) ReadPocInfo() string {
@@ -114,7 +114,7 @@ func (r *Result) Debug() {
 		gologger.Print().Msgf("%s\n", v.ResultRequest.GetRaw())
 
 		gologger.Info().Msgf("[%d][%s] Dumped Response\n", k, r.PocInfo.Id)
-		gologger.Print().Msgf("%s\n", v.ResultResponse.GetRaw())
+		gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(v.ResultResponse.GetRaw())))
 	}
 
 }

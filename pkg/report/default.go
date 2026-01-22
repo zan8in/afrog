@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	timeutil "github.com/zan8in/pins/time"
 )
 
@@ -78,7 +79,7 @@ func (report *Report) defaultHmtl(line string) string {
 		// respraw := []byte{}
 		// if v.ResultResponse.Url != nil {
 		reqraw := v.ResultRequest.GetRaw()
-		respraw := v.ResultResponse.GetRaw()
+		respraw := utils.Str2UTF8(string(v.ResultResponse.GetRaw()))
 		// }
 
 		fullurl := xssfilter(v.FullTarget)

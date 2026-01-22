@@ -14,6 +14,7 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/rawhttp"
 )
 
@@ -208,9 +209,11 @@ func (r *RawHttp) RawHttpRequest(request, baseurl string, header []string, varia
 	}
 
 	tempResultResponse.Body = bodyOut
-	tempResultResponse.Raw = []byte(string(dumpedResponseHeaders) + "\n" + string(bodyOut))
+	rawPrefix := append(dumpedResponseHeaders, '\n')
+	tempResultResponse.Raw = append(rawPrefix, bodyOut...)
 	tempResultResponse.RawHeader = dumpedResponseHeaders
 	variableMap["response"] = tempResultResponse
+	variableMap["response_text"] = utils.Str2UTF8(string(bodyOut))
 
 	tempResultRequest := &proto.Request{}
 	tempResultRequest.Method = rhttp.Method

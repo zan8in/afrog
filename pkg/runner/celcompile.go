@@ -23,6 +23,7 @@ var (
 		cel.Declarations(
 			decls.NewVar("request", decls.NewObjectType("proto.Request")),
 			decls.NewVar("response", decls.NewObjectType("proto.Response")),
+			decls.NewVar("response_text", decls.String),
 			// decls.NewVar("reverse", decls.NewObjectType("proto.Reverse")),
 		),
 		cel.Declarations(

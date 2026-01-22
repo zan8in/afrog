@@ -627,14 +627,13 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	resp.Body.Close()
 	respBody := buf.Bytes()
 
-	// respbody gbk to utf8 encoding
-	utf8RespBody := ""
+	responseText := ""
 	if len(respBody) > 0 {
-		// utf8RespBody = utils.Str2UTF8(string(respBody))
-		utf8RespBody = string(respBody) // fixed issue with https://github.com/zan8in/afrog/v3/issues/68
+		responseText = utils.Str2UTF8(string(respBody))
 	}
 
-	writeHTTPResponseToVars(variableMap, resp, utf8RespBody, milliseconds)
+	variableMap["response_text"] = responseText
+	writeHTTPResponseToVars(variableMap, resp, respBody, milliseconds)
 	writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
 
 	if resp != nil && resp.Request != nil && resp.Request.URL != nil {
@@ -646,7 +645,7 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	return nil
 }
 
-func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body string, latency int64) {
+func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
 	protoResp := &proto.Response{}
 	protoResp.Status = int32(resp.StatusCode)
 	protoResp.Url = url2ProtoUrl(resp.Request.URL)
@@ -662,14 +661,15 @@ func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, bo
 	}
 	protoResp.Headers = newRespHeader
 	protoResp.ContentType = resp.Header.Get("Content-Type")
-	protoResp.Body = []byte(body)
-	protoResp.Raw = []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n" + body)
+	protoResp.Body = body
+	rawPrefix := []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n")
+	protoResp.Raw = append(rawPrefix, body...)
 	protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
 	protoResp.Latency = latency
 	variableMap["response"] = protoResp
 }
 
-func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body string, latency int64) {
+func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
 	writeHTTPResponseToVars(variableMap, resp, body, latency)
 }
 

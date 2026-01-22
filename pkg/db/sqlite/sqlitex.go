@@ -14,6 +14,7 @@ import (
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 	randutil "github.com/zan8in/pins/rand"
 )
@@ -126,10 +127,11 @@ func addx(r *result.Result) error {
 			if pocResult != nil && pocResult.ResultResponse != nil && pocResult.ResultResponse.Raw != nil {
 				respRaw = pocResult.ResultResponse.Raw
 			}
+			responseText := utils.Str2UTF8(string(respRaw))
 			pocList = append(pocList, db2.PocResult{
 				FullTarget: pocResult.FullTarget,
 				Request:    string(reqRaw),
-				Response:   string(respRaw),
+				Response:   responseText,
 				Other:      db2.Other{Latency: pocResult.ResultResponse.GetLatency()},
 			})
 		}
@@ -172,10 +174,11 @@ func InsertResultAndReturnID(r *result.Result) (int64, error) {
 			if pocResult != nil && pocResult.ResultResponse != nil && pocResult.ResultResponse.Raw != nil {
 				respRaw = pocResult.ResultResponse.Raw
 			}
+			responseText := utils.Str2UTF8(string(respRaw))
 			pocList = append(pocList, db2.PocResult{
 				FullTarget: pocResult.FullTarget,
 				Request:    string(reqRaw),
-				Response:   string(respRaw),
+				Response:   responseText,
 				Other:      db2.Other{Latency: pocResult.ResultResponse.GetLatency()},
 			})
 		}
@@ -231,10 +234,11 @@ func InsertResultWithTaskID(r *result.Result, taskID string) (int64, error) {
 			if pocResult != nil && pocResult.ResultResponse != nil && pocResult.ResultResponse.Raw != nil {
 				respRaw = pocResult.ResultResponse.Raw
 			}
+			responseText := utils.Str2UTF8(string(respRaw))
 			pocList = append(pocList, db2.PocResult{
 				FullTarget: pocResult.FullTarget,
 				Request:    string(reqRaw),
-				Response:   string(respRaw),
+				Response:   responseText,
 				Other:      db2.Other{Latency: pocResult.ResultResponse.GetLatency()},
 			})
 		}
@@ -381,6 +385,9 @@ func SelectX(severity, keyword, page string) ([]db2.ResultData, error) {
 		data[key].Severity = strings.ToUpper(item.Severity)
 
 		json.Unmarshal([]byte(item.Result), &data[key].ResultList)
+		for i := range data[key].ResultList {
+			data[key].ResultList[i].Response = utils.Str2UTF8(data[key].ResultList[i].Response)
+		}
 		data[key].Result = ""
 
 		po := poc.Poc{}
@@ -459,6 +466,9 @@ func SelectPage(severity, keyword string, page, pageSize int, expandPoc, expandR
 
 		if expandResult {
 			_ = json.Unmarshal([]byte(item.Result), &data[key].ResultList)
+			for i := range data[key].ResultList {
+				data[key].ResultList[i].Response = utils.Str2UTF8(data[key].ResultList[i].Response)
+			}
 		}
 		data[key].Result = ""
 
@@ -496,6 +506,9 @@ func GetByID(id string, expandPoc, expandResult bool) (db2.ResultData, error) {
 
 	if expandResult {
 		_ = json.Unmarshal([]byte(row.Result), &row.ResultList)
+		for i := range row.ResultList {
+			row.ResultList[i].Response = utils.Str2UTF8(row.ResultList[i].Response)
+		}
 	}
 	row.Result = ""
 

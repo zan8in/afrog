@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	fileutil "github.com/zan8in/pins/file"
 	timeutil "github.com/zan8in/pins/time"
 )
@@ -175,7 +176,7 @@ func (jr *JsonReport) JsonContent() *JsonResult {
 		for _, pocResult := range rst.AllPocResult {
 			jresult.PocResult = append(jresult.PocResult, JsonReqResp{
 				Request:  string(pocResult.ResultRequest.Raw),
-				Response: string(pocResult.ResultResponse.Raw),
+				Response: utils.Str2UTF8(string(pocResult.ResultResponse.Raw)),
 			})
 		}
 	}
