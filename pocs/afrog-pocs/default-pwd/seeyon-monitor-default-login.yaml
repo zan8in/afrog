@@ -1,0 +1,28 @@
+id: seeyon-monitor-default-login
+
+info:
+  name: Seeyon A8 Management Monitor - Default Login
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    A8 Management Monitor 
+    1.登录页面：/seeyon/management/index.jsp
+    2.默认密码: WLCCYBD@SEEYON
+    fofa: app="致远互联-OA"
+  tags: seeyon,oa,default-login
+  created: 2023/10/30
+  requires: [seeyon]
+  requires-mode: opportunistic
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /seeyon/management/index.jsp
+      body: password=WLCCYBD@SEEYON
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'<title>A8 Management Monitor</title>') &&
+      response.body.bcontains(b'Connection Pooling')
+expression: r0()

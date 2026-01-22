@@ -15,6 +15,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
 	"github.com/zan8in/afrog/v3/pkg/protocols/raw"
+	"github.com/zan8in/afrog/v3/pkg/result"
 )
 
 type Executor interface {
@@ -70,6 +71,7 @@ func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, 
 		defer sess.Close()
 
 		lastWrite := ""
+		stepResults := make([]*result.PocResult, 0)
 		for _, st := range rule.Request.Steps {
 			if st.Write != nil {
 				data := st.Write.Data
@@ -123,6 +125,12 @@ func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, 
 				resp := &proto.Response{Raw: body, Body: body}
 				vars["response"] = resp
 				vars["fulltarget"] = sess.Address()
+				reqRaw := sess.Address()
+				if lastWrite != "" {
+					reqRaw += "\r\n" + lastWrite
+				}
+				req := &proto.Request{Raw: []byte(reqRaw), Body: []byte(lastWrite)}
+				stepResults = append(stepResults, &result.PocResult{ResultRequest: req, ResultResponse: resp})
 
 				saveAs := strings.TrimSpace(st.Read.SaveAs)
 				if saveAs != "" {
@@ -138,6 +146,9 @@ func (e NetExecutor) Execute(target string, rule poc.Rule, opt *config.Options, 
 			}
 		}
 
+		if len(stepResults) > 0 {
+			vars["__step_poc_results"] = stepResults
+		}
 		if vars["response"] == nil {
 			vars["response"] = &proto.Response{Raw: []byte{}, Body: []byte{}}
 		}

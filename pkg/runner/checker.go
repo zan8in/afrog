@@ -160,6 +160,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			rule.Request = cloneRuleRequest(baseReq)
 			c.preRenderRuleRequest(&rule.Request)
 
+			delete(c.VariableMap, "__step_poc_results")
 			reqType := strings.ToLower(rule.Request.Type)
 			if len(rule.Request.Raw) > 0 {
 				err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
@@ -224,6 +225,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				ruleAttempt.Request = cloneRuleRequest(baseReq)
 				c.preRenderRuleRequest(&ruleAttempt.Request)
 
+				delete(c.VariableMap, "__step_poc_results")
 				reqType := strings.ToLower(ruleAttempt.Request.Type)
 				if len(ruleAttempt.Request.Raw) > 0 {
 					iterErr = RawHTTPExecutor{}.Execute(target, ruleAttempt, c.Options, c.VariableMap)
@@ -296,21 +298,39 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.UpdateVariableMapExtractor(rule.Extractors)
 		}
 
-		pocRstTemp := result.PocResult{IsVul: isMatch, BruteTruncated: bruteTruncated, BruteRequests: bruteRequests}
-		if c.VariableMap["response"] != nil {
-			pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
+		if stepResults, ok := c.VariableMap["__step_poc_results"].([]*result.PocResult); ok && len(stepResults) > 0 {
+			if c.VariableMap["fulltarget"] != nil {
+				fullTarget := c.VariableMap["fulltarget"].(string)
+				c.Result.FullTarget = fullTarget
+				for _, sr := range stepResults {
+					sr.FullTarget = fullTarget
+				}
+			}
+			if c.VariableMap["target"] != nil {
+				c.Result.Target = c.VariableMap["target"].(string)
+			}
+			last := stepResults[len(stepResults)-1]
+			last.IsVul = isMatch
+			last.BruteTruncated = bruteTruncated
+			last.BruteRequests = bruteRequests
+			c.Result.AllPocResult = append(c.Result.AllPocResult, stepResults...)
+		} else {
+			pocRstTemp := result.PocResult{IsVul: isMatch, BruteTruncated: bruteTruncated, BruteRequests: bruteRequests}
+			if c.VariableMap["response"] != nil {
+				pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
+			}
+			if c.VariableMap["request"] != nil {
+				pocRstTemp.ResultRequest = c.VariableMap["request"].(*proto.Request)
+			}
+			if c.VariableMap["fulltarget"] != nil {
+				pocRstTemp.FullTarget = c.VariableMap["fulltarget"].(string)
+				c.Result.FullTarget = c.VariableMap["fulltarget"].(string)
+			}
+			if c.VariableMap["target"] != nil {
+				c.Result.Target = c.VariableMap["target"].(string)
+			}
+			c.Result.AllPocResult = append(c.Result.AllPocResult, &pocRstTemp)
 		}
-		if c.VariableMap["request"] != nil {
-			pocRstTemp.ResultRequest = c.VariableMap["request"].(*proto.Request)
-		}
-		if c.VariableMap["fulltarget"] != nil {
-			pocRstTemp.FullTarget = c.VariableMap["fulltarget"].(string)
-			c.Result.FullTarget = c.VariableMap["fulltarget"].(string)
-		}
-		if c.VariableMap["target"] != nil {
-			c.Result.Target = c.VariableMap["target"].(string)
-		}
-		c.Result.AllPocResult = append(c.Result.AllPocResult, &pocRstTemp)
 
 		if rule.StopIfMismatch && !isMatch {
 			c.Result.IsVul = false

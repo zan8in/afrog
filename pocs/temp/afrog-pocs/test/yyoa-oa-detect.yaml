@@ -1,0 +1,42 @@
+id: yyoa-oa-detect
+
+info:
+  name: 致远 YYOA OA 检测
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    致远 YYOA OA 检测
+  reference:
+    - https://mp.weixin.qq.com/s/GbmIyGNB3Gd16n9RCCyPCg
+  tags: yyoa,oa,fingerprint
+  created: 2026/01/20
+
+rules:
+  r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /
+        - /yyoa
+    request:
+      method: GET
+      path: "{{p}}"
+      follow_redirects: true
+    expression: |
+      response.raw_header.bcontains(b'/yyoa') ||
+      response.body.bcontains(b'src="/yyoa/seeyonoa/common') && response.body.bcontains(b'src="seeyonoa/common')
+    extractors:
+      - type: regex
+        extractor:
+          title: '"<title>.* (?P<version>.*?)</title>".bsubmatch(response.body)'
+          v: title["version"]
+#   r1:
+#     request:
+#       method: GET
+#       path: /favicon.ico
+#     expression: response.status == 200 && faviconHash(response.body) == -187813927
+# expression: r0() || r1()
+expression: r0()
