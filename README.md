@@ -25,6 +25,10 @@
   <a href="https://github.com/zan8in/afrog/wiki/Afrog-PoC-规则编写权威指南">Afrog PoC 规则编写权威指南</a>
 </p>
 
+<p align="center">
+  <img src="images/星球优惠券.png" alt="Afrog 官方圈 - 知识星球优惠券" width="260">
+</p>
+
 ## PoC Contributors
 
 <div><table frame=void>
