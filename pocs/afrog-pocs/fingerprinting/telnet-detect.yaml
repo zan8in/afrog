@@ -81,6 +81,7 @@ rules:
       response.raw.ibcontains(b"thinkcentre") ||
       response.raw.ibcontains(b"solaris") ||
       response.raw.ibcontains(b"ios") ||
-      response.raw.ibcontains(b"busyBox")
+      response.raw.ibcontains(b"busyBox") ||
+      (port=="23" && length(response.raw) >=0)
 
 expression: r0()

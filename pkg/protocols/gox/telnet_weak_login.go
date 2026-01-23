@@ -28,7 +28,7 @@ func telnet_weak_login(target string, variableMap map[string]any) error {
 	usernames := []string{"root", "admin", "administrator", "user", "test", "guest", "support"}
 	passwords := []string{"", "root", "admin", "123456", "12345678", "password", "toor", "guest", "111111", "000000", "123123"}
 
-	maxTries := 200
+	maxTries := 60
 	if v := variableMap["max_tries"]; v != nil {
 		if n, ok := v.(int); ok && n > 0 {
 			maxTries = n
@@ -70,15 +70,15 @@ func telnetAuthAttempt(host, username, password string) bool {
 	}
 	defer conn.Close()
 
-	_ = conn.SetDeadline(time.Now().Add(12 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(8 * time.Second))
 	reader := bufio.NewReader(conn)
 
-	bannerRaw, _ := telnetReadSome(conn, reader, 4096, 1500*time.Millisecond)
+	bannerRaw, _ := telnetReadSome(conn, reader, 4096, 900*time.Millisecond)
 	banner := telnetSanitizeText(bannerRaw)
 
 	if strings.TrimSpace(banner) == "" {
 		_, _ = fmt.Fprintf(conn, "\r\n")
-		moreRaw, _ := telnetReadSome(conn, reader, 4096, 1500*time.Millisecond)
+		moreRaw, _ := telnetReadSome(conn, reader, 4096, 800*time.Millisecond)
 		banner += "\n" + telnetSanitizeText(moreRaw)
 	}
 
@@ -91,17 +91,17 @@ func telnetAuthAttempt(host, username, password string) bool {
 		_, _ = fmt.Fprintf(conn, "%s\r\n", username)
 	}
 
-	pwRaw, _ := telnetReadSome(conn, reader, 4096, 2000*time.Millisecond)
+	pwRaw, _ := telnetReadSome(conn, reader, 4096, 1200*time.Millisecond)
 	pwText := telnetSanitizeText(pwRaw)
 	if !telnetHasPasswordPrompt(pwText) && !telnetHasPasswordPrompt(banner) {
 		_, _ = fmt.Fprintf(conn, "\r\n")
-		pwRaw2, _ := telnetReadSome(conn, reader, 4096, 1500*time.Millisecond)
+		pwRaw2, _ := telnetReadSome(conn, reader, 4096, 900*time.Millisecond)
 		pwText += "\n" + telnetSanitizeText(pwRaw2)
 	}
 
 	_, _ = fmt.Fprintf(conn, "%s\r\n", password)
 
-	afterRaw, _ := telnetReadSome(conn, reader, 8192, 2500*time.Millisecond)
+	afterRaw, _ := telnetReadSome(conn, reader, 8192, 1500*time.Millisecond)
 	after := telnetSanitizeText(afterRaw)
 
 	if telnetHasFailure(after) || telnetHasLoginPrompt(after) || telnetHasPasswordPrompt(after) {
@@ -109,7 +109,7 @@ func telnetAuthAttempt(host, username, password string) bool {
 	}
 
 	_, _ = fmt.Fprintf(conn, "\r\n")
-	promptRaw, _ := telnetReadSome(conn, reader, 8192, 1500*time.Millisecond)
+	promptRaw, _ := telnetReadSome(conn, reader, 8192, 900*time.Millisecond)
 	prompt := telnetSanitizeText(promptRaw)
 
 	return telnetLooksLikeShell(after + "\n" + prompt)
