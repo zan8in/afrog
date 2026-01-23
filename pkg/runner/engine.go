@@ -277,7 +277,10 @@ func (c *openPortsCollector) Snapshot() map[string][]int {
 	return cp
 }
 
-func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}) bool {
+func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}, testMode bool) bool {
+	if testMode {
+		return false
+	}
 	if len(p.Info.Requires) == 0 {
 		return false
 	}
@@ -962,7 +965,7 @@ func (runner *Runner) Execute() {
 					break
 				}
 
-				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey) {
+				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey, runner.options.Test) {
 					runner.NotVulCallback()
 					continue
 				}

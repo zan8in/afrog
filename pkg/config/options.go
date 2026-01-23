@@ -129,6 +129,7 @@ type Options struct {
 	DisableFingerprint    bool
 	EnableWebProbe        bool
 	FingerprintFilterMode string
+	Test                  bool
 
 	// number of times to retry a failed request (default 1)
 	Retries int
@@ -295,6 +296,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("debug", "Debug",
 		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
+		flagSet.BoolVar(&options.Test, "test", false, "test mode (requires gating disabled)"),
 		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),
 		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
 		flagSet.StringVar(&options.Validate, "validate", "", "validate POC YAML syntax, support file or directory"),
