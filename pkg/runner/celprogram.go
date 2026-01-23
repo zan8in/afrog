@@ -394,7 +394,35 @@ var (
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to bmatches", rhs.Type())
 					}
 					re := regexp2.MustCompile(string(v1), 0)
-					if isMatch, err = re.MatchString(string([]byte(v2))); err != nil {
+					raw := string([]byte(v2))
+					if isMatch, err = re.MatchString(raw); err != nil {
+						return types.NewErr("%v", err)
+					}
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+					return types.Bool(isMatch)
+				},
+			},
+			&functions.Overload{
+				Operator: "string_rmatches_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					var isMatch = false
+					var err error
+
+					v1, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to rmatches", lhs.Type())
+					}
+					v2, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to rmatches", rhs.Type())
+					}
+					re := regexp2.MustCompile(string(v1), 0)
+					if isMatch, err = re.MatchString(string(v2)); err != nil {
+						return types.NewErr("%v", err)
+					}
+					if err != nil {
 						return types.NewErr("%v", err)
 					}
 					return types.Bool(isMatch)
@@ -706,7 +734,10 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 					// }
 
 					re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					if m, _ := re.FindStringMatch(string([]byte(v2))); m != nil {
+					raw := string([]byte(v2))
+					m, _ := re.FindStringMatch(raw)
+
+					if m != nil {
 						gps := m.Groups()
 						for n, gp := range gps {
 							if n == 0 {

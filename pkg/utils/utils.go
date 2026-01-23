@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -203,11 +204,36 @@ func Str2UTF8(str string) string {
 		return ""
 	}
 	if !utf8.ValidString(str) {
+		if strings.IndexByte(str, 0) != -1 {
+			return str
+		}
+		raw := []byte(str)
+		gbkPairs := 0
+		for i := 0; i+1 < len(raw); i++ {
+			b1 := raw[i]
+			b2 := raw[i+1]
+			if b1 >= 0x81 && b1 <= 0xFE && b2 >= 0x40 && b2 <= 0xFE && b2 != 0x7F {
+				gbkPairs++
+				i++
+			}
+		}
+		if gbkPairs == 0 {
+			return str
+		}
 		utf8Bytes, _ := io.ReadAll(transform.NewReader(
 			strings.NewReader(str),
 			simplifiedchinese.GBK.NewDecoder(),
 		))
-		return string(utf8Bytes)
+		decoded := string(utf8Bytes)
+		if !utf8.ValidString(decoded) {
+			return str
+		}
+		for _, r := range decoded {
+			if unicode.Is(unicode.Han, r) {
+				return decoded
+			}
+		}
+		return str
 	}
 	return str
 }

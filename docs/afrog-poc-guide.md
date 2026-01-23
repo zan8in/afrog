@@ -134,7 +134,7 @@ rules:
     request:
       method: GET
       path: /version
-    expression: response.status == 200 && "[0-9]+\\.[0-9]+".bmatches(response.body)
+    expression: response.status == 200 && "[0-9]+\\.[0-9]+".rmatches(response_text)
 
 expression: ping() && version()
 ```
@@ -255,8 +255,35 @@ rules:
 ### Expression 表达式
 Afrog 使用 CEL（Common Expression Language）表达式。
 常用对象与函数：
-- `response.status`, `response.body`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`
-- 字符串与字节匹配：`contains`/`icontains`/`matches`/`bmatches`/`bcontains`/`ibcontains` 等
+- `response.status`, `response.body`, `response_text`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`
+- 文本匹配（推荐）：`contains`/`icontains`/`matches`/`rmatches`/`submatch`
+- 字节匹配：`bcontains`/`ibcontains`/`bmatches`/`bsubmatch` 等
+
+最常见的迁移（解决“中文乱码/编码不一致导致提取失败”）：
+
+1) 从响应体里做正则提取（提取变量）
+
+旧写法（对 bytes 做正则）：
+```yaml
+'"(?P<title>.+)"'.bsubmatch(response.body)
+```
+
+新写法（对文本做正则，推荐）：
+```yaml
+'"(?P<title>.+)"'.submatch(response_text)
+```
+
+2) 从响应体里做正则判断（返回 True/False）
+
+旧写法（对 bytes 做正则）：
+```yaml
+"root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+```
+
+新写法（对文本做正则，推荐）：
+```yaml
+"root:.*?:[0-9]*:[0-9]*:".rmatches(response_text)
+```
 
 简单示例：
 ```yaml
@@ -272,8 +299,8 @@ expression: response.status == 200 && response.body.ibcontains(b"success") && re
 ```yaml
 expression: |
   response.status == 200 &&
-  "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body) &&
-  !response.body.ibcontains(b"error")
+  "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".rmatches(response_text) &&
+  !response_text.icontains("error")
 ```
 
 ### Extractors 数据提取器
@@ -290,7 +317,7 @@ rules:
       path: /profile
     expression: response.status == 200
     output:
-      web_title: '"<title>(?P<webtitle>.+)</title>".bsubmatch(response.body)'
+      web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
   r1:
     request:
       method: GET
@@ -308,7 +335,7 @@ rules:
       path: /api/config
     expression: response.status == 200
     output:
-      web_title: '"<title>(?P<webtitle>.+)</title>".bsubmatch(response.body)'
+      web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
       web_cookie: '"Set-Cookie: (?P<webcookie>.+)".bsubmatch(response.raw_header)'
 
   use_key:
@@ -317,7 +344,7 @@ rules:
       path: /api/admin?title={{web_title['webtitle']}}
       headers:
         Cookie: "{{web_cookie['webcookie']}}"
-    expression: response.status == 200 && response.body.icontains("admin")
+    expression: response.status == 200 && response_text.icontains("admin")
 ```
 
 Extractors 方式：
@@ -333,7 +360,7 @@ rules:
     extractors:
       - type: regex
         extractor:
-          web_title: '"<title>(?P<webtitle>.+)</title>".bsubmatch(response.body)'
+          web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
   r1:
     request:
       method: GET
@@ -353,7 +380,7 @@ rules:
     extractors:
       - type: regex
         extractor:
-          web_title: '"<title>(?P<webtitle>.+)</title>".bsubmatch(response.body)'
+          web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
           web_cookie: '"Set-Cookie: (?P<webcookie>.+)".bsubmatch(response.raw_header)'
 
   use_key:
@@ -362,7 +389,7 @@ rules:
       path: /api/admin?title={{web_title['webtitle']}}
       headers:
         Cookie: "{{web_cookie['webcookie']}}"
-    expression: response.status == 200 && response.body.icontains("admin")
+    expression: response.status == 200 && response_text.icontains("admin")
 ```
 
 ---
@@ -412,7 +439,10 @@ rules:
 
 ### 请求与响应变量
 - 请求变量（只读）：`request.url`, `request.url.host`, `request.url.path`, `request.url.query`
-- 响应变量：`response.status`, `response.body`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`, `response.raw`（字节流）
+- 响应变量：
+  - `response.body`：响应体 bytes（适合 `bcontains/bmatches/bsubmatch` 等字节函数）
+  - `response_text`：响应体文本 string（按响应的 charset 尝试解码，适合中文与正则提取，推荐用于 `icontains/rmatches/submatch`）
+  - `response.status`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`, `response.raw`（字节流）
 
 ---
 
@@ -438,7 +468,7 @@ rules:
     request:
       method: GET
       path: /login
-    expression: response.status == 200 && response.body.icontains("csrf_token")
+    expression: response.status == 200 && response_text.icontains("csrf_token")
 
   step2:
     request:
@@ -767,7 +797,7 @@ expression: r0()
 - TCP 请求：`type: tcp`, `host`, `port`, `data`
 - 变量引用：`{{var}}`
 - 请求变量：`request.url`, `request.url.host`, `request.url.path`, `request.url.query`
-- 响应变量：`response.status`, `response.body`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`, `response.raw`
+- 响应变量：`response.status`, `response.body`, `response_text`, `response.headers`, `response.content_type`, `response.raw_header`, `response.latency`, `response.raw`
 
 ### 内置函数清单（常用）
 - 编码与转换：`base64`, `base64Decode`, `urlencode`, `urldecode`, `md5`, `hexdecode`, `toUpper`, `toLower`, `substr`, `replaceAll`, `printable`, `faviconHash`, `decimal`, `length`
@@ -791,7 +821,8 @@ expression: r0()
   - 在 YAML 字符串中需双反斜杠 `\\` 表示单个反斜杠
 - 与官方一致的术语：
   - 严重性：`critical|high|medium|low|info`
-  - 字节判断：`bcontains|ibcontains|bmatches` 等
+  - 字节判断：`bcontains|ibcontains|bmatches|bsubmatch` 等
+  - 文本判断：`contains|icontains|matches|rmatches|submatch` 等
 
 ---
 

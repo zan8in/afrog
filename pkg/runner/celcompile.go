@@ -146,6 +146,10 @@ var (
 				decls.NewInstanceOverload("string_bmatches_bytes",
 					[]*exprpb.Type{decls.String, decls.Bytes},
 					decls.Bool)),
+			decls.NewFunction("rmatches",
+				decls.NewInstanceOverload("string_rmatches_string",
+					[]*exprpb.Type{decls.String, decls.String},
+					decls.Bool)),
 			// reverse
 			decls.NewFunction("wait",
 				decls.NewInstanceOverload("reverse_wait_int",

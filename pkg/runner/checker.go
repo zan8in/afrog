@@ -732,7 +732,7 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 				c.CustomLib.UpdateCompileOption(key, StrStrMapType)
 				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
 			case string:
-				c.VariableMap[key] = fmt.Sprintf("%v", out)
+				c.VariableMap[key] = value
 				c.CustomLib.UpdateCompileOption(key, decls.String)
 				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: value})
 			}

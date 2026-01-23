@@ -651,6 +651,21 @@ expression: r0() && r1()
 
 返回值：提取匹配的子表达式内容
 
+常见使用场景：
+
+- 从响应头（如 `response.raw_header`）里提取 Cookie / Token（通常是 ASCII，直接用 `bsubmatch` 即可）
+- 从响应体里提取文本（尤其是中文、带 `charset=` 的页面）：更推荐用 `submatch(response_text)`，避免因为编码导致提取结果乱码
+
+迁移用法（小白版）：
+
+```yaml
+# 旧写法（字节正则，response.body 是 bytes）
+'"title>(?P<title>.+)</title>"'.bsubmatch(response.body)
+
+# 新写法（文本正则，response_text 是 string）
+'"title>(?P<title>.+)</title>"'.submatch(response_text)
+```
+
 bsubmatch 完整示例
 
 r0: 当登录请求成功且响应头包含 Set-Cookie 时，将其提取为变量 cookie。
@@ -739,6 +754,11 @@ Date: Mon, 11 Dec 2023 06:06:42 GMT
 
 返回值：True / False
 
+提示：
+
+- `bmatches` 常用于对 `response.body`（bytes）做“按字节内容”的正则判断
+- 如果你的目标是匹配/提取“可读文本”（尤其是中文页面），更推荐用 `rmatches(response_text)`（见下方 rmatches）
+
 读取文件 /etc/passwd 并验证是否成功读取
 
 ```yaml
@@ -775,6 +795,22 @@ rules:
       path: /rce.php?cmd=id
     expression: response.status == 200 && "((u|g)id|groups)=[0-9]{1,4}\\([a-z0-9]+\\)".bmatches(response.body)
 expression: r0()
+```
+
+### rmatches
+
+用于检查“文本内容”是否与正则表达式匹配（推荐搭配 `response_text` 使用）。
+
+返回值：True / False
+
+典型迁移场景（小白版）：
+
+```yaml
+# 旧写法（按 bytes 匹配，遇到非 UTF-8/中文页面可能出现乱码与匹配失败）
+"目标正则".bmatches(response.body)
+
+# 新写法（按文本匹配，使用已解码的 response_text）
+"目标正则".rmatches(response_text)
 ```
 
 ### oob()
@@ -1067,4 +1103,3 @@ afrog -validate pocs/cve-2024-1061.yaml
 ```
 afrog -validate pocs/
 ```
-

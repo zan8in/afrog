@@ -95,7 +95,7 @@ func (r *Result) PrintColorResultInfoConsole(number string) {
 			switch value := v.Value.(type) {
 			case map[string]string:
 			case string:
-				extinfo += "," + log.LogColor.Extractor(v.Key.(string)) + "=\"" + log.LogColor.Extractor(fmt.Sprintf("%v", value)) + "\""
+				extinfo += "," + log.LogColor.Extractor(v.Key.(string)) + "=\"" + log.LogColor.Extractor(utils.Str2UTF8(value)) + "\""
 			}
 		}
 		extinfo = "[" + strings.TrimLeft(extinfo, ",") + "]"
