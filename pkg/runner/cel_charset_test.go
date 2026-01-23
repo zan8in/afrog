@@ -73,17 +73,3 @@ func TestCELBSubmatchBytesGBK(t *testing.T) {
 		t.Fatalf("expected matches(toUtf8(body))=true, got false")
 	}
 }
-
-func TestMigrateExpressionResponseBodyRegex(t *testing.T) {
-	in := `"(?P<v>.+)".bsubmatch(response.body)["v"] != "" && "abc".bmatches(response.body)`
-	out := migrateExpression(in)
-	if strings.Contains(out, ".bsubmatch(") || strings.Contains(out, ".bmatches(") {
-		t.Fatalf("expected response.body b* calls to be migrated, got %q", out)
-	}
-	if !strings.Contains(out, `.submatch(response_text)`) {
-		t.Fatalf("expected bsubmatch migration, got %q", out)
-	}
-	if !strings.Contains(out, `.rmatches(response_text)`) {
-		t.Fatalf("expected bmatches migration, got %q", out)
-	}
-}

@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -90,8 +89,6 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 }
 
 func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
-	expression = migrateExpression(expression)
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
@@ -124,20 +121,6 @@ func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.
 		return nil, fmt.Errorf("Eval error")
 	}
 
-}
-
-var (
-	reBSubmatchResponseBody = regexp.MustCompile(`\.bsubmatch\(\s*response\.body\s*\)`)
-	reBMatchesResponseBody  = regexp.MustCompile(`\.bmatches\(\s*response\.body\s*\)`)
-)
-
-func migrateExpression(expression string) string {
-	if expression == "" {
-		return expression
-	}
-	expression = reBSubmatchResponseBody.ReplaceAllString(expression, `.submatch(response_text)`)
-	expression = reBMatchesResponseBody.ReplaceAllString(expression, `.rmatches(response_text)`)
-	return expression
 }
 
 func NewCustomLib() *CustomLib {
