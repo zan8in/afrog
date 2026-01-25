@@ -1,0 +1,22 @@
+id: seeyon-a8-management-detect
+
+info:
+  name: Seeyon A8 Management Monitor Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    Seeyon A8 Management Monitor Detect
+    fofa: app="致远互联-OA"
+  tags: seeyon,a8,management,fingerprint
+  created: 2024/04/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /seeyon/management/index.jsp
+    expression: |
+      response.status == 200 && 
+      response.body.ibcontains(b'<title>A8 Management Monitor</title>')
+expression: r0()

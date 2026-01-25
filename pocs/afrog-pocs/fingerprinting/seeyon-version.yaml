@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: info
   verified: true
-  tags: seeyon,version
+  tags: seeyon,version,fingerprint
   created: 2024/04/16
 
 rules:
@@ -13,5 +13,13 @@ rules:
     request:
       method: GET
       path: /seeyon/main.do?method=showAbout
-    expression: response.status == 200 && response.body.bcontains(b'>Build Id:</td>') && response.body.bcontains(b'>注册数:</td>')
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'>Build Id:</td>') && 
+      response_text.contains('>注册数:</td>')
+    extractors:
+      - type: regex
+        extractor:
+          search: '"<td width=\"75%\">&nbsp;(?P<version>.*?)</td>".submatch(response_text)'
+          v: search["version"]
 expression: r0()

@@ -1,16 +1,16 @@
-id: seeyon-monitor-default-login
+id: seeyon-management-weak-login
 
 info:
-  name: Seeyon A8 Management Monitor - Default Login
+  name: Seeyon A8 Management Monitor Weak Login
   author: zan8in
   severity: high
   verified: true
   description: |-
-    A8 Management Monitor 
+    Seeyon A8 Management Monitor  Weak Login
     1.登录页面：/seeyon/management/index.jsp
     2.默认密码: WLCCYBD@SEEYON
     fofa: app="致远互联-OA"
-  tags: seeyon,oa,default-login
+  tags: seeyon,oa,weak-login
   created: 2023/10/30
   requires: [seeyon]
   requires-mode: opportunistic

