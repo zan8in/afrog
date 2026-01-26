@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Version     = "3.3.2"
+	Version     = "3.3.3"
 	ProjectName = "Afrog"
 	Codename    = "Lightweight, Fast, and Direct to the Flaw."
 	LineWidth   = 56
@@ -71,12 +71,10 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
 		pocLine += " " + log.LogColor.Extractor("(update available)")
 	}
-	PrintStatusLine(
-		log.LogColor.Low(okSymbol),
-		"POC: ",
-		pocLine,
-		"",
-	)
+	PrintStatusLine(log.LogColor.Low(okSymbol), "POC: ", pocLine, "")
+
+	planetValue := fmt.Sprintf("%s", log.LogColor.Extractor("https://t.zsxq.com/lV66x"))
+	PrintStatusLine(log.LogColor.Low(okSymbol), "Planet", planetValue, "")
 }
 
 func ShowVersion() {

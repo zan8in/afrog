@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/zan8in/afrog/blob/main/images/星球优惠券.png" alt="Afrog 官方圈 - 知识星球优惠券" width="220">
+  <img src="https://github.com/zan8in/afrog/blob/main/images/planet.jpg" alt="Afrog 官方圈 - 知识星球" width="250">
 </p>
 
 ## PoC Contributors
