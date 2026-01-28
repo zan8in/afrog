@@ -29,6 +29,7 @@ rules:
       (
       (response.body.bcontains(b'src="/WebReport') && response.body.bcontains(b'href="/WebReport')) ||
       response.body.bcontains(b"DeploySuccess._init") ||
-      response.body.bcontains(b'down.download?FM_SYS_ID')
+      response.body.bcontains(b'down.download?FM_SYS_ID') ||
+      (response.body.bcontains(b"Powered by FanRuan") && response.body.bcontains(b"ReportServe\\?op=fs"))
       )
 expression: r0()

