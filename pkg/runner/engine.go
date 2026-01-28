@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync"
@@ -42,6 +43,49 @@ var CheckerPool = sync.Pool{
 }
 
 var titleExtractRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+
+func keyFromTargetWithPath(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+	if !strings.Contains(target, "://") {
+		host, port, err := net.SplitHostPort(target)
+		if err == nil && host != "" && port != "" {
+			return net.JoinHostPort(host, port)
+		}
+		return ""
+	}
+	u, err := url.Parse(target)
+	if err != nil || u == nil {
+		return ""
+	}
+	host := strings.TrimSpace(u.Hostname())
+	if host == "" {
+		return ""
+	}
+	port := strings.TrimSpace(u.Port())
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		default:
+			return ""
+		}
+	}
+	base := net.JoinHostPort(host, port)
+	path := strings.TrimSpace(u.EscapedPath())
+	path = strings.TrimRight(path, "/")
+	if path == "" || path == "/" {
+		return base
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return base + path
+}
 
 type openPortsCollector struct {
 	mu   sync.Mutex
@@ -642,7 +686,7 @@ func (runner *Runner) Execute() {
 			return ""
 		}
 		if strings.Contains(target, "://") {
-			return fingerprint.KeyFromTarget(target)
+			return keyFromTargetWithPath(target)
 		}
 		host, port, err := net.SplitHostPort(target)
 		if err == nil && host != "" && port != "" {
@@ -653,6 +697,7 @@ func (runner *Runner) Execute() {
 
 	dedupWebTargets := func(in []string) []string {
 		bestByKey := make(map[string]string)
+		keysInOrder := make([]string, 0, len(in))
 		out := make([]string, 0, len(in))
 		seenLoose := make(map[string]struct{})
 		for _, raw := range in {
@@ -678,9 +723,12 @@ func (runner *Runner) Execute() {
 				continue
 			}
 			bestByKey[key] = raw
+			keysInOrder = append(keysInOrder, key)
 		}
-		for _, v := range bestByKey {
-			out = append(out, v)
+		for _, k := range keysInOrder {
+			if v, ok := bestByKey[k]; ok {
+				out = append(out, v)
+			}
 		}
 		return out
 	}
@@ -790,18 +838,7 @@ func (runner *Runner) Execute() {
 	}
 
 	keyForTarget := func(target string) string {
-		target = strings.TrimSpace(target)
-		if target == "" {
-			return ""
-		}
-		if strings.Contains(target, "://") {
-			return fingerprint.KeyFromTarget(target)
-		}
-		host, port, err := net.SplitHostPort(target)
-		if err == nil && host != "" && port != "" {
-			return net.JoinHostPort(host, port)
-		}
-		return ""
+		return keyFromTargetWithPath(target)
 	}
 
 	fingerTagsByKey := make(map[string]map[string]struct{})
@@ -1119,9 +1156,9 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 		}
 	}
 	if c.Result.IsVul {
-		key := fingerprint.KeyFromTarget(c.Result.Target)
+		key := keyFromTargetWithPath(c.Result.Target)
 		if key == "" {
-			key = fingerprint.KeyFromTarget(target)
+			key = keyFromTargetWithPath(target)
 		}
 		if key != "" {
 			e.runner.setFingerprintResult(key, p.Id, c.Result)
@@ -1158,7 +1195,7 @@ func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string,
 }
 
 func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {
-	key := fingerprint.KeyFromTarget(target)
+	key := keyFromTargetWithPath(target)
 	if key == "" {
 		return nil
 	}

@@ -55,3 +55,27 @@ func TestFingerprintKeyFromTarget(t *testing.T) {
 		}
 	}
 }
+
+func TestRunnerKeyFromTargetWithPath(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"https://example.com", "example.com:443"},
+		{"https://example.com/", "example.com:443"},
+		{"http://example.com/admin", "example.com:80/admin"},
+		{"http://example.com/admin/", "example.com:80/admin"},
+		{"http://example.com//admin//", "example.com:80//admin"},
+		{"http://example.com/?a=1", "example.com:80"},
+		{"http://example.com/admin?a=1", "example.com:80/admin"},
+		{"http://example.com:8080/admin", "example.com:8080/admin"},
+		{"example.com:80", "example.com:80"},
+		{"", ""},
+		{"not a url", ""},
+	}
+	for _, tt := range tests {
+		if got := keyFromTargetWithPath(tt.in); got != tt.want {
+			t.Fatalf("keyFromTargetWithPath(%q)=%q want=%q", tt.in, got, tt.want)
+		}
+	}
+}
