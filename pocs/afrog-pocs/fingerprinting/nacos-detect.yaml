@@ -10,9 +10,16 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /nacos/v1/console/server/state
+        - /v1/console/server/state
     request:
       method: GET
-      path: /nacos/v1/console/server/state
+      path: "{{p}}"
     expression: |
       response.status == 200 && response.body.bcontains(b'"standalone_mode":') && response.body.bcontains(b'"version":')
     extractors:
@@ -20,22 +27,17 @@ rules:
         extractor:
           search: '"\"version\":\"(?P<nacos>.*?)\"".bsubmatch(response.body)'
           nacos: search["nacos"]
-
   r1:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /nacos/
+        - /
     request:
       method: GET
-      path: /v1/console/server/state
+      path: "{{p}}"
     expression: |
-      response.status == 200 && response.body.bcontains(b'"standalone_mode":') && response.body.bcontains(b'"version":')
-    extractors:
-      - type: regex
-        extractor:
-          search: '"\"version\":\"(?P<nacos>.*?)\"".bsubmatch(response.body)'
-          nacos: search["nacos"]
-  r2:
-    request:
-      method: GET
-      path: /nacos/
-      follow_redirects: true
-    expression: response.status == 200 && response.body.ibcontains(b'<title>Nacos</title>')
-expression: r0() || r1() || r2()
+      response.status == 200 && response.body.ibcontains(b'<title>Nacos</title>')
+expression: r0() || r1()
