@@ -1,0 +1,34 @@
+id: fanruan-detect
+
+info:
+  name: FanRuan OA detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    fofa: app="帆软-FineReport"
+  tags: fanruan,detect,fingerprint
+  created: 2025/05/15
+
+rules:
+  r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /
+        - /WebReport/rs?op=fs_load&cmd=fs_signin&_=1769502214650
+        - /WebReport/ReportServer
+        - /ReportServer
+    request:
+      method: GET
+      path: "{{p}}"
+    expression: |
+      response.status == 200 && 
+      (
+      (response.body.bcontains(b'src="/WebReport') && response.body.bcontains(b'href="/WebReport')) ||
+      response.body.bcontains(b"DeploySuccess._init") ||
+      response.body.bcontains(b'down.download?FM_SYS_ID')
+      )
+expression: r0()
