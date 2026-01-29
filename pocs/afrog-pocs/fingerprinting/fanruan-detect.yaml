@@ -21,6 +21,7 @@ rules:
         - /WebReport/rs?op=fs_load&cmd=fs_signin&_=1769502214650
         - /WebReport/ReportServer
         - /ReportServer
+        - /seeyonreport/ReportServer
     request:
       method: GET
       path: "{{p}}"
