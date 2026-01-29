@@ -195,6 +195,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
 			extinfo := ""
 			if t := strings.TrimSpace(meta.Title); t != "" {
+				t = utils.Str2UTF8(t)
 				extinfo += "[" + log.LogColor.Title(t) + "]"
 			}
 			serverOrPowered := ""
