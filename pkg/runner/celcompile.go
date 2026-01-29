@@ -217,6 +217,11 @@ var (
 				decls.NewOverload("length_bytes",
 					[]*exprpb.Type{decls.Bytes},
 					decls.Int)),
+			// trim
+			decls.NewFunction("trim",
+				decls.NewOverload("trim_string",
+					[]*exprpb.Type{decls.String},
+					decls.String)),
 		),
 	}
 )

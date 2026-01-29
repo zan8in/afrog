@@ -645,6 +645,18 @@ var (
 					return types.Int(len(v))
 				},
 			},
+			// trim
+			&functions.Overload{
+				Operator: "trim_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to trim_string", value.Type())
+					}
+					return types.String(strings.TrimSpace(string(v)))
+				},
+			},
 		),
 	}
 )
