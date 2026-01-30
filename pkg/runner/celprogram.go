@@ -405,6 +405,49 @@ var (
 				},
 			},
 			&functions.Overload{
+				Operator: "string_bcount_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					v1, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to bcount", lhs.Type())
+					}
+					v2, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to bcount", rhs.Type())
+					}
+
+					re := regexp2.MustCompile(string(v1), 0)
+					raw := string([]byte(v2))
+					rawLen := len([]rune(raw))
+
+					var (
+						count   int64
+						startAt int
+					)
+					for startAt <= rawLen {
+						m, err := re.FindStringMatchStartingAt(raw, startAt)
+						if err != nil {
+							return types.NewErr("%v", err)
+						}
+						if m == nil {
+							break
+						}
+						count++
+
+						next := m.Index + m.Length
+						if m.Length == 0 {
+							next = m.Index + 1
+						}
+						if next <= startAt {
+							next = startAt + 1
+						}
+						startAt = next
+					}
+
+					return types.Int(count)
+				},
+			},
+			&functions.Overload{
 				Operator: "string_rmatches_string",
 				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
 					var isMatch = false
@@ -426,6 +469,49 @@ var (
 						return types.NewErr("%v", err)
 					}
 					return types.Bool(isMatch)
+				},
+			},
+			&functions.Overload{
+				Operator: "string_rcount_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					v1, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to rcount", lhs.Type())
+					}
+					v2, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to rcount", rhs.Type())
+					}
+
+					re := regexp2.MustCompile(string(v1), 0)
+					raw := string(v2)
+					rawLen := len([]rune(raw))
+
+					var (
+						count   int64
+						startAt int
+					)
+					for startAt <= rawLen {
+						m, err := re.FindStringMatchStartingAt(raw, startAt)
+						if err != nil {
+							return types.NewErr("%v", err)
+						}
+						if m == nil {
+							break
+						}
+						count++
+
+						next := m.Index + m.Length
+						if m.Length == 0 {
+							next = m.Index + 1
+						}
+						if next <= startAt {
+							next = startAt + 1
+						}
+						startAt = next
+					}
+
+					return types.Int(count)
 				},
 			},
 			// reverse

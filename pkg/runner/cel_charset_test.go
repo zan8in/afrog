@@ -73,3 +73,32 @@ func TestCELBSubmatchBytesGBK(t *testing.T) {
 		t.Fatalf("expected matches(toUtf8(body))=true, got false")
 	}
 }
+
+func TestCELRegexCount(t *testing.T) {
+	html := "<title>a</title>\n<title>b</title>\n"
+	body := []byte(html)
+
+	lib := NewCustomLib()
+	lib.UpdateCompileOption("body", decls.Bytes)
+	lib.UpdateCompileOption("text", decls.String)
+
+	out, err := lib.RunEval(`"(?is)<title>.*?</title>".bcount(body)`, map[string]any{
+		"body": body,
+	})
+	if err != nil {
+		t.Fatalf("eval bcount error: %v", err)
+	}
+	if got, ok := out.Value().(int64); !ok || got != 2 {
+		t.Fatalf("expected bcount=2, got %T(%v)", out.Value(), out.Value())
+	}
+
+	out2, err := lib.RunEval(`"(?is)<title>.*?</title>".rcount(text)`, map[string]any{
+		"text": html,
+	})
+	if err != nil {
+		t.Fatalf("eval rcount error: %v", err)
+	}
+	if got, ok := out2.Value().(int64); !ok || got != 2 {
+		t.Fatalf("expected rcount=2, got %T(%v)", out2.Value(), out2.Value())
+	}
+}
