@@ -44,6 +44,8 @@ fscan
 naabu
 nuclei
 afrog-curated
+afrog-pro-api
+dist-afrog-pro-api
 dist
 .sandbox_home
 *.afg

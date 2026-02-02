@@ -213,6 +213,12 @@ type Options struct {
 
 	// Validate POC YAML syntax
 	Validate string
+
+	CuratedEnabled     string
+	CuratedBin         string
+	CuratedEndpoint    string
+	CuratedTimeout     int
+	CuratedForceUpdate bool
 }
 
 func NewOptions() (*Options, error) {
@@ -324,6 +330,14 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVar(&options.ConfigFile, "config", "", "path to the afrog configuration file"),
 	)
 
+	flagSet.CreateGroup("curated", "Curated",
+		flagSet.StringVar(&options.CuratedEnabled, "curated", "", "curated pocs mode: auto|on|off"),
+		flagSet.StringVar(&options.CuratedBin, "curated-bin", "", "path to afrog-curated binary"),
+		flagSet.StringVar(&options.CuratedEndpoint, "curated-endpoint", "", "curated service endpoint"),
+		flagSet.IntVar(&options.CuratedTimeout, "curated-timeout", 0, "curated mount timeout seconds"),
+		flagSet.BoolVar(&options.CuratedForceUpdate, "curated-force-update", false, "force curated pocs update check now"),
+	)
+
 	_ = flagSet.Parse()
 
 	if err := options.VerifyOptions(); err != nil {
@@ -363,6 +377,22 @@ func (opt *Options) VerifyOptions() error {
 		return err
 	}
 	opt.Config = config
+
+	if opt.Config != nil {
+		if v := strings.TrimSpace(opt.CuratedEnabled); v != "" {
+			opt.Config.Curated.Enabled = v
+		}
+		if v := strings.TrimSpace(opt.CuratedBin); v != "" {
+			opt.Config.Curated.Bin = v
+		}
+		if v := strings.TrimSpace(opt.CuratedEndpoint); v != "" {
+			opt.Config.Curated.Endpoint = v
+		}
+		if opt.CuratedTimeout > 0 {
+			opt.Config.Curated.TimeoutSec = opt.CuratedTimeout
+		}
+		normalizeCuratedDefaults(opt.Config)
+	}
 
 	if err := sqlite.NewWebSqliteDB(); err != nil {
 		return fmt.Errorf("init sqlite db error: %v", err)

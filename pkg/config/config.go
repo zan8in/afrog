@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -16,6 +18,17 @@ type Config struct {
 	Reverse       Reverse    `yaml:"reverse"`
 	Webhook       Webhook    `yaml:"webhook"`
 	Cyberspace    Cyberspace `yaml:"cyberspace"`
+	Curated       Curated    `yaml:"curated"`
+}
+
+type Curated struct {
+	Enabled    string `yaml:"enabled"`
+	AutoUpdate *bool  `yaml:"auto_update"`
+	Endpoint   string `yaml:"endpoint"`
+	Bin        string `yaml:"bin"`
+	TimeoutSec int    `yaml:"timeout_sec"`
+	Channel    string `yaml:"channel"`
+	LicenseKey string `yaml:"license_key"`
 }
 type ConfigHttp struct {
 	Proxy               string `yaml:"proxy"`
@@ -152,6 +165,17 @@ func NewConfig(configFile string) (*Config, error) {
 		cyberspace.ZoomEyes = []string{""}
 		c.Cyberspace = cyberspace
 
+		curated := c.Curated
+		curated.Enabled = "auto"
+		au := true
+		curated.AutoUpdate = &au
+		curated.Endpoint = ""
+		curated.Bin = defaultCuratedBin()
+		curated.TimeoutSec = 10
+		curated.Channel = "stable"
+		curated.LicenseKey = ""
+		c.Curated = curated
+
 		WriteConfiguration(&c, configFile)
 	}
 	return ReadConfiguration(configFile)
@@ -227,7 +251,171 @@ func ReadConfiguration(configFile string) (*Config, error) {
 	if err := yaml.NewDecoder(file).Decode(config); err != nil {
 		return nil, err
 	}
+	normalizeCuratedDefaults(config)
+	_ = ensureCuratedSection(afrogConfigFile, config.Curated)
 	return config, nil
+}
+
+func normalizeCuratedDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	enabled := strings.ToLower(strings.TrimSpace(cfg.Curated.Enabled))
+	switch enabled {
+	case "auto", "true", "false", "on", "off", "1", "0":
+	default:
+		enabled = "auto"
+	}
+	cfg.Curated.Enabled = enabled
+	if cfg.Curated.Bin == "" {
+		cfg.Curated.Bin = defaultCuratedBin()
+	}
+	if cfg.Curated.TimeoutSec <= 0 {
+		cfg.Curated.TimeoutSec = 10
+	}
+	if strings.TrimSpace(cfg.Curated.Channel) == "" {
+		cfg.Curated.Channel = "stable"
+	}
+	if enabled == "off" || enabled == "false" || enabled == "0" {
+		return
+	}
+	if cfg.Curated.AutoUpdate == nil {
+		au := true
+		cfg.Curated.AutoUpdate = &au
+	}
+}
+
+func defaultCuratedBin() string {
+	if runtime.GOOS == "windows" {
+		return "~/.config/afrog/bin/afrog-curated.exe"
+	}
+	return "~/.config/afrog/bin/afrog-curated"
+}
+
+func ensureCuratedSection(configPath string, curated Curated) error {
+	b, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(b), "\n")
+
+	curatedIdx := -1
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if leadingSpaces(line) != 0 {
+			continue
+		}
+		t := strings.TrimSpace(stripYAMLLineComment(line))
+		if strings.HasPrefix(t, "curated:") {
+			curatedIdx = i
+			break
+		}
+	}
+
+	if curatedIdx == -1 {
+		if len(lines) > 0 && lines[len(lines)-1] != "" {
+			lines = append(lines, "")
+		}
+		lines = append(lines, curatedSectionLines(0, curated)...)
+		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+	}
+
+	baseIndent := leadingSpaces(lines[curatedIdx])
+	end := len(lines)
+	for j := curatedIdx + 1; j < len(lines); j++ {
+		if strings.TrimSpace(lines[j]) == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) <= baseIndent {
+			end = j
+			break
+		}
+	}
+
+	childIndent := baseIndent + 2
+	present := map[string]bool{}
+	for j := curatedIdx + 1; j < end; j++ {
+		raw := strings.TrimSpace(stripYAMLLineComment(lines[j]))
+		if raw == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) < childIndent {
+			continue
+		}
+		colon := strings.Index(raw, ":")
+		if colon <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(raw[:colon])
+		present[key] = true
+	}
+
+	insert := curatedKeyLines(childIndent, curated, present)
+	if len(insert) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(lines)+len(insert))
+	out = append(out, lines[:end]...)
+	out = append(out, insert...)
+	out = append(out, lines[end:]...)
+	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+}
+
+func curatedSectionLines(baseIndent int, curated Curated) []string {
+	lines := []string{strings.Repeat(" ", baseIndent) + "curated:"}
+	return append(lines, curatedKeyLines(baseIndent+2, curated, map[string]bool{})...)
+}
+
+func curatedKeyLines(indent int, curated Curated, present map[string]bool) []string {
+	prefix := strings.Repeat(" ", indent)
+	lines := make([]string, 0, 7)
+
+	if !present["enabled"] {
+		lines = append(lines, prefix+"enabled: "+strconv.Quote(curated.Enabled))
+	}
+	if !present["auto_update"] {
+		val := true
+		if curated.AutoUpdate != nil {
+			val = *curated.AutoUpdate
+		}
+		if val {
+			lines = append(lines, prefix+"auto_update: true")
+		} else {
+			lines = append(lines, prefix+"auto_update: false")
+		}
+	}
+	if !present["endpoint"] {
+		lines = append(lines, prefix+"endpoint: "+strconv.Quote(strings.TrimSpace(curated.Endpoint)))
+	}
+	if !present["bin"] {
+		lines = append(lines, prefix+"bin: "+strconv.Quote(strings.TrimSpace(curated.Bin)))
+	}
+	if !present["timeout_sec"] {
+		lines = append(lines, prefix+"timeout_sec: "+strconv.Itoa(curated.TimeoutSec))
+	}
+	if !present["channel"] {
+		lines = append(lines, prefix+"channel: "+strconv.Quote(strings.TrimSpace(curated.Channel)))
+	}
+	if !present["license_key"] {
+		lines = append(lines, prefix+"license_key: "+strconv.Quote(strings.TrimSpace(curated.LicenseKey)))
+	}
+	return lines
+}
+
+func stripYAMLLineComment(line string) string {
+	if i := strings.Index(line, "#"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
+func leadingSpaces(s string) int {
+	n := 0
+	for n < len(s) && s[n] == ' ' {
+		n++
+	}
+	return n
 }
 
 // WriteConfiguration writes the updated afrog configuration to disk

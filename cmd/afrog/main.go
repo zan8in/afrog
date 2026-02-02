@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +35,53 @@ func main() {
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
+	}
+
+	if options.Config != nil {
+		cur := options.Config.Curated
+		enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
+		if enabled != "off" && enabled != "false" && enabled != "0" {
+			if cur.Bin != "" {
+				args := []string{"mount"}
+				if cur.Endpoint != "" {
+					args = append(args, "--endpoint", cur.Endpoint)
+				}
+				if strings.TrimSpace(cur.Channel) != "" {
+					args = append(args, "--channel", cur.Channel)
+				}
+				if options.CuratedForceUpdate {
+					args = append(args, "--force-update")
+				}
+				if cur.AutoUpdate != nil && !*cur.AutoUpdate && !options.CuratedForceUpdate {
+					args = append(args, "--no-update")
+				}
+				if cur.TimeoutSec > 0 {
+					args = append(args, "--timeout", fmt.Sprintf("%d", cur.TimeoutSec))
+				}
+				binPath := expandTildePath(cur.Bin)
+				cmd := exec.Command(binPath, args...)
+				cmd.Env = os.Environ()
+				if strings.TrimSpace(cur.LicenseKey) != "" {
+					cmd.Env = append(cmd.Env, fmt.Sprintf("AFROG_CURATED_LICENSE_KEY=%s", strings.TrimSpace(cur.LicenseKey)))
+				}
+				var stdoutBuf bytes.Buffer
+				var stderrBuf bytes.Buffer
+				cmd.Stdout = &stdoutBuf
+				cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+				if err := cmd.Run(); err == nil {
+					dir := strings.TrimSpace(stdoutBuf.String())
+					if dir != "" {
+						_ = os.Setenv("AFROG_POCS_CURATED_DIR", dir)
+					}
+				} else {
+					msg := strings.TrimSpace(stderrBuf.String())
+					if msg == "" {
+						msg = err.Error()
+					}
+					gologger.Warning().Msgf("curated mount failed: %s", msg)
+				}
+			}
+		}
 	}
 
 	if options.Web {
@@ -364,4 +415,24 @@ func main() {
 
 	// 标记正常退出
 	normalExit = !interrupted.Load()
+}
+
+func expandTildePath(v string) string {
+	s := strings.TrimSpace(os.ExpandEnv(v))
+	if s == "" {
+		return s
+	}
+	s = filepath.FromSlash(s)
+	sep := string(os.PathSeparator)
+	if s == "~" || strings.HasPrefix(s, "~"+sep) {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			return filepath.Clean(s)
+		}
+		if s == "~" {
+			return home
+		}
+		return filepath.Join(home, strings.TrimPrefix(s, "~"+sep))
+	}
+	return filepath.Clean(s)
 }

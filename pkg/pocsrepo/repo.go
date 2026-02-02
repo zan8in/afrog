@@ -22,6 +22,8 @@ const (
 	SourceAppend  Source = "append"
 )
 
+const EnvCuratedPocDir = "AFROG_POCS_CURATED_DIR"
+
 // 统一的 POC 元信息项（列表用）
 type Item struct {
 	ID       string
@@ -107,32 +109,32 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				items = append(items, it)
 			}
 
-        case SourceCurated:
-            home, _ := os.UserHomeDir()
-            dir := filepath.Join(home, ".config", "afrog", "pocs-curated")
-            files, _ := poc.LocalWalkFiles(dir)
-            for _, lp := range files {
-                pm, err := poc.LocalReadPocMetaByPath(lp)
-                if err != nil {
-                    continue
-                }
-                it := Item{
-                    ID:       pm.Id,
-                    Name:     pm.Info.Name,
-                    Severity: normalizeSeverity(pm.Info.Severity),
-                    Author:   SplitAuthors(pm.Info.Author),
-                    Tags:     SplitTags(pm.Info.Tags),
-                    Source:   SourceCurated,
-                    Path:     strings.Replace(lp, home, "~", 1),
-                    Created:  pm.Info.Created,
-                }
-                key := makeKey(it)
-                if _, ok := seen[key]; ok {
-                    continue
-                }
-                seen[key] = struct{}{}
-                items = append(items, it)
-            }
+		case SourceCurated:
+			home, _ := os.UserHomeDir()
+			dir := curatedPocDir(home)
+			files, _ := poc.LocalWalkFiles(dir)
+			for _, lp := range files {
+				pm, err := poc.LocalReadPocMetaByPath(lp)
+				if err != nil {
+					continue
+				}
+				it := Item{
+					ID:       pm.Id,
+					Name:     pm.Info.Name,
+					Severity: normalizeSeverity(pm.Info.Severity),
+					Author:   SplitAuthors(pm.Info.Author),
+					Tags:     SplitTags(pm.Info.Tags),
+					Source:   SourceCurated,
+					Path:     strings.Replace(lp, home, "~", 1),
+					Created:  pm.Info.Created,
+				}
+				key := makeKey(it)
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				items = append(items, it)
+			}
 
         case SourceMy:
             home, _ := os.UserHomeDir()
@@ -303,12 +305,12 @@ func CollectOrderedPocPaths(appendDirs []string) ([]PathItem, error) {
 
 	home, _ := os.UserHomeDir()
 
-    // curated
-    curDir := filepath.Join(home, ".config", "afrog", "pocs-curated")
-    curFiles, _ := poc.LocalWalkFiles(curDir)
-    for _, p := range curFiles {
-        add(p, SourceCurated)
-    }
+	// curated
+	curDir := curatedPocDir(home)
+	curFiles, _ := poc.LocalWalkFiles(curDir)
+	for _, p := range curFiles {
+		add(p, SourceCurated)
+	}
 
     // my
     myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
@@ -349,6 +351,16 @@ func CollectOrderedPocPaths(appendDirs []string) ([]PathItem, error) {
 }
 
 // ---- helpers ----
+
+func curatedPocDir(home string) string {
+	if v := strings.TrimSpace(os.Getenv(EnvCuratedPocDir)); v != "" {
+		if strings.HasPrefix(v, "~") {
+			v = filepath.Join(home, strings.TrimPrefix(v, "~"))
+		}
+		return filepath.Clean(v)
+	}
+	return filepath.Join(home, ".config", "afrog", "pocs-curated")
+}
 
 func makeKey(it Item) string {
 	if it.ID != "" {
