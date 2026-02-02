@@ -91,6 +91,11 @@ type Options struct {
 
 	// POC Execution Duration Tracker
 	PocExecutionDurationMonitor bool
+	PedmLogLimit                int
+	PedmSlowThresholdSec        int
+	PedmSlowLogLimit            int
+	PedmSummaryTop              int
+	PedmSummaryBy               string
 
 	// Single Vulnerability Stopper
 	VulnerabilityScannerBreakpoint bool
@@ -283,6 +288,11 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
 		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
+		flagSet.IntVar(&options.PedmLogLimit, "pedm-log-limit", 50, "when -pedm enabled, log first N started tasks (0 disables)"),
+		flagSet.IntVar(&options.PedmSlowThresholdSec, "pedm-slow-sec", 3, "when -pedm enabled, log tasks slower than N seconds (0 disables)"),
+		flagSet.IntVar(&options.PedmSlowLogLimit, "pedm-slow-log-limit", 50, "when -pedm enabled, log at most N slow tasks (0 disables)"),
+		flagSet.IntVar(&options.PedmSummaryTop, "pedm-summary-top", 20, "when -pedm enabled, print top N slowest PoCs summary (0 disables)"),
+		flagSet.StringVar(&options.PedmSummaryBy, "pedm-summary-by", "max", "when -pedm enabled, summary sort key: max|avg"),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 		// flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
 		flagSet.StringSliceVarP(&options.Header, "header", "H", nil, "custom header/cookie to include in all http request in key:value format (comma separated), eg: -H 'X-Forwarded-For: 1.1.1.1' -H 'Cookie: JSESSION=xxx;'", goflags.StringSliceOptions),
@@ -414,6 +424,26 @@ func (opt *Options) VerifyOptions() error {
 	}
 	if opt.FingerprintFilterMode != "strict" && opt.FingerprintFilterMode != "opportunistic" {
 		opt.FingerprintFilterMode = "strict"
+	}
+
+	opt.PedmSummaryBy = strings.ToLower(strings.TrimSpace(opt.PedmSummaryBy))
+	if opt.PedmSummaryBy == "" {
+		opt.PedmSummaryBy = "max"
+	}
+	if opt.PedmSummaryBy != "max" && opt.PedmSummaryBy != "avg" {
+		opt.PedmSummaryBy = "max"
+	}
+	if opt.PedmLogLimit < 0 {
+		return fmt.Errorf("--pedm-log-limit must be >= 0")
+	}
+	if opt.PedmSlowThresholdSec < 0 {
+		return fmt.Errorf("--pedm-slow-sec must be >= 0")
+	}
+	if opt.PedmSlowLogLimit < 0 {
+		return fmt.Errorf("--pedm-slow-log-limit must be >= 0")
+	}
+	if opt.PedmSummaryTop < 0 {
+		return fmt.Errorf("--pedm-summary-top must be >= 0")
 	}
 
 	limitModeCount := 0
