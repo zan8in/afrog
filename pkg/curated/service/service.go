@@ -153,13 +153,17 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 	endpoint := strings.TrimSpace(s.cfg.Endpoint)
 	var updateErr error
 	if endpoint != "" && (s.cfg.ForceUpdate || shouldCheck) && !s.cfg.NoUpdate {
-		updateErr = s.Update(ctx, UpdateOptions{})
+		uopts := UpdateOptions{}
+		if s.cfg.ForceUpdate {
+			uopts.Force = true
+		}
+		updateErr = s.Update(ctx, uopts)
 	}
 	st, _ = readRuntime(filepath.Join(cfgDir, "curated-state.json"))
 	if st == nil {
 		st = &runtimeState{}
 	}
-	_ = s.updateRuntimeDir(dir, st.ManifestID, st.LastError)
+	_ = s.updateRuntimeCurrentDir(dir, st.ManifestID, st.LastError)
 	if updateErr != nil && endpoint != "" && !dirHasCuratedPocs(dir) {
 		return "", updateErr
 	}
@@ -272,6 +276,29 @@ func (s *Service) updateRuntimeDir(dir string, manifestID string, msg string) er
 	rs.CurrentDir = dir
 	rs.LastCheckAt = now
 	rs.LastUpdateAt = now
+	rs.LastError = strings.TrimSpace(msg)
+	if strings.TrimSpace(manifestID) != "" {
+		rs.ManifestID = strings.TrimSpace(manifestID)
+	}
+	rs.CuratedChannel = strings.TrimSpace(s.cfg.Channel)
+	data, err := json.MarshalIndent(rs, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+func (s *Service) updateRuntimeCurrentDir(dir string, manifestID string, msg string) error {
+	cfgDir, err := configDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(cfgDir, "curated-state.json")
+	rs, _ := readRuntime(path)
+	if rs == nil {
+		rs = &runtimeState{}
+	}
+	rs.CurrentDir = strings.TrimSpace(dir)
 	rs.LastError = strings.TrimSpace(msg)
 	if strings.TrimSpace(manifestID) != "" {
 		rs.ManifestID = strings.TrimSpace(manifestID)
@@ -402,56 +429,89 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 	}
 	authPath := filepath.Join(cfgDir, "curated-auth.json")
 	as, err := readAuth(authPath)
-	if (err != nil || as == nil) && strings.TrimSpace(s.cfg.LicenseKey) != "" {
-		_ = s.Login(ctx, s.cfg.LicenseKey)
+	license := strings.TrimSpace(s.cfg.LicenseKey)
+	if (err != nil || as == nil) && license != "" {
+		if loginErr := s.Login(ctx, license); loginErr != nil {
+			_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(loginErr))
+			return loginErr
+		}
+		as, err = readAuth(authPath)
+	}
+	if err == nil && as != nil && license != "" && strings.TrimSpace(as.LicenseKey) != "" && strings.TrimSpace(as.LicenseKey) != license {
+		if loginErr := s.Login(ctx, license); loginErr != nil {
+			_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(loginErr))
+			return loginErr
+		}
 		as, err = readAuth(authPath)
 	}
 	if err != nil || as == nil {
-		return errors.New("not logged in")
+		errOut := errors.New("not logged in")
+		_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(errOut))
+		return errOut
 	}
 	if as.DeviceFingerprint == "" {
 		as.DeviceFingerprint = loadOrCreateDeviceFingerprint(filepath.Join(cfgDir, "curated-device.json"))
 		_ = writeAuth(authPath, as)
 	}
 	c := api.NewClient(endpoint, api.ClientOptions{})
-	now := time.Now()
-	if strings.TrimSpace(as.AccessToken) == "" || (!as.AccessExpiresAt.IsZero() && now.After(as.AccessExpiresAt)) {
-		if strings.TrimSpace(as.RefreshToken) == "" {
-			return errors.New("authorization expired, please login again")
+	var manResp api.ManifestResponse
+	for attempt := 0; attempt < 2; attempt++ {
+		now := time.Now()
+		if strings.TrimSpace(as.AccessToken) == "" || (!as.AccessExpiresAt.IsZero() && now.After(as.AccessExpiresAt)) {
+			if strings.TrimSpace(as.RefreshToken) == "" {
+				errOut := errors.New("authorization expired, please login again")
+				_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(errOut))
+				return errOut
+			}
+			ref, err := c.Refresh(ctx, api.RefreshRequest{
+				RefreshToken:      as.RefreshToken,
+				DeviceFingerprint: as.DeviceFingerprint,
+			})
+			if err != nil {
+				if attempt == 0 && license != "" && isInvalidRefreshTokenMessage(err.Error()) {
+					if loginErr := s.Login(ctx, license); loginErr != nil {
+						_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(loginErr))
+						return loginErr
+					}
+					as, err = readAuth(authPath)
+					if err != nil || as == nil {
+						errOut := errors.New("not logged in")
+						_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(errOut))
+						return errOut
+					}
+					continue
+				}
+				_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(err))
+				return err
+			}
+			as.AccessToken = ref.AccessToken
+			if ref.AccessExpiresInSec > 0 {
+				as.AccessExpiresAt = time.Now().Add(time.Duration(ref.AccessExpiresInSec) * time.Second)
+			}
+			if strings.TrimSpace(ref.RefreshToken) != "" {
+				as.RefreshToken = ref.RefreshToken
+				if ref.RefreshExpiresInSec > 0 {
+					as.RefreshExpiresAt = time.Now().Add(time.Duration(ref.RefreshExpiresInSec) * time.Second)
+				}
+			}
+			_ = writeAuth(authPath, as)
 		}
-		ref, err := c.Refresh(ctx, api.RefreshRequest{
-			RefreshToken:      as.RefreshToken,
-			DeviceFingerprint: as.DeviceFingerprint,
+
+		resp, err := c.GetManifest(ctx, as.AccessToken, api.ManifestRequest{
+			Channel:      strings.TrimSpace(s.cfg.Channel),
+			OSArch:       runtimeOSArch(),
+			AfrogVersion: "",
 		})
 		if err != nil {
-			_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, err.Error())
+			_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(err))
 			return err
 		}
-		as.AccessToken = ref.AccessToken
-		if ref.AccessExpiresInSec > 0 {
-			as.AccessExpiresAt = time.Now().Add(time.Duration(ref.AccessExpiresInSec) * time.Second)
-		}
-		if strings.TrimSpace(ref.RefreshToken) != "" {
-			as.RefreshToken = ref.RefreshToken
-			if ref.RefreshExpiresInSec > 0 {
-				as.RefreshExpiresAt = time.Now().Add(time.Duration(ref.RefreshExpiresInSec) * time.Second)
-			}
-		}
-		_ = writeAuth(authPath, as)
-	}
-
-	manResp, err := c.GetManifest(ctx, as.AccessToken, api.ManifestRequest{
-		Channel:      strings.TrimSpace(s.cfg.Channel),
-		OSArch:       runtimeOSArch(),
-		AfrogVersion: "",
-	})
-	if err != nil {
-		_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, err.Error())
-		return err
+		manResp = resp
+		break
 	}
 	man, err := manifest.ParseAndVerify(manResp.ManifestJSONB64, manResp.ManifestSigB64)
 	if err != nil {
-		_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, err.Error())
+		_ = s.updateRuntimeDir(curatedDir, opts.ManifestID, normalizeRuntimeError(err))
 		return err
 	}
 
@@ -468,7 +528,7 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 	artifact, ok := man.SelectBestArtifact(currentManifest)
 	if !ok {
 		err := errors.New("no artifact available")
-		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, err.Error())
+		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, normalizeRuntimeError(err))
 		return err
 	}
 
@@ -478,7 +538,7 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 		DeviceFingerprint:  as.DeviceFingerprint,
 	})
 	if err != nil {
-		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, err.Error())
+		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, normalizeRuntimeError(err))
 		return err
 	}
 
@@ -488,7 +548,7 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 	}
 	tmpFile := filepath.Join(cacheDir, fmt.Sprintf("download-%d.afcp", time.Now().UnixNano()))
 	if err := api.DownloadToFile(ctx, authz.DownloadURL, tmpFile); err != nil {
-		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, err.Error())
+		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, normalizeRuntimeError(err))
 		return err
 	}
 
@@ -498,11 +558,55 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 		ManifestID:    man.ManifestID,
 	}
 	if err := s.installAFCP(curatedDir, installOpts); err != nil {
-		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, err.Error())
+		_ = s.updateRuntimeDir(curatedDir, man.ManifestID, normalizeRuntimeError(err))
 		return err
 	}
 	_ = os.Remove(tmpFile)
 	return nil
+}
+
+func normalizeRuntimeError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(err.Error())
+	if msg == "" {
+		return ""
+	}
+	if isLicenseExpiredMessage(msg) {
+		return "license expired, please renew"
+	}
+	return msg
+}
+
+func isLicenseExpiredMessage(msg string) bool {
+	m := strings.ToLower(strings.TrimSpace(msg))
+	if m == "" {
+		return false
+	}
+	if strings.Contains(m, "license_expired") ||
+		strings.Contains(m, "subscription_expired") ||
+		strings.Contains(m, "plan_expired") {
+		return true
+	}
+	if strings.Contains(m, "license") && strings.Contains(m, "expired") {
+		return true
+	}
+	if strings.Contains(m, "license") && strings.Contains(m, "expire") {
+		return true
+	}
+	if strings.Contains(m, "已过期") || strings.Contains(m, "过期") {
+		return true
+	}
+	return false
+}
+
+func isInvalidRefreshTokenMessage(msg string) bool {
+	m := strings.ToLower(strings.TrimSpace(msg))
+	if m == "" {
+		return false
+	}
+	return strings.Contains(m, "invalid refresh token")
 }
 
 func writeAuth(path string, as *authState) error {
@@ -606,4 +710,3 @@ func runtimeValue(key string) string {
 		return ""
 	}
 }
-
