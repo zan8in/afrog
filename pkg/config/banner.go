@@ -2,11 +2,15 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gookit/color"
 	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
@@ -43,7 +47,7 @@ func initSymbols() {
 	}
 }
 
-func ShowBanner(u *AfrogUpdate, oobStatus string) {
+func ShowBanner(u *AfrogUpdate, curated *Curated) {
 	initSymbols()
 
 	// 第一行标题
@@ -73,8 +77,21 @@ func ShowBanner(u *AfrogUpdate, oobStatus string) {
 	}
 	PrintStatusLine(log.LogColor.Low(okSymbol), "POC: ", pocLine, "")
 
-	planetValue := fmt.Sprintf("%s", log.LogColor.Extractor("https://t.zsxq.com/lV66x"))
-	PrintStatusLine(log.LogColor.Low(okSymbol), "Planet", planetValue, "")
+	count, lastErr := curatedStats()
+	planetLink := log.LogColor.Extractor("https://t.zsxq.com/lV66x")
+	symbol := log.LogColor.Low(okSymbol)
+	value := fmt.Sprintf("%d pocs", count)
+	note := planetLink
+	if !curatedEnabled(curated) {
+		note = log.LogColor.DarkGray("(off)") + " " + planetLink
+	} else {
+		errMsg := strings.TrimSpace(lastErr)
+		if errMsg != "" {
+			symbol = log.LogColor.Red(errorSymbol)
+			note = log.LogColor.Red("update failed: "+truncateError(errMsg)) + " " + planetLink
+		}
+	}
+	PrintStatusLine(symbol, "Planet", value, note)
 }
 
 func ShowVersion() {
@@ -103,4 +120,55 @@ func PocV(u *AfrogUpdate) string {
 		return fmt.Sprintf("%s → %s", base, log.LogColor.Red(u.LastestVersion))
 	}
 	return log.LogColor.Green(base)
+}
+
+func curatedEnabled(cur *Curated) bool {
+	if cur == nil {
+		return false
+	}
+	mode := strings.ToLower(strings.TrimSpace(cur.Enabled))
+	if mode == "" {
+		mode = "auto"
+	}
+	return mode != "off" && mode != "false" && mode != "0"
+}
+
+func curatedStats() (int, string) {
+	items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "curated"})
+	if err != nil {
+		return 0, readCuratedLastError()
+	}
+	return len(items), readCuratedLastError()
+}
+
+func readCuratedLastError() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	path := filepath.Join(home, ".config", "afrog", "curated-state.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var state struct {
+		LastError string `json:"last_error"`
+	}
+	if err := json.Unmarshal(data, &state); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(state.LastError)
+}
+
+func truncateError(msg string) string {
+	if msg == "" {
+		return ""
+	}
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+	if len(msg) > 80 {
+		return msg[:77] + "..."
+	}
+	return msg
 }

@@ -30,6 +30,8 @@ type Options struct {
 	// afrog-config.yaml configuration file
 	Config *Config
 
+	AfrogUpdate *AfrogUpdate
+
 	// Pocs Directory
 	PocsDirectory utils.StringSlice
 
@@ -367,6 +369,7 @@ func (opt *Options) VerifyOptions() error {
 	if err != nil {
 		return err
 	}
+	opt.AfrogUpdate = au
 
 	if !opt.DisableUpdateCheck {
 		info, _ := au.AfrogUpdatePocs()
@@ -537,15 +540,7 @@ func (opt *Options) VerifyOptions() error {
 		os.Exit(0)
 	}
 
-	if len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0) {
-
-		ShowBanner(au, "")
-
-		// oob setting
-		// opt.SetOOBAdapter()
-
-	} else {
-		return fmt.Errorf("target or cyberspace or query is empty")
+	if !(len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0)) {
 	}
 
 	return nil

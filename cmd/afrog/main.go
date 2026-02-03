@@ -63,6 +63,14 @@ func main() {
 		}
 	}
 
+	if !options.Web && options.AfrogUpdate != nil {
+		var curated *config.Curated
+		if options.Config != nil {
+			curated = &options.Config.Curated
+		}
+		config.ShowBanner(options.AfrogUpdate, curated)
+	}
+
 	if options.Web {
 		cfg := options.Config
 		addr := ":16868"
