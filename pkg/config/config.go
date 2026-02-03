@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -25,7 +24,7 @@ type Curated struct {
 	Enabled    string `yaml:"enabled"`
 	AutoUpdate *bool  `yaml:"auto_update"`
 	Endpoint   string `yaml:"endpoint"`
-	Bin        string `yaml:"bin"`
+	Bin        string `yaml:"bin,omitempty"`
 	TimeoutSec int    `yaml:"timeout_sec"`
 	Channel    string `yaml:"channel"`
 	LicenseKey string `yaml:"license_key"`
@@ -170,7 +169,6 @@ func NewConfig(configFile string) (*Config, error) {
 		au := true
 		curated.AutoUpdate = &au
 		curated.Endpoint = ""
-		curated.Bin = defaultCuratedBin()
 		curated.TimeoutSec = 10
 		curated.Channel = "stable"
 		curated.LicenseKey = ""
@@ -267,9 +265,6 @@ func normalizeCuratedDefaults(cfg *Config) {
 		enabled = "auto"
 	}
 	cfg.Curated.Enabled = enabled
-	if cfg.Curated.Bin == "" {
-		cfg.Curated.Bin = defaultCuratedBin()
-	}
 	if cfg.Curated.TimeoutSec <= 0 {
 		cfg.Curated.TimeoutSec = 10
 	}
@@ -283,13 +278,6 @@ func normalizeCuratedDefaults(cfg *Config) {
 		au := true
 		cfg.Curated.AutoUpdate = &au
 	}
-}
-
-func defaultCuratedBin() string {
-	if runtime.GOOS == "windows" {
-		return "~/.config/afrog/bin/afrog-curated.exe"
-	}
-	return "~/.config/afrog/bin/afrog-curated"
 }
 
 func ensureCuratedSection(configPath string, curated Curated) error {
@@ -369,7 +357,7 @@ func curatedSectionLines(baseIndent int, curated Curated) []string {
 
 func curatedKeyLines(indent int, curated Curated, present map[string]bool) []string {
 	prefix := strings.Repeat(" ", indent)
-	lines := make([]string, 0, 7)
+	lines := make([]string, 0, 6)
 
 	if !present["enabled"] {
 		lines = append(lines, prefix+"enabled: "+strconv.Quote(curated.Enabled))
@@ -387,9 +375,6 @@ func curatedKeyLines(indent int, curated Curated, present map[string]bool) []str
 	}
 	if !present["endpoint"] {
 		lines = append(lines, prefix+"endpoint: "+strconv.Quote(strings.TrimSpace(curated.Endpoint)))
-	}
-	if !present["bin"] {
-		lines = append(lines, prefix+"bin: "+strconv.Quote(strings.TrimSpace(curated.Bin)))
 	}
 	if !present["timeout_sec"] {
 		lines = append(lines, prefix+"timeout_sec: "+strconv.Itoa(curated.TimeoutSec))

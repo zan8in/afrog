@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -17,6 +15,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/curated/service"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -41,45 +40,25 @@ func main() {
 		cur := options.Config.Curated
 		enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
 		if enabled != "off" && enabled != "false" && enabled != "0" {
-			if cur.Bin != "" {
-				args := []string{"mount"}
-				if cur.Endpoint != "" {
-					args = append(args, "--endpoint", cur.Endpoint)
-				}
-				if strings.TrimSpace(cur.Channel) != "" {
-					args = append(args, "--channel", cur.Channel)
-				}
-				if options.CuratedForceUpdate {
-					args = append(args, "--force-update")
-				}
-				if cur.AutoUpdate != nil && !*cur.AutoUpdate && !options.CuratedForceUpdate {
-					args = append(args, "--no-update")
-				}
-				if cur.TimeoutSec > 0 {
-					args = append(args, "--timeout", fmt.Sprintf("%d", cur.TimeoutSec))
-				}
-				binPath := expandTildePath(cur.Bin)
-				cmd := exec.Command(binPath, args...)
-				cmd.Env = os.Environ()
-				if strings.TrimSpace(cur.LicenseKey) != "" {
-					cmd.Env = append(cmd.Env, fmt.Sprintf("AFROG_CURATED_LICENSE_KEY=%s", strings.TrimSpace(cur.LicenseKey)))
-				}
-				var stdoutBuf bytes.Buffer
-				var stderrBuf bytes.Buffer
-				cmd.Stdout = &stdoutBuf
-				cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
-				if err := cmd.Run(); err == nil {
-					dir := strings.TrimSpace(stdoutBuf.String())
-					if dir != "" {
-						_ = os.Setenv("AFROG_POCS_CURATED_DIR", dir)
-					}
-				} else {
-					msg := strings.TrimSpace(stderrBuf.String())
-					if msg == "" {
-						msg = err.Error()
-					}
-					gologger.Warning().Msgf("curated mount failed: %s", msg)
-				}
+			svc := service.New(service.Config{
+				Endpoint:      strings.TrimSpace(cur.Endpoint),
+				Channel:       strings.TrimSpace(cur.Channel),
+				CuratedPocDir: "",
+				LicenseKey:    strings.TrimSpace(cur.LicenseKey),
+				NoUpdate:      cur.AutoUpdate != nil && !*cur.AutoUpdate && !options.CuratedForceUpdate,
+				ForceUpdate:   options.CuratedForceUpdate,
+				ClientVersion: config.Version,
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cur.TimeoutSec)*time.Second)
+			if cur.TimeoutSec <= 0 {
+				ctx, cancel = context.WithCancel(context.Background())
+			}
+			defer cancel()
+			dir, err := svc.Mount(ctx)
+			if err != nil {
+				gologger.Warning().Msgf("curated mount failed: %s", strings.TrimSpace(err.Error()))
+			} else if strings.TrimSpace(dir) != "" {
+				_ = os.Setenv("AFROG_POCS_CURATED_DIR", dir)
 			}
 		}
 	}

@@ -220,7 +220,6 @@ type Options struct {
 	Validate string
 
 	CuratedEnabled     string
-	CuratedBin         string
 	CuratedEndpoint    string
 	CuratedTimeout     int
 	CuratedForceUpdate bool
@@ -342,7 +341,6 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("curated", "Curated",
 		flagSet.StringVar(&options.CuratedEnabled, "curated", "", "curated pocs mode: auto|on|off"),
-		flagSet.StringVar(&options.CuratedBin, "curated-bin", "", "path to afrog-curated binary"),
 		flagSet.StringVar(&options.CuratedEndpoint, "curated-endpoint", "", "curated service endpoint"),
 		flagSet.IntVar(&options.CuratedTimeout, "curated-timeout", 0, "curated mount timeout seconds"),
 		flagSet.BoolVar(&options.CuratedForceUpdate, "curated-force-update", false, "force curated pocs update check now"),
@@ -391,9 +389,6 @@ func (opt *Options) VerifyOptions() error {
 	if opt.Config != nil {
 		if v := strings.TrimSpace(opt.CuratedEnabled); v != "" {
 			opt.Config.Curated.Enabled = v
-		}
-		if v := strings.TrimSpace(opt.CuratedBin); v != "" {
-			opt.Config.Curated.Bin = v
 		}
 		if v := strings.TrimSpace(opt.CuratedEndpoint); v != "" {
 			opt.Config.Curated.Endpoint = v

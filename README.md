@@ -601,6 +601,14 @@ The first time you start afrog, it will automatically create a configuration fil
 Here is an example config file:
 
 ```yaml
+curated:
+  enabled: "auto"         # auto|on|off
+  endpoint: ""            # curated service endpoint, leave empty to disable online update
+  auto_update: true       # automatically check for curated updates
+  timeout_sec: 10         # mount/update timeout in seconds
+  channel: "stable"       # curated channel, e.g. stable/beta
+  license_key: ""         # your curated license key (if you have one)
+
 reverse:
   ceye:
     api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -621,11 +629,28 @@ reverse:
     api_url: "http://x.x.x.x/helplog"
 ```
 
+### Curated PoCs
+
+Curated PoCs are an additional encrypted PoC set that can be mounted and updated automatically before scanning.
+
+- When `curated.enabled` is `auto` or `on`, afrog tries to mount curated PoCs on startup.
+- If a valid `endpoint` and `license_key` are configured, afrog will:
+  - Log in to the curated service
+  - Periodically check and download the latest curated PoCs
+  - Decrypt and store them under `~/.config/afrog/pocs-curated`
+- PoC loading priority is:
+  - curated > my > append > local > builtin
+  so curated PoCs override other sources with the same PoC id.
+
+If `curated.enabled` is `off`, or `endpoint` is empty, afrog will not connect to any curated service and will only use local/builtin PoCs.
+
+For advanced users, you can override the curated PoC directory with the environment variable `AFROG_POCS_CURATED_DIR`.
+
+
 `reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification.
 
 ### Ceye Configuration
 
-To obtain ceye, follow these steps:
 
 - Go to the [ceye.io](http://ceye.io/) website and register an account.
 - Log in and go to the personal settings page.
