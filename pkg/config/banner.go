@@ -80,18 +80,22 @@ func ShowBanner(u *AfrogUpdate, curated *Curated) {
 	count, lastErr := curatedStats()
 	planetLink := log.LogColor.Extractor("https://t.zsxq.com/lV66x")
 	symbol := log.LogColor.Low(okSymbol)
-	value := fmt.Sprintf("%d pocs", count)
-	note := planetLink
+	value := fmt.Sprintf("%d/pocs", count)
+	extra := ""
 	if !curatedEnabled(curated) {
-		note = log.LogColor.DarkGray("(off)") + " " + planetLink
+		extra = log.LogColor.DarkGray("(off)")
 	} else {
 		errMsg := strings.TrimSpace(lastErr)
 		if errMsg != "" {
 			symbol = log.LogColor.Red(errorSymbol)
-			note = log.LogColor.Red("update failed: "+truncateError(errMsg)) + " " + planetLink
+			extra = log.LogColor.Red("update failed: " + truncateError(errMsg))
 		}
 	}
-	PrintStatusLine(symbol, "Planet", value, note)
+	line := value + " " + planetLink
+	if strings.TrimSpace(extra) != "" {
+		line = value + " " + extra + " " + planetLink
+	}
+	PrintStatusLine(symbol, "Cur:", line, "")
 }
 
 func ShowVersion() {
