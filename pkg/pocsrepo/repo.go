@@ -1,6 +1,7 @@
 package pocsrepo
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -112,6 +113,10 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 		case SourceCurated:
 			home, _ := os.UserHomeDir()
 			dir := curatedPocDir(home)
+			if curatedBlocked(home, dir) {
+				_ = os.RemoveAll(dir)
+				break
+			}
 			files, _ := poc.LocalWalkFiles(dir)
 			for _, lp := range files {
 				pm, err := poc.LocalReadPocMetaByPath(lp)
@@ -307,6 +312,10 @@ func CollectOrderedPocPaths(appendDirs []string) ([]PathItem, error) {
 
 	// curated
 	curDir := curatedPocDir(home)
+	if curatedBlocked(home, curDir) {
+		_ = os.RemoveAll(curDir)
+		curDir = ""
+	}
 	curFiles, _ := poc.LocalWalkFiles(curDir)
 	for _, p := range curFiles {
 		add(p, SourceCurated)
@@ -360,6 +369,101 @@ func curatedPocDir(home string) string {
 		return filepath.Clean(v)
 	}
 	return filepath.Join(home, ".config", "afrog", "pocs-curated")
+}
+
+func curatedBlocked(home string, curatedDir string) bool {
+	if strings.TrimSpace(os.Getenv(EnvCuratedPocDir)) != "" {
+		return false
+	}
+	home = strings.TrimSpace(home)
+	if home == "" {
+		return false
+	}
+	curatedDir = strings.TrimSpace(curatedDir)
+	if curatedDir == "" {
+		return false
+	}
+	defaultDir := filepath.Join(home, ".config", "afrog", "pocs-curated")
+	if filepath.Clean(curatedDir) != filepath.Clean(defaultDir) {
+		return false
+	}
+
+	cfgDir := filepath.Join(home, ".config", "afrog")
+	if msg := readCuratedLastError(filepath.Join(cfgDir, "curated-state.json")); isCuratedAuthErrorMessage(msg) {
+		return true
+	}
+
+	lic, ok := readCuratedAuthLicense(filepath.Join(cfgDir, "curated-auth.json"))
+	if !ok || strings.TrimSpace(lic) == "" {
+		return true
+	}
+
+	return false
+}
+
+func readCuratedLastError(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var state struct {
+		LastError string `json:"last_error"`
+	}
+	if err := json.Unmarshal(b, &state); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(state.LastError)
+}
+
+func readCuratedAuthLicense(path string) (string, bool) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	var st struct {
+		LicenseKey string `json:"license_key"`
+	}
+	if err := json.Unmarshal(b, &st); err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(st.LicenseKey), true
+}
+
+func isCuratedAuthErrorMessage(msg string) bool {
+	m := strings.ToLower(strings.TrimSpace(msg))
+	if m == "" {
+		return false
+	}
+	if strings.Contains(m, "license") && strings.Contains(m, "expired") {
+		return true
+	}
+	if strings.Contains(m, "license_expired") ||
+		strings.Contains(m, "subscription_expired") ||
+		strings.Contains(m, "plan_expired") {
+		return true
+	}
+	if strings.Contains(m, "not logged in") ||
+		strings.Contains(m, "please login") ||
+		strings.Contains(m, "invalid license") ||
+		strings.Contains(m, "no license") {
+		return true
+	}
+	if strings.Contains(m, "unauthorized device") ||
+		strings.Contains(m, "device unauthorized") ||
+		strings.Contains(m, "device_fingerprint") {
+		return true
+	}
+	if strings.Contains(m, "invalid refresh token") ||
+		(strings.Contains(m, "refresh token") && strings.Contains(m, "unauthorized")) {
+		return true
+	}
+	if strings.Contains(m, "unauthorized") || strings.Contains(m, "forbidden") {
+		return true
+	}
+	if strings.Contains(m, "status code: 401") || strings.Contains(m, "status code: 403") {
+		return true
+	}
+	return false
 }
 
 func makeKey(it Item) string {

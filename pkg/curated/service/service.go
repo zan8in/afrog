@@ -151,6 +151,20 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 	}
 	shouldCheck := st.LastCheckAt.IsZero() || time.Since(st.LastCheckAt) > 6*time.Hour
 	endpoint := strings.TrimSpace(s.cfg.Endpoint)
+	var checkErr error
+	if endpoint != "" {
+		checkErr = s.checkRemoteAccess(ctx, dir, st.ManifestID)
+		if checkErr != nil && isCuratedAuthErrorMessage(checkErr.Error()) {
+			_ = s.purgeCuratedLocal(dir)
+			_ = s.updateRuntimeCurrentDir("", st.ManifestID, normalizeRuntimeError(checkErr))
+			return "", checkErr
+		}
+	}
+	st, _ = readRuntime(filepath.Join(cfgDir, "curated-state.json"))
+	if st == nil {
+		st = &runtimeState{}
+	}
+
 	var updateErr error
 	if endpoint != "" && (s.cfg.ForceUpdate || shouldCheck) && !s.cfg.NoUpdate {
 		uopts := UpdateOptions{}
@@ -158,16 +172,39 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 			uopts.Force = true
 		}
 		updateErr = s.Update(ctx, uopts)
+		if updateErr != nil && isCuratedAuthErrorMessage(updateErr.Error()) {
+			_ = s.purgeCuratedLocal(dir)
+			_ = s.updateRuntimeCurrentDir("", st.ManifestID, normalizeRuntimeError(updateErr))
+			return "", updateErr
+		}
 	}
 	st, _ = readRuntime(filepath.Join(cfgDir, "curated-state.json"))
 	if st == nil {
 		st = &runtimeState{}
 	}
 	_ = s.updateRuntimeCurrentDir(dir, st.ManifestID, st.LastError)
-	if updateErr != nil && endpoint != "" && !dirHasCuratedPocs(dir) {
-		return "", updateErr
+	if (checkErr != nil || updateErr != nil) && endpoint != "" && !dirHasCuratedPocs(dir) {
+		if updateErr != nil {
+			return "", updateErr
+		}
+		return "", checkErr
 	}
 	return filepath.Clean(dir), nil
+}
+
+func (s *Service) purgeCuratedLocal(curatedDir string) error {
+	curatedDir = strings.TrimSpace(curatedDir)
+	if curatedDir != "" {
+		_ = os.RemoveAll(curatedDir)
+	}
+	cfgDir, err := configDir()
+	if err != nil {
+		return err
+	}
+	_ = os.RemoveAll(filepath.Join(cfgDir, "curated-cache"))
+	_ = os.Remove(filepath.Join(cfgDir, "curated-auth.json"))
+	_ = os.Remove(filepath.Join(cfgDir, "curated-state.json"))
+	return nil
 }
 
 func (s *Service) Update(ctx context.Context, opts UpdateOptions) error {
@@ -606,7 +643,82 @@ func isInvalidRefreshTokenMessage(msg string) bool {
 	if m == "" {
 		return false
 	}
-	return strings.Contains(m, "invalid refresh token")
+	if strings.Contains(m, "invalid refresh token") {
+		return true
+	}
+	if strings.Contains(m, "refresh token") && strings.Contains(m, "unauthorized") {
+		return true
+	}
+	if strings.Contains(m, "refresh_token") && strings.Contains(m, "unauthorized") {
+		return true
+	}
+	return false
+}
+
+func isCuratedAuthErrorMessage(msg string) bool {
+	m := strings.ToLower(strings.TrimSpace(msg))
+	if m == "" {
+		return false
+	}
+	if isLicenseExpiredMessage(m) {
+		return true
+	}
+	if strings.Contains(m, "not logged in") ||
+		strings.Contains(m, "please login") ||
+		strings.Contains(m, "license is empty") ||
+		strings.Contains(m, "invalid license") ||
+		strings.Contains(m, "no license") {
+		return true
+	}
+	if strings.Contains(m, "unauthorized device") ||
+		strings.Contains(m, "device unauthorized") ||
+		strings.Contains(m, "device_fingerprint") {
+		return true
+	}
+	if strings.Contains(m, "invalid refresh token") ||
+		(strings.Contains(m, "refresh token") && strings.Contains(m, "unauthorized")) {
+		return true
+	}
+	if strings.Contains(m, "unauthorized") || strings.Contains(m, "forbidden") {
+		return true
+	}
+	if strings.Contains(m, "status code: 401") || strings.Contains(m, "status code: 403") {
+		return true
+	}
+	return false
+}
+
+func (s *Service) checkRemoteAccess(ctx context.Context, curatedDir string, manifestID string) error {
+	_ = ctx
+	_ = manifestID
+
+	curatedDir = strings.TrimSpace(curatedDir)
+	if curatedDir == "" {
+		return nil
+	}
+	if !dirHasCuratedPocs(curatedDir) {
+		return nil
+	}
+
+	cfgDir, err := configDir()
+	if err != nil {
+		return err
+	}
+
+	if st, _ := readRuntime(filepath.Join(cfgDir, "curated-state.json")); st != nil {
+		if isCuratedAuthErrorMessage(st.LastError) {
+			return errors.New(strings.TrimSpace(st.LastError))
+		}
+	}
+
+	as, _ := readAuth(filepath.Join(cfgDir, "curated-auth.json"))
+	if as == nil {
+		return errors.New("not logged in")
+	}
+	if strings.TrimSpace(as.AccessToken) == "" && strings.TrimSpace(as.RefreshToken) == "" {
+		return errors.New("not logged in")
+	}
+	return nil
 }
 
 func writeAuth(path string, as *authState) error {
