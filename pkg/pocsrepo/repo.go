@@ -141,32 +141,32 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				items = append(items, it)
 			}
 
-        case SourceMy:
-            home, _ := os.UserHomeDir()
-            dir := filepath.Join(home, ".config", "afrog", "pocs-my")
-            files, _ := poc.LocalWalkFiles(dir)
-            for _, lp := range files {
-                pm, err := poc.LocalReadPocMetaByPath(lp)
-                if err != nil {
-                    continue
-                }
-                it := Item{
-                    ID:       pm.Id,
-                    Name:     pm.Info.Name,
-                    Severity: normalizeSeverity(pm.Info.Severity),
-                    Author:   SplitAuthors(pm.Info.Author),
-                    Tags:     SplitTags(pm.Info.Tags),
-                    Source:   SourceMy,
-                    Path:     strings.Replace(lp, home, "~", 1),
-                    Created:  pm.Info.Created,
-                }
-                key := makeKey(it)
-                if _, ok := seen[key]; ok {
-                    continue
-                }
-                seen[key] = struct{}{}
-                items = append(items, it)
-            }
+		case SourceMy:
+			home, _ := os.UserHomeDir()
+			dir := filepath.Join(home, ".config", "afrog", "pocs-my")
+			files, _ := poc.LocalWalkFiles(dir)
+			for _, lp := range files {
+				pm, err := poc.LocalReadPocMetaByPath(lp)
+				if err != nil {
+					continue
+				}
+				it := Item{
+					ID:       pm.Id,
+					Name:     pm.Info.Name,
+					Severity: normalizeSeverity(pm.Info.Severity),
+					Author:   SplitAuthors(pm.Info.Author),
+					Tags:     SplitTags(pm.Info.Tags),
+					Source:   SourceMy,
+					Path:     strings.Replace(lp, home, "~", 1),
+					Created:  pm.Info.Created,
+				}
+				key := makeKey(it)
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				items = append(items, it)
+			}
 
 		case SourceLocal:
 			home, _ := os.UserHomeDir()
@@ -321,12 +321,12 @@ func CollectOrderedPocPaths(appendDirs []string) ([]PathItem, error) {
 		add(p, SourceCurated)
 	}
 
-    // my
-    myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
-    myFiles, _ := poc.LocalWalkFiles(myDir)
-    for _, p := range myFiles {
-        add(p, SourceMy)
-    }
+	// my
+	myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
+	myFiles, _ := poc.LocalWalkFiles(myDir)
+	for _, p := range myFiles {
+		add(p, SourceMy)
+	}
 
 	// append
 	for _, dir := range appendDirs {
@@ -372,9 +372,6 @@ func curatedPocDir(home string) string {
 }
 
 func curatedBlocked(home string, curatedDir string) bool {
-	if strings.TrimSpace(os.Getenv(EnvCuratedPocDir)) != "" {
-		return false
-	}
 	home = strings.TrimSpace(home)
 	if home == "" {
 		return false
