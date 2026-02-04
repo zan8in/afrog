@@ -39,9 +39,18 @@ func main() {
 	if options.Config != nil {
 		cur := options.Config.Curated
 		enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
-		if enabled != "off" && enabled != "false" && enabled != "0" {
+		endpoint := strings.TrimSpace(cur.Endpoint)
+		if enabled == "off" || enabled == "false" || enabled == "0" || endpoint == "" {
+			_ = os.Setenv("AFROG_CURATED_DISABLED", "1")
+			_ = os.Unsetenv("AFROG_POCS_CURATED_DIR")
+			home, err := os.UserHomeDir()
+			if err == nil && strings.TrimSpace(home) != "" {
+				_ = os.RemoveAll(filepath.Join(home, ".config", "afrog", "pocs-curated"))
+			}
+		} else {
+			_ = os.Unsetenv("AFROG_CURATED_DISABLED")
 			svc := service.New(service.Config{
-				Endpoint:      strings.TrimSpace(cur.Endpoint),
+				Endpoint:      endpoint,
 				Channel:       strings.TrimSpace(cur.Channel),
 				CuratedPocDir: "",
 				LicenseKey:    strings.TrimSpace(cur.LicenseKey),

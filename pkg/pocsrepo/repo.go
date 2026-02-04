@@ -24,6 +24,7 @@ const (
 )
 
 const EnvCuratedPocDir = "AFROG_POCS_CURATED_DIR"
+const EnvCuratedDisabled = "AFROG_CURATED_DISABLED"
 
 // 统一的 POC 元信息项（列表用）
 type Item struct {
@@ -111,6 +112,9 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 			}
 
 		case SourceCurated:
+			if curatedDisabled() {
+				break
+			}
 			home, _ := os.UserHomeDir()
 			dir := curatedPocDir(home)
 			if curatedBlocked(home, dir) {
@@ -311,10 +315,13 @@ func CollectOrderedPocPaths(appendDirs []string) ([]PathItem, error) {
 	home, _ := os.UserHomeDir()
 
 	// curated
-	curDir := curatedPocDir(home)
-	if curatedBlocked(home, curDir) {
-		_ = os.RemoveAll(curDir)
-		curDir = ""
+	curDir := ""
+	if !curatedDisabled() {
+		curDir = curatedPocDir(home)
+		if curatedBlocked(home, curDir) {
+			_ = os.RemoveAll(curDir)
+			curDir = ""
+		}
 	}
 	curFiles, _ := poc.LocalWalkFiles(curDir)
 	for _, p := range curFiles {
@@ -369,6 +376,11 @@ func curatedPocDir(home string) string {
 		return filepath.Clean(v)
 	}
 	return filepath.Join(home, ".config", "afrog", "pocs-curated")
+}
+
+func curatedDisabled() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(EnvCuratedDisabled)))
+	return v == "1" || v == "true" || v == "on" || v == "yes"
 }
 
 func curatedBlocked(home string, curatedDir string) bool {
