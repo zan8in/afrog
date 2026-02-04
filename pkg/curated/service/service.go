@@ -149,7 +149,10 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 	if st == nil {
 		st = &runtimeState{}
 	}
-	shouldCheck := st.LastCheckAt.IsZero() || time.Since(st.LastCheckAt) > 6*time.Hour
+	now := time.Now()
+	shouldCheck := st.LastCheckAt.IsZero() ||
+		st.LastCheckAt.After(now.Add(5*time.Minute)) ||
+		now.Sub(st.LastCheckAt) > 6*time.Hour
 	endpoint := strings.TrimSpace(s.cfg.Endpoint)
 	var checkErr error
 	if endpoint != "" {
@@ -378,9 +381,6 @@ func readAuth(path string) (*authState, error) {
 	var as authState
 	if err := json.Unmarshal(b, &as); err != nil {
 		return nil, err
-	}
-	if strings.TrimSpace(as.DeviceFingerprint) == "" || strings.TrimSpace(as.Checksum) == "" {
-		return &as, nil
 	}
 	if !verifyAuthChecksum(&as) {
 		return nil, errors.New("invalid auth state checksum")
@@ -659,11 +659,15 @@ func isCuratedAuthErrorMessage(msg string) bool {
 	if m == "" {
 		return false
 	}
+	if strings.Contains(m, "invalid auth state checksum") {
+		return true
+	}
 	if isLicenseExpiredMessage(m) {
 		return true
 	}
 	if strings.Contains(m, "not logged in") ||
 		strings.Contains(m, "please login") ||
+		strings.Contains(m, "authorization expired") ||
 		strings.Contains(m, "license is empty") ||
 		strings.Contains(m, "invalid license") ||
 		strings.Contains(m, "no license") {
@@ -688,7 +692,6 @@ func isCuratedAuthErrorMessage(msg string) bool {
 }
 
 func (s *Service) checkRemoteAccess(ctx context.Context, curatedDir string, manifestID string) error {
-	_ = ctx
 	_ = manifestID
 
 	curatedDir = strings.TrimSpace(curatedDir)
@@ -710,13 +713,81 @@ func (s *Service) checkRemoteAccess(ctx context.Context, curatedDir string, mani
 		}
 	}
 
-	as, _ := readAuth(filepath.Join(cfgDir, "curated-auth.json"))
-	if as == nil {
+	endpoint := strings.TrimSpace(s.cfg.Endpoint)
+	if endpoint == "" {
+		return nil
+	}
+
+	authPath := filepath.Join(cfgDir, "curated-auth.json")
+	as, err := readAuth(authPath)
+	license := strings.TrimSpace(s.cfg.LicenseKey)
+	if (err != nil || as == nil) && license != "" {
+		if loginErr := s.Login(ctx, license); loginErr != nil {
+			return loginErr
+		}
+		as, err = readAuth(authPath)
+	}
+	if err != nil || as == nil {
 		return errors.New("not logged in")
 	}
+
+	now := time.Now()
 	if strings.TrimSpace(as.AccessToken) == "" && strings.TrimSpace(as.RefreshToken) == "" {
 		return errors.New("not logged in")
 	}
+
+	if strings.TrimSpace(as.AccessToken) == "" || as.AccessExpiresAt.IsZero() || now.After(as.AccessExpiresAt) {
+		if strings.TrimSpace(as.RefreshToken) == "" || as.RefreshExpiresAt.IsZero() || now.After(as.RefreshExpiresAt) {
+			return errors.New("authorization expired, please login again")
+		}
+
+		c := api.NewClient(endpoint, api.ClientOptions{})
+		ref, err := c.Refresh(ctx, api.RefreshRequest{
+			RefreshToken:      as.RefreshToken,
+			DeviceFingerprint: as.DeviceFingerprint,
+		})
+		if err != nil {
+			if license != "" && isInvalidRefreshTokenMessage(err.Error()) {
+				if loginErr := s.Login(ctx, license); loginErr != nil {
+					return loginErr
+				}
+				as, err = readAuth(authPath)
+				if err != nil || as == nil {
+					return errors.New("not logged in")
+				}
+				now = time.Now()
+				if strings.TrimSpace(as.AccessToken) == "" || as.AccessExpiresAt.IsZero() || now.After(as.AccessExpiresAt) {
+					return errors.New("authorization expired, please login again")
+				}
+				return nil
+			}
+			return err
+		}
+
+		as.AccessToken = ref.AccessToken
+		if ref.AccessExpiresInSec > 0 {
+			as.AccessExpiresAt = time.Now().Add(time.Duration(ref.AccessExpiresInSec) * time.Second)
+		} else {
+			as.AccessExpiresAt = time.Time{}
+		}
+		if strings.TrimSpace(ref.RefreshToken) != "" {
+			as.RefreshToken = ref.RefreshToken
+			if ref.RefreshExpiresInSec > 0 {
+				as.RefreshExpiresAt = time.Now().Add(time.Duration(ref.RefreshExpiresInSec) * time.Second)
+			} else {
+				as.RefreshExpiresAt = time.Time{}
+			}
+		}
+		if err := writeAuth(authPath, as); err != nil {
+			return err
+		}
+
+		now = time.Now()
+		if strings.TrimSpace(as.AccessToken) == "" || as.AccessExpiresAt.IsZero() || now.After(as.AccessExpiresAt) {
+			return errors.New("authorization expired, please login again")
+		}
+	}
+
 	return nil
 }
 
@@ -783,11 +854,14 @@ func computeAuthChecksum(as *authState) string {
 
 func verifyAuthChecksum(as *authState) bool {
 	if as == nil {
-		return true
+		return false
 	}
 	want := strings.TrimSpace(as.Checksum)
 	if want == "" {
-		return true
+		return false
+	}
+	if strings.TrimSpace(as.DeviceFingerprint) == "" {
+		return false
 	}
 	got := strings.TrimSpace(computeAuthChecksum(as))
 	return got != "" && got == want
