@@ -156,7 +156,7 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 		checkErr = s.checkRemoteAccess(ctx, dir, st.ManifestID)
 		if checkErr != nil && isCuratedAuthErrorMessage(checkErr.Error()) {
 			_ = s.purgeCuratedLocal(dir)
-			_ = s.updateRuntimeCurrentDir("", st.ManifestID, normalizeRuntimeError(checkErr))
+			_ = s.updateRuntimeDir("", st.ManifestID, normalizeRuntimeError(checkErr))
 			return "", checkErr
 		}
 	}
@@ -174,7 +174,7 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 		updateErr = s.Update(ctx, uopts)
 		if updateErr != nil && isCuratedAuthErrorMessage(updateErr.Error()) {
 			_ = s.purgeCuratedLocal(dir)
-			_ = s.updateRuntimeCurrentDir("", st.ManifestID, normalizeRuntimeError(updateErr))
+			_ = s.updateRuntimeDir("", st.ManifestID, normalizeRuntimeError(updateErr))
 			return "", updateErr
 		}
 	}
@@ -203,7 +203,6 @@ func (s *Service) purgeCuratedLocal(curatedDir string) error {
 	}
 	_ = os.RemoveAll(filepath.Join(cfgDir, "curated-cache"))
 	_ = os.Remove(filepath.Join(cfgDir, "curated-auth.json"))
-	_ = os.Remove(filepath.Join(cfgDir, "curated-state.json"))
 	return nil
 }
 

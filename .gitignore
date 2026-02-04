@@ -46,6 +46,7 @@ nuclei
 afrog-curated
 afrog-pro-api
 dist-afrog-pro-api
+pocs-curated
 dist
 .sandbox_home
 *.afg
