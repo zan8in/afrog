@@ -524,8 +524,16 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	if isAbs {
 		target = baseHost + newpath
 	} else {
-		bp := strings.TrimRight(basePath, "/")
-		target = baseHost + bp + newpath
+		if newpath == "/" {
+			if basePath == "" {
+				target = baseHost + "/"
+			} else {
+				target = baseHost + basePath
+			}
+		} else {
+			bp := strings.TrimRight(basePath, "/")
+			target = baseHost + bp + newpath
+		}
 	}
 
 	// body

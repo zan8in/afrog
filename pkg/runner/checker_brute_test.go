@@ -16,6 +16,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/targets"
 	"gopkg.in/yaml.v2"
 )
 
@@ -692,5 +693,77 @@ func TestShouldCountHostError(t *testing.T) {
 				t.Fatalf("shouldCountHostError(%v)=%v, want %v", tc.err, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestWebProbePreservesTargetPath(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 2,
+	})
+
+	var mu sync.Mutex
+	paths := make([]string, 0, 4)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/clove/app":
+			w.Header().Set("Server", "openresty")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("<html><head><title>OK</title></head><body>OK</body></html>"))
+		case "/clove/app/":
+			w.Header().Set("Server", "openresty")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte("404"))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	target := srv.URL + "/clove/app"
+	idx := targets.BuildTargetIndex([]string{target})
+
+	opt := &config.Options{
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 2,
+		RateLimit:       10,
+		Concurrency:     1,
+		SDKMode:         true,
+		Silent:          true,
+	}
+	r := &Runner{
+		options:      opt,
+		ctx:          context.Background(),
+		webURLByKey:  make(map[string]string),
+		webMetaByKey: make(map[string]WebMeta),
+	}
+
+	out := r.webProbe(context.Background(), idx)
+	if len(out) != 1 || out[0] != target {
+		t.Fatalf("unexpected webprobe out: %#v, want [%q]", out, target)
+	}
+
+	mu.Lock()
+	gotPaths := append([]string(nil), paths...)
+	mu.Unlock()
+	for _, p := range gotPaths {
+		if p == "/clove/app/" {
+			t.Fatalf("unexpected trailing-slash request to %q: paths=%#v", p, gotPaths)
+		}
+	}
+
+	gotTitle := ""
+	for _, meta := range r.webMetaByKey {
+		gotTitle = meta.Title
+		break
+	}
+	if gotTitle != "OK" {
+		t.Fatalf("unexpected title: got=%q want=%q", gotTitle, "OK")
 	}
 }

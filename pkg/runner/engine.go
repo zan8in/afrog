@@ -229,13 +229,21 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		if ctx != nil {
 			vm[retryhttpclient.ContextVarKey] = ctx
 		}
+		meta := WebMeta{URL: urlStr}
+		u, err := url.Parse(urlStr)
+		if err != nil {
+			return meta
+		}
+		reqURI := strings.TrimSpace(u.RequestURI())
+		if reqURI == "" {
+			reqURI = "/"
+		}
 		rule := poc.Rule{}
 		rule.Request.Method = "GET"
-		rule.Request.Path = "/"
+		rule.Request.Path = "^" + reqURI
 		rule.Request.FollowRedirects = true
 		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
 
-		meta := WebMeta{URL: urlStr}
 		resp, _ := vm["response"].(*proto.Response)
 		if resp == nil {
 			return meta
