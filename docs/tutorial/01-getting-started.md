@@ -41,7 +41,7 @@
 如果你本地有 Go 1.19+ 环境，一条命令搞定：
 
 ```bash
-go install -v github.com/zan8in/afrog/cmd/afrog@latest
+go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
 ```
 
 安装完成后，直接在终端输入 `afrog` 即可（前提是你的 GOPATH/bin 在环境变量里）。
