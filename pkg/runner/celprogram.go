@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -65,6 +66,31 @@ var (
 							return types.NewErr("invalid start or length to 'substr'")
 						}
 						return types.String(runes[start : start+length])
+					} else {
+						return types.NewErr("too many arguments to 'substr'")
+					}
+				},
+			},
+			&functions.Overload{
+				Operator: "substr_bytes_int_int",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) == 3 {
+						b, ok := values[0].(types.Bytes)
+						if !ok {
+							return types.NewErr("invalid bytes to 'substr'")
+						}
+						start, ok := values[1].(types.Int)
+						if !ok {
+							return types.NewErr("invalid start to 'substr'")
+						}
+						length, ok := values[2].(types.Int)
+						if !ok {
+							return types.NewErr("invalid length to 'substr'")
+						}
+						if start < 0 || length < 0 || int(start+length) > len(b) {
+							return types.NewErr("invalid start or length to 'substr'")
+						}
+						return types.Bytes(b[start : start+length])
 					} else {
 						return types.NewErr("too many arguments to 'substr'")
 					}
@@ -141,6 +167,17 @@ var (
 				},
 			},
 			&functions.Overload{
+				Operator: "toUpper_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toUpper_bytes", value.Type())
+					}
+
+					return types.Bytes(bytes.ToUpper(v))
+				},
+			},
+			&functions.Overload{
 				Operator: "toLower_string",
 				Unary: func(value ref.Val) ref.Val {
 					v, ok := value.(types.String)
@@ -169,6 +206,16 @@ var (
 						return types.ValOrErr(value, "unexpected type '%v' passed to toUtf8_bytes", value.Type())
 					}
 					return types.String(utils.Str2UTF8(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "toBytes_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to toBytes_string", value.Type())
+					}
+					return types.Bytes([]byte(v))
 				},
 			},
 
@@ -224,6 +271,138 @@ var (
 						return types.ValOrErr(value, "unexpected type '%v' passed to md5_string", value.Type())
 					}
 					return types.String(fmt.Sprintf("%x", md5.Sum([]byte(v))))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha1_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha1_string", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha1.Sum([]byte(v))))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha1_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha1_bytes", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha1.Sum(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "hex_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to hex_bytes", value.Type())
+					}
+					return types.String(hex.EncodeToString(v))
+				},
+			},
+			&functions.Overload{
+				Operator: "hex_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to hex_string", value.Type())
+					}
+					return types.String(hex.EncodeToString([]byte(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "pkcs7Pad_string_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to pkcs7Pad", lhs.Type())
+					}
+					bs, ok := rhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to pkcs7Pad", rhs.Type())
+					}
+					blockSize := int(bs)
+					if blockSize <= 0 {
+						return types.NewErr("invalid block size")
+					}
+					raw := []byte(text)
+					padding := blockSize - (len(raw) % blockSize)
+					if padding == 0 {
+						padding = blockSize
+					}
+					pad := bytes.Repeat([]byte{byte(padding)}, padding)
+					return types.Bytes(append(raw, pad...))
+				},
+			},
+			&functions.Overload{
+				Operator: "pkcs7Pad_bytes_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					raw, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to pkcs7Pad", lhs.Type())
+					}
+					bs, ok := rhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to pkcs7Pad", rhs.Type())
+					}
+					blockSize := int(bs)
+					if blockSize <= 0 {
+						return types.NewErr("invalid block size")
+					}
+					padding := blockSize - (len(raw) % blockSize)
+					if padding == 0 {
+						padding = blockSize
+					}
+					pad := bytes.Repeat([]byte{byte(padding)}, padding)
+					return types.Bytes(append(raw, pad...))
+				},
+			},
+			&functions.Overload{
+				Operator: "zeroPad_string_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to zeroPad", lhs.Type())
+					}
+					bs, ok := rhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to zeroPad", rhs.Type())
+					}
+					blockSize := int(bs)
+					if blockSize <= 0 {
+						return types.NewErr("invalid block size")
+					}
+					raw := []byte(text)
+					padLen := (blockSize - (len(raw) % blockSize)) % blockSize
+					if padLen == 0 {
+						return types.Bytes(raw)
+					}
+					return types.Bytes(append(raw, make([]byte, padLen)...))
+				},
+			},
+			&functions.Overload{
+				Operator: "zeroPad_bytes_int",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					raw, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to zeroPad", lhs.Type())
+					}
+					bs, ok := rhs.(types.Int)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to zeroPad", rhs.Type())
+					}
+					blockSize := int(bs)
+					if blockSize <= 0 {
+						return types.NewErr("invalid block size")
+					}
+					padLen := (blockSize - (len(raw) % blockSize)) % blockSize
+					if padLen == 0 {
+						return types.Bytes(raw)
+					}
+					return types.Bytes(append(raw, make([]byte, padLen)...))
 				},
 			},
 			&functions.Overload{
@@ -612,6 +791,16 @@ var (
 				},
 			},
 			&functions.Overload{
+				Operator: "timestamp_milli",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'timestamp_milli'")
+					}
+					timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+					return types.String(timestamp)
+				},
+			},
+			&functions.Overload{
 				Operator: "versionCompare_string_string_string",
 				Function: func(values ...ref.Val) ref.Val {
 					if len(values) != 3 {
@@ -674,6 +863,224 @@ var (
 					mode.CryptBlocks(ciphertext, plainText)
 
 					return types.String(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECB_string_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECB", lhs.Type())
+					}
+					key, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECB", rhs.Type())
+					}
+
+					plainText := utils.Pkcs5padding([]byte(text), aes.BlockSize, len([]byte(text)))
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(plainText))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(plainText); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], plainText[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECB_bytes_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECB", lhs.Type())
+					}
+					key, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECB", rhs.Type())
+					}
+
+					plainText := utils.Pkcs5padding([]byte(text), aes.BlockSize, len([]byte(text)))
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(plainText))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(plainText); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], plainText[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECB_bytes_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECB", lhs.Type())
+					}
+					key, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECB", rhs.Type())
+					}
+
+					plainText := utils.Pkcs5padding([]byte(text), aes.BlockSize, len([]byte(text)))
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(plainText))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(plainText); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], plainText[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECB_string_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECB", lhs.Type())
+					}
+					key, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECB", rhs.Type())
+					}
+
+					plainText := utils.Pkcs5padding([]byte(text), aes.BlockSize, len([]byte(text)))
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(plainText))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(plainText); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], plainText[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECBNoPad_string_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECBNoPad", lhs.Type())
+					}
+					key, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECBNoPad", rhs.Type())
+					}
+
+					raw := []byte(text)
+					if len(raw) == 0 || len(raw)%aes.BlockSize != 0 {
+						return types.NewErr("aesECBNoPad requires input length multiple of 16")
+					}
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(raw))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(raw); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], raw[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECBNoPad_bytes_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					raw, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECBNoPad", lhs.Type())
+					}
+					key, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECBNoPad", rhs.Type())
+					}
+
+					if len(raw) == 0 || len(raw)%aes.BlockSize != 0 {
+						return types.NewErr("aesECBNoPad requires input length multiple of 16")
+					}
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(raw))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(raw); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], raw[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECBNoPad_bytes_string",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					raw, ok := lhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECBNoPad", lhs.Type())
+					}
+					key, ok := rhs.(types.String)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECBNoPad", rhs.Type())
+					}
+
+					if len(raw) == 0 || len(raw)%aes.BlockSize != 0 {
+						return types.NewErr("aesECBNoPad requires input length multiple of 16")
+					}
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(raw))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(raw); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], raw[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
+				},
+			},
+			&functions.Overload{
+				Operator: "aesECBNoPad_string_bytes",
+				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
+					text, ok := lhs.(types.String)
+					if !ok {
+						return types.ValOrErr(lhs, "unexpected type '%v' passed to aesECBNoPad", lhs.Type())
+					}
+					key, ok := rhs.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(rhs, "unexpected type '%v' passed to aesECBNoPad", rhs.Type())
+					}
+
+					raw := []byte(text)
+					if len(raw) == 0 || len(raw)%aes.BlockSize != 0 {
+						return types.NewErr("aesECBNoPad requires input length multiple of 16")
+					}
+					block, err := aes.NewCipher([]byte(key))
+					if err != nil {
+						return types.NewErr("%v", err)
+					}
+
+					ciphertext := make([]byte, len(raw))
+					blockSize := block.BlockSize()
+					for i := 0; i < len(raw); i += blockSize {
+						block.Encrypt(ciphertext[i:i+blockSize], raw[i:i+blockSize])
+					}
+					return types.Bytes(ciphertext)
 				},
 			},
 			&functions.Overload{
