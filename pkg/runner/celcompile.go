@@ -233,7 +233,7 @@ var (
 				decls.NewOverload("day_string", []*exprpb.Type{decls.Int},
 					decls.String)),
 			decls.NewFunction("timestamp_second",
-				decls.NewOverload("timestamp_second_string", []*exprpb.Type{decls.Int},
+				decls.NewOverload("timestamp_second", []*exprpb.Type{},
 					decls.String)),
 			decls.NewFunction("timestamp_milli",
 				decls.NewOverload("timestamp_milli", []*exprpb.Type{},

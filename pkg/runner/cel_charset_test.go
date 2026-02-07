@@ -258,3 +258,15 @@ func TestCELTimestampMilli(t *testing.T) {
 		t.Fatalf("expected millisecond timestamp string, got %T(%v)", out.Value(), out.Value())
 	}
 }
+
+func TestCELTimestampSecond(t *testing.T) {
+	lib := NewCustomLib()
+	out, err := lib.RunEval(`timestamp_second()`, map[string]any{})
+	if err != nil {
+		t.Fatalf("eval timestamp_second error: %v", err)
+	}
+	s, ok := out.Value().(string)
+	if !ok || len(s) < 10 {
+		t.Fatalf("expected second timestamp string, got %T(%v)", out.Value(), out.Value())
+	}
+}

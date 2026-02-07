@@ -784,8 +784,11 @@ var (
 				},
 			},
 			&functions.Overload{
-				Operator: "timestamp_second_string",
-				Unary: func(value ref.Val) ref.Val {
+				Operator: "timestamp_second",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'timestamp_second'")
+					}
 					timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 					return types.String(timestamp)
 				},
