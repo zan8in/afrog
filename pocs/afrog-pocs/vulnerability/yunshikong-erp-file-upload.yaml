@@ -17,7 +17,7 @@ set:
   r3: randomInt(40000, 44800)
   r4: randomInt(40000, 44800)
   randname: randomLowercase(6)
-  fileth: year(0) + "-" + month(0) + "-" + day(0)
+  fileth: year() + "-" + month() + "-" + day()
   q: replaceAll(fileth,"-0","-")
   rboundary: randomLowercase(8)
 rules:

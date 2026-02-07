@@ -17,7 +17,7 @@ info:
 set:
   rboundary: randomLowercase(8)
   filename: randomLowercase(6)
-  folder: year(0) + month(0)
+  folder: year() + month()
 rules:
   r0:
     request:

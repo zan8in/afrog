@@ -756,29 +756,41 @@ var (
 			},
 			// year
 			&functions.Overload{
-				Operator: "year_string",
-				Unary: func(value ref.Val) ref.Val {
+				Operator: "year",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'year'")
+					}
 					year := time.Now().Format("2006")
 					return types.String(year)
 				},
 			},
 			&functions.Overload{
-				Operator: "shortyear_string",
-				Unary: func(value ref.Val) ref.Val {
+				Operator: "shortyear",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'shortyear'")
+					}
 					year := time.Now().Format("06")
 					return types.String(year)
 				},
 			},
 			&functions.Overload{
-				Operator: "month_string",
-				Unary: func(value ref.Val) ref.Val {
+				Operator: "month",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'month'")
+					}
 					month := time.Now().Format("01")
 					return types.String(month)
 				},
 			},
 			&functions.Overload{
-				Operator: "day_string",
-				Unary: func(value ref.Val) ref.Val {
+				Operator: "day",
+				Function: func(values ...ref.Val) ref.Val {
+					if len(values) != 0 {
+						return types.NewErr("too many arguments to 'day'")
+					}
 					day := time.Now().Format("02")
 					return types.String(day)
 				},

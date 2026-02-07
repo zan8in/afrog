@@ -270,3 +270,43 @@ func TestCELTimestampSecond(t *testing.T) {
 		t.Fatalf("expected second timestamp string, got %T(%v)", out.Value(), out.Value())
 	}
 }
+
+func TestCELDateNoArgs(t *testing.T) {
+	lib := NewCustomLib()
+
+	out, err := lib.RunEval(`year()`, map[string]any{})
+	if err != nil {
+		t.Fatalf("eval year error: %v", err)
+	}
+	y, ok := out.Value().(string)
+	if !ok || len(y) != 4 {
+		t.Fatalf("expected year length=4, got %T(%v)", out.Value(), out.Value())
+	}
+
+	out, err = lib.RunEval(`shortyear()`, map[string]any{})
+	if err != nil {
+		t.Fatalf("eval shortyear error: %v", err)
+	}
+	sy, ok := out.Value().(string)
+	if !ok || len(sy) != 2 {
+		t.Fatalf("expected shortyear length=2, got %T(%v)", out.Value(), out.Value())
+	}
+
+	out, err = lib.RunEval(`month()`, map[string]any{})
+	if err != nil {
+		t.Fatalf("eval month error: %v", err)
+	}
+	m, ok := out.Value().(string)
+	if !ok || len(m) != 2 {
+		t.Fatalf("expected month length=2, got %T(%v)", out.Value(), out.Value())
+	}
+
+	out, err = lib.RunEval(`day()`, map[string]any{})
+	if err != nil {
+		t.Fatalf("eval day error: %v", err)
+	}
+	d, ok := out.Value().(string)
+	if !ok || len(d) != 2 {
+		t.Fatalf("expected day length=2, got %T(%v)", out.Value(), out.Value())
+	}
+}

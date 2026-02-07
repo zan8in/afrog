@@ -520,34 +520,34 @@ x�
 比如：2023
 
 ```
-year = year(0)
+year = year()
 ```
 
 年简写
 比如：23
 
 ```
-shortYear = shortyear(0)
+shortYear = shortyear()
 ```
 
 月份
 比如：12
 
 ```
-month = month(0)
+month = month()
 ```
 
 日
 比如：02
 
 ```
-day = day(0)
+day = day()
 ```
 
 当前时间戳（秒）
 
 ```
-tsecond = timestamp_second(0)
+tsecond = timestamp_second()
 ```
 
 完整示例
@@ -561,14 +561,14 @@ info:
   severity: info
 
 set:
-  year: year(0)
-  shortYear: shortyear(0)
-  month: month(0)
-  day: day(0)
-  tsecond: timestamp_second(0)
+  year: year()
+  shortYear: shortyear()
+  month: month()
+  day: day()
+  tsecond: timestamp_second()
   millisecond: tsecond + "000"
-  pathname: shortyear(0) + month(0)
-  logfile: shortyear(0) + "_" + month(0) + "_" + day(0) + ".log"
+  pathname: shortyear() + month()
+  logfile: shortyear() + "_" + month() + "_" + day() + ".log"
 rules:
   r0:
     request:

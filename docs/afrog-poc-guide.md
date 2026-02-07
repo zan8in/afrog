@@ -206,7 +206,7 @@ set:
   randfile: randomLowercase(10)
   raw_token: "admin:password"
   token_b64: base64(raw_token)
-  today: shortyear(0) + "-" + month(0) + "-" + day(0)
+  today: shortyear() + "-" + month() + "-" + day()
 ```
 
 ### Rules 规则与 Request
