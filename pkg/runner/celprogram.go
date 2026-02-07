@@ -418,14 +418,15 @@ var (
 
 					re := regexp2.MustCompile(string(v1), 0)
 					raw := string([]byte(v2))
-					rawLen := len([]rune(raw))
+					rawRunes := []rune(raw)
+					rawLen := len(rawRunes)
 
 					var (
 						count   int64
 						startAt int
 					)
 					for startAt <= rawLen {
-						m, err := re.FindStringMatchStartingAt(raw, startAt)
+						m, err := re.FindRunesMatchStartingAt(rawRunes, startAt)
 						if err != nil {
 							return types.NewErr("%v", err)
 						}
@@ -485,14 +486,15 @@ var (
 
 					re := regexp2.MustCompile(string(v1), 0)
 					raw := string(v2)
-					rawLen := len([]rune(raw))
+					rawRunes := []rune(raw)
+					rawLen := len(rawRunes)
 
 					var (
 						count   int64
 						startAt int
 					)
 					for startAt <= rawLen {
-						m, err := re.FindStringMatchStartingAt(raw, startAt)
+						m, err := re.FindRunesMatchStartingAt(rawRunes, startAt)
 						if err != nil {
 							return types.NewErr("%v", err)
 						}
