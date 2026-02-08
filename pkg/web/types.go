@@ -127,6 +127,12 @@ type ScanCreateRequest struct {
 	OOBDomain       string   `json:"oob_domain,omitempty"`
 	OOBApiUrl       string   `json:"oob_api_url,omitempty"`
 	OOBHttpUrl      string   `json:"oob_http_url,omitempty"`
+	PortScan        bool     `json:"portscan,omitempty"`
+	PortScanCompat  bool     `json:"port_scan,omitempty"`
+	SkipHostDisc    bool     `json:"skip_host_discovery,omitempty"`
+	Ports           string   `json:"ports,omitempty"`
+	WebProbe        bool     `json:"webprobe,omitempty"`
+	WebFingerprint  bool     `json:"web_fingerprint,omitempty"`
 	TaskName        string   `json:"task_name,omitempty"`
 	Labels          []string `json:"labels,omitempty"`
 	EnableStream    bool     `json:"enable_stream"`

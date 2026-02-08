@@ -268,19 +268,16 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	if pocPath == "" {
 		src := strings.ToLower(strings.TrimSpace(req.PocSource))
+		home, _ := os.UserHomeDir()
+		curatedDir := filepath.Join(home, ".config", "afrog", "pocs-curated")
+		myDir := filepath.Join(home, ".config", "afrog", "pocs-my")
 		switch src {
 		case "curated":
-			home, _ := os.UserHomeDir()
-			pocPath = filepath.Join(home, ".config", "afrog", "pocs-curated")
+			appendPocs = append(appendPocs, curatedDir)
 		case "my":
-			home, _ := os.UserHomeDir()
-			pocPath = filepath.Join(home, ".config", "afrog", "pocs-my")
+			appendPocs = append(appendPocs, myDir)
 		default:
-			home, _ := os.UserHomeDir()
-			appendPocs = []string{
-				filepath.Join(home, ".config", "afrog", "pocs-curated"),
-				filepath.Join(home, ".config", "afrog", "pocs-my"),
-			}
+			appendPocs = append(appendPocs, curatedDir, myDir)
 		}
 	}
 
@@ -348,6 +345,14 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	sdkOpts.OOBDomain = strings.TrimSpace(req.OOBDomain)
 	sdkOpts.OOBApiUrl = strings.TrimSpace(req.OOBApiUrl)
 	sdkOpts.OOBHttpUrl = strings.TrimSpace(req.OOBHttpUrl)
+	sdkOpts.PortScan = req.PortScan || req.PortScanCompat
+	sdkOpts.PSSkipDiscovery = req.SkipHostDisc
+	if v := strings.TrimSpace(req.Ports); v != "" {
+		sdkOpts.PSPorts = v
+	}
+	if req.WebProbe || req.WebFingerprint {
+		sdkOpts.EnableWebProbe = true
+	}
 	sdkOpts.EnableStream = true
 
 	scanner, err := afrog.NewSDKScanner(sdkOpts)
@@ -424,6 +429,18 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.OOBHttpUrl != "" {
 		logParts = append(logParts, fmt.Sprintf("oob_http_url=%s", req.OOBHttpUrl))
+	}
+	if req.PortScan || req.PortScanCompat {
+		logParts = append(logParts, fmt.Sprintf("portscan=%t", req.PortScan || req.PortScanCompat))
+	}
+	if req.Ports != "" {
+		logParts = append(logParts, fmt.Sprintf("ports=%s", req.Ports))
+	}
+	if req.WebProbe || req.WebFingerprint {
+		logParts = append(logParts, fmt.Sprintf("webprobe=%t", req.WebProbe || req.WebFingerprint))
+	}
+	if req.SkipHostDisc {
+		logParts = append(logParts, fmt.Sprintf("skip_host_discovery=%t", req.SkipHostDisc))
 	}
 	if req.AssetSetID != "" {
 		logParts = append(logParts, fmt.Sprintf("asset_set_id=%s", req.AssetSetID))

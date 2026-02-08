@@ -14,12 +14,15 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/curated/service"
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
 	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/afrog/v3/pocs"
 )
 
 // SDKScanner SDK版本的扫描器，专为库调用优化
@@ -90,20 +93,32 @@ type SDKOptions struct {
 	TargetsFile string   // 目标文件路径
 
 	// ========== POC配置 ==========
-	PocFile   string   // POC文件或目录路径（必须）
-	AppendPoc []string // 附加POC文件或目录路径
-	Search    string   // POC搜索关键词
-	Severity  string   // 严重程度过滤
+	PocFile         string   // POC文件或目录路径（必须）
+	AppendPoc       []string // 附加POC文件或目录路径
+	Search          string   // POC搜索关键词
+	Severity        string   // 严重程度过滤
+	ExcludePocs     []string
+	ExcludePocsFile string
 
 	// ========== 性能配置 ==========
-	RateLimit          int // 请求速率限制 (默认: 150)
-	ReqLimitPerTarget  int
-	Concurrency        int // 并发数 (默认: 25)
-	Retries            int // 重试次数 (默认: 1)
-	Timeout            int // 超时时间秒 (默认: 10)
-	MaxHostError       int // 主机最大错误数 (默认: 3)
-	Smart              bool
-	DisableFingerprint bool
+	RateLimit                      int // 请求速率限制 (默认: 150)
+	ReqLimitPerTarget              int
+	AutoReqLimit                   bool
+	Polite                         bool
+	Balanced                       bool
+	Aggressive                     bool
+	Concurrency                    int // 并发数 (默认: 25)
+	Retries                        int // 重试次数 (默认: 1)
+	Timeout                        int // 超时时间秒 (默认: 10)
+	MaxHostError                   int // 主机最大错误数 (默认: 3)
+	Smart                          bool
+	DisableFingerprint             bool
+	EnableWebProbe                 bool
+	FingerprintFilterMode          string
+	MaxRespBodySize                int
+	BruteMaxRequests               int
+	DefaultAccept                  bool
+	VulnerabilityScannerBreakpoint bool
 
 	PortScan        bool
 	PSPorts         string
@@ -118,27 +133,43 @@ type SDKOptions struct {
 	Headers []string
 
 	// ========== OOB配置 ==========
-	EnableOOB  bool   // 是否启用OOB检测 (默认: false)
-	OOB        string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
-	OOBKey     string // OOB API密钥
-	OOBDomain  string // OOB域名
-	OOBApiUrl  string // OOB API地址
-	OOBHttpUrl string // OOB HTTP地址
+	EnableOOB      bool   // 是否启用OOB检测 (默认: false)
+	OOB            string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
+	OOBKey         string // OOB API密钥
+	OOBDomain      string // OOB域名
+	OOBApiUrl      string // OOB API地址
+	OOBHttpUrl     string // OOB HTTP地址
+	OOBRateLimit   int
+	OOBConcurrency int
 
 	// ========== 输出配置 ==========
 	EnableStream bool // 启用流式输出
+
+	Dingtalk bool
+	Wecom    bool
+
+	CuratedEnabled     string
+	CuratedEndpoint    string
+	CuratedTimeout     int
+	CuratedForceUpdate bool
 }
 
 // NewSDKOptions 创建默认配置
 func NewSDKOptions() *SDKOptions {
 	return &SDKOptions{
-		RateLimit:    150,
-		Concurrency:  25,
-		Retries:      1,
-		Timeout:      10,
-		MaxHostError: 3,
-		PSPorts:      "top",
-		PSS4Chunk:    1000,
+		RateLimit:             150,
+		Concurrency:           25,
+		Retries:               1,
+		Timeout:               50,
+		MaxHostError:          3,
+		MaxRespBodySize:       2,
+		BruteMaxRequests:      5000,
+		DefaultAccept:         true,
+		FingerprintFilterMode: "strict",
+		PSPorts:               "top",
+		PSS4Chunk:             1000,
+		OOBRateLimit:          25,
+		OOBConcurrency:        25,
 	}
 }
 
@@ -171,6 +202,20 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		cfg = &config.Config{}
 	}
 	options.Config = cfg
+
+	if v := strings.TrimSpace(opts.CuratedEnabled); v != "" {
+		options.Config.Curated.Enabled = v
+	}
+	if v := strings.TrimSpace(opts.CuratedEndpoint); v != "" {
+		options.Config.Curated.Endpoint = v
+	}
+	if opts.CuratedTimeout > 0 {
+		options.Config.Curated.TimeoutSec = opts.CuratedTimeout
+	}
+	options.CuratedForceUpdate = opts.CuratedForceUpdate
+	if err := applyCuratedMount(options); err != nil {
+		return nil, err
+	}
 
 	// 设置OOB配置（只有启用OOB且配置了OOB适配器才设置）
 	if opts.EnableOOB && opts.OOB != "" {
@@ -411,6 +456,54 @@ func (s *SDKScanner) run() error {
 			// 如果设置了发现漏洞即停止
 			if s.options.VulnerabilityScannerBreakpoint {
 				return
+			}
+		}
+	}
+
+	s.runner.OnFingerprint = func(targetKey string, hits []fingerprint.Hit) {
+		for _, hit := range hits {
+			sev := strings.TrimSpace(hit.Severity)
+			if sev == "" {
+				sev = "info"
+			}
+			name := strings.TrimSpace(hit.Name)
+			if name == "" {
+				name = strings.TrimSpace(hit.ID)
+			}
+
+			rst := s.runner.FingerprintResult(targetKey, hit.ID)
+			if rst == nil {
+				rst = &result.Result{
+					IsVul:      true,
+					Target:     targetKey,
+					FullTarget: targetKey,
+					PocInfo: &poc.Poc{
+						Id: hit.ID,
+						Info: poc.Info{
+							Name:     name,
+							Severity: sev,
+							Tags:     hit.Tags,
+						},
+					},
+					FingerResult: []fingerprint.Hit{hit},
+				}
+			} else {
+				rst.IsVul = true
+				if rst.PocInfo == nil {
+					rst.PocInfo = &poc.Poc{Id: hit.ID}
+				} else {
+					rst.PocInfo.Id = hit.ID
+				}
+				rst.PocInfo.Info.Name = name
+				rst.PocInfo.Info.Severity = sev
+				rst.PocInfo.Info.Tags = hit.Tags
+				rst.FingerResult = []fingerprint.Hit{hit}
+			}
+			if strings.TrimSpace(rst.FullTarget) == "" {
+				rst.FullTarget = rst.Target
+			}
+			if s.runner.OnResult != nil {
+				s.runner.OnResult(rst)
 			}
 		}
 	}
@@ -697,33 +790,135 @@ func (s *SDKScanner) printScanInfo() {
 	fmt.Printf("=============================\n")
 }
 
+func applyCuratedMount(options *config.Options) error {
+	if options == nil || options.Config == nil {
+		return nil
+	}
+	cur := options.Config.Curated
+	enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
+	endpoint := strings.TrimSpace(cur.Endpoint)
+	if enabled == "off" || enabled == "false" || enabled == "0" || endpoint == "" {
+		_ = os.Setenv("AFROG_CURATED_DISABLED", "1")
+		_ = os.Unsetenv("AFROG_POCS_CURATED_DIR")
+		return nil
+	}
+
+	_ = os.Unsetenv("AFROG_CURATED_DISABLED")
+	svc := service.New(service.Config{
+		Endpoint:      endpoint,
+		Channel:       strings.TrimSpace(cur.Channel),
+		CuratedPocDir: "",
+		LicenseKey:    strings.TrimSpace(cur.LicenseKey),
+		NoUpdate:      cur.AutoUpdate != nil && !*cur.AutoUpdate && !options.CuratedForceUpdate,
+		ForceUpdate:   options.CuratedForceUpdate,
+		ClientVersion: config.Version,
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cur.TimeoutSec)*time.Second)
+	if cur.TimeoutSec <= 0 {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	defer cancel()
+
+	dir, err := svc.Mount(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "curated mount failed: %s\n", strings.TrimSpace(err.Error()))
+		return nil
+	}
+	if strings.TrimSpace(dir) != "" {
+		_ = os.Setenv("AFROG_POCS_CURATED_DIR", dir)
+	}
+	return nil
+}
+
 // convertSDKOptions 转换SDK配置到内部配置
 func convertSDKOptions(opts *SDKOptions) *config.Options {
 	options := &config.Options{
-		TargetsFile:        opts.TargetsFile,
-		PocFile:            opts.PocFile,
-		AppendPoc:          opts.AppendPoc,
-		Search:             opts.Search,
-		Severity:           opts.Severity,
-		RateLimit:          opts.RateLimit,
-		ReqLimitPerTarget:  opts.ReqLimitPerTarget,
-		Concurrency:        opts.Concurrency,
-		Retries:            opts.Retries,
-		Timeout:            opts.Timeout,
-		MaxHostError:       opts.MaxHostError,
-		Proxy:              opts.Proxy,
-		MaxRespBodySize:    2,
-		OOBRateLimit:       50,
-		OOBConcurrency:     20,
-		Smart:              opts.Smart,
-		DisableFingerprint: opts.DisableFingerprint,
-		PortScan:           opts.PortScan,
-		PSPorts:            opts.PSPorts,
-		PSRateLimit:        opts.PSRateLimit,
-		PSTimeout:          opts.PSTimeout,
-		PSRetries:          opts.PSRetries,
-		PSSkipDiscovery:    opts.PSSkipDiscovery,
-		PSS4Chunk:          opts.PSS4Chunk,
+		TargetsFile:                    opts.TargetsFile,
+		PocFile:                        opts.PocFile,
+		AppendPoc:                      opts.AppendPoc,
+		Search:                         opts.Search,
+		Severity:                       opts.Severity,
+		ExcludePocs:                    opts.ExcludePocs,
+		ExcludePocsFile:                opts.ExcludePocsFile,
+		RateLimit:                      opts.RateLimit,
+		ReqLimitPerTarget:              opts.ReqLimitPerTarget,
+		AutoReqLimit:                   opts.AutoReqLimit,
+		Polite:                         opts.Polite,
+		Balanced:                       opts.Balanced,
+		Aggressive:                     opts.Aggressive,
+		Concurrency:                    opts.Concurrency,
+		Retries:                        opts.Retries,
+		Timeout:                        opts.Timeout,
+		MaxHostError:                   opts.MaxHostError,
+		Proxy:                          opts.Proxy,
+		MaxRespBodySize:                opts.MaxRespBodySize,
+		BruteMaxRequests:               opts.BruteMaxRequests,
+		DefaultAccept:                  opts.DefaultAccept,
+		OOBRateLimit:                   opts.OOBRateLimit,
+		OOBConcurrency:                 opts.OOBConcurrency,
+		Smart:                          opts.Smart,
+		DisableFingerprint:             opts.DisableFingerprint,
+		EnableWebProbe:                 opts.EnableWebProbe,
+		FingerprintFilterMode:          opts.FingerprintFilterMode,
+		VulnerabilityScannerBreakpoint: opts.VulnerabilityScannerBreakpoint,
+		PortScan:                       opts.PortScan,
+		PSPorts:                        opts.PSPorts,
+		PSRateLimit:                    opts.PSRateLimit,
+		PSTimeout:                      opts.PSTimeout,
+		PSRetries:                      opts.PSRetries,
+		PSSkipDiscovery:                opts.PSSkipDiscovery,
+		PSS4Chunk:                      opts.PSS4Chunk,
+		Dingtalk:                       opts.Dingtalk,
+		Wecom:                          opts.Wecom,
+		CuratedEnabled:                 opts.CuratedEnabled,
+		CuratedEndpoint:                opts.CuratedEndpoint,
+		CuratedTimeout:                 opts.CuratedTimeout,
+		CuratedForceUpdate:             opts.CuratedForceUpdate,
+	}
+
+	if options.MaxRespBodySize <= 0 {
+		options.MaxRespBodySize = 2
+	}
+	if strings.TrimSpace(options.FingerprintFilterMode) == "" {
+		options.FingerprintFilterMode = "strict"
+	}
+	if options.OOBRateLimit == 0 {
+		options.OOBRateLimit = 25
+	}
+	if options.OOBConcurrency == 0 {
+		options.OOBConcurrency = 25
+	}
+	if options.ReqLimitPerTarget == 0 {
+		if options.Polite {
+			options.ReqLimitPerTarget = 5
+		} else if options.Balanced {
+			options.ReqLimitPerTarget = 15
+		} else if options.Aggressive {
+			options.ReqLimitPerTarget = 50
+		} else if options.AutoReqLimit {
+			baseRate := options.RateLimit
+			if baseRate <= 0 {
+				baseRate = 150
+			}
+			r := baseRate / 10
+			if r < 5 {
+				r = 5
+			}
+			if r > 15 {
+				r = 15
+			}
+			con := options.Concurrency
+			if con <= 0 {
+				con = 1
+			}
+			if con >= 100 && r > 8 {
+				r = 8
+			} else if con >= 50 && r > 12 {
+				r = 12
+			}
+			options.ReqLimitPerTarget = r
+		}
 	}
 
 	if len(opts.Headers) > 0 {
@@ -744,6 +939,37 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 
 // validateSDKConfig SDK配置验证
 func validateSDKConfig(options *config.Options) error {
+	limitModeCount := 0
+	if options.ReqLimitPerTarget > 0 {
+		limitModeCount++
+	}
+	if options.AutoReqLimit {
+		limitModeCount++
+	}
+	if options.Polite {
+		limitModeCount++
+	}
+	if options.Balanced {
+		limitModeCount++
+	}
+	if options.Aggressive {
+		limitModeCount++
+	}
+	if limitModeCount > 1 {
+		return errors.New("only one of ReqLimitPerTarget/AutoReqLimit/Polite/Balanced/Aggressive can be used")
+	}
+	if options.ReqLimitPerTarget < 0 {
+		return errors.New("ReqLimitPerTarget must be >= 0")
+	}
+
+	options.FingerprintFilterMode = strings.ToLower(strings.TrimSpace(options.FingerprintFilterMode))
+	if options.FingerprintFilterMode == "" {
+		options.FingerprintFilterMode = "strict"
+	}
+	if options.FingerprintFilterMode != "strict" && options.FingerprintFilterMode != "opportunistic" {
+		options.FingerprintFilterMode = "strict"
+	}
+
 	// 验证目标
 	if len(options.Target) == 0 && len(options.TargetsFile) == 0 {
 		return errors.New("未指定扫描目标")
@@ -759,6 +985,24 @@ func validateSDKConfig(options *config.Options) error {
 	if options.PocFile != "" {
 		if _, err := os.Stat(options.PocFile); err != nil {
 			return fmt.Errorf("POC文件或目录不存在: %s", options.PocFile)
+		}
+	}
+
+	if options.Config != nil {
+		tokensEmpty := func(tokens []string) bool {
+			for _, t := range tokens {
+				if strings.TrimSpace(t) != "" {
+					return false
+				}
+			}
+			return true
+		}
+
+		if options.Dingtalk && tokensEmpty(options.Config.Webhook.Dingtalk.Tokens) {
+			return errors.New("Dingtalk webhook token is required")
+		}
+		if options.Wecom && tokensEmpty(options.Config.Webhook.Wecom.Tokens) {
+			return errors.New("Wecom webhook token is required")
 		}
 	}
 
@@ -833,7 +1077,7 @@ func createSDKRunner(options *config.Options) (*runner.Runner, error) {
 	// SDK模式特殊处理
 	c := catalog.New(options.PocsDirectory.String())
 	allPocsYamlSlice := c.GetPocsPath(options.PocsDirectory)
-	if len(allPocsYamlSlice) == 0 {
+	if len(allPocsYamlSlice) == 0 && len(pocs.EmbedFileList) == 0 {
 		return nil, errors.New("未找到POC文件")
 	}
 
