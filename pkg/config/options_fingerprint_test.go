@@ -51,6 +51,25 @@ func TestFilterPocSeveritySearchWithFingerprint(t *testing.T) {
 			t.Fatalf("expected included when no filters are set")
 		}
 	})
+
+	t.Run("search keyword matches tags", func(t *testing.T) {
+		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,weblogic,rce"); !got {
+			t.Fatalf("expected included when search matches tags")
+		}
+		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,tomcat,rce"); got {
+			t.Fatalf("expected excluded when search mismatches tags")
+		}
+	})
+}
+
+func TestOptions_FilterPocSeveritySearch_MatchesTags(t *testing.T) {
+	o := &Options{Search: "weblogic"}
+	if !o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,weblogic,rce", "high") {
+		t.Fatalf("expected included when search matches tags")
+	}
+	if o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,tomcat,rce", "high") {
+		t.Fatalf("expected excluded when search mismatches tags")
+	}
 }
 
 func TestParseNacosDetectPocMeta(t *testing.T) {

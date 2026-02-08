@@ -313,7 +313,7 @@ afrog -t targets.txt -smart
 
 | 参数 | 默认值 | 说明 |
 | :--- | :--- | :--- |
-| `-s`, `--search` |  | 按关键词搜索 PoC（逗号分隔） |
+| `-s`, `--search` |  | 按关键词搜索 PoC（匹配 id/name/tags，逗号分隔） |
 | `-S`, `--severity` |  | 按严重级别过滤（`info/low/medium/high/critical/unknown`） |
 
 ### Rate-Limit

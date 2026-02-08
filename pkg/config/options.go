@@ -558,23 +558,27 @@ func (opt *Options) VerifyOptions() error {
 }
 
 func (o *Options) SetSearchKeyword() bool {
-	if len(o.Search) > 0 {
-		arr := strings.Split(o.Search, ",")
-		if len(arr) > 0 {
-			for _, v := range arr {
-				o.SearchKeywords = append(o.SearchKeywords, strings.TrimSpace(v))
-			}
-			return true
-		}
+	o.SearchKeywords = o.SearchKeywords[:0]
+	if strings.TrimSpace(o.Search) == "" {
+		return false
 	}
-	return false
+	for _, v := range strings.Split(o.Search, ",") {
+		k := strings.ToLower(strings.TrimSpace(v))
+		if k == "" {
+			continue
+		}
+		o.SearchKeywords = append(o.SearchKeywords, k)
+	}
+	return len(o.SearchKeywords) > 0
 }
 
-func (o *Options) CheckPocKeywords(id, name string) bool {
+func (o *Options) CheckPocKeywords(id, name, tags string) bool {
 	if len(o.SearchKeywords) > 0 {
+		idLower := strings.ToLower(id)
+		nameLower := strings.ToLower(name)
+		tagsLower := strings.ToLower(tags)
 		for _, v := range o.SearchKeywords {
-			v = strings.ToLower(v)
-			if strings.Contains(strings.ToLower(id), v) || strings.Contains(strings.ToLower(name), v) {
+			if strings.Contains(idLower, v) || strings.Contains(nameLower, v) || strings.Contains(tagsLower, v) {
 				return true
 			}
 		}
@@ -606,10 +610,10 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 	return false
 }
 
-func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, severity string) bool {
+func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, pocTags, severity string) bool {
 	var isShow bool
 	if len(o.Search) > 0 && o.SetSearchKeyword() && len(o.Severity) > 0 && o.SetSeverityKeyword() {
-		if o.CheckPocKeywords(pocId, pocInfoName) && o.CheckPocSeverityKeywords(severity) {
+		if o.CheckPocKeywords(pocId, pocInfoName, pocTags) && o.CheckPocSeverityKeywords(severity) {
 			isShow = true
 		}
 	} else if len(o.Severity) > 0 && o.SetSeverityKeyword() {
@@ -617,7 +621,7 @@ func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, severity string) b
 			isShow = true
 		}
 	} else if len(o.Search) > 0 && o.SetSearchKeyword() {
-		if o.CheckPocKeywords(pocId, pocInfoName) {
+		if o.CheckPocKeywords(pocId, pocInfoName, pocTags) {
 			isShow = true
 		}
 	} else {
@@ -657,14 +661,15 @@ func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocNa
 		return false
 	}
 
-	matchKeyword := func(id, name string) bool {
+	matchKeyword := func(id, name, tags string) bool {
 		if len(searchKeywords) == 0 {
 			return true
 		}
 		idLower := strings.ToLower(id)
 		nameLower := strings.ToLower(name)
+		tagsLower := strings.ToLower(tags)
 		for _, k := range searchKeywords {
-			if strings.Contains(idLower, k) || strings.Contains(nameLower, k) {
+			if strings.Contains(idLower, k) || strings.Contains(nameLower, k) || strings.Contains(tagsLower, k) {
 				return true
 			}
 		}
@@ -687,7 +692,7 @@ func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocNa
 	if len(searchKeywords) == 0 && len(severityKeywords) == 0 {
 		return true
 	}
-	if !matchKeyword(pocID, pocName) {
+	if !matchKeyword(pocID, pocName, pocTags) {
 		return false
 	}
 	if matchSeverity(pocSeverity) {
@@ -736,9 +741,9 @@ func (o *Options) PrintPocList() error {
 		}
 
 		var (
-			id, name, severity string
-			authors            []string
-			err                error
+			id, name, tags, severity string
+			authors                  []string
+			err                      error
 		)
 
 		if it.Source == pocsrepo.SourceBuiltin {
@@ -749,6 +754,7 @@ func (o *Options) PrintPocList() error {
 			if err == nil {
 				id = pm.Id
 				name = pm.Info.Name
+				tags = pm.Info.Tags
 				severity = pm.Info.Severity
 				authors = pocsrepo.SplitAuthors(pm.Info.Author)
 			}
@@ -758,6 +764,7 @@ func (o *Options) PrintPocList() error {
 			if err == nil {
 				id = pm.Id
 				name = pm.Info.Name
+				tags = pm.Info.Tags
 				severity = pm.Info.Severity
 				authors = pocsrepo.SplitAuthors(pm.Info.Author)
 			}
@@ -769,7 +776,7 @@ func (o *Options) PrintPocList() error {
 		}
 
 		// 保留原有过滤逻辑
-		if !o.FilterPocSeveritySearch(id, name, severity) {
+		if !o.FilterPocSeveritySearch(id, name, tags, severity) {
 			continue
 		}
 		// 排除列表
