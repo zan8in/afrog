@@ -16,26 +16,84 @@
 afrog -T targets.txt
 ```
 
-### 2. 联动端口扫描：`-ps` (Port Scan)
-Afrog 不仅仅是个 Web 漏扫。当你面对一个 IP 时，不知道它开放了哪些 Web 端口？
-加上 `-ps` 参数，Afrog 会先进行端口扫描，发现开放的 Web 服务后，自动进行漏洞扫描。
+### 2. 资产探测：CIDR/段探测 + 端口扫描（`-ps`）+ Web 探测（`-w`）
+当你的输入不是“URL”，而是 “IP / 网段 / 段范围”时，最佳姿势通常是：
 
+1) 用 `-ps` 做端口预扫，把 `host:port` 资产捞出来  
+2) 用 `-w` 做 Web 存活探测，把可访问的 Web URL（含标题等信息）捞出来  
+3) Afrog 再基于这些资产跑指纹与漏洞 PoC
+
+#### 2.1 CIDR / 段范围作为目标
 ```bash
-# 扫描 ip 的常见端口，发现服务后自动扫漏洞
-afrog -t 192.168.1.100 -ps
+# CIDR 目标（会进入预扫/扫描流程）
+afrog -t 192.168.1.0/24 -ps
+
+# IP 段范围目标（会进入预扫/扫描流程）
+afrog -t 192.168.1.1-192.168.1.254 -ps
 ```
 
-你甚至可以指定端口范围：
+#### 2.2 端口预扫：`-ps` + `-p`
 ```bash
-# 扫描全端口
+# 默认端口策略：-p top（常见端口优先）
+afrog -t 192.168.1.100 -ps
+
+# 自定义端口：单个 / 逗号分隔 / 范围
+afrog -t 192.168.1.100 -ps -p 80,443,8080,8000-9000
+```
+
+`-p` 支持关键字（更适合“资产探测”的语义）：
+- `top`：常见端口优先（默认）
+- `full` / `all`：内置高覆盖端口序列（分层扫描），适合更全面的探测
+- `s1`/`s2`/`s3`/`s4`：分层端口集合（更偏调参玩法）
+
+如果你想要“真正意义的 1-65535 全端口”，使用范围更直观：
+```bash
 afrog -t 192.168.1.100 -ps -p 1-65535
 ```
+
+#### 2.3 端口预扫调参：`-Pn` / `-prate` / `-ptimeout` / `-ptries`
+```bash
+# 跳过主机发现阶段，直接对输入目标做端口扫描
+afrog -t 192.168.1.0/24 -ps -Pn
+
+# 控制端口扫描速率/超时/重试（单位：ms）
+afrog -t 192.168.1.0/24 -ps -p all -prate 2000 -ptimeout 800 -ptries 1
+```
+
+`-p all/full` 时，内部会把大端口集合切块扫描；可以用 `-ps-s4-chunk` 控制块大小（更稳但更慢，或更快但更吃资源）。
+
+#### 2.4 Web 存活探测：`-w`
+`-w` 会对目标集合做 Web 探测，自动补全/识别可访问的 HTTP(S) URL，并输出常见元信息（如标题、Server 等）。它适合你在跑漏洞前快速摸清 Web 面。
+
+```bash
+# 端口预扫 + Web 探测 + 漏洞扫描
+afrog -t 192.168.1.0/24 -ps  -w
+```
+
+#### 2.5 常见服务探测 → 弱口令/默认口令探测
+端口预扫得到的是 `host:port`，随后 Afrog 会进行指纹识别；当服务类型能被识别时，对应的弱口令/默认口令 PoC（位于 `pocs/afrog-pocs/default-pwd/`）就可以自动跑起来（例如 `ssh-weak-login` 的 `requires: [ssh]`）。
+
+实战示例：
+```bash
+# 网段资产探测 + Web 探测
+afrog -t 192.168.1.0/24 -ps -w
+
+# 只盯一个服务（示例：SSH 弱口令）
+afrog -t 192.168.1.0/24 -ps -p 22 -s ssh
+
+# 先把弱口令 PoC 列出来看看（用于了解支持范围）
+afrog -pl -s detect,weak-login,default
+```
+
+常见覆盖的服务/组件（以内置 PoC 为准，随版本迭代）：
+- 网络服务：SSH、FTP、Telnet、SMB、WinRM、SMTP/POP3/IMAP、VNC、Redis、MongoDB、MySQL、PostgreSQL、MSSQL、Oracle、Memcached、Zookeeper
+- 常见后台/中间件：Tomcat、Jenkins、Grafana、Zabbix、RabbitMQ、phpMyAdmin、Nexus、MinIO、ActiveMQ 等
 
 ---
 
 ## 🔍 过滤的艺术：精准制导
 
-Afrog 内置了数千个 PoC，全量扫描虽然覆盖全，但有时太慢或动静太大。这时候你需要“过滤器”。
+Afrog 内置了一千多个 PoC，全量扫描虽然覆盖全，但有时太慢或动静太大。这时候你需要“过滤器”。
 
 ### 1. 按关键词搜索：`-s` (Search)
 假设你只关心 **Spring Boot** 相关的漏洞：
@@ -94,10 +152,10 @@ afrog -t http://example.com -ja result_full.json
 示例：
 ```bash
 # 企业微信推送
-afrog -T targets.txt -S high,critical -wecom
+afrog -T targets.txt -wecom
 
 # 钉钉推送
-afrog -T targets.txt -S high,critical -dingtalk
+afrog -T targets.txt -dingtalk
 
 # 如果你使用了非默认路径的配置文件
 afrog -T targets.txt -wecom -config /path/to/afrog-config.yaml
@@ -120,7 +178,7 @@ afrog -t targets.txt -c 50
 ```bash
 afrog -t targets.txt -smart
 ```
-开启后，Afrog 会根据目标的数量自动调整并发策略，让你省心省力。
+开启后，Afrog 会根据目标的数量和终端的并发能力自动调整并发策略，让你省心省力。
 
 ---
 
@@ -129,7 +187,9 @@ afrog -t targets.txt -smart
 | 场景 | 参数组合 |
 | :--- | :--- |
 | **批量扫描** | `afrog -T urls.txt` |
-| **IP 资产探测** | `afrog -t 1.2.3.4 -ps` |
+| **IP/网段资产探测** | `afrog -t 1.2.3.4 -ps -w` |
+| **全端口扫描** | `afrog -t 1.2.3.4 -ps -p 1-65535` |
+| **弱口令/默认口令** | `afrog -t 1.2.3.0/24 -ps -s detect,weak-login,default` |
 | **只扫某组件** | `afrog -t example.com -s weblogic` |
 | **只看高危** | `afrog -t example.com -S high,critical` |
 | **自动化对接** | `afrog -t example.com -ja result.json` |
