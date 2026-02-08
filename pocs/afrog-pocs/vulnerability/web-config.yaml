@@ -5,6 +5,7 @@ info:
   author: Yash Anand @yashanand155
   severity: info
   tags: config,exposure
+  created: 2024/01/16
 
 rules:
   r0:

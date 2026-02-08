@@ -12,6 +12,7 @@ info:
   reference:
     - https://karaf.apache.org/manual/latest/webconsole
   tags: default-login,apache,karaf
+  created: 2024/01/16
 
 set:
   karaf: base64('karaf:karaf')

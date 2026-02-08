@@ -11,6 +11,7 @@ info:
   reference:
     - https://mp.weixin.qq.com/s/LTA8vshnI1AFybyzOZLbIQ?token=564303397&lang=zh_CN
   tags: hanwangE,hanwang,hanvon,fastjson,rce
+  created: 2024/01/16
 
 set:
   username: randomLowercase(12)

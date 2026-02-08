@@ -10,7 +10,7 @@ info:
   reference:
     - https://github.com/Threekiii/Awesome-POC/blob/master/CMS%E6%BC%8F%E6%B4%9E/PbootCMS%20search%20SQL%E6%B3%A8%E5%85%A5%E6%BC%8F%E6%B4%9E.md
   tags: pbootcms,pboot,sqli
-  create: 2023/06/15
+  created: 2023/06/15
 
 rules:
   r0:

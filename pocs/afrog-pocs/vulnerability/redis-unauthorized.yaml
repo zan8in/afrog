@@ -10,7 +10,8 @@ info:
     fofa: app="redis"
   reference:
     - https://developer.aliyun.com/article/515894
-  tags: network,redis,unauth
+  tags: network,redis,unauthorized
+  created: 2024/01/16
 
 set:
   hostname: request.url.host
