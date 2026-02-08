@@ -14,4 +14,13 @@ rules:
       method: GET
       path: /v1/cs/configs?export=true&group=&tenant=&appName=&ids=&dataId=
     expression: response.status == 200 && response.headers["content-disposition"].icontains("nacos_config_export_")
-expression: r0()
+  r1:
+    request:
+      method: GET
+      path: /nacos/v1/cs/configs?dataId=*&group=*&appName=&config_tags=&pageNo=1&pageSize=10&tenant=*&search=blur
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"totalCount":') &&
+      response.body.bcontains(b'"pageAvailable":') &&
+      response.body.bcontains(b'"content":')
+expression: r0() || r1()
