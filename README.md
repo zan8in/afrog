@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/zan8in/afrog/blob/main/images/planet.jpg" alt="Afrog 官方圈 - 知识星球" width="250">
+  <img src="https://github.com/zan8in/afrog/blob/main/images/planet.png" alt="Afrog 官方圈 - 知识星球" width="250">
 </p>
 <p align="center">
   本圈专注更新 PoC，不追求数量，只打磨质量。
