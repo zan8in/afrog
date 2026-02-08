@@ -5,6 +5,10 @@ info:
   author: zan8in
   severity: high
   verified: false
+  description: |-
+    JNDI Test
+  tags: jndi,test
+  created: 2024/01/16
 
 set:
   oob: oob()

@@ -6,6 +6,8 @@ info:
   severity: high
   verified: true
   description: TCP Demo
+  tags: tcp,demo
+  created: 2024/01/16
 
 set:
   hostname: request.url.host
@@ -26,7 +28,3 @@ rules:
       read-size: 1024
     expression: response.raw.bcontains(b'No such') && response.raw.bcontains(b'lstat() failed')
 expression: r0() || r1()
-
-
-
-  

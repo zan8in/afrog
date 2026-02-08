@@ -7,7 +7,10 @@ info:
   description: |-
     swagger-ui使用了一个过时的库DomPurify，结合库的特性允许获得由查询参数控制的DOM型XSS,该漏洞允许攻击者在页面上注入任何属性的HTML元素
     此漏洞 3.38.0 已经修复，建议受影响用户及时升级更新 Swagger UI 到最新版本。漏洞利用点为index.html?configUrl=xxx.json或index.html?url=xxx.yaml
-    FoFa：icon_hash="-1180440057"
+    fofa: app="Swagger-UI" && icon_hash="-1180440057"
+  tags: swagger-ui,xss
+  created: 2024/01/16
+
 rules:
   r0:
     brute:
