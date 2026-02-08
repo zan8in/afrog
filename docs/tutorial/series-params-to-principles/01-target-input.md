@@ -2,7 +2,7 @@
 
 > “你以为你在喂目标，其实你在给扫描系统定‘战场形态’。”
 
-上一期我们用 `afrog -t http://example.com` 跑通了最基本的一次扫描。  
+这一期我们先用 `afrog -t http://example.com` 跑通最基本的一次扫描。  
 但从开发者视角看，`-t/-T` 不是“输入框”这么简单——它决定了：
 
 - 后续要不要补协议、怎么补
@@ -17,8 +17,6 @@
 
 - `-t, --target`：命令行直接传目标（支持逗号分隔多目标）
 - `-T, --target-file`：从文件读目标（一行一个）
-
-参数定义在 [options.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/config/options.go#L240-L248)。
 
 ---
 
@@ -45,9 +43,7 @@
 
 ### 1) 目标汇总：三路输入统一进 options.Targets
 
-Afrog 会把 `-t`、`-T`、以及测绘导入（`-cs/-q`）拿到的目标，统一 append 到 `options.Targets` 里，并用 `seen` 做一次去重。
-
-实现位置：[runner.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/runner/runner.go#L162-L210)
+Afrog 会把 `-t`、`-T` 等入口拿到的目标，统一 append 到 `options.Targets` 里，并用 `seen` 做一次去重。
 
 关键行为：
 
@@ -57,7 +53,7 @@ Afrog 会把 `-t`、`-T`、以及测绘导入（`-cs/-q`）拿到的目标，统
 
 ### 2) 目标文件读取：朴素到你必须知道它的边界
 
-`targets.txt` 的读取是纯逐行读取：[file.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/utils/file.go#L15-L32)
+`targets.txt` 的读取是纯逐行读取：
 
 它的“朴素后果”：
 
@@ -78,17 +74,15 @@ Afrog 会把 `-t`、`-T`、以及测绘导入（`-cs/-q`）拿到的目标，统
 - HostPorts：`1.2.3.4:8080`
 - Expandable：`192.168.1.0/24`、`192.168.1.1-192.168.1.254`
 
-入口在：[index.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/targets/index.go#L25-L75)
-
 ### 1) 先识别“可展开目标”（CIDR/段范围）
 
-CIDR 和 IP 段范围会被优先识别为 Expandable：[index.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/targets/index.go#L166-L192)
+CIDR 和 IP 段范围会被优先识别为 Expandable。
 
 这也是为什么你输入 `192.168.1.0/24` 时，后面 `-ps` 能自然接上：它天生就是“资产扩展型输入”。
 
 ### 2) URL 的识别：只在它“看起来像 URL”时才会被当成 URL
 
-URL 识别逻辑里有个关键设计：没写 scheme 且没有 `/ ? #` 时，不把它当 URL。[index.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/targets/index.go#L194-L227)
+URL 识别逻辑里有个关键设计：没写 scheme 且没有 `/ ? #` 时，不把它当 URL。
 
 也就是说：
 
@@ -99,7 +93,7 @@ URL 识别逻辑里有个关键设计：没写 scheme 且没有 `/ ? #` 时，�
 
 ### 3) Host:Port 的识别：严格限制端口合法性
 
-`host:port` 会被解析并校验端口范围，最终规范化：[index.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/targets/index.go#L260-L305)
+`host:port` 会被解析并校验端口范围，最终规范化。
 
 好处：把明显错误的输入尽早挡住，避免把无意义目标拖进后续流程。
 
@@ -108,8 +102,6 @@ URL 识别逻辑里有个关键设计：没写 scheme 且没有 `/ ? #` 时，�
 ## “为什么我没写 http/https，它也能跑？”——协议补全与探活的真相
 
 当目标不是 URL 时，会走协议探测：探测成功会把目标更新为 `http(s)://...`；探测失败会累计错误，超过阈值会被拉黑，避免拖垮全局跑批。
-
-实现位置：[monitor.go](file:///Users/zanbin/Documents/gowork/github/zan8in/afrog/pkg/runner/monitor.go#L90-L125)
 
 ---
 
@@ -138,7 +130,7 @@ afrog -t 192.168.1.0/24 -ps
 ### 3) 跑批常用基线（稳）
 
 ```bash
-afrog -T targets.txt -S high,critical -ja result.json
+afrog -T targets.txt -S info,high,critical -smart
 ```
 
 ---
@@ -155,5 +147,4 @@ afrog -T targets.txt -S high,critical -ja result.json
 ## 下期预告
 
 下一期我们继续把“目标输入”打穿：  
-**#02：`-cs/-q/-qc` 空间测绘导入为什么这么设计，怎么避免把自己跑死。**
-
+**#02：`--resume` 断点续扫为什么需要，恢复边界在哪里。**
