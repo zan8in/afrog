@@ -44,6 +44,15 @@ type ConfigHttp struct {
 
 type Webhook struct {
 	Dingtalk Dingtalk `yaml:"dingtalk"`
+	Wecom    Wecom    `yaml:"wecom"`
+}
+
+type Wecom struct {
+	Tokens    []string `yaml:"tokens"`
+	AtMobiles []string `yaml:"at_mobiles"`
+	AtAll     bool     `yaml:"at_all"`
+	Range     string   `yaml:"range"`
+	Markdown  bool     `yaml:"markdown"`
 }
 
 type Dingtalk struct {
@@ -158,6 +167,13 @@ func NewConfig(configFile string) (*Config, error) {
 		webhook.Dingtalk.AtMobiles = []string{""}
 		webhook.Dingtalk.AtAll = false
 		webhook.Dingtalk.Range = "high,critical"
+
+		webhook.Wecom.Tokens = []string{""}
+		webhook.Wecom.AtMobiles = []string{""}
+		webhook.Wecom.AtAll = false
+		webhook.Wecom.Range = "high,critical"
+		webhook.Wecom.Markdown = true
+
 		c.Webhook = webhook
 
 		cyberspace := c.Cyberspace

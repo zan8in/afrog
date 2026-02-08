@@ -140,6 +140,7 @@ func main() {
 
 	var (
 		lock      = sync.Mutex{}
+		webhookWG = sync.WaitGroup{}
 		starttime = time.Now()
 		number    uint32
 	)
@@ -229,7 +230,22 @@ func main() {
 			sqlite.SetResultX(rst)
 
 			if options.Dingtalk {
-				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(rst.PocInfo.Id, rst.PocInfo.Info.Severity, rst.FullTarget))
+				webhookWG.Add(1)
+				go func() {
+					defer webhookWG.Done()
+					if err := r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(rst.PocInfo.Id, rst.PocInfo.Info.Severity, rst.FullTarget)); err != nil {
+						gologger.Error().Msgf("dingtalk webhook send failed: %v", err)
+					}
+				}()
+			}
+			if options.Wecom {
+				webhookWG.Add(1)
+				go func() {
+					defer webhookWG.Done()
+					if err := r.Wecom.SendVulMessage(rst, r.Wecom.Markdown); err != nil {
+						gologger.Error().Msgf("wecom webhook send failed: %v", err)
+					}
+				}()
 			}
 
 			if !options.DisableOutputHtml {
@@ -303,7 +319,23 @@ func main() {
 			sqlite.SetResultX(result)
 
 			if options.Dingtalk {
-				go r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget))
+				webhookWG.Add(1)
+				go func() {
+					defer webhookWG.Done()
+					if err := r.Ding.SendMarkDownMessageBySlice("From afrog vulnerability Notice", r.Ding.MarkdownText(result.PocInfo.Id, result.PocInfo.Info.Severity, result.FullTarget)); err != nil {
+						gologger.Error().Msgf("dingtalk webhook send failed: %v", err)
+					}
+				}()
+			}
+
+			if options.Wecom {
+				webhookWG.Add(1)
+				go func() {
+					defer webhookWG.Done()
+					if err := r.Wecom.SendVulMessage(result, r.Wecom.Markdown); err != nil {
+						gologger.Error().Msgf("wecom webhook send failed: %v", err)
+					}
+				}()
 			}
 
 			if !options.DisableOutputHtml {
@@ -387,6 +419,7 @@ func main() {
 		}
 	}
 
+	webhookWG.Wait()
 	sqlite.CloseX()
 	gologger.Print().Msg("")
 

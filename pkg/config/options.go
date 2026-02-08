@@ -19,6 +19,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/validator"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
+	"github.com/zan8in/afrog/v3/pkg/webhook/wecom"
 	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
@@ -172,6 +173,9 @@ type Options struct {
 
 	// webhook
 	Dingtalk bool
+
+	// webhook wecom
+	Wecom bool
 
 	// resume
 	Resume string
@@ -335,6 +339,7 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("webhook", "Webhook",
 		flagSet.BoolVar(&options.Dingtalk, "dingtalk", false, "Start a dingtalk webhook."),
+		flagSet.BoolVar(&options.Wecom, "wecom", false, "Start a wecom webhook."),
 	)
 
 	flagSet.CreateGroup("configurations", "Configurations",
@@ -409,6 +414,12 @@ func (opt *Options) VerifyOptions() error {
 	if opt.Dingtalk {
 		if dingtalk.IsTokensEmpty(opt.Config.Webhook.Dingtalk.Tokens) {
 			return fmt.Errorf("Dingtalk webhook token is required")
+		}
+	}
+
+	if opt.Wecom {
+		if wecom.IsTokensEmpty(opt.Config.Webhook.Wecom.Tokens) {
+			return fmt.Errorf("Wecom webhook token is required")
 		}
 	}
 
