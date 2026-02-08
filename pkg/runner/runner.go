@@ -39,6 +39,7 @@ type Runner struct {
 	JsonReport        *report.JsonReport
 	OnResult          OnResult
 	OnFingerprint     func(targetKey string, hits []fingerprint.Hit)
+	OnWebProbe        func(meta WebMeta)
 	PocsYaml          utils.StringSlice
 	PocsEmbedYaml     utils.StringSlice
 	engine            *Engine

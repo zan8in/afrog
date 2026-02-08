@@ -50,10 +50,14 @@ type SDKScanner struct {
 
 	OnPort func(host string, port int)
 
+	OnWebProbe func(r WebProbeResult)
+
 	// 实时结果通道（流式版本）
 	ResultChan chan *result.Result
 
 	PortChan chan PortScanResult
+
+	WebProbeChan chan WebProbeResult
 
 	closeChansOnce sync.Once
 
@@ -84,6 +88,13 @@ type ScanStats struct {
 type PortScanResult struct {
 	Host string
 	Port int
+}
+
+type WebProbeResult struct {
+	URL       string
+	Title     string
+	Server    string
+	PoweredBy string
 }
 
 // SDKOptions SDK扫描配置选项（优化版）
@@ -309,6 +320,33 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		}
 	}
 
+	scanner.runner.OnWebProbe = func(meta runner.WebMeta) {
+		if scanner.WebProbeChan == nil && scanner.OnWebProbe == nil {
+			return
+		}
+		r := WebProbeResult{
+			URL:       strings.TrimSpace(meta.URL),
+			Title:     strings.TrimSpace(meta.Title),
+			Server:    strings.TrimSpace(meta.Server),
+			PoweredBy: strings.TrimSpace(meta.PoweredBy),
+		}
+		if scanner.WebProbeChan != nil {
+			ch := scanner.WebProbeChan
+			func() {
+				defer func() { _ = recover() }()
+				select {
+				case ch <- r:
+				case <-scanner.ctx.Done():
+					return
+				default:
+				}
+			}()
+		}
+		if scanner.OnWebProbe != nil {
+			scanner.OnWebProbe(r)
+		}
+	}
+
 	// 如果启用流式输出，创建结果通道
 	if opts.EnableStream {
 		scanner.ResultChan = make(chan *result.Result, 100)
@@ -316,6 +354,10 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 
 	if opts.PortScan {
 		scanner.PortChan = make(chan PortScanResult, 100)
+	}
+
+	if opts.EnableWebProbe {
+		scanner.WebProbeChan = make(chan WebProbeResult, 100)
 	}
 
 	// 计算扫描统计
@@ -411,6 +453,9 @@ func (s *SDKScanner) closeChans() {
 		}
 		if s.PortChan != nil {
 			close(s.PortChan)
+		}
+		if s.WebProbeChan != nil {
+			close(s.WebProbeChan)
 		}
 	})
 }

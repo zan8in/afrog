@@ -149,14 +149,21 @@ func startTask(m *TaskManager, t *Task) {
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
+		resultCh := t.Scanner.ResultChan
+		portCh := t.Scanner.PortChan
+		webProbeCh := t.Scanner.WebProbeChan
 		for {
+			if resultCh == nil && portCh == nil && webProbeCh == nil {
+				if t.Status != TaskCancelled {
+					finalizeTask(m, t, TaskCompleted)
+				}
+				return
+			}
 			select {
-			case r, ok := <-t.Scanner.ResultChan:
+			case r, ok := <-resultCh:
 				if !ok {
-					if t.Status != TaskCancelled {
-						finalizeTask(m, t, TaskCompleted)
-					}
-					return
+					resultCh = nil
+					continue
 				}
 				sev := strings.ToLower(r.PocInfo.Info.Severity)
 				if t.SeverityStats == nil {
@@ -173,6 +180,28 @@ func startTask(m *TaskManager, t *Task) {
 					},
 					"message": fmt.Sprintf("命中 %s", r.PocInfo.Info.Severity),
 					"ts":      time.Now().UnixMilli(),
+				}})
+			case pr, ok := <-portCh:
+				if !ok {
+					portCh = nil
+					continue
+				}
+				publish(t, ScanEvent{Type: "port", Data: map[string]interface{}{
+					"host": pr.Host,
+					"port": pr.Port,
+					"ts":   time.Now().UnixMilli(),
+				}})
+			case wp, ok := <-webProbeCh:
+				if !ok {
+					webProbeCh = nil
+					continue
+				}
+				publish(t, ScanEvent{Type: "webprobe", Data: map[string]interface{}{
+					"url":        wp.URL,
+					"title":      wp.Title,
+					"server":     wp.Server,
+					"powered_by": wp.PoweredBy,
+					"ts":         time.Now().UnixMilli(),
 				}})
 			case <-ticker.C:
 				st := t.Scanner.GetStats()

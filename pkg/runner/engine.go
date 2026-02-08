@@ -193,6 +193,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		webMetaByKey[key] = meta
 		webURLs = append(webURLs, urlStr)
 		mu.Unlock()
+		if runner.OnWebProbe != nil {
+			runner.OnWebProbe(meta)
+		}
 		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
 			extinfo := ""
 			if t := strings.TrimSpace(meta.Title); t != "" {
