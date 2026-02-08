@@ -48,7 +48,7 @@ func newPhaseProgress(opt *Options, phase string, total int) *phaseProgress {
 }
 
 func (p *phaseProgress) enabled() bool {
-	return p != nil && p.opt != nil && !p.opt.Quiet && p.opt.Debug && p.total > 0
+	return p != nil && p.opt != nil && p.total > 0 && (p.opt.OnProgress != nil || (!p.opt.Quiet && p.opt.Debug))
 }
 
 func (p *phaseProgress) startRender(ctx context.Context) {
@@ -56,6 +56,7 @@ func (p *phaseProgress) startRender(ctx context.Context) {
 		return
 	}
 	p.start = time.Now()
+	p.render(false)
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
@@ -81,8 +82,8 @@ func (p *phaseProgress) stopRender() {
 	default:
 		close(p.stop)
 	}
-	if p.enabled() {
-		p.render(true)
+	p.render(true)
+	if p.opt != nil && !p.opt.Quiet && p.opt.Debug && p.total > 0 {
 		fmt.Fprint(os.Stderr, "\r\033[2K\r")
 	}
 }
@@ -99,6 +100,9 @@ func (p *phaseProgress) markAlive(host, proto string) {
 		return
 	}
 	atomic.AddUint64(&p.alive, 1)
+	if p.opt.OnDiscoveredHost != nil && strings.TrimSpace(host) != "" {
+		p.opt.OnDiscoveredHost(host)
+	}
 	if p.opt.LogDiscoveredHosts || p.opt.Debug {
 		if p.opt.Debug && !p.opt.Quiet {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
@@ -108,7 +112,7 @@ func (p *phaseProgress) markAlive(host, proto string) {
 }
 
 func (p *phaseProgress) render(final bool) {
-	if !p.enabled() {
+	if p == nil || p.opt == nil {
 		return
 	}
 	p.printMu.Lock()
@@ -125,6 +129,17 @@ func (p *phaseProgress) render(final bool) {
 	percent := int(done * 100 / total)
 	if final {
 		percent = 100
+	}
+	if p.opt.OnProgress != nil {
+		status := "running"
+		if final {
+			status = "completed"
+		}
+		p.opt.OnProgress("host_discovery", status, int(done), int(total), percent)
+	}
+	printEnabled := !p.opt.Quiet && p.opt.Debug && total > 0
+	if !printEnabled {
+		return
 	}
 	if !final && int32(percent) == atomic.LoadInt32(&p.lastPercent) {
 		return

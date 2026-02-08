@@ -218,6 +218,9 @@ type Options struct {
 	PSSkipDiscovery  bool
 	PSS4Chunk        int
 	OnPortScanResult func(host string, port int)
+	OnHostDiscovered func(host string)
+	OnPhaseProgress  func(phase string, status string, finished int64, total int64, percent int)
+	OnScanInfoUpdate func(info ScanInfoUpdate)
 
 	// path to the afrog configuration file
 	ConfigFile string
@@ -229,6 +232,15 @@ type Options struct {
 	CuratedEndpoint    string
 	CuratedTimeout     int
 	CuratedForceUpdate bool
+}
+
+type ScanInfoUpdate struct {
+	TotalTargets int
+	Targets      []string
+	TotalPocs    int
+	TotalScans   int
+	OOBEnabled   bool
+	OOBStatus    string
 }
 
 func NewOptions() (*Options, error) {

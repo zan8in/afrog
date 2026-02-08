@@ -133,6 +133,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			gologger.Info().Msgf("%-9s | %-9s | alive=%d/%d duration=%s", utils.StageHostDiscovery, "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
 		}
 		hostIter = NewHostIterator(aliveHosts)
+	} else if s.options.OnProgress != nil {
+		s.options.OnProgress("host_discovery", "skipped", 0, 0, 0)
 	}
 
 	// Shuffle hosts to avoid sequential scanning detection
@@ -151,13 +153,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 	}
 
-	progressEnabled := (s.options.Debug || s.options.LiveStats) && !s.options.Quiet && total > 0
+	printEnabled := (s.options.Debug || s.options.LiveStats) && !s.options.Quiet && total > 0
+	callbackEnabled := s.options.OnProgress != nil && total > 0
 	var progressDone chan struct{}
 	var lastPercent int32 = -1
+	var lastCallbackPercent int32 = -1
 	renderProgress := func(final bool) {
-		if !progressEnabled {
-			return
-		}
 		curr := atomic.LoadUint64(&s.currentProgress)
 		if int(curr) > total {
 			curr = uint64(total)
@@ -169,7 +170,21 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if final {
 			percent = 100
 			curr = uint64(total)
-		} else {
+		}
+		if callbackEnabled {
+			if final || int32(percent) != atomic.LoadInt32(&lastCallbackPercent) {
+				atomic.StoreInt32(&lastCallbackPercent, int32(percent))
+				status := "running"
+				if final {
+					status = "completed"
+				}
+				s.options.OnProgress("portscan", status, int(curr), total, percent)
+			}
+		}
+		if !printEnabled {
+			return
+		}
+		if !final {
 			if int32(percent) == atomic.LoadInt32(&lastPercent) {
 				return
 			}
@@ -188,7 +203,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, curr, total, elapsed, suffix)
 	}
 
-	if progressEnabled {
+	if printEnabled || callbackEnabled {
 		progressDone = make(chan struct{})
 		go func() {
 			ticker := time.NewTicker(1 * time.Second)
@@ -319,7 +334,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	wg.Wait()
 
 	if scanCtx.Err() != nil && !s.options.Quiet {
-		if progressEnabled {
+		if printEnabled {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
 		if v := stageCursor.Load(); v != nil {
@@ -338,9 +353,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		close(progressDone)
 		progressDone = nil
 	}
-	if progressEnabled {
+	if printEnabled || callbackEnabled {
 		renderProgress(true)
-		fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		if printEnabled {
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		}
 	}
 	if !s.options.Quiet {
 		if !s.options.LiveStats {

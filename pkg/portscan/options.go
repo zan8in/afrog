@@ -15,6 +15,8 @@ type Options struct {
 	ScanMode               ScanMode
 	ServiceDB              string // Path to nmap-services or custom fingerprints
 	OnResult               func(*ScanResult)
+	OnProgress             func(phase string, status string, finished int, total int, percent int)
+	OnDiscoveredHost       func(host string)
 	Debug                  bool
 	LiveStats              bool
 	Quiet                  bool

@@ -57,7 +57,13 @@ type SDKScanner struct {
 
 	PortChan chan PortScanResult
 
+	HostChan chan HostDiscoveryResult
+
 	WebProbeChan chan WebProbeResult
+
+	PhaseProgressChan chan PhaseProgress
+
+	ScanInfoChan chan ScanInfoUpdate
 
 	closeChansOnce sync.Once
 
@@ -72,6 +78,11 @@ type SDKScanner struct {
 
 	// 扫描统计信息
 	stats *ScanStats
+
+	phaseMu sync.Mutex
+	phases  map[string]PhaseProgress
+
+	lastVulnPhasePercent int32
 }
 
 // ScanStats 扫描统计信息
@@ -90,11 +101,32 @@ type PortScanResult struct {
 	Port int
 }
 
+type HostDiscoveryResult struct {
+	Host string
+}
+
 type WebProbeResult struct {
 	URL       string
 	Title     string
 	Server    string
 	PoweredBy string
+}
+
+type PhaseProgress struct {
+	Phase    string
+	Status   string
+	Finished int64
+	Total    int64
+	Percent  int
+}
+
+type ScanInfoUpdate struct {
+	TotalTargets int
+	Targets      []string
+	TotalPocs    int
+	TotalScans   int
+	OOBEnabled   bool
+	OOBStatus    string
 }
 
 // SDKOptions SDK扫描配置选项（优化版）
@@ -290,7 +322,9 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		stats: &ScanStats{
 			StartTime: time.Now(),
 		},
+		phases: make(map[string]PhaseProgress),
 	}
+	atomic.StoreInt32(&scanner.lastVulnPhasePercent, -1)
 
 	options.OnPortScanResult = func(host string, port int) {
 		scanner.openPortsMu.Lock()
@@ -317,6 +351,25 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 
 		if scanner.OnPort != nil {
 			scanner.OnPort(host, port)
+		}
+	}
+
+	options.OnHostDiscovered = func(host string) {
+		host = strings.TrimSpace(host)
+		if host == "" {
+			return
+		}
+		if scanner.HostChan != nil {
+			ch := scanner.HostChan
+			func() {
+				defer func() { _ = recover() }()
+				select {
+				case ch <- HostDiscoveryResult{Host: host}:
+				case <-scanner.ctx.Done():
+					return
+				default:
+				}
+			}()
 		}
 	}
 
@@ -350,14 +403,78 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	// 如果启用流式输出，创建结果通道
 	if opts.EnableStream {
 		scanner.ResultChan = make(chan *result.Result, 100)
+		scanner.PhaseProgressChan = make(chan PhaseProgress, 64)
+		scanner.ScanInfoChan = make(chan ScanInfoUpdate, 16)
 	}
 
 	if opts.PortScan {
 		scanner.PortChan = make(chan PortScanResult, 100)
+		scanner.HostChan = make(chan HostDiscoveryResult, 256)
 	}
 
 	if opts.EnableWebProbe {
 		scanner.WebProbeChan = make(chan WebProbeResult, 100)
+	}
+
+	options.OnPhaseProgress = func(phase string, status string, finished int64, total int64, percent int) {
+		phase = strings.ToLower(strings.TrimSpace(phase))
+		if phase == "" {
+			return
+		}
+		if percent < 0 {
+			percent = 0
+		}
+		if percent > 100 {
+			percent = 100
+		}
+		pp := PhaseProgress{
+			Phase:    phase,
+			Status:   strings.ToLower(strings.TrimSpace(status)),
+			Finished: finished,
+			Total:    total,
+			Percent:  percent,
+		}
+		scanner.phaseMu.Lock()
+		scanner.phases[phase] = pp
+		scanner.phaseMu.Unlock()
+		if scanner.PhaseProgressChan != nil {
+			ch := scanner.PhaseProgressChan
+			func() {
+				defer func() { _ = recover() }()
+				select {
+				case ch <- pp:
+				case <-scanner.ctx.Done():
+					return
+				default:
+				}
+			}()
+		}
+	}
+
+	options.OnScanInfoUpdate = func(info config.ScanInfoUpdate) {
+		scanner.stats.TotalTargets = info.TotalTargets
+		scanner.stats.TotalPocs = info.TotalPocs
+		scanner.stats.TotalScans = info.TotalScans
+		if scanner.ScanInfoChan != nil {
+			ch := scanner.ScanInfoChan
+			up := ScanInfoUpdate{
+				TotalTargets: info.TotalTargets,
+				Targets:      append([]string(nil), info.Targets...),
+				TotalPocs:    info.TotalPocs,
+				TotalScans:   info.TotalScans,
+				OOBEnabled:   info.OOBEnabled,
+				OOBStatus:    info.OOBStatus,
+			}
+			func() {
+				defer func() { _ = recover() }()
+				select {
+				case ch <- up:
+				case <-scanner.ctx.Done():
+					return
+				default:
+				}
+			}()
+		}
 	}
 
 	// 计算扫描统计
@@ -454,8 +571,17 @@ func (s *SDKScanner) closeChans() {
 		if s.PortChan != nil {
 			close(s.PortChan)
 		}
+		if s.HostChan != nil {
+			close(s.HostChan)
+		}
 		if s.WebProbeChan != nil {
 			close(s.WebProbeChan)
+		}
+		if s.PhaseProgressChan != nil {
+			close(s.PhaseProgressChan)
+		}
+		if s.ScanInfoChan != nil {
+			close(s.ScanInfoChan)
 		}
 	})
 }
@@ -472,6 +598,28 @@ func (s *SDKScanner) run() error {
 	// 设置结果处理器
 	s.runner.OnResult = func(r *result.Result) {
 		atomic.AddInt32(&s.stats.CompletedScans, 1)
+		if s.options != nil && s.options.OnPhaseProgress != nil {
+			total := int64(s.stats.TotalScans)
+			completed := int64(atomic.LoadInt32(&s.stats.CompletedScans))
+			percent := 100
+			if total > 0 {
+				percent = int(completed * 100 / total)
+				if percent > 100 {
+					percent = 100
+				}
+				if percent < 0 {
+					percent = 0
+				}
+			}
+			if int32(percent) != atomic.LoadInt32(&s.lastVulnPhasePercent) {
+				atomic.StoreInt32(&s.lastVulnPhasePercent, int32(percent))
+				status := "running"
+				if total == 0 || (completed >= total && percent >= 100) {
+					status = "completed"
+				}
+				s.options.OnPhaseProgress("vuln", status, completed, total, percent)
+			}
+		}
 
 		if r.IsVul {
 			s.mu.Lock()
@@ -556,6 +704,34 @@ func (s *SDKScanner) run() error {
 	// 执行扫描
 	s.runner.Execute()
 
+	if s.options != nil && s.options.OnPhaseProgress != nil {
+		total := int64(s.stats.TotalScans)
+		completed := int64(atomic.LoadInt32(&s.stats.CompletedScans))
+		percent := 100
+		if total > 0 {
+			percent = int(completed * 100 / total)
+			if percent > 100 {
+				percent = 100
+			}
+			if percent < 0 {
+				percent = 0
+			}
+		}
+		status := "completed"
+		if s.ctx != nil && s.ctx.Err() != nil {
+			status = "interrupted"
+		} else if total > 0 && completed < total {
+			status = "interrupted"
+		}
+		if status == "completed" {
+			percent = 100
+			if total > 0 {
+				completed = total
+			}
+		}
+		s.options.OnPhaseProgress("vuln", status, completed, total, percent)
+	}
+
 	s.stats.EndTime = time.Now()
 	return nil
 }
@@ -598,11 +774,76 @@ func (s *SDKScanner) GetStats() ScanStats {
 
 // GetProgress 获取扫描进度（0-100）
 func (s *SDKScanner) GetProgress() float64 {
-	if s.stats.TotalScans == 0 {
-		return 0
+	clip := func(v float64) float64 {
+		if v < 0 {
+			return 0
+		}
+		if v > 100 {
+			return 100
+		}
+		return v
 	}
-	completed := atomic.LoadInt32(&s.stats.CompletedScans)
-	return float64(completed) / float64(s.stats.TotalScans) * 100
+
+	getPhasePercent := func(name string) int {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			return 0
+		}
+		s.phaseMu.Lock()
+		pp, ok := s.phases[name]
+		s.phaseMu.Unlock()
+		if !ok {
+			return 0
+		}
+		if pp.Percent < 0 {
+			return 0
+		}
+		if pp.Percent > 100 {
+			return 100
+		}
+		return pp.Percent
+	}
+
+	vulnPercent := 100.0
+	if s.stats.TotalScans > 0 {
+		completed := atomic.LoadInt32(&s.stats.CompletedScans)
+		vulnPercent = float64(completed) / float64(s.stats.TotalScans) * 100
+	}
+
+	hasPort := s.sdkOpts != nil && s.sdkOpts.PortScan
+	hasWebProbe := s.sdkOpts != nil && s.sdkOpts.EnableWebProbe
+
+	portStagePercent := 100.0
+	if hasPort {
+		hostDisc := getPhasePercent("host_discovery")
+		portscan := getPhasePercent("portscan")
+		if hostDisc == 0 && portscan == 0 {
+			portStagePercent = 0
+		} else {
+			portStagePercent = (float64(hostDisc) + float64(portscan)) / 2
+		}
+	}
+
+	webprobePercent := 100.0
+	if hasWebProbe {
+		wp := getPhasePercent("webprobe")
+		webprobePercent = float64(wp)
+	}
+
+	wPort := 0.0
+	if hasPort {
+		wPort = 0.2
+	}
+	wWeb := 0.0
+	if hasWebProbe {
+		wWeb = 0.2
+	}
+	wVuln := 1.0 - wPort - wWeb
+	if wVuln < 0 {
+		wVuln = 0
+	}
+
+	return clip(wPort*portStagePercent + wWeb*webprobePercent + wVuln*clip(vulnPercent))
 }
 
 // Stop 停止扫描

@@ -151,9 +151,12 @@ func startTask(m *TaskManager, t *Task) {
 		defer ticker.Stop()
 		resultCh := t.Scanner.ResultChan
 		portCh := t.Scanner.PortChan
+		hostCh := t.Scanner.HostChan
 		webProbeCh := t.Scanner.WebProbeChan
+		phaseCh := t.Scanner.PhaseProgressChan
+		scanInfoCh := t.Scanner.ScanInfoChan
 		for {
-			if resultCh == nil && portCh == nil && webProbeCh == nil {
+			if resultCh == nil && portCh == nil && hostCh == nil && webProbeCh == nil && phaseCh == nil && scanInfoCh == nil {
 				if t.Status != TaskCancelled {
 					finalizeTask(m, t, TaskCompleted)
 				}
@@ -191,6 +194,15 @@ func startTask(m *TaskManager, t *Task) {
 					"port": pr.Port,
 					"ts":   time.Now().UnixMilli(),
 				}})
+			case hr, ok := <-hostCh:
+				if !ok {
+					hostCh = nil
+					continue
+				}
+				publish(t, ScanEvent{Type: "host", Data: map[string]interface{}{
+					"host": hr.Host,
+					"ts":   time.Now().UnixMilli(),
+				}})
 			case wp, ok := <-webProbeCh:
 				if !ok {
 					webProbeCh = nil
@@ -202,6 +214,37 @@ func startTask(m *TaskManager, t *Task) {
 					"server":     wp.Server,
 					"powered_by": wp.PoweredBy,
 					"ts":         time.Now().UnixMilli(),
+				}})
+			case pp, ok := <-phaseCh:
+				if !ok {
+					phaseCh = nil
+					continue
+				}
+				publish(t, ScanEvent{Type: "phase_progress", Data: map[string]interface{}{
+					"phase":    pp.Phase,
+					"status":   pp.Status,
+					"finished": pp.Finished,
+					"total":    pp.Total,
+					"percent":  pp.Percent,
+					"ts":       time.Now().UnixMilli(),
+				}})
+			case si, ok := <-scanInfoCh:
+				if !ok {
+					scanInfoCh = nil
+					continue
+				}
+				displayTargets := si.Targets
+				if len(displayTargets) > 5 {
+					displayTargets = displayTargets[:5]
+				}
+				publish(t, ScanEvent{Type: "scan_info", Data: map[string]interface{}{
+					"total_targets": si.TotalTargets,
+					"total_pocs":    si.TotalPocs,
+					"total_scans":   si.TotalScans,
+					"targets":       displayTargets,
+					"oob_enabled":   si.OOBEnabled,
+					"oob_status":    si.OOBStatus,
+					"ts":            time.Now().UnixMilli(),
 				}})
 			case <-ticker.C:
 				st := t.Scanner.GetStats()
@@ -221,6 +264,26 @@ func startTask(m *TaskManager, t *Task) {
 
 func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	t.Status = status
+	if t.Scanner != nil {
+		st := t.Scanner.GetStats()
+		prog := t.Scanner.GetProgress()
+		publish(t, ScanEvent{Type: "progress", Data: map[string]interface{}{
+			"percent":   int(prog + 0.5),
+			"finished":  int(st.CompletedScans),
+			"total":     st.TotalScans,
+			"rate":      calcRate(t.startTime, st.CompletedScans),
+			"elapsedMs": time.Since(t.startTime).Milliseconds(),
+		}})
+		oobEnabled, oobStatus := t.Scanner.GetOOBStatus()
+		publish(t, ScanEvent{Type: "scan_info", Data: map[string]interface{}{
+			"total_targets": st.TotalTargets,
+			"total_pocs":    st.TotalPocs,
+			"total_scans":   st.TotalScans,
+			"oob_enabled":   oobEnabled,
+			"oob_status":    oobStatus,
+			"ts":            time.Now().UnixMilli(),
+		}})
+	}
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(status)}})
 	m.mu.Lock()
 	if m.running > 0 {

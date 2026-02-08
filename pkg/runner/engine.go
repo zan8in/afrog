@@ -152,6 +152,12 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	if len(candidates) == 0 {
 		return nil
 	}
+	totalCandidates := len(candidates)
+	var processed uint64
+	var lastPercent int32 = -1
+	if runner.options.OnPhaseProgress != nil {
+		runner.options.OnPhaseProgress("webprobe", "running", 0, int64(totalCandidates), 0)
+	}
 
 	rate := runner.options.RateLimit
 	if rate <= 0 {
@@ -273,6 +279,17 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 					if !ok {
 						return
 					}
+					d := atomic.AddUint64(&processed, 1)
+					if runner.options.OnPhaseProgress != nil && totalCandidates > 0 {
+						percent := int(d * 100 / uint64(totalCandidates))
+						if percent > 100 {
+							percent = 100
+						}
+						if int32(percent) != atomic.LoadInt32(&lastPercent) {
+							atomic.StoreInt32(&lastPercent, int32(percent))
+							runner.options.OnPhaseProgress("webprobe", "running", int64(d), int64(totalCandidates), percent)
+						}
+					}
 					select {
 					case <-runner.ctx.Done():
 						return
@@ -305,6 +322,27 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	}
 	close(tasks)
 	wg.Wait()
+	if runner.options.OnPhaseProgress != nil {
+		done := atomic.LoadUint64(&processed)
+		percent := 0
+		if totalCandidates > 0 {
+			percent = int(done * 100 / uint64(totalCandidates))
+			if percent > 100 {
+				percent = 100
+			}
+		}
+		status := "completed"
+		if ctx != nil && ctx.Err() != nil {
+			status = "interrupted"
+		} else if runner.ctx != nil && runner.ctx.Err() != nil {
+			status = "interrupted"
+		} else if int(done) != totalCandidates {
+			status = "interrupted"
+		} else if totalCandidates > 0 {
+			percent = 100
+		}
+		runner.options.OnPhaseProgress("webprobe", status, int64(done), int64(totalCandidates), percent)
+	}
 
 	runner.webMu.Lock()
 	for k, v := range webURLByKey {
@@ -665,6 +703,16 @@ func (runner *Runner) Execute() {
 			psOpts.Debug = !options.Silent
 			psOpts.LiveStats = options.LiveStats
 			psOpts.Quiet = false
+			if options.OnPhaseProgress != nil {
+				psOpts.OnProgress = func(phase string, status string, finished int, total int, percent int) {
+					options.OnPhaseProgress(phase, status, int64(finished), int64(total), percent)
+				}
+			}
+			if options.OnHostDiscovered != nil {
+				psOpts.OnDiscoveredHost = func(host string) {
+					options.OnHostDiscovered(host)
+				}
+			}
 			if options.PSPorts != "" {
 				psOpts.Ports = options.PSPorts
 			}
@@ -727,10 +775,16 @@ func (runner *Runner) Execute() {
 		} else if !options.SDKMode {
 			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
 			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
+		} else if options.OnPhaseProgress != nil {
+			options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
+			options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 		}
 	} else if !options.SDKMode {
 		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
 		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
+	} else if options.OnPhaseProgress != nil {
+		options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
+		options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 	}
 
 	allTargets := make([]string, 0, runner.options.Targets.Len())
@@ -937,6 +991,21 @@ func (runner *Runner) Execute() {
 		}
 	}
 	options.Count += taskCount
+	if options.OnScanInfoUpdate != nil {
+		pocTotal := len(pocSlice)
+		if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
+			pocTotal += len(fingerprintPocs)
+		}
+		oobEnabled, oobStatus := runner.getOOBStatus(reversePocs)
+		options.OnScanInfoUpdate(config.ScanInfoUpdate{
+			TotalTargets: len(webScanTargets),
+			Targets:      append([]string(nil), webScanTargets...),
+			TotalPocs:    pocTotal,
+			TotalScans:   options.Count,
+			OOBEnabled:   oobEnabled,
+			OOBStatus:    oobStatus,
+		})
+	}
 
 	if options.Smart {
 		options.SmartControl()
