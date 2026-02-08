@@ -63,11 +63,14 @@ reverse:
 扫描任务一跑就是几个小时，难道要一直盯着屏幕？
 当然不！配置 Webhook，发现漏洞直接推送到你的手机。
 
-### 钉钉/企业微信机器人
-以钉钉为例：
-1.  在钉钉群里添加“自定义机器人”。
-2.  安全设置选择“加签”或“关键词”（关键词填 `afrog`）。
-3.  复制 Webhook 地址。
+使用提示：
+- Webhook 是“配置 + 启用参数”两件事：在 `afrog-config.yaml` 配好 token 后，还需要在命令行加 `-dingtalk` 或 `-wecom` 才会推送。
+- 配置文件默认位置：`~/.config/afrog/afrog-config.yaml`，如果你修改了其他位置，扫描时需要用 `-config` 指定。
+
+### 钉钉机器人
+1. 在钉钉群里添加“自定义机器人”。
+2. 安全设置选择“加签”或“关键词”（关键词填 `afrog`）。
+3. 复制 Webhook 地址，从中取出 `access_token=...` 后面的那段作为 token。
 
 修改 `afrog-config.yaml`：
 ```yaml
@@ -76,9 +79,47 @@ webhook:
     tokens: 
       - "这里填access_token后面的那串字符"
     at_mobiles: [] # 需要@的人手机号
+    at_all: false # 是否@所有人
     range: "high,critical" # 只推送高危和严重漏洞
 ```
-这样，一旦扫出高危漏洞，你的手机就会“叮”一声，报告直接送到手边。
+
+启用推送（示例）：
+```bash
+afrog -t http://example.com -s spring -dingtalk
+```
+
+### 企业微信机器人（群机器人 Webhook）
+企业微信这里的 `token` 指的是群机器人 Webhook URL 里的 `key`（不是应用的 `access_token`），形如：
+`https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxxxx`，把 `key=xxxxxx` 的 `xxxxxx` 填入 tokens。
+
+修改 `afrog-config.yaml`：
+```yaml
+webhook:
+  wecom:
+    tokens:
+      - "这里填key后面的那串字符"
+    at_mobiles: [] # 需要@的人手机号（仅在 markdown=false 时生效）
+    at_all: false # 是否@所有人
+    range: high,critical # 推送的漏洞等级（命中即推）
+    markdown: true # 是否使用 markdown 消息
+```
+
+启用推送（示例）：
+```bash
+afrog -t http://example.com -s spring -wecom
+```
+
+字段解释（企业微信）：
+
+| 字段名 | 含义 | 默认值 |
+| --- | --- | --- |
+| tokens | 企业微信群机器人 Webhook key，可配置多个 | 空 |
+| at_mobiles | 需要 @ 的成员手机号（仅在 markdown=false 时生效） | 空 |
+| at_all | 是否 @ 全体成员 | false |
+| range | 推送的漏洞等级过滤（示例：high,critical） | high,critical |
+| markdown | 是否用 markdown 格式发送 | true |
+
+这样，一旦扫出高危漏洞，你的手机就会收到推送，报告直接送到手边。
 
 ---
 

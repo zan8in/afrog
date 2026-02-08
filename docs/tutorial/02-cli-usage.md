@@ -83,6 +83,30 @@ afrog -t http://example.com -ja result_full.json
 
 ---
 
+## 🔔 Webhook 告警：钉钉 / 企业微信
+
+当你跑批量任务时，最怕的是“扫完才发现有洞”。Webhook 告警可以让 Afrog 在命中漏洞时直接把消息推送到群里。
+
+要点：
+- 先在 `~/.config/afrog/afrog-config.yaml` 里配置 token
+- 扫描时再加 `-dingtalk` 或 `-wecom` 才会推送
+
+示例：
+```bash
+# 企业微信推送
+afrog -T targets.txt -S high,critical -wecom
+
+# 钉钉推送
+afrog -T targets.txt -S high,critical -dingtalk
+
+# 如果你使用了非默认路径的配置文件
+afrog -T targets.txt -wecom -config /path/to/afrog-config.yaml
+```
+
+字段说明与配置样例请看下一篇教程《配置文件深度解析》中的 Webhook 章节。
+
+---
+
 ## ⚡ 进阶技巧：智能并发
 
 默认情况下，Afrog 的并发已经调教得很好了。但如果你想更激进，或者目标很脆弱，可以手动调整并发数 `-c` (Concurrency)：
