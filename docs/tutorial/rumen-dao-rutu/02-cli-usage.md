@@ -20,9 +20,10 @@
 | 全端口扫描（绝对全量） | `afrog -t 1.2.3.4 -ps -p 1-65535 -Pn` |
 | 快速只扫高危 | `afrog -T targets.txt -S high,critical` |
 | 只跑某类 PoC（关键词） | `afrog -t http://example.com -s spring,weblogic` |
-| 输出完整证据链（便于复现） | `afrog -t http://example.com -ja result_full.json` |
 | 扫到洞立刻群里告警 | `afrog -T targets.txt -S high,critical -wecom` |
 | **公网防抖动（强烈推荐）** | `afrog -T targets.txt -mt` |
+| **智能并发（省心）** | `afrog -T targets.txt -smart` |
+| **安全并发（推荐）** | `afrog -T targets.txt -auto-req-limit` |
 
 ## 🎯 目标指定：指哪打哪
 
