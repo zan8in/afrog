@@ -255,9 +255,11 @@ type Classification struct {
 const DefaultLocalPocDirectory = "pocs"
 
 var (
-	LocalFileList   []string
-	LocalAppendList []string
-	LocalTestList   []string
+	LocalFileList    []string
+	LocalAppendList  []string
+	LocalTestList    []string
+	LocalCuratedList []string
+	LocalMyList      []string
 )
 var LocalPocDirectory string
 
@@ -267,6 +269,19 @@ func init() {
 
 	// 确保在启动时创建用户目录下的 afrog-curated-pocs 和 afrog-my-pocs
 	EnsureCuratedAndMyPocDirectories()
+
+	// 初始化 curated 和 my pocs 列表
+	homeDir, _ := os.UserHomeDir()
+	configDir := filepath.Join(homeDir, ".config", "afrog")
+
+	// 优先检查环境变量 AFROG_POCS_CURATED_DIR
+	curatedDir := os.Getenv("AFROG_POCS_CURATED_DIR")
+	if curatedDir == "" {
+		curatedDir = filepath.Join(configDir, "pocs-curated")
+	}
+	LocalCuratedList, _ = LocalWalkFiles(curatedDir)
+
+	LocalMyList, _ = LocalWalkFiles(filepath.Join(configDir, "pocs-my"))
 }
 
 func InitLocalAppendList(pathFolder []string) {
@@ -299,7 +314,7 @@ func LocalReadContentByName(name string) ([]byte, error) {
 		result []byte
 	)
 
-	if len(LocalFileList) == 0 && len(LocalAppendList) == 0 {
+	if len(LocalFileList) == 0 && len(LocalAppendList) == 0 && len(LocalCuratedList) == 0 && len(LocalMyList) == 0 {
 		return nil, fmt.Errorf("local file list is empty")
 	}
 
@@ -314,17 +329,41 @@ func LocalReadContentByName(name string) ([]byte, error) {
 		}
 	}
 
-	if len(LocalAppendList) == 0 {
-		return nil, fmt.Errorf("applend file list is empty")
+	if len(LocalAppendList) > 0 {
+		for _, file := range LocalAppendList {
+			file = strings.ReplaceAll(file, "\\", "/")
+			lastSlashIndex := strings.LastIndex(file, "/")
+			if lastSlashIndex != -1 {
+				fname := file[lastSlashIndex+1:]
+				if name == fname || name+".yaml" == fname || name+".yml" == fname {
+					return os.ReadFile(file)
+				}
+			}
+		}
 	}
 
-	for _, file := range LocalAppendList {
-		file = strings.ReplaceAll(file, "\\", "/")
-		lastSlashIndex := strings.LastIndex(file, "/")
-		if lastSlashIndex != -1 {
-			fname := file[lastSlashIndex+1:]
-			if name == fname || name+".yaml" == fname || name+".yml" == fname {
-				return os.ReadFile(file)
+	if len(LocalCuratedList) > 0 {
+		for _, file := range LocalCuratedList {
+			file = strings.ReplaceAll(file, "\\", "/")
+			lastSlashIndex := strings.LastIndex(file, "/")
+			if lastSlashIndex != -1 {
+				fname := file[lastSlashIndex+1:]
+				if name == fname || name+".yaml" == fname || name+".yml" == fname {
+					return os.ReadFile(file)
+				}
+			}
+		}
+	}
+
+	if len(LocalMyList) > 0 {
+		for _, file := range LocalMyList {
+			file = strings.ReplaceAll(file, "\\", "/")
+			lastSlashIndex := strings.LastIndex(file, "/")
+			if lastSlashIndex != -1 {
+				fname := file[lastSlashIndex+1:]
+				if name == fname || name+".yaml" == fname || name+".yml" == fname {
+					return os.ReadFile(file)
+				}
 			}
 		}
 	}
