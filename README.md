@@ -25,12 +25,12 @@
   <a href="https://github.com/zan8in/afrog/wiki/Afrog-PoC-规则编写权威指南">Afrog PoC 规则编写权威指南</a>
 </p>
 
-<p align="center">
+<!-- <p align="center">
   <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/planet.png&w=250" alt="Afrog 官方圈 - 知识星球" width="250">
 </p>
 <p align="center">
   本圈专注更新 PoC，不追求数量，只打磨质量。
-</p>
+</p> -->
 
 ## PoC Contributors
 
