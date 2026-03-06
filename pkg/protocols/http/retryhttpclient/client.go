@@ -2,6 +2,7 @@ package retryhttpclient
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -654,27 +655,52 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 }
 
 func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
+	bodyOut := body
+	if resp != nil && strings.Contains(strings.ToLower(resp.Header.Get("Content-Encoding")), "gzip") {
+		if decompressed, derr := gunzip(body); derr == nil {
+			bodyOut = decompressed
+		}
+	}
+
 	protoResp := &proto.Response{}
-	protoResp.Status = int32(resp.StatusCode)
-	protoResp.Url = url2ProtoUrl(resp.Request.URL)
+	if resp != nil {
+		protoResp.Status = int32(resp.StatusCode)
+		if resp.Request != nil && resp.Request.URL != nil {
+			protoResp.Url = url2ProtoUrl(resp.Request.URL)
+		}
+	}
 
 	newRespHeader := make(map[string]string)
 	rawHeaderBuilder := strings.Builder{}
-	for k, v := range resp.Header {
-		newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
-		rawHeaderBuilder.WriteString(k)
-		rawHeaderBuilder.WriteString(": ")
-		rawHeaderBuilder.WriteString(strings.Join(v, ";"))
-		rawHeaderBuilder.WriteString("\n")
+	if resp != nil {
+		for k, v := range resp.Header {
+			newRespHeader[strings.ToLower(k)] = strings.Join(v, ";")
+			rawHeaderBuilder.WriteString(k)
+			rawHeaderBuilder.WriteString(": ")
+			rawHeaderBuilder.WriteString(strings.Join(v, ";"))
+			rawHeaderBuilder.WriteString("\n")
+		}
 	}
 	protoResp.Headers = newRespHeader
-	protoResp.ContentType = resp.Header.Get("Content-Type")
-	protoResp.Body = body
-	rawPrefix := []byte(resp.Proto + " " + resp.Status + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n")
-	protoResp.Raw = append(rawPrefix, body...)
+	if resp != nil {
+		protoResp.ContentType = resp.Header.Get("Content-Type")
+	}
+	protoResp.Body = bodyOut
+
+	rawProto := "HTTP/1.1"
+	rawStatus := ""
+	if resp != nil {
+		if strings.TrimSpace(resp.Proto) != "" {
+			rawProto = resp.Proto
+		}
+		rawStatus = strings.TrimSpace(resp.Status)
+	}
+	rawPrefix := []byte(rawProto + " " + rawStatus + "\n" + strings.Trim(rawHeaderBuilder.String(), "\n") + "\n\n")
+	protoResp.Raw = append(rawPrefix, bodyOut...)
 	protoResp.RawHeader = []byte(strings.Trim(rawHeaderBuilder.String(), "\n"))
 	protoResp.Latency = latency
 	variableMap["response"] = protoResp
+	variableMap["response_text"] = utils.Str2UTF8(string(bodyOut))
 }
 
 func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
@@ -756,6 +782,23 @@ func setVariableMap(find string, variableMap map[string]any) string {
 		find = strings.ReplaceAll(find, oldstr, newstr)
 	}
 	return find
+}
+
+func gunzip(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return data, nil
+	}
+	br := bytes.NewReader(data)
+	zr, err := gzip.NewReader(br)
+	if err != nil {
+		return nil, err
+	}
+	defer zr.Close()
+	out, err := io.ReadAll(zr)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // 处理multipart（已过期）
