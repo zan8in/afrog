@@ -236,6 +236,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.preRenderRuleRequest(&rule.Request)
 
 			delete(c.VariableMap, "__step_poc_results")
+			c.VariableMap["response"] = &proto.Response{Headers: map[string]string{}}
+			c.VariableMap["response_text"] = ""
 			reqType := strings.ToLower(rule.Request.Type)
 			if len(rule.Request.Raw) > 0 {
 				err = RawHTTPExecutor{}.Execute(target, rule, c.Options, c.VariableMap)
@@ -250,9 +252,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			if err != nil && c.Options != nil && c.Options.Debug {
 				gologger.Error().Msgf("[%s] request failed: %v", k, err)
 			}
-			if err == nil {
-				isMatch = c.evalRuleMatch(&rule, pocItem)
-			}
+			isMatch = c.evalRuleMatch(&rule, pocItem)
 		} else {
 			coreKeys := []string{"request", "response", "fulltarget", "target"}
 			if len(stepVars) > 0 {
@@ -301,6 +301,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				c.preRenderRuleRequest(&ruleAttempt.Request)
 
 				delete(c.VariableMap, "__step_poc_results")
+				c.VariableMap["response"] = &proto.Response{Headers: map[string]string{}}
+				c.VariableMap["response_text"] = ""
 				reqType := strings.ToLower(ruleAttempt.Request.Type)
 				if len(ruleAttempt.Request.Raw) > 0 {
 					iterErr = RawHTTPExecutor{}.Execute(target, ruleAttempt, c.Options, c.VariableMap)
@@ -313,33 +315,29 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				}
 
 				lastAttemptSnapshot = snapshotVars(c.VariableMap, coreKeys)
-				if iterErr == nil {
-					if c.evalRuleMatch(&ruleAttempt, pocItem) {
-						found = true
-						isMatch = true
-						if commit == "winner" || commit == "first" {
-							if winnerSnapshot == nil {
-								winnerSnapshot = snapshotVars(c.VariableMap, attemptKeys)
-							} else {
-								restoreVars(c.VariableMap, winnerSnapshot)
-							}
-							if !bruteCfg.Continue {
-								return true
-							}
-						} else if commit == "last" {
-							if !bruteCfg.Continue {
-								return true
-							}
-						} else if commit == "none" {
-							commitSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
-							restoreVars(c.VariableMap, attemptSnapshot)
-							restoreVars(c.VariableMap, commitSnapshot)
-							if !bruteCfg.Continue {
-								return true
-							}
+				if c.evalRuleMatch(&ruleAttempt, pocItem) {
+					found = true
+					isMatch = true
+					if commit == "winner" || commit == "first" {
+						if winnerSnapshot == nil {
+							winnerSnapshot = snapshotVars(c.VariableMap, attemptKeys)
+						} else {
+							restoreVars(c.VariableMap, winnerSnapshot)
 						}
-					} else {
+						if !bruteCfg.Continue {
+							return true
+						}
+					} else if commit == "last" {
+						if !bruteCfg.Continue {
+							return true
+						}
+					} else if commit == "none" {
+						commitSnapshot := snapshotVars(c.VariableMap, []string{"request", "response", "fulltarget", "target"})
 						restoreVars(c.VariableMap, attemptSnapshot)
+						restoreVars(c.VariableMap, commitSnapshot)
+						if !bruteCfg.Continue {
+							return true
+						}
 					}
 				} else {
 					restoreVars(c.VariableMap, attemptSnapshot)
