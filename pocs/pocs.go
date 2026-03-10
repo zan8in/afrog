@@ -61,6 +61,10 @@ func EmbedReadContentByName(name string) ([]byte, error) {
 	return result, err
 }
 
+func EmbedReadContentByPath(path string) ([]byte, error) {
+	return f.ReadFile(path)
+}
+
 // read poc struct by path
 func EmbedReadPocByPath(path string) (poc.Poc, error) {
 	var poc = poc.Poc{}

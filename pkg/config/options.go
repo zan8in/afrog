@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/zan8in/gologger"
 	fileutil "github.com/zan8in/pins/file"
 	sliceutil "github.com/zan8in/pins/slice"
+	"gopkg.in/yaml.v2"
 )
 
 type Options struct {
@@ -76,7 +78,7 @@ type Options struct {
 	SearchKeywords []string
 
 	// no progress if silent is true
-	Silent bool
+	Silent  bool
 	NoColor bool
 
 	// pocs to run based on severity. Possible values: info, low, medium, high, critical
@@ -997,48 +999,141 @@ func (o *Options) FingerprintPoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 	return finger, other
 }
 
-func (o *Options) CreatePocList() []poc.Poc {
-	var pocSlice []poc.Poc
+var legacyOOBCheckRe = regexp.MustCompile(`(?i)\boobcheck\s*\(\s*oob\s*,`)
+var legacyOOBCheckTokenRe = regexp.MustCompile(`(?i)\boobchecktoken\s*\(`)
+var legacyOOBWaitRe = regexp.MustCompile(`(?i)\boobwait\s*\(`)
+var legacyOOBVarsRe = regexp.MustCompile(`(?i)\{\{\s*oobdns\s*\}\}|\{\{\s*oobhttp\s*\}\}`)
+var legacyOOBSetInitRe = regexp.MustCompile(`(?im)^\s*oob\s*:\s*oob\(\)\s*$`)
 
-	if len(o.PocFile) > 0 {
+func stripYAMLLineCommentLegacy(line string) string {
+	if i := strings.Index(line, "#"); i >= 0 {
+		return line[:i]
+	}
+	return line
+}
+
+func stripYAMLCommentsLegacy(s string) string {
+	if s == "" {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	var b strings.Builder
+	b.Grow(len(s))
+	for i, line := range lines {
+		b.WriteString(stripYAMLLineCommentLegacy(line))
+		if i < len(lines)-1 {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
+}
+
+func detectLegacyOOBReasons(yamlText string) []string {
+	src := stripYAMLCommentsLegacy(yamlText)
+	reasons := make([]string, 0, 4)
+
+	if legacyOOBVarsRe.MatchString(src) {
+		reasons = append(reasons, "旧占位符 {{oobDNS}}/{{oobHTTP}}")
+	}
+	if legacyOOBCheckRe.MatchString(src) {
+		reasons = append(reasons, "旧函数签名 oobCheck(oob, ...)")
+	}
+	if legacyOOBCheckTokenRe.MatchString(src) {
+		reasons = append(reasons, "旧函数 oobCheckToken(...)")
+	}
+	if legacyOOBWaitRe.MatchString(src) {
+		reasons = append(reasons, "旧函数 oobWait(...)")
+	}
+	if legacyOOBSetInitRe.MatchString(src) && len(reasons) > 0 {
+		reasons = append(reasons, "旧初始化 set: oob: oob()")
+	}
+	return reasons
+}
+
+func (o *Options) CreatePocList() []poc.Poc {
+	type legacyItem struct {
+		ID      string
+		Path    string
+		Reasons []string
+	}
+
+	pathItems := []pocsrepo.PathItem{}
+	if strings.TrimSpace(o.PocFile) != "" {
 		c := catalog.New(o.PocFile)
 		paths, _ := c.GetPocPath(o.PocFile)
 		for _, pth := range paths {
-			if p, err := poc.LocalReadPocByPath(pth); err == nil {
-				pocSlice = append(pocSlice, p)
-			} else {
-				gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", pth, err)
-			}
+			pathItems = append(pathItems, pocsrepo.PathItem{Path: pth, Source: pocsrepo.SourceLocal})
 		}
 	} else {
-
-		// 使用仓库层统一的路径整合与去重（优先级：curated > my > append > local > builtin）
-		pathItems, _ := pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
-
-		// 读取并校验：格式错误的 POC 剔除并输出错误
-		for _, it := range pathItems {
-			if it.Source == pocsrepo.SourceBuiltin {
-				path := strings.TrimPrefix(it.Path, "embedded:")
-				if p, err := pocs.EmbedReadPocByPath(path); err == nil {
-					pocSlice = append(pocSlice, p)
-				} else {
-					gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", path, err)
-				}
-			} else {
-				if p, err := poc.LocalReadPocByPath(it.Path); err == nil {
-					pocSlice = append(pocSlice, p)
-				} else {
-					gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", it.Path, err)
-				}
-			}
-		}
+		pathItems, _ = pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
 	}
 
-	newPocSlice := []poc.Poc{}
-	for _, pp := range pocSlice {
-		if filterPocSeveritySearchWithFingerprint(o.Search, o.Severity, pp.Id, pp.Info.Name, pp.Info.Severity, pp.Info.Tags) {
-			newPocSlice = append(newPocSlice, pp)
+	newPocSlice := make([]poc.Poc, 0, len(pathItems))
+	legacy := make([]legacyItem, 0)
+
+	for _, it := range pathItems {
+		var (
+			raw     []byte
+			srcPath string
+			err     error
+		)
+
+		if it.Source == pocsrepo.SourceBuiltin {
+			srcPath = strings.TrimPrefix(it.Path, "embedded:")
+			raw, err = pocs.EmbedReadContentByPath(srcPath)
+		} else {
+			srcPath = it.Path
+			raw, err = os.ReadFile(srcPath)
 		}
+		if err != nil {
+			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, err)
+			continue
+		}
+
+		pm := poc.PocMeta{}
+		if e := yaml.Unmarshal(raw, &pm); e != nil {
+			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, e)
+			continue
+		}
+		id := strings.TrimSpace(pm.Id)
+		if id == "" {
+			id = strings.TrimSuffix(strings.TrimSuffix(filepath.Base(srcPath), ".yaml"), ".yml")
+		}
+
+		if !filterPocSeveritySearchWithFingerprint(o.Search, o.Severity, id, pm.Info.Name, pm.Info.Severity, pm.Info.Tags) {
+			continue
+		}
+
+		reasons := detectLegacyOOBReasons(string(raw))
+		if len(reasons) > 0 {
+			legacy = append(legacy, legacyItem{ID: id, Path: srcPath, Reasons: reasons})
+			continue
+		}
+
+		pp := poc.Poc{}
+		if e := yaml.Unmarshal(raw, &pp); e != nil {
+			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, e)
+			continue
+		}
+		newPocSlice = append(newPocSlice, pp)
+	}
+
+	if len(legacy) > 0 {
+		total := len(legacy)
+		const limit = 20
+		gologger.Print().Msgf("检测到旧OOB POC（已跳过）：%d 个", total)
+		n := total
+		if n > limit {
+			n = limit
+		}
+		for i := 0; i < n; i++ {
+			it := legacy[i]
+			gologger.Print().Msgf("- %s (%s)", it.ID, strings.Join(it.Reasons, "; "))
+		}
+		if total > n {
+			gologger.Print().Msgf("+ %d more", total-n)
+		}
+		gologger.Print().Msg("建议：使用 -pocmigrate 迁移旧语法")
 	}
 
 	// 按严重级别排序但保留未设置 severity 的 POC
