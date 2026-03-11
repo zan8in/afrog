@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/checker/decls"
+	"github.com/zan8in/afrog/v3/pkg/proto"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
 )
@@ -308,5 +309,41 @@ func TestCELDateNoArgs(t *testing.T) {
 	d, ok := out.Value().(string)
 	if !ok || len(d) != 2 {
 		t.Fatalf("expected day length=2, got %T(%v)", out.Value(), out.Value())
+	}
+}
+
+func TestCELResponseHeadersIndexCaseInsensitive(t *testing.T) {
+	lib := NewCustomLib()
+	out, err := lib.RunEval(`response.headers['Content-Type'].icontains('application/json')`, map[string]any{
+		"response": &proto.Response{
+			Headers: map[string]string{
+				"content-type": "application/json; charset=utf-8",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("eval error: %v", err)
+	}
+	ok, _ := out.Value().(bool)
+	if !ok {
+		t.Fatalf("expected true, got %T(%v)", out.Value(), out.Value())
+	}
+}
+
+func TestCELResponseHeadersInCaseInsensitive(t *testing.T) {
+	lib := NewCustomLib()
+	out, err := lib.RunEval(`('Content-Type' in response.headers) && response.headers['Content-Type'] == 'application/json'`, map[string]any{
+		"response": &proto.Response{
+			Headers: map[string]string{
+				"content-type": "application/json",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("eval error: %v", err)
+	}
+	ok, _ := out.Value().(bool)
+	if !ok {
+		t.Fatalf("expected true, got %T(%v)", out.Value(), out.Value())
 	}
 }

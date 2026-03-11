@@ -272,6 +272,7 @@ func Eval(env *cel.Env, expression string, params map[string]any) (ref.Val, erro
 		log.Log().Error(fmt.Sprintf("cel env.Compile err, %s", iss.Err().Error()))
 		return nil, iss.Err()
 	}
+	normalizeHeaderKeyAccess(ast)
 	prg, err := env.Program(ast)
 	if err != nil {
 		log.Log().Error(fmt.Sprintf("cel env.Program err, %s", err.Error()))
@@ -283,6 +284,98 @@ func Eval(env *cel.Env, expression string, params map[string]any) (ref.Val, erro
 		return nil, err
 	}
 	return out, nil
+}
+
+func normalizeHeaderKeyAccess(ast *cel.Ast) {
+	if ast == nil {
+		return
+	}
+	normalizeHeaderKeyAccessExpr(ast.Expr())
+}
+
+func normalizeHeaderKeyAccessExpr(e *exprpb.Expr) {
+	if e == nil {
+		return
+	}
+
+	switch ek := e.ExprKind.(type) {
+	case *exprpb.Expr_CallExpr:
+		call := ek.CallExpr
+		if call.Target != nil {
+			normalizeHeaderKeyAccessExpr(call.Target)
+		}
+		for _, a := range call.Args {
+			normalizeHeaderKeyAccessExpr(a)
+		}
+
+		if call.Function == "_[_]" && len(call.Args) == 2 && isRequestOrResponseHeadersSelect(call.Args[0]) {
+			lowerStringConst(call.Args[1])
+		}
+		if (call.Function == "@in" || call.Function == "_in_" || call.Function == "in") && len(call.Args) == 2 && isRequestOrResponseHeadersSelect(call.Args[1]) {
+			lowerStringConst(call.Args[0])
+		}
+	case *exprpb.Expr_SelectExpr:
+		if ek.SelectExpr.Operand != nil {
+			normalizeHeaderKeyAccessExpr(ek.SelectExpr.Operand)
+		}
+	case *exprpb.Expr_ListExpr:
+		for _, el := range ek.ListExpr.Elements {
+			normalizeHeaderKeyAccessExpr(el)
+		}
+	case *exprpb.Expr_StructExpr:
+		for _, ent := range ek.StructExpr.Entries {
+			if ent.KeyKind != nil {
+				switch kk := ent.KeyKind.(type) {
+				case *exprpb.Expr_CreateStruct_Entry_FieldKey:
+					_ = kk
+				case *exprpb.Expr_CreateStruct_Entry_MapKey:
+					normalizeHeaderKeyAccessExpr(kk.MapKey)
+				}
+			}
+			normalizeHeaderKeyAccessExpr(ent.Value)
+		}
+	case *exprpb.Expr_ComprehensionExpr:
+		comp := ek.ComprehensionExpr
+		normalizeHeaderKeyAccessExpr(comp.IterRange)
+		normalizeHeaderKeyAccessExpr(comp.AccuInit)
+		normalizeHeaderKeyAccessExpr(comp.LoopCondition)
+		normalizeHeaderKeyAccessExpr(comp.LoopStep)
+		normalizeHeaderKeyAccessExpr(comp.Result)
+	}
+}
+
+func isRequestOrResponseHeadersSelect(e *exprpb.Expr) bool {
+	if e == nil {
+		return false
+	}
+	sel := e.GetSelectExpr()
+	if sel == nil || sel.Field != "headers" {
+		return false
+	}
+	op := sel.Operand
+	if op == nil {
+		return false
+	}
+	id := op.GetIdentExpr()
+	if id == nil {
+		return false
+	}
+	return id.Name == "request" || id.Name == "response"
+}
+
+func lowerStringConst(e *exprpb.Expr) bool {
+	if e == nil {
+		return false
+	}
+	ce := e.GetConstExpr()
+	if ce == nil {
+		return false
+	}
+	if _, ok := ce.GetConstantKind().(*exprpb.Constant_StringValue); !ok {
+		return false
+	}
+	ce.ConstantKind = &exprpb.Constant_StringValue{StringValue: strings.ToLower(ce.GetStringValue())}
+	return true
 }
 
 func (c *CustomLib) WriteRuleSetOptions(args yaml.MapSlice) {

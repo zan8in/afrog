@@ -17,7 +17,8 @@ rules:
       path: /jmreport/getDataSourceByPage
     expression: |
       response.status == 200 && 
-      response.headers['content-type'].icontains('application/json') &&
+      "Content-Type" in response.headers &&
+      response.headers['Content-Type'].icontains('application/json') &&
       response.body.ibcontains(b'"success":true') &&
       response.body.ibcontains(b'"dbUsername":') &&
       response.body.ibcontains(b'"dbPassword":') &&
