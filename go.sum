@@ -1296,6 +1296,14 @@ github.com/zan8in/oobadapter v1.0.0 h1:UdJlL00wD9+lxHUr38FH7/MTsaxXvuH6xhmEA+Cg6
 github.com/zan8in/oobadapter v1.0.0/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/oobadapter v1.1.0 h1:KNLyeqPjYz3nxkipvnoeuZL7Byn+IJu38eig/hkpBQ4=
 github.com/zan8in/oobadapter v1.1.0/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v1.1.1-0.20260312071118-7596f35bf0e6 h1:2dYYl50K7neWtn2u8PruKNtWYM+TXs8zDa+Ewl10tUY=
+github.com/zan8in/oobadapter v1.1.1-0.20260312071118-7596f35bf0e6/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v1.1.1-0.20260312072447-8c88eb2eada5 h1:e/6ruuT/ScObzepA5vYqirmavyedsQ7EF/4jXUlBHxQ=
+github.com/zan8in/oobadapter v1.1.1-0.20260312072447-8c88eb2eada5/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v1.1.1-0.20260312073803-8142b2740197 h1:P6RTLsrBCbLyaDg1wMxyn76a/aqWNGLO4DQbl+Jex9E=
+github.com/zan8in/oobadapter v1.1.1-0.20260312073803-8142b2740197/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
+github.com/zan8in/oobadapter v1.1.1-0.20260312074157-825925181daf h1:butmswqhzoZBeuhXfYuU0eMTKMDC5+fsaIWJF2MYwCI=
+github.com/zan8in/oobadapter v1.1.1-0.20260312074157-825925181daf/go.mod h1:q9M+0H/FBTo9G2XZIsi3IDawHcwgEGDWCabCPoEpZ/I=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a h1:VyIgWXlK5oEr/azRm/iHJjV6urHqwTIiJYxGKOnSIgg=
 github.com/zan8in/pins v0.0.0-20240530014940-e9ebb462913a/go.mod h1:S9s9dtMfihcAMCxApBB1v69hi6njQWT7FMGTI0ObaCA=
 github.com/zan8in/rawhttp v0.0.0-20230318132449-31532db674af h1:j6djL5pHc8hdPpRqqj4mSpq9NKhGmlisGbnfb80Yml8=
