@@ -264,6 +264,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			iterErr := error(nil)
 			lastAttemptSnapshot := map[string]savedVar(nil)
 			winnerSnapshot := map[string]savedVar(nil)
+			debugSteps := make([]*result.PocResult, 0, 8)
 			reqCount := 0
 			maxReq := 0
 			if c.Options != nil {
@@ -315,7 +316,23 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				}
 
 				lastAttemptSnapshot = snapshotVars(c.VariableMap, coreKeys)
-				if c.evalRuleMatch(&ruleAttempt, pocItem) {
+				matched := c.evalRuleMatch(&ruleAttempt, pocItem)
+				if c.Options != nil && c.Options.Debug {
+					step := &result.PocResult{IsVul: matched}
+					if c.VariableMap["response"] != nil {
+						if resp, ok := c.VariableMap["response"].(*proto.Response); ok {
+							step.ResultResponse = resp
+						}
+					}
+					if c.VariableMap["request"] != nil {
+						if req, ok := c.VariableMap["request"].(*proto.Request); ok {
+							step.ResultRequest = req
+						}
+					}
+					debugSteps = append(debugSteps, step)
+				}
+
+				if matched {
 					found = true
 					isMatch = true
 					if commit == "winner" || commit == "first" {
@@ -352,6 +369,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				if lastAttemptSnapshot != nil {
 					restoreVars(c.VariableMap, lastAttemptSnapshot)
 				}
+			}
+			if c.Options != nil && c.Options.Debug && len(debugSteps) > 0 {
+				c.VariableMap["__step_poc_results"] = debugSteps
 			}
 			truncVar := "__brute_truncated_" + celSafeIdent(k)
 			c.VariableMap[truncVar] = bruteTruncated
