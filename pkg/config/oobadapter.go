@@ -6,6 +6,7 @@ var (
 	OOBAlphalog = "alphalog"
 	OOBXray     = "xray"
 	OOBRevsuit  = "revsuit"
+	OOBInteractsh = "interactsh"
 )
 
 func IsOOBAdapter(oob string) bool {
@@ -19,6 +20,8 @@ func IsOOBAdapter(oob string) bool {
 	case OOBXray:
 		return true
 	case OOBRevsuit:
+		return true
+	case OOBInteractsh:
 		return true
 	default:
 		return false
@@ -74,6 +77,13 @@ func (opt *Options) SetOOBAdapter() {
 		if len(opt.OOBKey) == 0 && len(opt.OOBDomain) == 0 && len(opt.OOBHttpUrl) == 0 && len(opt.OOBApiUrl) == 0 {
 			// gologger.Info().Msg("Revsuit is not configured")
 			return
+		}
+	case OOBInteractsh:
+		opt.OOB = OOBInteractsh
+		opt.OOBDomain = reverse.Interactsh.Server
+		opt.OOBKey = reverse.Interactsh.Token
+		if len(opt.OOBDomain) == 0 {
+			opt.OOBDomain = "oast.pro"
 		}
 	default:
 		// default ceyeio

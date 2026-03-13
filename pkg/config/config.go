@@ -63,13 +63,14 @@ type Dingtalk struct {
 }
 
 type Reverse struct {
-	Alphalog Alphalog `yaml:"alphalog"`
-	Ceye     Ceye     `yaml:"ceye"`
-	Dnslogcn Dnslogcn `yaml:"dnslogcn"`
-	Eye      Eye      `yaml:"eye"`
-	Jndi     Jndi     `yaml:"jndi"`
-	Xray     Xray     `yaml:"xray"`
-	Revsuit  Revsuit  `yaml:"revsuit"`
+	Alphalog   Alphalog   `yaml:"alphalog"`
+	Ceye       Ceye       `yaml:"ceye"`
+	Dnslogcn   Dnslogcn   `yaml:"dnslogcn"`
+	Eye        Eye        `yaml:"eye"`
+	Interactsh Interactsh `yaml:"interactsh"`
+	Jndi       Jndi       `yaml:"jndi"`
+	Xray       Xray       `yaml:"xray"`
+	Revsuit    Revsuit    `yaml:"revsuit"`
 }
 
 type Ceye struct {
@@ -103,6 +104,11 @@ type Revsuit struct {
 	DnsDomain string `yaml:"dns_domain"`
 	HttpUrl   string `yaml:"http_url"`
 	ApiUrl    string `yaml:"api_url"`
+}
+
+type Interactsh struct {
+	Server string `yaml:"server"`
+	Token  string `yaml:"token"`
 }
 
 type Jndi struct {
@@ -159,6 +165,10 @@ func NewConfig(configFile string) (*Config, error) {
 		reverse.Revsuit.DnsDomain = ""
 		reverse.Revsuit.HttpUrl = ""
 		reverse.Revsuit.ApiUrl = ""
+
+		// interactsh
+		reverse.Interactsh.Server = "oast.pro"
+		reverse.Interactsh.Token = ""
 
 		c.Reverse = reverse
 
@@ -266,7 +276,9 @@ func ReadConfiguration(configFile string) (*Config, error) {
 		return nil, err
 	}
 	normalizeCuratedDefaults(config)
+	normalizeInteractshDefaults(config)
 	_ = ensureCuratedSection(afrogConfigFile, config.Curated)
+	_ = ensureInteractshSection(afrogConfigFile, config.Reverse.Interactsh)
 	return config, nil
 }
 
@@ -294,6 +306,17 @@ func normalizeCuratedDefaults(cfg *Config) {
 		au := true
 		cfg.Curated.AutoUpdate = &au
 	}
+}
+
+func normalizeInteractshDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	s := strings.TrimSpace(cfg.Reverse.Interactsh.Server)
+	if s == "" {
+		s = "oast.pro"
+	}
+	cfg.Reverse.Interactsh.Server = s
 }
 
 func ensureCuratedSection(configPath string, curated Curated) error {
@@ -364,6 +387,140 @@ func ensureCuratedSection(configPath string, curated Curated) error {
 	out = append(out, insert...)
 	out = append(out, lines[end:]...)
 	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+}
+
+func ensureInteractshSection(configPath string, interactsh Interactsh) error {
+	b, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(b), "\n")
+
+	reverseIdx := -1
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if leadingSpaces(line) != 0 {
+			continue
+		}
+		t := strings.TrimSpace(stripYAMLLineComment(line))
+		if strings.HasPrefix(t, "reverse:") {
+			reverseIdx = i
+			break
+		}
+	}
+
+	if reverseIdx == -1 {
+		if len(lines) > 0 && lines[len(lines)-1] != "" {
+			lines = append(lines, "")
+		}
+		lines = append(lines, reverseInteractshSectionLines(0, interactsh)...)
+		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+	}
+
+	baseIndent := leadingSpaces(lines[reverseIdx])
+	reverseEnd := len(lines)
+	for j := reverseIdx + 1; j < len(lines); j++ {
+		if strings.TrimSpace(lines[j]) == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) <= baseIndent {
+			reverseEnd = j
+			break
+		}
+	}
+
+	interactshIdx := -1
+	interactshIndent := baseIndent + 2
+	for j := reverseIdx + 1; j < reverseEnd; j++ {
+		if leadingSpaces(lines[j]) != interactshIndent {
+			continue
+		}
+		t := strings.TrimSpace(stripYAMLLineComment(lines[j]))
+		if strings.HasPrefix(t, "interactsh:") {
+			interactshIdx = j
+			break
+		}
+	}
+
+	if interactshIdx == -1 {
+		insert := interactshSectionLines(interactshIndent, interactsh)
+		out := make([]string, 0, len(lines)+len(insert))
+		out = append(out, lines[:reverseEnd]...)
+		if reverseEnd > 0 && strings.TrimSpace(out[reverseEnd-1]) != "" {
+			out = append(out, "")
+		}
+		out = append(out, insert...)
+		out = append(out, lines[reverseEnd:]...)
+		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	}
+
+	interactshEnd := reverseEnd
+	for j := interactshIdx + 1; j < reverseEnd; j++ {
+		if strings.TrimSpace(lines[j]) == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) <= interactshIndent {
+			interactshEnd = j
+			break
+		}
+	}
+
+	childIndent := interactshIndent + 2
+	present := map[string]bool{}
+	for j := interactshIdx + 1; j < interactshEnd; j++ {
+		raw := strings.TrimSpace(stripYAMLLineComment(lines[j]))
+		if raw == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) < childIndent {
+			continue
+		}
+		colon := strings.Index(raw, ":")
+		if colon <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(raw[:colon])
+		present[key] = true
+	}
+
+	insert := interactshKeyLines(childIndent, interactsh, present)
+	if len(insert) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(lines)+len(insert))
+	out = append(out, lines[:interactshEnd]...)
+	out = append(out, insert...)
+	out = append(out, lines[interactshEnd:]...)
+	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+}
+
+func reverseInteractshSectionLines(baseIndent int, interactsh Interactsh) []string {
+	lines := []string{strings.Repeat(" ", baseIndent) + "reverse:"}
+	lines = append(lines, interactshSectionLines(baseIndent+2, interactsh)...)
+	return lines
+}
+
+func interactshSectionLines(baseIndent int, interactsh Interactsh) []string {
+	lines := []string{strings.Repeat(" ", baseIndent) + "interactsh:"}
+	return append(lines, interactshKeyLines(baseIndent+2, interactsh, map[string]bool{})...)
+}
+
+func interactshKeyLines(indent int, interactsh Interactsh, present map[string]bool) []string {
+	prefix := strings.Repeat(" ", indent)
+	lines := make([]string, 0, 2)
+
+	server := strings.TrimSpace(interactsh.Server)
+	if server == "" {
+		server = "oast.pro"
+	}
+	if !present["server"] {
+		lines = append(lines, prefix+"server: "+strconv.Quote(server))
+	}
+	if !present["token"] {
+		lines = append(lines, prefix+"token: "+strconv.Quote(strings.TrimSpace(interactsh.Token)))
+	}
+	return lines
 }
 
 func curatedSectionLines(baseIndent int, curated Curated) []string {
