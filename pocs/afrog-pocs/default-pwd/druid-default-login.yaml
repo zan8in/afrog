@@ -21,6 +21,10 @@ rules:
         - /druid/submitLogin
         - /submitLogin
         - /prod-api/druid/submitLogin
+        - /dev-api/druid/submitLogin
+        - /api/druid/submitLogin
+        - /admin/druid/submitLogin
+        - /admin-api/druid/submitLogin
       username:
         - admin
         - ruoyi

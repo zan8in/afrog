@@ -1,8 +1,8 @@
 id: ruoyi-druid-unauth
 
 info:
-  name: 若依管理系统未授权访问
-  author: Str1am
+  name: 若依管理系统 druid 未授权访问
+  author: zan9in
   severity: high
   verified: true
   description: |-
@@ -12,8 +12,19 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /druid/index.html
+        - /prod-api/druid/index.html
+        - /dev-api/druid/index.html
+        - /api/druid/index.html
+        - /admin/druid/index.html
+        - /admin-api/druid/index.html
     request:
       method: GET
-      path: /prod-api/druid/websession.html
-    expression: response.status == 200 && response.body.bcontains(b'Druid Web Session Stat') && response.body.bcontains(b'Web Session Stat')
+      path: "{{p}}"
+    expression: response.status == 200 && response.body.bcontains(b"Druid Stat Index") && response.body.bcontains(b"DruidVersion") && response.body.bcontains(b"DruidDrivers")
 expression: r0()
