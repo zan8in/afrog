@@ -10,8 +10,19 @@ info:
 
 rules:
   r0:
+    brute:
+      mode: clusterbomb
+      commit: winner
+      continue: false
+      p:
+        - /druid/login.html
+        - /prod-api/druid/login.html
+        - /dev-api/druid/login.html
+        - /api/druid/login.html
+        - /admin/druid/login.html
+        - /admin-api/druid/login.html
     request:
       method: GET
-      path: /druid/login.html
+      path: "{{p}}"
     expression: response.status == 200 && response.body.ibcontains(b'<title>druid monitor</title>')
 expression: r0()
