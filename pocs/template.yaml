@@ -13,29 +13,31 @@ info: # poc 信息描述   注意缩进 父子关系  yaml语言和python相似 
   reference: # 参考 引用的文章
     - http://wiki.peiqi.tech/wiki/
     - http://wiki.peiqi.tech/wiki/2 #  - 插入列表
+  tags: phpinfo,info,leak # 标签  逗号隔开  方便查找
+  created: 2023/12/22 # 创建时间
 
 set:
   randomfilename: randomLowercase(16) #随机生成16位小写字符串  一般上传使用
 
 rules: #poc 本体 规则集合
-  mingzi1: # 规则名随便起
+  r0: # 规则名随便起
     request: # request 请求
       method: GET # POST  PUT GET
       path: /phpinfo.php #路径  要写已知的默认的(改了就不行了)  #下来有时间了写个红队特别版  加入字典跑（高并发）
     expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
     # bcontains(b'xxxxxxxxx')  contains原本是字符数组  加b转成二进制字符流
 
-  mingzi2: # 规则2
+  r1: # 规则2
     request: # request 请求
       method: GET
       path: /phpinfo.php
     expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
 
-  mingzi3: # 规则3
+  r2: # 规则3
     request: # request 请求
       method: POST # randomfilename 自定义变量  调用
       path: /{{randomfilename}}.php
       body: username=admin&password=123456 #post 必写  #自定义的可以写  比如UA Content-Type  甚至host  否则使用默认的就行
     expression: response.status == 200 && response.body.bcontains(b'<title>PHP') && response.body.bcontains(b'phpinfo()</title>')
 
-expression: mingzi1() ||mingzi2() || mingzi3() # 判断响应结果表达式   或的关系  有1则1
+expression: r0() ||r1() || r2() # 判断响应结果表达式   或的关系  有1则1

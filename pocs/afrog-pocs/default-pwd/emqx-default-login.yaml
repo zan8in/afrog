@@ -4,7 +4,7 @@ info:
   name: Emqx Default Admin Login
   author: For3stCo1d
   severity: high
-  verifed: true
+  verified: true
   description: |-
     Emqx default admin credentials were discovered.
     shodan: http.favicon.hash:"-670975485"

@@ -63,10 +63,10 @@ rules:
         {{randbody}}\r\n\
         \r\n\
         ------WebKitFormBoundary{{rboundary}}--"
-      expression: response.status == 200
-      output:
-        search: '"\"fullPath\":\"(?P<filename>.+?)\"".bsubmatch(response.body)'
-        filename: search["filename"]
+    expression: response.status == 200
+    output:
+      search: '"\"fullPath\":\"(?P<filename>.+?)\"".bsubmatch(response.body)'
+      filename: search["filename"]
   r1:
     request:
       method: GET

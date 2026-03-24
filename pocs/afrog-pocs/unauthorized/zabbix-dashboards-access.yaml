@@ -4,7 +4,7 @@ info:
   name: Zabbix Dashboards Access
   author: pussycat0x,vsh00t
   severity: medium
-  verfied: true
+  verified: true
   description: |-
     View dashboard with guest login.
   reference:

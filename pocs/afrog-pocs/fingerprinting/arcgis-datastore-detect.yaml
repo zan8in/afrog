@@ -4,7 +4,7 @@ info:
   name: ArcGIS Datastore Detect
   author: zan8in
   severity: info
-  verifie: true
+  verified: true
   tags: arcgis,datastore
   created: 2023/07/27
 
@@ -14,5 +14,5 @@ rules:
       method: GET
       path: /arcgis/datastore
       follow_redirects: true
-    expression: response.status == 200 && response.body.ibcontains(b'<title>ArcGIS Data Store</title>') 
+    expression: response.status == 200 && response.body.ibcontains(b'<title>ArcGIS Data Store</title>')
 expression: r0()

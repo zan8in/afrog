@@ -116,17 +116,10 @@ func validateSinglePocFile(filePath string) ValidationResult {
 		return result
 	}
 
-	// YAML语法验证
 	var pocData poc.Poc
-	if err := yaml.Unmarshal(content, &pocData); err != nil {
+	if err := yaml.UnmarshalStrict(content, &pocData); err != nil {
 		result.Passed = false
-		lineNum, colNum := extractYamlErrorPosition(err.Error())
-		result.Errors = append(result.Errors, ValidationError{
-			File:    filePath,
-			Line:    lineNum,
-			Column:  colNum,
-			Message: fmt.Sprintf("YAML syntax error: %v", err),
-		})
+		result.Errors = append(result.Errors, parseYamlStrictErrors(filePath, string(content), err)...)
 		return result
 	}
 
@@ -143,6 +136,135 @@ func validateSinglePocFile(filePath string) ValidationResult {
 	}
 
 	return result
+}
+
+func parseYamlStrictErrors(filePath, content string, err error) []ValidationError {
+	msg := err.Error()
+	lines := strings.Split(msg, "\n")
+	var out []ValidationError
+
+	appendLine := func(line int, message string) {
+		out = append(out, ValidationError{
+			File:    filePath,
+			Line:    line,
+			Column:  0,
+			Message: message,
+		})
+	}
+
+	reLine := regexp.MustCompile(`line (\d+):\s*(.*)`)
+	reUnknownField := regexp.MustCompile(`field ([^ ]+) not found in type`)
+
+	if len(lines) > 0 && strings.Contains(lines[0], "unmarshal errors:") {
+		for _, l := range lines[1:] {
+			l = strings.TrimSpace(l)
+			if l == "" {
+				continue
+			}
+			m := reLine.FindStringSubmatch(l)
+			if len(m) < 3 {
+				appendLine(0, fmt.Sprintf("YAML error: %s", l))
+				continue
+			}
+			lineNum, _ := strconv.Atoi(m[1])
+			detail := m[2]
+			if uf := reUnknownField.FindStringSubmatch(detail); len(uf) >= 2 {
+				field := strings.TrimSpace(uf[1])
+				hint := hintForUnknownField(field, content)
+				if hint != "" {
+					appendLine(lineNum, fmt.Sprintf("unsupported field '%s': %s", field, hint))
+				} else {
+					appendLine(lineNum, fmt.Sprintf("unsupported field '%s'", field))
+				}
+				continue
+			}
+			appendLine(lineNum, fmt.Sprintf("YAML error: %s", detail))
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+
+	if m := reLine.FindStringSubmatch(msg); len(m) >= 3 {
+		lineNum, _ := strconv.Atoi(m[1])
+		detail := m[2]
+		if uf := reUnknownField.FindStringSubmatch(detail); len(uf) >= 2 {
+			field := strings.TrimSpace(uf[1])
+			hint := hintForUnknownField(field, content)
+			if hint != "" {
+				appendLine(lineNum, fmt.Sprintf("unsupported field '%s': %s", field, hint))
+				return out
+			}
+			appendLine(lineNum, fmt.Sprintf("unsupported field '%s'", field))
+			return out
+		}
+		appendLine(lineNum, fmt.Sprintf("YAML error: %s", detail))
+		return out
+	}
+
+	lineNum, _ := extractYamlErrorPosition(msg)
+	if uf := reUnknownField.FindStringSubmatch(msg); len(uf) >= 2 {
+		field := strings.TrimSpace(uf[1])
+		hint := hintForUnknownField(field, content)
+		if hint != "" {
+			appendLine(lineNum, fmt.Sprintf("unsupported field '%s': %s", field, hint))
+			return out
+		}
+		appendLine(lineNum, fmt.Sprintf("unsupported field '%s'", field))
+		return out
+	}
+
+	appendLine(lineNum, fmt.Sprintf("YAML error: %v", err))
+	return out
+}
+
+func hintForUnknownField(field, content string) string {
+	lowerField := strings.ToLower(strings.TrimSpace(field))
+	if lowerField == "" {
+		return ""
+	}
+
+	nucleiKeywords := map[string]struct{}{
+		"requests":            {},
+		"http":                {},
+		"tcp":                 {},
+		"dns":                 {},
+		"ssl":                 {},
+		"variables":           {},
+		"matchers":            {},
+		"matchers-condition":  {},
+		"extractors":          {},
+		"payloads":            {},
+		"attack":              {},
+		"stop-at-first-match": {},
+		"flow":                {},
+		"metadata":            {},
+	}
+
+	if _, ok := nucleiKeywords[lowerField]; ok || looksLikeNucleiTemplate(content) {
+		switch lowerField {
+		case "requests", "http", "tcp", "dns":
+			return "looks like nuclei template structure; afrog expects 'rules' + 'expression'"
+		case "matchers", "matchers-condition", "extractors":
+			return "looks like nuclei matchers/extractors; afrog uses CEL 'expression' and optional 'extractors'"
+		default:
+			return "looks like nuclei syntax; rewrite with afrog fields"
+		}
+	}
+
+	if strings.Contains(lowerField, "matcher") || strings.Contains(lowerField, "extractor") {
+		return "afrog doesn't support this key; use 'expression' and/or 'extractors'"
+	}
+
+	return "afrog doesn't support this key"
+}
+
+func looksLikeNucleiTemplate(content string) bool {
+	re := regexp.MustCompile(`(?m)^\s*(requests|http|tcp|dns)\s*:\s*$`)
+	if re.MatchString(content) {
+		return true
+	}
+	return regexp.MustCompile(`(?m)^\s*matchers(-condition)?\s*:\s*$`).MatchString(content)
 }
 
 // extractYamlErrorPosition 从YAML错误信息中提取行号和列号

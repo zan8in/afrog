@@ -4,7 +4,7 @@ info:
   name: Jira Unauthenticated Admin Projects
   author: TESS
   severity: info
-  verfied: true
+  verified: true
   description: |-
     Jira Unauthenticated Admin Projects
   tags: jira,unauth

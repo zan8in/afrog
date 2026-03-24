@@ -4,7 +4,7 @@ info:
   name: 方正畅享全媒体新闻采编系统 reportCenter.do sql注入
   author: zan8in
   severity: high
-  verifide: true
+  verified: true
   description: |-
     方正畅享全媒体新闻采编系统 reportCenter.do sql注入
     fofa: app="FOUNDER-全媒体采编系统"

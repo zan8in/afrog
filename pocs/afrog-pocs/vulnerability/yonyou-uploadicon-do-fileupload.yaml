@@ -5,7 +5,7 @@ info:
   author: zan8in
   severity: critical
   verified: true
-  descritpion: |-
+  description: |-
     用友移动管理系统 /maportal/appmanager/uploadIcon.do、/mobsm/common/upload等接口存在任意文件上传漏洞，未经授权攻击者通过漏洞上传任意文件，最终可以获取服务器权限。
     Fofa: app="用友-移动系统管理"
   reference:

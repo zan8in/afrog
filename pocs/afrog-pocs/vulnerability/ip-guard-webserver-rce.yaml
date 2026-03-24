@@ -5,7 +5,7 @@ info:
   author: 二大爷
   severity: high
   verified: true
-  descripiton: |-
+  description: |-
     IP-guard WebServer 远程命令执行漏洞
     fofa: app="IP-guard"
   tags: ip-guard,rce

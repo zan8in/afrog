@@ -8,7 +8,7 @@ info:
   description: |-
     用友 GRP-U8 FileUpload接口存在任意文件上传漏洞，攻击者通过漏洞可以获取服务器权限。
     faofa: "用友GRP-U8"
-  references:
+  reference:
     - https://mp.weixin.qq.com/s/SFP8djDK-je1IzINSG3Ltw
   tags: yonyou,fileupload
   created: 2025/02/24

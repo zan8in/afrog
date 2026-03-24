@@ -4,8 +4,8 @@ info:
   name: 飞企互联-FE企业运营管理平台 parseTree 接口SQL注入
   author: zan8in
   severity: high
-  verified: false
-  descripiton: |-
+  verified: true
+  description: |-
     fofa: app="飞企互联-FE企业运营管理平台"
   reference:
     - https://mp.weixin.qq.com/s/Cf9VaHgD1MqA1YhsX0UO6Q

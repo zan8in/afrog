@@ -4,7 +4,7 @@ info:
   name: ETCD Unauth
   author: j4ckzh0u
   severity: high
-  verfied: true
+  verified: true
   tags: etcd,unauth
   created: 2023/07/07
 

