@@ -53,6 +53,14 @@ rules:
         - /v3/api-docs
         - /api_docs
         - /api-docs
+        - ;/v2/api-docs
+        - ;/v2/api-docs;.css
+        - ;/v3/api-docs
+        - ;/v3/api-docs;.css
+        - ;;/v2/api-docs
+        - ;;/v2/api-docs;.css
+        - ;;/v3/api-docs
+        - ;;/v3/api-docs;.css
     request:
       method: GET
       path: "{{p}}"

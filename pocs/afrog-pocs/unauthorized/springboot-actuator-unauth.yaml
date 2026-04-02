@@ -21,6 +21,7 @@ rules:
         - /appenv
         - /env%72
         - /appenv%72
+        - ;;/env;.css
     request:
       method: GET
       path: "{{p}}"
