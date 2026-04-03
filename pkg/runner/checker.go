@@ -236,6 +236,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			c.preRenderRuleRequest(&rule.Request)
 
 			delete(c.VariableMap, "__step_poc_results")
+			c.VariableMap["target"] = target
+			c.VariableMap["fulltarget"] = target
 			c.VariableMap["response"] = &proto.Response{Headers: map[string]string{}}
 			c.VariableMap["response_text"] = ""
 			reqType := strings.ToLower(rule.Request.Type)
@@ -302,6 +304,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				c.preRenderRuleRequest(&ruleAttempt.Request)
 
 				delete(c.VariableMap, "__step_poc_results")
+				c.VariableMap["target"] = target
+				c.VariableMap["fulltarget"] = target
 				c.VariableMap["response"] = &proto.Response{Headers: map[string]string{}}
 				c.VariableMap["response_text"] = ""
 				reqType := strings.ToLower(ruleAttempt.Request.Type)
