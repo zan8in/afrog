@@ -256,24 +256,74 @@ func NewOptions() (*Options, error) {
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`afrog`)
 
-	flagSet.CreateGroup("target", "Target",
+	flagSet.CreateGroup("input", "Input",
 		flagSet.StringSliceVarP(&options.Target, "target", "t", nil, "target URLs/hosts to scan (comma separated)", goflags.CommaSeparatedStringSliceOptions),
 		flagSet.StringVarP(&options.TargetsFile, "target-file", "T", "", "list of target URLs/hosts to scan (one per line)"),
 		flagSet.StringVarP(&options.Cyberspace, "cyberspace", "cs", "", "cyberspace search, eg: -cs zoomeye"),
 		flagSet.StringVarP(&options.Query, "query", "q", "", "cyberspace search keywords, eg: -q app:'tomcat'"),
 		flagSet.IntVarP(&options.QueryCount, "query-count", "qc", 100, "cyberspace search data count, eg: -qc 1000"),
 		flagSet.StringVar(&options.Resume, "resume", "", "resume scan using resume.afg"),
-		flagSet.StringVar(&options.OOB, "oob", "", "set Out-of-Band (OOB) adapter, eg: -oob ceyeio or -oob dnslogcn or -oob alphalog"),
 	)
 
 	flagSet.CreateGroup("pocs", "PoCs",
 		flagSet.StringVarP(&options.PocFile, "poc-file", "P", "", "PoC file or directory to scan"),
 		flagSet.StringSliceVarP(&options.AppendPoc, "append-poc", "ap", nil, "append PoC file or directory to scan (comma separated)", goflags.NormalizedOriginalStringSliceOptions),
-		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
-		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
 		flagSet.StringVar(&options.PocMigrate, "pocmigrate", "", "migrate legacy PoCs to current syntax (file or directory)"),
 		flagSet.StringSliceVarP(&options.ExcludePocs, "exclude-pocs", "ep", nil, "pocs to exclude from the scan (comma-separated)", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.StringVarP(&options.ExcludePocsFile, "exclude-pocs-file", "epf", "", "list of pocs to exclude from scan (file)"),
+		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
+		flagSet.StringVarP(&options.PocDetail, "poc-detail", "pd", "", "show a afrog-pocs detail"),
+	)
+
+	flagSet.CreateGroup("select", "Select",
+		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by keyword , eg: -s tomcat,phpinfo"),
+		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. support: info, low, medium, high, critical, unknown"),
+		flagSet.StringVar(&options.Sort, "sort", "", "scan sorting: severity|a-z"),
+	)
+
+	flagSet.CreateGroup("network", "Network",
+		flagSet.IntVar(&options.Timeout, "timeout", 50, "time to wait in seconds before timeout"),
+		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
+		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
+		flagSet.StringSliceVarP(&options.Header, "header", "H", nil, "custom header/cookie to include in all http request in key:value format (comma separated), eg: -H 'X-Forwarded-For: 1.1.1.1' -H 'Cookie: JSESSION=xxx;'", goflags.StringSliceOptions),
+		flagSet.BoolVar(&options.DefaultAccept, "http-default-accept", true, "add Accept: */* when PoC doesn't set Accept"),
+	)
+
+	flagSet.CreateGroup("performance", "Performance",
+		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.ReqLimitPerTarget, "req-limit-per-target", "rlt", 0, "maximum number of requests per second per target (host:port), 0 disables"),
+		flagSet.BoolVar(&options.AutoReqLimit, "auto-req-limit", false, "automatically set per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Polite, "polite", false, "use polite per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Balanced, "balanced", false, "use balanced per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Aggressive, "aggressive", false, "use aggressive per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
+		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
+		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
+		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
+	)
+
+	flagSet.CreateGroup("oob", "OOB",
+		flagSet.StringVar(&options.OOB, "oob", "", "set Out-of-Band (OOB) adapter, eg: -oob ceyeio or -oob dnslogcn or -oob alphalog"),
+		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
+		flagSet.IntVarP(&options.OOBConcurrency, "oob-concurrency", "oc", 25, "oob poc maximum number of afrog-pocs to be executed in parallel"),
+		flagSet.IntVar(&options.OOBPollInterval, "oob-poll-interval", 1, "oob polling interval in seconds"),
+		flagSet.IntVar(&options.OOBHitRetention, "oob-hit-retention", 10, "oob hit retention in minutes"),
+	)
+
+	flagSet.CreateGroup("stages", "Stages",
+		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
+		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (custom ports also scan 'top')"),
+		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
+		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
+		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
+		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
+		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
+		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
+		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
+		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
+		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),
+		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 	)
 
 	flagSet.CreateGroup("output", "Output",
@@ -282,90 +332,24 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.JsonAll, "json-all", "ja", "", "write to the JSON file, including all vulnerability results"),
 		flagSet.BoolVarP(&options.DisableOutputHtml, "disable-output-html", "doh", false, "disable the automatic generation of HTML reports (higher priority than the -o command)"),
 		flagSet.BoolVarP(&options.NoColor, "no-color", "nc", false, "disable output content coloring (ANSI escape codes)"),
-	)
-
-	flagSet.CreateGroup("filter", "Filter",
-		flagSet.StringVarP(&options.Search, "search", "s", "", "search PoC by keyword , eg: -s tomcat,phpinfo"),
-		flagSet.StringVarP(&options.Severity, "severity", "S", "", "pocs to run based on severity. support: info, low, medium, high, critical, unknown"),
-	)
-
-	flagSet.CreateGroup("rate-limit", "Rate-Limit",
-		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
-		flagSet.IntVarP(&options.ReqLimitPerTarget, "req-limit-per-target", "rlt", 0, "maximum number of requests per second per target (host:port), 0 disables"),
-		flagSet.BoolVar(&options.AutoReqLimit, "auto-req-limit", false, "automatically set per-target request limit (host:port)"),
-		flagSet.BoolVar(&options.Polite, "polite", false, "use polite per-target request limit (host:port)"),
-		flagSet.BoolVar(&options.Balanced, "balanced", false, "use balanced per-target request limit (host:port)"),
-		flagSet.BoolVar(&options.Aggressive, "aggressive", false, "use aggressive per-target request limit (host:port)"),
-		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
-		flagSet.BoolVar(&options.Smart, "smart", false, "intelligent adjustment of concurrency based on changes in the total number of assets being scanned"),
-		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
-		flagSet.IntVarP(&options.OOBConcurrency, "oob-concurrency", "oc", 25, "oob poc maximum number of afrog-pocs to be executed in parallel"),
-		flagSet.IntVar(&options.OOBPollInterval, "oob-poll-interval", 1, "oob polling interval in seconds"),
-		flagSet.IntVar(&options.OOBHitRetention, "oob-hit-retention", 10, "oob hit retention in minutes"),
-	)
-
-	flagSet.CreateGroup("optimization", "Optimization",
-		flagSet.IntVar(&options.Retries, "retries", 1, "number of times to retry a failed request"),
-		flagSet.IntVar(&options.Timeout, "timeout", 50, "time to wait in seconds before timeout"),
-		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),
-		flagSet.IntVar(&options.MaxHostError, "mhe", 3, "max errors for a host before skipping from scan"),
-		flagSet.IntVar(&options.MaxRespBodySize, "mrbs", 2, "max of http response body size"),
-		flagSet.IntVar(&options.BruteMaxRequests, "brute-max-requests", 5000, "max brute requests per rule, 0 disables"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
-		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
-		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
-		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
-		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "This monitor tracks and records the execution time of each POC to identify the POC with the longest execution time."),
-		flagSet.IntVar(&options.PedmLogLimit, "pedm-log-limit", 50, "when -pedm enabled, log first N started tasks (0 disables)"),
-		flagSet.IntVar(&options.PedmSlowThresholdSec, "pedm-slow-sec", 3, "when -pedm enabled, log tasks slower than N seconds (0 disables)"),
-		flagSet.IntVar(&options.PedmSlowLogLimit, "pedm-slow-log-limit", 50, "when -pedm enabled, log at most N slow tasks (0 disables)"),
-		flagSet.IntVar(&options.PedmSummaryTop, "pedm-summary-top", 20, "when -pedm enabled, print top N slowest PoCs summary (0 disables)"),
-		flagSet.StringVar(&options.PedmSummaryBy, "pedm-summary-by", "max", "when -pedm enabled, summary sort key: max|avg"),
-		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
-		// flagSet.StringVar(&options.Cookie, "cookie", "", "custom global cookie, only applicable to http(s) protocol, eg: -cookie 'JSESSION=xxx;'"),
-		flagSet.StringSliceVarP(&options.Header, "header", "H", nil, "custom header/cookie to include in all http request in key:value format (comma separated), eg: -H 'X-Forwarded-For: 1.1.1.1' -H 'Cookie: JSESSION=xxx;'", goflags.StringSliceOptions),
-		flagSet.BoolVar(&options.DefaultAccept, "http-default-accept", true, "add Accept: */* when PoC doesn't set Accept"),
-		flagSet.StringVar(&options.Sort, "sort", "", "Scan sorting, default security level scanning, `-sort a-z` scan in alphabetical order"),
+		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),
 	)
 
-	flagSet.CreateGroup("update", "Update",
-		flagSet.BoolVarP(&options.Update, "update", "un", false, "update afrog engine to the latest released version"),
-		// flagSet.BoolVarP(&options.UpdatePocs, "update-pocs", "up", false, "update afrog-pocs to the latest released version"),
-		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic afrog-pocs update check"),
-	)
-
-	flagSet.CreateGroup("proxy", "Proxy",
-		flagSet.StringVar(&options.Proxy, "proxy", "", "list of http/socks5 proxy to use (comma separated or file input)"),
-	)
-
-	flagSet.CreateGroup("debug", "Debug",
+	flagSet.CreateGroup("debug", "Debug & Tools",
 		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
 		flagSet.BoolVar(&options.Test, "test", false, "test mode (requires gating disabled)"),
-		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),
-		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
 		flagSet.StringVar(&options.Validate, "validate", "", "validate POC YAML syntax, support file or directory"),
+		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
 	)
 
-	flagSet.CreateGroup("server", "Server",
+	flagSet.CreateGroup("services", "Services & Integrations",
 		flagSet.BoolVar(&options.Web, "web", false, "Start a web server."),
-	)
-
-	flagSet.CreateGroup("portscan", "PortScan",
-		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
-		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (custom ports also scan 'top')"),
-		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
-		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
-		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
-		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
-		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
-	)
-
-	flagSet.CreateGroup("webhook", "Webhook",
 		flagSet.BoolVar(&options.Dingtalk, "dingtalk", false, "Start a dingtalk webhook."),
 		flagSet.BoolVar(&options.Wecom, "wecom", false, "Start a wecom webhook."),
 	)
 
-	flagSet.CreateGroup("configurations", "Configurations",
+	flagSet.CreateGroup("config", "Config",
 		flagSet.StringVar(&options.ConfigFile, "config", "", "path to the afrog configuration file"),
 	)
 
@@ -374,6 +358,11 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVar(&options.CuratedEndpoint, "curated-endpoint", "", "curated service endpoint"),
 		flagSet.IntVar(&options.CuratedTimeout, "curated-timeout", 0, "curated mount timeout seconds"),
 		flagSet.BoolVar(&options.CuratedForceUpdate, "curated-force-update", false, "force curated pocs update check now"),
+	)
+
+	flagSet.CreateGroup("update", "Update",
+		flagSet.BoolVarP(&options.Update, "update", "un", false, "update afrog engine to the latest released version"),
+		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic afrog-pocs update check"),
 	)
 
 	_ = flagSet.Parse()
