@@ -378,7 +378,7 @@ func main() {
 			runner.Stop()
 
 			// 立即保存进度
-			if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
+			if err := r.ScanProgress.AtomicSave(autoSaveFile, atomic.LoadUint32(&options.CurrentCount), uint32(options.Count)); err != nil {
 				gologger.Error().Msgf("Could not preserve scan state: %s", err)
 			} else {
 				gologger.Info().Msgf("Scan state archived: %s\n", autoSaveFile)
@@ -396,7 +396,7 @@ func main() {
 			case <-r.Done():
 				return
 			case <-ticker.C:
-				if err := r.ScanProgress.AtomicSave(autoSaveFile); err != nil {
+				if err := r.ScanProgress.AtomicSave(autoSaveFile, atomic.LoadUint32(&options.CurrentCount), uint32(options.Count)); err != nil {
 					gologger.Debug().Msgf("auto save file failed: %s", err)
 				}
 			}

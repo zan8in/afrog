@@ -183,7 +183,8 @@ type Options struct {
 	Wecom bool
 
 	// resume
-	Resume string
+	Resume          string
+	ResumeDoneTasks uint32
 
 	// debug
 	Debug     bool

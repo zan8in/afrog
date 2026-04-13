@@ -1201,7 +1201,7 @@ func (runner *Runner) Execute() {
 				return
 			}
 			if v.(*atomic.Int64).Add(-1) == 0 {
-				runner.ScanProgress.Increment(pocID)
+				runner.ScanProgress.MarkPocDone(pocID)
 			}
 		}
 
@@ -1241,8 +1241,10 @@ func (runner *Runner) Execute() {
 			}
 
 			if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(pocItem.Id) {
-				for range targetView {
-					runner.NotVulCallback()
+				if runner.options.ResumeDoneTasks == 0 {
+					for range targetView {
+						runner.NotVulCallback()
+					}
 				}
 				continue
 			}
@@ -1253,12 +1255,21 @@ func (runner *Runner) Execute() {
 					break
 				}
 
+				if len(runner.options.Resume) > 0 && runner.ScanProgress.ContainsTask(pocItem.Id, t) {
+					if runner.options.ResumeDoneTasks == 0 {
+						runner.NotVulCallback()
+					}
+					continue
+				}
+
 				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey, runner.options.Test) {
+					runner.ScanProgress.IncrementTask(pocItem.Id, t)
 					runner.NotVulCallback()
 					continue
 				}
 
 				if shouldSkipFingerprintFiltered(t, pocItem) {
+					runner.ScanProgress.IncrementTask(pocItem.Id, t)
 					runner.NotVulCallback()
 					continue
 				}
@@ -1276,7 +1287,7 @@ func (runner *Runner) Execute() {
 				}
 			}
 			if scheduled == 0 {
-				runner.ScanProgress.Increment(pocItem.Id)
+				runner.ScanProgress.MarkPocDone(pocItem.Id)
 			}
 		}
 
@@ -1305,16 +1316,20 @@ func (runner *Runner) Execute() {
 			}
 
 			if len(runner.options.Resume) > 0 && runner.ScanProgress.Contains(pocItem.Id) {
-				for range targetView {
-					runner.NotVulCallback()
+				if runner.options.ResumeDoneTasks == 0 {
+					for range targetView {
+						runner.NotVulCallback()
+					}
 				}
 				continue
 			}
 
 			for range targetView {
-				runner.NotVulCallback()
+				if runner.options.ResumeDoneTasks == 0 {
+					runner.NotVulCallback()
+				}
 			}
-			runner.ScanProgress.Increment(pocItem.Id)
+			runner.ScanProgress.MarkPocDone(pocItem.Id)
 		}
 	} else {
 		runStage(reversePocs, oobRate, oobCon)
@@ -1391,6 +1406,9 @@ func (runner *Runner) exec(tap *TransData) {
 func (runner *Runner) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := runner.engine.AcquireChecker()
 	defer runner.engine.ReleaseChecker(c)
+	if runner.ScanProgress != nil && poc != nil && poc.Id != "" && target != "" {
+		defer runner.ScanProgress.IncrementTask(poc.Id, target)
+	}
 
 	defer func() {
 		// https://github.com/zan8in/afrog/v3/issues/7
@@ -1418,9 +1436,28 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 	if e.runner == nil || e.runner.engine == nil {
 		return false, "", nil
 	}
+	if e.runner.options != nil && e.runner.options.Resume != "" && e.runner.ScanProgress != nil {
+		fpID := "finger:" + p.Id
+		if e.runner.ScanProgress.ContainsPoc(fpID) {
+			if e.runner.options.ResumeDoneTasks == 0 {
+				e.runner.NotVulCallback()
+			}
+			return false, "", nil
+		}
+		if e.runner.ScanProgress.ContainsTask(fpID, target) {
+			if e.runner.options.ResumeDoneTasks == 0 {
+				e.runner.NotVulCallback()
+			}
+			return false, "", nil
+		}
+	}
 	c := e.runner.engine.AcquireChecker()
 	defer e.runner.engine.ReleaseChecker(c)
 	defer e.runner.NotVulCallback()
+	if e.runner.ScanProgress != nil && p != nil && p.Id != "" && target != "" {
+		fpID := "finger:" + p.Id
+		defer e.runner.ScanProgress.IncrementTask(fpID, target)
+	}
 
 	if ctx != nil {
 		c.VariableMap[retryhttpclient.ContextVarKey] = ctx
@@ -1497,6 +1534,14 @@ func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string,
 
 	e := &fingerprint.Engine{Rate: runner.options.RateLimit, Concurrency: runner.options.Concurrency}
 	e.Run(ctx, targets, pocs, runnerFingerprintExecutor{runner: runner})
+	if runner.ScanProgress != nil {
+		for _, p := range pocs {
+			if p.Id == "" {
+				continue
+			}
+			runner.ScanProgress.MarkPocDone("finger:" + p.Id)
+		}
+	}
 }
 
 func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {

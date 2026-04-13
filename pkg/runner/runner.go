@@ -138,6 +138,10 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	if runner.ScanProgress, err = NewScanProgress(options.Resume); err != nil {
 		return nil, fmt.Errorf("%s %s", options.Resume, err.Error())
 	}
+	if options.Resume != "" && runner.ScanProgress.DoneTasks > 0 {
+		options.ResumeDoneTasks = runner.ScanProgress.DoneTasks
+		options.CurrentCount = runner.ScanProgress.DoneTasks
+	}
 
 	// 在SDK模式下，不创建任何报告实例，避免自动创建reports目录
 	if !options.SDKMode {
