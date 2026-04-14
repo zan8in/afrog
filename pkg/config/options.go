@@ -212,6 +212,7 @@ type Options struct {
 	OOBApiUrl       string
 	OOBPollInterval int
 	OOBHitRetention int
+	OOBFinalizeTimeout int
 
 	// SDK模式标志，用于控制OOB检测行为
 	SDKMode   bool
@@ -308,8 +309,9 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVar(&options.OOB, "oob", "", "set Out-of-Band (OOB) adapter, eg: -oob ceyeio or -oob dnslogcn or -oob alphalog"),
 		flagSet.IntVarP(&options.OOBRateLimit, "oob-rate-limit", "orl", 25, "oob poc maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.OOBConcurrency, "oob-concurrency", "oc", 25, "oob poc maximum number of afrog-pocs to be executed in parallel"),
-		flagSet.IntVar(&options.OOBPollInterval, "oob-poll-interval", 1, "oob polling interval in seconds"),
+		flagSet.IntVar(&options.OOBPollInterval, "oob-poll-interval", 2, "oob polling interval in seconds"),
 		flagSet.IntVar(&options.OOBHitRetention, "oob-hit-retention", 10, "oob hit retention in minutes"),
+		flagSet.IntVar(&options.OOBFinalizeTimeout, "oob-finalize-timeout", -1, "oob finalize wait timeout in seconds, -1 uses pending timeout (clamped 5-60), 0 disables waiting"),
 	)
 
 	flagSet.CreateGroup("stages", "Stages",
@@ -480,6 +482,12 @@ func (opt *Options) VerifyOptions() error {
 	}
 	if opt.PedmSummaryTop < 0 {
 		return fmt.Errorf("--pedm-summary-top must be >= 0")
+	}
+	if opt.OOBFinalizeTimeout < -1 {
+		return fmt.Errorf("--oob-finalize-timeout must be >= -1")
+	}
+	if opt.OOBFinalizeTimeout > 3600 {
+		return fmt.Errorf("--oob-finalize-timeout must be <= 3600")
 	}
 
 	limitModeCount := 0

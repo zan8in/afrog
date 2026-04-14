@@ -26,6 +26,14 @@ type CustomLib struct {
 	oobMgr             *OOBManager
 	currentOOB         *proto.OOB
 	lastOOBHit         *OOBHitSnapshot
+	lastOOBPending     []OOBPending
+}
+
+type OOBPending struct {
+	Filter     string
+	FilterType string
+	TimeoutSec int64
+	Token      string
 }
 
 func (c *CustomLib) CompileOptions() []cel.EnvOption {
@@ -131,13 +139,13 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 				if to == 0 {
 					to = 3
 				}
-				waitOK := mgr.Wait(oob.Filter, ft, time.Second*time.Duration(to))
-				if waitOK {
-					if snap, ok2 := mgr.HitSnapshot(oob.Filter, ft); ok2 {
-						c.lastOOBHit = &snap
-					}
+				mgr.Watch(oob.Filter, ft)
+				if snap, ok2 := mgr.HitSnapshot(oob.Filter, ft); ok2 {
+					c.lastOOBHit = &snap
+					return types.Bool(true)
 				}
-				return types.Bool(waitOK)
+				c.lastOOBPending = append(c.lastOOBPending, OOBPending{Filter: oob.Filter, FilterType: ft, TimeoutSec: to})
+				return types.Bool(false)
 			},
 		},
 		&functions.Overload{
@@ -173,20 +181,18 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 				if to == 0 {
 					to = 3
 				}
-				waitOK := mgr.Wait(oob.Filter, ft, time.Second*time.Duration(to))
-				if !waitOK {
-					return types.Bool(false)
-				}
-				snap, ok2 := mgr.HitSnapshot(oob.Filter, ft)
-				if !ok2 {
-					return types.Bool(false)
-				}
 				tok := strings.TrimSpace(string(token))
-				if tok != "" && !strings.Contains(snap.Snippet, tok) {
-					return types.Bool(false)
+				mgr.Watch(oob.Filter, ft)
+				if snap, ok2 := mgr.HitSnapshot(oob.Filter, ft); ok2 {
+					if tok != "" && !strings.Contains(snap.Snippet, tok) {
+						c.lastOOBPending = append(c.lastOOBPending, OOBPending{Filter: oob.Filter, FilterType: ft, TimeoutSec: to, Token: tok})
+						return types.Bool(false)
+					}
+					c.lastOOBHit = &snap
+					return types.Bool(true)
 				}
-				c.lastOOBHit = &snap
-				return types.Bool(true)
+				c.lastOOBPending = append(c.lastOOBPending, OOBPending{Filter: oob.Filter, FilterType: ft, TimeoutSec: to, Token: tok})
+				return types.Bool(false)
 			},
 		},
 		&functions.Overload{
@@ -426,6 +432,15 @@ func (c *CustomLib) SetOOBManager(mgr *OOBManager) {
 
 func (c *CustomLib) SetCurrentOOB(oob *proto.OOB) {
 	c.currentOOB = oob
+}
+
+func (c *CustomLib) TakeOOBPending() []OOBPending {
+	if c == nil || len(c.lastOOBPending) == 0 {
+		return nil
+	}
+	out := c.lastOOBPending
+	c.lastOOBPending = nil
+	return out
 }
 
 func (c *CustomLib) Reset() {

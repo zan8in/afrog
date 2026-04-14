@@ -17,6 +17,7 @@ type OOBManager struct {
 	hitRetention  time.Duration
 	mu            sync.Mutex
 	waiters       map[string]*oobWaitEntry
+	watchers      map[string]time.Time
 	hits          map[string]oobHit
 	events        map[string][]oobEvent
 	seen          map[string]map[string]time.Time
@@ -74,6 +75,7 @@ func NewOOBManager(ctx context.Context, adapter *oobadapter.OOBAdapter, pollInte
 		pollInterval:  pollInterval,
 		hitRetention:  hitRetention,
 		waiters:       make(map[string]*oobWaitEntry),
+		watchers:      make(map[string]time.Time),
 		hits:          make(map[string]oobHit),
 		events:        make(map[string][]oobEvent),
 		seen:          make(map[string]map[string]time.Time),
@@ -84,6 +86,33 @@ func NewOOBManager(ctx context.Context, adapter *oobadapter.OOBAdapter, pollInte
 	}
 	go m.loop(ctx)
 	return m
+}
+
+func (m *OOBManager) Watch(filter string, filterType string) {
+	if m == nil || m.adapter == nil || strings.TrimSpace(filter) == "" {
+		return
+	}
+	if strings.TrimSpace(filterType) == "" {
+		filterType = oobadapter.OOBDNS
+	}
+	key := filterType + "|" + filter
+	now := time.Now().UTC()
+	m.mu.Lock()
+	if m.watchers == nil {
+		m.watchers = make(map[string]time.Time)
+	}
+	m.watchers[key] = now
+	if m.maxSeen > 0 && len(m.watchers) > m.maxSeen {
+		n := len(m.watchers) - m.maxSeen
+		for k := range m.watchers {
+			delete(m.watchers, k)
+			n--
+			if n <= 0 {
+				break
+			}
+		}
+	}
+	m.mu.Unlock()
 }
 
 func (m *OOBManager) Wait(filter string, filterType string, timeout time.Duration) bool {
@@ -233,7 +262,7 @@ func (m *OOBManager) loop(ctx context.Context) {
 		case <-ticker.C:
 		}
 
-		typeGroup := m.snapshotWaiters()
+		typeGroup := m.snapshotWatchTargets()
 		if len(typeGroup) == 0 {
 			m.cleanupHits()
 			continue
@@ -392,10 +421,49 @@ func (m *OOBManager) snapshotWaiters() map[string][]oobWaitSnapshot {
 	return group
 }
 
+func (m *OOBManager) snapshotWatchTargets() map[string][]oobWaitSnapshot {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.waiters) == 0 && len(m.watchers) == 0 {
+		return nil
+	}
+	group := make(map[string][]oobWaitSnapshot)
+	for k, e := range m.waiters {
+		group[e.filterType] = append(group[e.filterType], oobWaitSnapshot{
+			key:    k,
+			filter: e.filter,
+			done:   e.done,
+		})
+	}
+	for key := range m.watchers {
+		parts := strings.SplitN(key, "|", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		filterType := parts[0]
+		filter := parts[1]
+		group[filterType] = append(group[filterType], oobWaitSnapshot{
+			key:    key,
+			filter: filter,
+			done:   nil,
+		})
+	}
+	return group
+}
+
 func (m *OOBManager) cleanupHits() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.hits) == 0 {
+		if m.hitRetention <= 0 {
+			return
+		}
+		now := time.Now().UTC()
+		for k, t := range m.watchers {
+			if now.Sub(t) > m.hitRetention {
+				delete(m.watchers, k)
+			}
+		}
 		return
 	}
 	if m.hitRetention <= 0 {
@@ -407,6 +475,12 @@ func (m *OOBManager) cleanupHits() {
 			delete(m.hits, k)
 			delete(m.events, k)
 			delete(m.seen, k)
+		}
+	}
+	nowUTC := now.UTC()
+	for k, t := range m.watchers {
+		if nowUTC.Sub(t) > m.hitRetention {
+			delete(m.watchers, k)
 		}
 	}
 }

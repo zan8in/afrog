@@ -184,6 +184,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	c.CustomLib.UpdateCompileOption("oob_filter", decls.String)
 	c.CustomLib.SetCurrentOOB(o)
 	c.CustomLib.lastOOBHit = nil
+	c.CustomLib.lastOOBPending = nil
 
 	if len(pocItem.Set) > 0 {
 		c.UpdateVariableMap(pocItem.Set)

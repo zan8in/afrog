@@ -694,6 +694,8 @@ func (runner *Runner) Execute() {
 		hitRetention := time.Duration(options.OOBHitRetention) * time.Minute
 		runner.engine.oobMgr = NewOOBManager(runner.ctx, runner.engine.oobAdapter, pollInterval, hitRetention)
 	}
+	runner.startOOBResolver()
+	defer runner.stopOOBResolver()
 
 	runner.printOOBStatus(reversePocs)
 
@@ -1295,8 +1297,6 @@ func (runner *Runner) Execute() {
 		workers.Wait()
 	}
 
-	runStage(otherPocs, options.RateLimit, options.Concurrency)
-
 	oobRate := options.OOBRateLimit
 	if oobRate <= 0 {
 		oobRate = options.RateLimit
@@ -1334,6 +1334,10 @@ func (runner *Runner) Execute() {
 	} else {
 		runStage(reversePocs, oobRate, oobCon)
 	}
+
+	runStage(otherPocs, options.RateLimit, options.Concurrency)
+
+	runner.finalizeOOBPendings()
 
 	if options.PocExecutionDurationMonitor && runner.engine != nil {
 		runner.engine.pedmSummary(options)
@@ -1424,6 +1428,11 @@ func (runner *Runner) executeExpression(ctx context.Context, target string, poc 
 	c.Check(target, poc)
 	if c.Result != nil {
 		c.Result.FingerResult = runner.fingerprintForTarget(c.Result.Target)
+	}
+	if c.CustomLib != nil && c.Result != nil {
+		if pendings := c.CustomLib.TakeOOBPending(); len(pendings) > 0 {
+			runner.registerOOBPendings(c.Result, pendings)
+		}
 	}
 	runner.OnResult(c.Result)
 }

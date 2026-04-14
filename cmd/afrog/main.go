@@ -146,6 +146,15 @@ func main() {
 	)
 
 	progressEnabled := !options.Silent
+	type oobFinalizeProgress struct {
+		Active   bool
+		Status   string
+		Finished int64
+		Total    int64
+		Percent  int
+	}
+	var oobFinalize atomic.Value
+	oobFinalize.Store(oobFinalizeProgress{})
 
 	progressLine := func() string {
 		total := options.Count
@@ -159,6 +168,17 @@ func main() {
 		suffix := ""
 		if options.LiveStats {
 			suffix = r.LiveStatsSuffix()
+		} else {
+			if v, ok := oobFinalize.Load().(oobFinalizeProgress); ok && strings.TrimSpace(v.Status) != "" {
+				remain := v.Total - v.Finished
+				if remain < 0 {
+					remain = 0
+				}
+				if v.Total < 0 {
+					v.Total = 0
+				}
+				suffix = fmt.Sprintf(" oobf=%d/%d %s", remain, v.Total, v.Status)
+			}
 		}
 		return fmt.Sprintf("[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(pgress, 0), pgress, current, total, elapsed, suffix)
 	}
@@ -171,6 +191,41 @@ func main() {
 
 	var progressDone chan struct{}
 	var progressOnce sync.Once
+	if progressEnabled {
+		prev := options.OnPhaseProgress
+		options.OnPhaseProgress = func(phase string, status string, finished int64, total int64, percent int) {
+			if prev != nil {
+				prev(phase, status, finished, total, percent)
+			}
+			phase = strings.ToLower(strings.TrimSpace(phase))
+			if phase != "oob_finalize" {
+				return
+			}
+			status = strings.ToLower(strings.TrimSpace(status))
+			if percent < 0 {
+				percent = 0
+			}
+			if percent > 100 {
+				percent = 100
+			}
+			next := oobFinalizeProgress{
+				Active:   status == "running",
+				Status:   status,
+				Finished: finished,
+				Total:    total,
+				Percent:  percent,
+			}
+			cur, _ := oobFinalize.Load().(oobFinalizeProgress)
+			if cur.Status == next.Status && cur.Finished == next.Finished && cur.Total == next.Total && cur.Percent == next.Percent && cur.Active == next.Active {
+				return
+			}
+			oobFinalize.Store(next)
+
+			lock.Lock()
+			renderProgress()
+			lock.Unlock()
+		}
+	}
 
 	r.OnFingerprint = func(targetKey string, hits []fingerprint.Hit) {
 		if len(hits) == 0 {
@@ -294,7 +349,9 @@ func main() {
 		}
 
 		defer func() {
-			atomic.AddUint32(&options.CurrentCount, 1)
+			if result == nil || !result.SkipCount {
+				atomic.AddUint32(&options.CurrentCount, 1)
+			}
 			if progressEnabled && !options.LiveStats {
 				lock.Lock()
 				renderProgress()

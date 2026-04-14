@@ -15,6 +15,7 @@ import (
 
 type Result struct {
 	IsVul        bool
+	SkipCount    bool
 	Target       string
 	FullTarget   string
 	PocInfo      *poc.Poc

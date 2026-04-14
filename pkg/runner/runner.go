@@ -52,6 +52,11 @@ type Runner struct {
 	liveMu            sync.Mutex
 	livePrev          retryhttpclient.LiveMetrics
 	livePrevAt        time.Time
+	oobPendingMu      sync.Mutex
+	oobPending        map[string]*oobPendingEntry
+	oobFinalizing     uint32
+	oobResolverStop   chan struct{}
+	oobResolverDone   chan struct{}
 	ctx               context.Context
 	cancel            context.CancelFunc
 	// OOB           *oobadapter.OOBAdapter
@@ -330,7 +335,7 @@ func (r *Runner) LiveStatsSuffix() string {
 	taskWaitMsPerSec := (deltaTaskWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 	reqWaitMsPerSec := (deltaReqWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 
-	return fmt.Sprintf(" ta=%d hi=%d ri=%d ni=%d rlt=%d tw=%dms/%d rw=%dms/%d",
+	suffix := fmt.Sprintf(" ta=%d hi=%d ri=%d ni=%d rlt=%d tw=%dms/%d rw=%dms/%d",
 		atomic.LoadInt64(&r.engine.activeTasks),
 		cur.HTTPInflight,
 		cur.RawInflight,
@@ -341,6 +346,17 @@ func (r *Runner) LiveStatsSuffix() string {
 		reqWaitMsPerSec,
 		reqWaitPerSec,
 	)
+	r.oobPendingMu.Lock()
+	oobPending := len(r.oobPending)
+	r.oobPendingMu.Unlock()
+	if oobPending > 0 || atomic.LoadUint32(&r.oobFinalizing) != 0 {
+		if atomic.LoadUint32(&r.oobFinalizing) != 0 {
+			suffix += fmt.Sprintf(" oobf=%d", oobPending)
+		} else {
+			suffix += fmt.Sprintf(" oob=%d", oobPending)
+		}
+	}
+	return suffix
 }
 
 func (r *Runner) setFingerprintResult(targetKey, pocID string, res *result.Result) {

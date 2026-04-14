@@ -184,6 +184,7 @@ type SDKOptions struct {
 	OOBHttpUrl     string // OOB HTTP地址
 	OOBRateLimit   int
 	OOBConcurrency int
+	OOBFinalizeTimeout int
 
 	// ========== 输出配置 ==========
 	EnableStream bool // 启用流式输出
@@ -213,6 +214,7 @@ func NewSDKOptions() *SDKOptions {
 		PSS4Chunk:             1000,
 		OOBRateLimit:          25,
 		OOBConcurrency:        25,
+		OOBFinalizeTimeout:    -1,
 	}
 }
 
@@ -597,7 +599,9 @@ func (s *SDKScanner) run() error {
 
 	// 设置结果处理器
 	s.runner.OnResult = func(r *result.Result) {
-		atomic.AddInt32(&s.stats.CompletedScans, 1)
+		if r == nil || !r.SkipCount {
+			atomic.AddInt32(&s.stats.CompletedScans, 1)
+		}
 		if s.options != nil && s.options.OnPhaseProgress != nil {
 			total := int64(s.stats.TotalScans)
 			completed := int64(atomic.LoadInt32(&s.stats.CompletedScans))
@@ -1143,6 +1147,7 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 		DefaultAccept:                  opts.DefaultAccept,
 		OOBRateLimit:                   opts.OOBRateLimit,
 		OOBConcurrency:                 opts.OOBConcurrency,
+		OOBFinalizeTimeout:             opts.OOBFinalizeTimeout,
 		Smart:                          opts.Smart,
 		DisableFingerprint:             opts.DisableFingerprint,
 		EnableWebProbe:                 opts.EnableWebProbe,
