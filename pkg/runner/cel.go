@@ -184,7 +184,7 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 				tok := strings.TrimSpace(string(token))
 				mgr.Watch(oob.Filter, ft)
 				if snap, ok2 := mgr.HitSnapshot(oob.Filter, ft); ok2 {
-					if tok != "" && !strings.Contains(snap.Snippet, tok) {
+					if tok != "" && !mgr.TokenMatches(oob.Filter, ft, tok) {
 						c.lastOOBPending = append(c.lastOOBPending, OOBPending{Filter: oob.Filter, FilterType: ft, TimeoutSec: to, Token: tok})
 						return types.Bool(false)
 					}

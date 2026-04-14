@@ -145,11 +145,11 @@ func (r *Runner) resolveOOBPendingsOnce() int {
 	resolved := 0
 	for _, it := range items {
 		ent := it.ent
-		snap, ok := r.engine.oobMgr.HitSnapshot(ent.filter, ent.filterType)
+		_, ok := r.engine.oobMgr.HitSnapshot(ent.filter, ent.filterType)
 		if !ok {
 			continue
 		}
-		if ent.token != "" && !strings.Contains(snap.Snippet, ent.token) {
+		if ent.token != "" && !r.engine.oobMgr.TokenMatches(ent.filter, ent.filterType, ent.token) {
 			continue
 		}
 

@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/google/cel-go/checker/decls"
-	"github.com/zan8in/oobadapter/pkg/oobadapter"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/targets"
+	"github.com/zan8in/oobadapter/pkg/oobadapter"
 	"gopkg.in/yaml.v2"
 )
 
@@ -701,7 +701,12 @@ func TestOOBCheckHelpers(t *testing.T) {
 				firstAt: now.Add(-time.Second),
 				lastAt:  now,
 				count:   1,
-				snippet: "hello token-123 world",
+				snippet: "hello world",
+			},
+		},
+		events: map[string][]oobEvent{
+			"dns|f1": {
+				{at: now, uniqueKey: "u1", snippet: "", raw: "dns query=aa-token-123-bb"},
 			},
 		},
 		lastPolledAt:  make(map[string]time.Time),
@@ -738,6 +743,7 @@ func TestOOBCheckHelpers(t *testing.T) {
 		VariableMap: map[string]any{},
 		Result:      &result.Result{},
 		CustomLib:   lib,
+		OOBMgr:      mgr,
 	}
 	c.attachOOBEvidence()
 	found := false

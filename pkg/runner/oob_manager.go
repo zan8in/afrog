@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -238,6 +239,71 @@ func (m *OOBManager) Evidence(filter string, filterType string, maxEvents int) s
 		}
 	}
 	return b.String()
+}
+
+func (m *OOBManager) TokenMatches(filter string, filterType string, token string) bool {
+	if m == nil || strings.TrimSpace(filter) == "" {
+		return false
+	}
+	tok := strings.ToLower(strings.TrimSpace(token))
+	if tok == "" {
+		return true
+	}
+	if filterType == "" {
+		filterType = oobadapter.OOBDNS
+	}
+	key := filterType + "|" + filter
+
+	m.mu.Lock()
+	h, ok := m.hits[key]
+	evs := append([]oobEvent(nil), m.events[key]...)
+	m.mu.Unlock()
+	if !ok {
+		return false
+	}
+	if m.hitRetention > 0 && time.Since(h.lastAt) > m.hitRetention {
+		return false
+	}
+	if tokenInText(tok, h.snippet) {
+		return true
+	}
+	if len(evs) == 0 {
+		return false
+	}
+	const lastN = 10
+	if len(evs) > lastN {
+		evs = evs[len(evs)-lastN:]
+	}
+	for _, ev := range evs {
+		if tokenInText(tok, ev.snippet, ev.raw) {
+			return true
+		}
+	}
+	return false
+}
+
+func tokenInText(tokenLower string, texts ...string) bool {
+	if tokenLower == "" {
+		return true
+	}
+	for _, s := range texts {
+		ss := strings.TrimSpace(s)
+		if ss == "" {
+			continue
+		}
+		l := strings.ToLower(ss)
+		if strings.Contains(l, tokenLower) {
+			return true
+		}
+		if strings.Contains(l, "%") || strings.Contains(l, "+") {
+			if dec, err := url.QueryUnescape(ss); err == nil {
+				if strings.Contains(strings.ToLower(dec), tokenLower) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func waitClosed(ch <-chan struct{}, timeout time.Duration) bool {
