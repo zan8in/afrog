@@ -2,6 +2,7 @@ package gox
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -154,19 +155,31 @@ func getFilenames(target string) []string {
 	return uniqueStringsPreserveOrder(result)
 }
 
-func processData(target string, shouldStop chan string, found *atomic.Bool) {
+func processData(ctx context.Context, target string, shouldStop chan string, found *atomic.Bool, cancel context.CancelFunc, headerLines []string) {
 	defer func() {
 		if r := recover(); r != nil {
 			gologger.Error().Msgf("[backup_files:processData] error: %v", r)
 		}
 	}()
 
+	if ctx != nil && ctx.Err() != nil {
+		return
+	}
 	if found.Load() {
 		return
 	}
-	body := GetBackupFile(target)
+	vmap := map[string]any{
+		retryhttpclient.ContextVarKey: ctx,
+	}
+	if len(headerLines) > 0 {
+		vmap["__global_headers"] = headerLines
+	}
+	body := getBackupFile(target, vmap)
 	if len(body) > 0 {
 		if found.CompareAndSwap(false, true) {
+			if cancel != nil {
+				cancel()
+			}
 			select {
 			case shouldStop <- target:
 			default:
@@ -184,11 +197,28 @@ func backup_files(target string, variableMap map[string]any) error {
 	}()
 
 	shouldStop := make(chan string, 1)
+	doneCh := make(chan struct{})
 	found := &atomic.Bool{}
 
 	baseTargets := getBaseTargets(target)
 	filenames := getFilenames(target)
 	exts := uniqueStringsPreserveOrder(exts)
+
+	baseCtx := retryhttpclient.ContextFromVariableMap(variableMap)
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(baseCtx)
+	defer cancel()
+
+	var headerLines []string
+	if variableMap != nil {
+		if v := variableMap["__global_headers"]; v != nil {
+			if lines, ok := v.([]string); ok && len(lines) > 0 {
+				headerLines = append([]string(nil), lines...)
+			}
+		}
+	}
 
 	workerCount := csize
 	if rl := retryhttpclient.GetReqLimitPerTarget(); rl > 0 && rl < workerCount {
@@ -201,13 +231,13 @@ func backup_files(target string, variableMap map[string]any) error {
 	for _, baseTarget := range baseTargets {
 		for _, filename := range filenames {
 			for _, ext := range exts {
-				if found.Load() {
+				if found.Load() || ctx.Err() != nil {
 					break
 				}
 				swg.Add()
 				go func(baseTarget, filename, ext string) {
 					defer swg.Done()
-					processData(joinURL(baseTarget, filename+"."+ext), shouldStop, found)
+					processData(ctx, joinURL(baseTarget, filename+"."+ext), shouldStop, found, cancel, headerLines)
 				}(baseTarget, filename, ext)
 			}
 			if found.Load() {
@@ -220,10 +250,19 @@ func backup_files(target string, variableMap map[string]any) error {
 	}
 	go func() {
 		swg.Wait()
-		close(shouldStop)
+		close(doneCh)
 	}()
 
-	resultUrl := <-shouldStop
+	var resultUrl string
+	select {
+	case resultUrl = <-shouldStop:
+		cancel()
+		select {
+		case <-doneCh:
+		case <-time.After(timeout + 2*time.Second):
+		}
+	case <-doneCh:
+	}
 	if len(resultUrl) > 0 {
 		_, err := DoHTTPWithTimeout(timeout, http.MethodGet, resultUrl, nil, nil, false, variableMap)
 		if err != nil {
@@ -244,13 +283,17 @@ func init() {
 }
 
 func GetBackupFile(target string) string {
+	return getBackupFile(target, nil)
+}
+
+func getBackupFile(target string, variableMap map[string]any) string {
 	defer func() {
 		if r := recover(); r != nil {
 			gologger.Error().Msgf("[backup_files:GetBackupFile] error: %v", r)
 		}
 	}()
 
-	data, status, _, err := FetchLimited(http.MethodGet, target, nil, nil, false, timeout, int64(maxSize), nil)
+	data, status, _, err := FetchLimited(http.MethodGet, target, nil, nil, false, timeout, int64(maxSize), variableMap)
 	// fmt.Println("err: ", err)
 	// fmt.Println("status: ", status)
 	// fmt.Println("data: ", string(data))
