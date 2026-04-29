@@ -165,6 +165,9 @@ func Init(opt *Options) (err error) {
 		}
 	}
 
+	configureHTTPTransport(RtryNoRedirect, opt)
+	configureHTTPTransport(RtryRedirect, opt)
+
 	maxDefaultBody = int64(opt.MaxRespBodySize * 1024 * 1024)
 
 	if opt.ReqLimitPerTarget > 0 {
@@ -175,6 +178,63 @@ func Init(opt *Options) (err error) {
 	applyReqLimitTransport(RtryNoRedirect)
 	applyReqLimitTransport(RtryRedirect)
 
+	return nil
+}
+
+func CloseIdleConnections() {
+	closeIdleConnections(RtryNoRedirect)
+	closeIdleConnections(RtryRedirect)
+}
+
+func closeIdleConnections(c *retryablehttp.Client) {
+	t := underlyingHTTPTransport(c)
+	if t == nil {
+		return
+	}
+	t.CloseIdleConnections()
+}
+
+func configureHTTPTransport(c *retryablehttp.Client, opt *Options) {
+	t := underlyingHTTPTransport(c)
+	if t == nil {
+		return
+	}
+	if t.IdleConnTimeout <= 0 {
+		t.IdleConnTimeout = 15 * time.Second
+	}
+	if t.MaxIdleConns <= 0 {
+		t.MaxIdleConns = 256
+	}
+	if t.MaxIdleConnsPerHost <= 0 {
+		t.MaxIdleConnsPerHost = 16
+	}
+	if opt != nil && opt.ReqLimitPerTarget > 0 {
+		if t.MaxConnsPerHost <= 0 || t.MaxConnsPerHost > opt.ReqLimitPerTarget {
+			t.MaxConnsPerHost = opt.ReqLimitPerTarget
+		}
+	}
+	if t.TLSHandshakeTimeout <= 0 {
+		t.TLSHandshakeTimeout = 10 * time.Second
+	}
+	if t.ExpectContinueTimeout <= 0 {
+		t.ExpectContinueTimeout = 1 * time.Second
+	}
+}
+
+func underlyingHTTPTransport(c *retryablehttp.Client) *http.Transport {
+	if c == nil || c.HTTPClient == nil {
+		return nil
+	}
+	rt := c.HTTPClient.Transport
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	if w, ok := rt.(*reqLimitTransport); ok && w != nil {
+		rt = w.base
+	}
+	if t, ok := rt.(*http.Transport); ok {
+		return t
+	}
 	return nil
 }
 

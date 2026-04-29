@@ -196,6 +196,8 @@ func backup_files(target string, variableMap map[string]any) error {
 		}
 	}()
 
+	defer retryhttpclient.CloseIdleConnections()
+
 	shouldStop := make(chan string, 1)
 	doneCh := make(chan struct{})
 	found := &atomic.Bool{}
