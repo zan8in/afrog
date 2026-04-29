@@ -205,13 +205,13 @@ type Options struct {
 	QueryCount int
 
 	// oobadapter, eg: `-oob ceyeio` or `-oob dnslogcn` or `-oob alphalog`
-	OOB             string
-	OOBKey          string
-	OOBDomain       string
-	OOBHttpUrl      string
-	OOBApiUrl       string
-	OOBPollInterval int
-	OOBHitRetention int
+	OOB                string
+	OOBKey             string
+	OOBDomain          string
+	OOBHttpUrl         string
+	OOBApiUrl          string
+	OOBPollInterval    int
+	OOBHitRetention    int
 	OOBFinalizeTimeout int
 
 	// SDK模式标志，用于控制OOB检测行为
