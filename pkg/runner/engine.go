@@ -455,6 +455,203 @@ func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[strin
 	return true
 }
 
+type stagePocCursor struct {
+	poc       poc.Poc
+	targets   []string
+	next      int
+	scheduled int
+	heavy     bool
+	done      bool
+}
+
+func nextRoundRobinCursor(cursors []stagePocCursor, start int) (int, int, bool) {
+	if len(cursors) == 0 {
+		return 0, start, false
+	}
+	if start < 0 {
+		start = 0
+	}
+	for offset := 0; offset < len(cursors); offset++ {
+		idx := (start + offset) % len(cursors)
+		if !cursors[idx].done {
+			return idx, (idx + 1) % len(cursors), true
+		}
+	}
+	return 0, start, false
+}
+
+func heavyWorkerLimit(concurrency int) int {
+	switch {
+	case concurrency <= 1:
+		return 0
+	case concurrency <= 16:
+		return 1
+	case concurrency <= 32:
+		return 2
+	case concurrency <= 64:
+		return 3
+	default:
+		return 4
+	}
+}
+
+func estimateBruteCost(rule poc.Rule) (candidates int, variableCount int, keepGoing bool, ok bool) {
+	cfg, vars, order := parseBrute(rule.Brute)
+	if len(order) == 0 {
+		return 0, 0, false, false
+	}
+
+	mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
+	if mode == "" {
+		mode = "clusterbomb"
+	}
+
+	switch mode {
+	case "pitchfork":
+		minLen := -1
+		for _, key := range order {
+			n := len(vars[key])
+			if n <= 0 {
+				return 0, len(order), cfg.Continue, false
+			}
+			if minLen == -1 || n < minLen {
+				minLen = n
+			}
+		}
+		if minLen <= 0 {
+			return 0, len(order), cfg.Continue, false
+		}
+		return minLen, len(order), cfg.Continue, true
+	default:
+		total := 1
+		for _, key := range order {
+			n := len(vars[key])
+			if n <= 0 {
+				return 0, len(order), cfg.Continue, false
+			}
+			if total > 64 || n > 64 || total > 64/n {
+				return 65, len(order), cfg.Continue, true
+			}
+			total *= n
+			if total > 64 {
+				return 65, len(order), cfg.Continue, true
+			}
+		}
+		return total, len(order), cfg.Continue, true
+	}
+}
+
+func bruteKeyClass(keys []string) (authLike bool, pathLike bool) {
+	if len(keys) == 0 {
+		return false, false
+	}
+	authKeys := map[string]struct{}{
+		"username":      {},
+		"user":          {},
+		"userid":        {},
+		"account":       {},
+		"login":         {},
+		"password":      {},
+		"pass":          {},
+		"passwd":        {},
+		"pwd":           {},
+		"secret":        {},
+		"token":         {},
+		"auth":          {},
+		"authorization": {},
+		"credential":    {},
+		"creds":         {},
+		"session":       {},
+		"apikey":        {},
+		"api_key":       {},
+	}
+	pathKeys := map[string]struct{}{
+		"p":        {},
+		"path":     {},
+		"uri":      {},
+		"url":      {},
+		"endpoint": {},
+		"route":    {},
+		"action":   {},
+		"api":      {},
+		"dir":      {},
+		"file":     {},
+		"filename": {},
+		"location": {},
+		"resource": {},
+		"page":     {},
+	}
+
+	pathLike = true
+	for _, key := range keys {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key == "" {
+			pathLike = false
+			continue
+		}
+		if _, ok := authKeys[key]; ok {
+			authLike = true
+		}
+		if _, ok := pathKeys[key]; !ok {
+			pathLike = false
+		}
+	}
+	return authLike, pathLike
+}
+
+func isHeavyPoc(p poc.Poc) bool {
+	id := strings.ToLower(strings.TrimSpace(p.Id))
+	gopoc := strings.ToLower(strings.TrimSpace(p.Gopoc))
+	if strings.Contains(id, "weak-login") || strings.Contains(id, "weak_login") ||
+		strings.Contains(gopoc, "weak-login") || strings.Contains(gopoc, "weak_login") {
+		return true
+	}
+
+	heavyTags := map[string]struct{}{
+		"weak-password":    {},
+		"weak_password":    {},
+		"weak-login":       {},
+		"weak_login":       {},
+		"default-password": {},
+		"default_password": {},
+	}
+	for _, tag := range strings.Split(strings.ToLower(p.Info.Tags), ",") {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := heavyTags[tag]; ok {
+			return true
+		}
+	}
+
+	for _, rm := range p.Rules {
+		candidates, vars, keepGoing, ok := estimateBruteCost(rm.Value)
+		if !ok {
+			continue
+		}
+		cfg, _, keys := parseBrute(rm.Value.Brute)
+		authLike, pathLike := bruteKeyClass(keys)
+		mode := strings.ToLower(strings.TrimSpace(cfg.Mode))
+		if mode == "" {
+			mode = "clusterbomb"
+		}
+		if authLike {
+			return true
+		}
+		if pathLike && mode == "sniper" && !keepGoing {
+			continue
+		}
+		if vars == 1 && candidates <= 8 && !keepGoing {
+			continue
+		}
+		if candidates > 32 {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *Engine) AcquireChecker() *Checker {
 	c := CheckerPool.Get().(*Checker)
 	c.Options = e.options
@@ -1183,9 +1380,27 @@ func (runner *Runner) Execute() {
 		type stageTask struct {
 			tap   *TransData
 			pocID string
+			heavy bool
 		}
 
-		tasks := make(chan stageTask, concurrency*4)
+		heavyLimit := heavyWorkerLimit(concurrency)
+		if heavyLimit >= concurrency {
+			heavyLimit = concurrency - 1
+		}
+		if heavyLimit < 0 {
+			heavyLimit = 0
+		}
+		normalWorkers := concurrency - heavyLimit
+		if normalWorkers <= 0 {
+			normalWorkers = 1
+			heavyLimit = 0
+		}
+
+		normalTasks := make(chan stageTask, concurrency*4)
+		var heavyTasks chan stageTask
+		if heavyLimit > 0 {
+			heavyTasks = make(chan stageTask, heavyLimit*4)
+		}
 		var workers sync.WaitGroup
 
 		var counters sync.Map // map[string]*atomic.Int64
@@ -1207,32 +1422,39 @@ func (runner *Runner) Execute() {
 			}
 		}
 
-		for i := 0; i < concurrency; i++ {
-			workers.Add(1)
-			go func() {
-				defer workers.Done()
-				for {
-					select {
-					case <-runner.engine.quit:
+		runWorker := func(taskCh <-chan stageTask) {
+			defer workers.Done()
+			for {
+				select {
+				case <-runner.engine.quit:
+					return
+				case <-runner.ctx.Done():
+					return
+				case task, ok := <-taskCh:
+					if !ok {
 						return
-					case <-runner.ctx.Done():
-						return
-					case task, ok := <-tasks:
-						if !ok {
-							return
-						}
-						runner.engine.waitTick()
-						if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
-							finish(task.pocID)
-							continue
-						}
-						runner.exec(task.tap)
-						finish(task.pocID)
 					}
+					runner.engine.waitTick()
+					if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
+						finish(task.pocID)
+						continue
+					}
+					runner.exec(task.tap)
+					finish(task.pocID)
 				}
-			}()
+			}
 		}
 
+		for i := 0; i < normalWorkers; i++ {
+			workers.Add(1)
+			go runWorker(normalTasks)
+		}
+		for i := 0; i < heavyLimit; i++ {
+			workers.Add(1)
+			go runWorker(heavyTasks)
+		}
+
+		cursors := make([]stagePocCursor, 0, len(pocs))
 		for _, pocItem := range pocs {
 			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
 				break
@@ -1251,49 +1473,90 @@ func (runner *Runner) Execute() {
 				continue
 			}
 
-			scheduled := 0
-			for _, t := range targetView {
-				if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
-					break
-				}
+			cursors = append(cursors, stagePocCursor{
+				poc:     pocItem,
+				targets: targetView,
+				heavy:   isHeavyPoc(pocItem),
+			})
+		}
 
-				if len(runner.options.Resume) > 0 && runner.ScanProgress.ContainsTask(pocItem.Id, t) {
+		nextTaskForCursor := func(cur *stagePocCursor) *stageTask {
+			for cur.next < len(cur.targets) {
+				t := cur.targets[cur.next]
+				cur.next++
+
+				if len(runner.options.Resume) > 0 && runner.ScanProgress.ContainsTask(cur.poc.Id, t) {
 					if runner.options.ResumeDoneTasks == 0 {
 						runner.NotVulCallback()
 					}
 					continue
 				}
 
-				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey, runner.options.Test) {
-					runner.ScanProgress.IncrementTask(pocItem.Id, t)
+				if shouldSkipRequires(t, cur.poc, keyForTarget, fingerTagsByKey, runner.options.Test) {
+					runner.ScanProgress.IncrementTask(cur.poc.Id, t)
 					runner.NotVulCallback()
 					continue
 				}
 
-				if shouldSkipFingerprintFiltered(t, pocItem) {
-					runner.ScanProgress.IncrementTask(pocItem.Id, t)
+				if shouldSkipFingerprintFiltered(t, cur.poc) {
+					runner.ScanProgress.IncrementTask(cur.poc.Id, t)
 					runner.NotVulCallback()
 					continue
 				}
 
-				getCounter(pocItem.Id).Add(1)
-				scheduled++
-
-				task := stageTask{tap: &TransData{Target: t, Poc: pocItem}, pocID: pocItem.Id}
-				select {
-				case <-runner.engine.quit:
-					finish(task.pocID)
-				case <-runner.ctx.Done():
-					finish(task.pocID)
-				case tasks <- task:
+				return &stageTask{
+					tap:   &TransData{Target: t, Poc: cur.poc},
+					pocID: cur.poc.Id,
+					heavy: cur.heavy && heavyTasks != nil,
 				}
 			}
-			if scheduled == 0 {
-				runner.ScanProgress.MarkPocDone(pocItem.Id)
+			return nil
+		}
+
+		activeCursors := len(cursors)
+		rrStart := 0
+		for activeCursors > 0 {
+			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+				break
+			}
+
+			idx, nextStart, ok := nextRoundRobinCursor(cursors, rrStart)
+			if !ok {
+				break
+			}
+			rrStart = nextStart
+
+			cur := &cursors[idx]
+			task := nextTaskForCursor(cur)
+			if task == nil {
+				cur.done = true
+				activeCursors--
+				if cur.scheduled == 0 {
+					runner.ScanProgress.MarkPocDone(cur.poc.Id)
+				}
+				continue
+			}
+
+			getCounter(task.pocID).Add(1)
+			cur.scheduled++
+
+			out := normalTasks
+			if task.heavy {
+				out = heavyTasks
+			}
+			select {
+			case <-runner.engine.quit:
+				finish(task.pocID)
+			case <-runner.ctx.Done():
+				finish(task.pocID)
+			case out <- *task:
 			}
 		}
 
-		close(tasks)
+		close(normalTasks)
+		if heavyTasks != nil {
+			close(heavyTasks)
+		}
 		workers.Wait()
 	}
 

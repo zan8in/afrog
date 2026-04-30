@@ -341,6 +341,12 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("debug", "Debug & Tools",
 		flagSet.BoolVar(&options.Debug, "debug", false, "show all requests and responses"),
+		flagSet.BoolVar(&options.PocExecutionDurationMonitor, "pedm", false, "enable PoC execution duration monitoring"),
+		flagSet.IntVar(&options.PedmLogLimit, "pedm-log-limit", 0, "log the first N started PoC tasks for duration monitoring, 0 disables"),
+		flagSet.IntVar(&options.PedmSlowThresholdSec, "pedm-slow-sec", 15, "log PoC executions that take longer than N seconds when --pedm is enabled, 0 disables"),
+		flagSet.IntVar(&options.PedmSlowLogLimit, "pedm-slow-log-limit", 20, "maximum number of slow PoC duration logs when --pedm is enabled, 0 disables"),
+		flagSet.IntVar(&options.PedmSummaryTop, "pedm-summary-top", 10, "show top N slowest PoCs in summary when --pedm is enabled, 0 disables"),
+		flagSet.StringVar(&options.PedmSummaryBy, "pedm-summary-by", "max", "PoC duration summary ranking: max|avg"),
 		flagSet.BoolVar(&options.Test, "test", false, "test mode (requires gating disabled)"),
 		flagSet.StringVar(&options.Validate, "validate", "", "validate POC YAML syntax, support file or directory"),
 		flagSet.BoolVarP(&options.Version, "version", "v", false, "show afrog version"),
