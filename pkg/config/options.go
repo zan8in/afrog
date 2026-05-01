@@ -595,6 +595,8 @@ func (opt *Options) VerifyOptions() error {
 	if !(len(opt.Target) > 0 || len(opt.TargetsFile) > 0 || (len(opt.Cyberspace) > 0 && len(opt.Query) > 0)) {
 	}
 
+	opt.SetSeverityKeyword()
+
 	return nil
 }
 
