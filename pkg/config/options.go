@@ -1113,6 +1113,10 @@ func (o *Options) CreatePocList() []poc.Poc {
 			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, e)
 			continue
 		}
+		pp.Id = strings.TrimSpace(pp.Id)
+		if pp.Id == "" {
+			pp.Id = id
+		}
 		newPocSlice = append(newPocSlice, pp)
 	}
 
