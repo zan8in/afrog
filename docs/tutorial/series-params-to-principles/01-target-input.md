@@ -225,4 +225,4 @@ afrog -T targets.txt -S info,high,critical -smart
 ## 下期预告
 
 下一期我们继续把“目标输入”打穿：  
-**#02：`--resume` 断点续扫为什么需要，恢复边界在哪里。**
+**#02：`--task-smart-timeout` 为什么值得你在跑批里默认带上。**
