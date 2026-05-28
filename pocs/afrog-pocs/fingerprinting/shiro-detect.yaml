@@ -19,13 +19,13 @@ rules:
       path: /
       follow_redirects: true
       headers:
-        cookie: JSESSIONID={{randstr}};rememberMe=123;
+        cookie: JSESSIONID={{randstr}};rememberMe=123
     expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
   r1:
     request:
       method: GET
       path: /
       headers:
-        cookie: JSESSIONID={{randstr}};rememberMe=123;
+        cookie: JSESSIONID={{randstr}};rememberMe=123
     expression: response.raw_header.bcontains(b'rememberMe=deleteMe')
 expression: r0() || r1()
