@@ -104,6 +104,70 @@ func TestCELRegexCount(t *testing.T) {
 	}
 }
 
+func TestCELDeletePayloadHelpers(t *testing.T) {
+	lib := NewCustomLib()
+	lib.UpdateCompileOption("marker", decls.String)
+
+	tests := []struct {
+		name     string
+		expr     string
+		contains []string
+	}{
+		{
+			name: "jspDelete",
+			expr: `jspDelete(marker)`,
+			contains: []string{
+				`out.println("hello-marker")`,
+				`application.getRealPath(request.getServletPath())`,
+				`.delete()`,
+			},
+		},
+		{
+			name: "phpDelete",
+			expr: `phpDelete(marker)`,
+			contains: []string{
+				`echo 'hello-marker'`,
+				`@unlink(__FILE__)`,
+			},
+		},
+		{
+			name: "aspxDelete",
+			expr: `aspxDelete(marker)`,
+			contains: []string{
+				`Response.Write("hello-marker")`,
+				`System.IO.File.Delete(Request.PhysicalPath)`,
+			},
+		},
+		{
+			name: "aspDelete",
+			expr: `aspDelete(marker)`,
+			contains: []string{
+				`Response.Write("hello-marker")`,
+				`Scripting.FileSystemObject`,
+				`DeleteFile`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := lib.RunEval(tt.expr, map[string]any{"marker": "hello-marker"})
+			if err != nil {
+				t.Fatalf("eval %s error: %v", tt.expr, err)
+			}
+			got, ok := out.Value().(string)
+			if !ok {
+				t.Fatalf("expected string, got %T(%v)", out.Value(), out.Value())
+			}
+			for _, want := range tt.contains {
+				if !strings.Contains(got, want) {
+					t.Fatalf("expected %q to contain %q, got %q", tt.expr, want, got)
+				}
+			}
+		})
+	}
+}
+
 func TestCELSha1SubstrBytesToUpperBytes(t *testing.T) {
 	lib := NewCustomLib()
 	lib.UpdateCompileOption("b", decls.Bytes)

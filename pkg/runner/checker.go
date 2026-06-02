@@ -50,6 +50,31 @@ type savedVar struct {
 	exists bool
 }
 
+const (
+	defaultUploadBoundaryLen = 8
+	defaultUploadFilenameLen = 6
+	defaultUploadBodyLen     = 10
+)
+
+func (c *Checker) injectDefaultUploadVars() {
+	if c.VariableMap == nil {
+		c.VariableMap = map[string]any{}
+	}
+	if c.CustomLib == nil {
+		return
+	}
+
+	defaults := map[string]string{
+		"rboundary": utils.RandLetters(defaultUploadBoundaryLen),
+		"rfilename": utils.RandLetters(defaultUploadFilenameLen),
+		"rbody":     utils.RandLetters(defaultUploadBodyLen),
+	}
+	for key, value := range defaults {
+		c.VariableMap[key] = value
+		c.CustomLib.UpdateCompileOption(key, decls.String)
+	}
+}
+
 func checkerNeedsOOB(p *poc.Poc) bool {
 	if p == nil {
 		return false
@@ -185,6 +210,8 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	c.CustomLib.SetCurrentOOB(o)
 	c.CustomLib.lastOOBHit = nil
 	c.CustomLib.lastOOBPending = nil
+
+	c.injectDefaultUploadVars()
 
 	if len(pocItem.Set) > 0 {
 		c.UpdateVariableMap(pocItem.Set)

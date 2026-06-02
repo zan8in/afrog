@@ -24,6 +24,38 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
+func escapeJSPString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return s
+}
+
+func escapePHPString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	return s
+}
+
+func escapeVBString(s string) string {
+	return strings.ReplaceAll(s, `"`, `""`)
+}
+
+func jspDeletePayload(marker string) string {
+	return fmt.Sprintf(`<%%out.println("%s");new java.io.File(application.getRealPath(request.getServletPath())).delete();%%>`, escapeJSPString(marker))
+}
+
+func phpDeletePayload(marker string) string {
+	return fmt.Sprintf(`<?php echo '%s'; @unlink(__FILE__); ?>`, escapePHPString(marker))
+}
+
+func aspxDeletePayload(marker string) string {
+	return fmt.Sprintf(`<%%@ Page Language="C#" %%><%% Response.Write("%s"); System.IO.File.Delete(Request.PhysicalPath); %%>`, escapeJSPString(marker))
+}
+
+func aspDeletePayload(marker string) string {
+	return fmt.Sprintf(`<%%Response.Write("%s"):On Error Resume Next:Set fso=CreateObject("Scripting.FileSystemObject"):fso.DeleteFile Server.MapPath(Request.ServerVariables("SCRIPT_NAME")),True%%>`, escapeVBString(marker))
+}
+
 var (
 	NewProgramOptions = []cel.ProgramOption{
 		cel.Functions(
@@ -552,6 +584,46 @@ var (
 						return types.ValOrErr(value, "unexpected type '%v' passed to randomLowercase", value.Type())
 					}
 					return types.String(utils.RandLetters(int(n)))
+				},
+			},
+			&functions.Overload{
+				Operator: "jspDelete_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to jspDelete", value.Type())
+					}
+					return types.String(jspDeletePayload(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "phpDelete_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to phpDelete", value.Type())
+					}
+					return types.String(phpDeletePayload(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "aspxDelete_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to aspxDelete", value.Type())
+					}
+					return types.String(aspxDeletePayload(string(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "aspDelete_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to aspDelete", value.Type())
+					}
+					return types.String(aspDeletePayload(string(v)))
 				},
 			},
 			// regex
