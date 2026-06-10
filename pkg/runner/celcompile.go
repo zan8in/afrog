@@ -326,7 +326,7 @@ var (
 	}
 )
 
-func ReadComplieOptions(reg ref.TypeRegistry) []cel.EnvOption {
+func ReadCompileOptions(reg ref.TypeRegistry) []cel.EnvOption {
 	allEnvOptions := []cel.EnvOption{
 		cel.CustomTypeAdapter(reg),
 		cel.CustomTypeProvider(reg),

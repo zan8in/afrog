@@ -183,8 +183,8 @@ func (r *Runner) finalizeOOBPendings() {
 		return
 	}
 	if r.engine == nil || r.engine.oobMgr == nil {
-		if r.options != nil && r.options.OnPhaseProgress != nil {
-			r.options.OnPhaseProgress("oob_finalize", "skipped", 0, 0, 100)
+		if r.options != nil && r.getScanCtx().OnPhaseProgress != nil {
+			r.getScanCtx().OnPhaseProgress("oob_finalize", "skipped", 0, 0, 100)
 		}
 		return
 	}
@@ -208,8 +208,8 @@ func (r *Runner) finalizeOOBPendings() {
 	r.oobPendingMu.Unlock()
 
 	if total == 0 {
-		if r.options != nil && r.options.OnPhaseProgress != nil {
-			r.options.OnPhaseProgress("oob_finalize", "skipped", 0, 0, 100)
+		if r.options != nil && r.getScanCtx().OnPhaseProgress != nil {
+			r.getScanCtx().OnPhaseProgress("oob_finalize", "skipped", 0, 0, 100)
 		}
 		return
 	}
@@ -240,7 +240,7 @@ func (r *Runner) finalizeOOBPendings() {
 	status := "running"
 
 	emit := func(status string, remain int64) {
-		if r.options == nil || r.options.OnPhaseProgress == nil {
+		if r.options == nil || r.getScanCtx().OnPhaseProgress == nil {
 			return
 		}
 		finished := total - remain
@@ -260,7 +260,7 @@ func (r *Runner) finalizeOOBPendings() {
 				percent = 0
 			}
 		}
-		r.options.OnPhaseProgress("oob_finalize", status, finished, total, percent)
+		r.getScanCtx().OnPhaseProgress("oob_finalize", status, finished, total, percent)
 	}
 
 	for {

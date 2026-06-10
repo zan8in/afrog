@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
@@ -25,8 +24,6 @@ import (
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
 	"gopkg.in/yaml.v2"
 )
-
-var MMutex = &sync.Mutex{}
 
 type Checker struct {
 	Options *config.Options
@@ -73,56 +70,6 @@ func (c *Checker) injectDefaultUploadVars() {
 		c.VariableMap[key] = value
 		c.CustomLib.UpdateCompileOption(key, decls.String)
 	}
-}
-
-func checkerNeedsOOB(p *poc.Poc) bool {
-	if p == nil {
-		return false
-	}
-	if checkerContainsOOBToken(p.Expression) {
-		return true
-	}
-	for _, it := range p.Set {
-		if s, ok := it.Value.(string); ok && checkerContainsOOBToken(s) {
-			return true
-		}
-	}
-	for _, rm := range p.Rules {
-		r := rm.Value
-		if checkerContainsOOBToken(r.Expression) {
-			return true
-		}
-		for _, e := range r.Expressions {
-			if checkerContainsOOBToken(e) {
-				return true
-			}
-		}
-		req := r.Request
-		if checkerContainsOOBToken(req.Path) || checkerContainsOOBToken(req.Host) || checkerContainsOOBToken(req.Body) || checkerContainsOOBToken(req.Raw) || checkerContainsOOBToken(req.Data) {
-			return true
-		}
-		for _, hv := range req.Headers {
-			if checkerContainsOOBToken(hv) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func checkerContainsOOBToken(s string) bool {
-	if s == "" {
-		return false
-	}
-	l := strings.ToLower(s)
-	return strings.Contains(l, "oobcheck(") ||
-		strings.Contains(l, "oobchecktoken(") ||
-		strings.Contains(l, "oobevidence(") ||
-		strings.Contains(l, "{{oob") ||
-		strings.Contains(l, "{{ oob") ||
-		strings.Contains(l, "oob_") ||
-		strings.Contains(l, "oob.") ||
-		strings.Contains(l, "oob()")
 }
 
 func celSafeIdent(s string) string {
@@ -193,7 +140,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		ProtocolHTTP: "http",
 		ProtocolDNS:  "dns",
 	}
-	if checkerNeedsOOB(pocItem) && c.OOBAlive && c.OOBAdapter != nil {
+	if config.PocUsesOOB(*pocItem) && c.OOBAlive && c.OOBAdapter != nil {
 		vdomains := c.OOBAdapter.GetValidationDomain()
 		o.Filter = vdomains.Filter
 		o.HTTP = vdomains.HTTP
@@ -696,10 +643,14 @@ func (c *Checker) evalRuleMatch(rule *poc.Rule, pocItem *poc.Poc) bool {
 	}
 
 	evalResult, err := c.CustomLib.RunEval(rule.Expression, c.VariableMap)
-	if err == nil {
-		if v, ok := evalResult.Value().(bool); ok {
-			return v
+	if err != nil {
+		if c.Options != nil && c.Options.Debug {
+			gologger.Debug().Msgf("rule expression eval failed: %v", err)
 		}
+		return false
+	}
+	if v, ok := evalResult.Value().(bool); ok {
+		return v
 	}
 	return false
 }
@@ -801,7 +752,10 @@ func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
 			// 原有字符串路径：走 CEL 求值
 			out, err := c.CustomLib.RunEval(v, c.VariableMap)
 			if err != nil {
-				// fixed set string failed bug
+				// CEL eval failed: fall back to string literal for backward compat
+				if c.Options != nil && c.Options.Debug {
+					gologger.Debug().Msgf("set[%s]: CEL eval failed, using literal: %v", key, err)
+				}
 				c.VariableMap[key] = fmt.Sprintf("%v", v)
 				c.CustomLib.UpdateCompileOption(key, decls.String)
 				continue
@@ -887,44 +841,6 @@ func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
 }
 
 // func (c *Checker) newRerverse() *proto.Reverse {
-
-// 	urlStr := ""
-// 	// sub := utils.CreateRandomString(20)
-
-// 	// 使用反连平台优先权逻辑如下：
-// 	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
-// 	// @edit 2021.11.29 21:50
-// 	// 关联代码 celprogram.go line-596
-// 	// if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
-// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
-// 	// } else if config.ReverseCeyeLive {
-// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseCeyeDomain)
-// 	// } else if config.ReverseEyeShLive {
-// 	// 	urlStr = fmt.Sprintf("http://%s.%s", sub, config.ReverseEyeDomain)
-// 	// }
-
-// 	u, _ := url.Parse(urlStr)
-// 	return &proto.Reverse{
-// 		Url:                utils.ParseUrl(u),
-// 		Domain:             u.Hostname(),
-// 		Ip:                 u.Host,
-// 		IsDomainNameServer: false,
-// 	}
-// }
-
-// func (c *Checker) newJNDI() *proto.Reverse {
-// 	// randomstr := utils.CreateRandomString(22)
-// 	// urlStr := fmt.Sprintf("http://%s:%s/%s", config.ReverseJndi, config.ReverseLdapPort, randomstr)
-// 	// u, _ := url.Parse(urlStr)
-// 	// url := utils.ParseUrl(u)
-// 	// return &proto.Reverse{
-// 	// 	Url:                url,
-// 	// 	Domain:             u.Hostname(),
-// 	// 	Ip:                 config.ReverseJndi,
-// 	// 	IsDomainNameServer: false,
-// 	// }
-// 	return &proto.Reverse{}
-// }
 
 func checkExpression(expression string) string {
 	if strings.Contains(expression, "!= \"\"") {
