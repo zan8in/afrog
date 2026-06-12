@@ -18,6 +18,7 @@ go build ./...                             # check all packages compile
 go vet ./...                               # static analysis
 go test ./...                              # run all tests
 go test -v -run TestX ./pkg/runner/        # run specific test
+go test -count=1 ./pkg/fingerprint/        # run tests without cache
 ```
 
 ## Architecture
@@ -26,21 +27,21 @@ go test -v -run TestX ./pkg/runner/        # run specific test
 
 ```
 CLI (cmd/afrog/main.go)
-  → config.NewOptions()                    — parse flags, load afrog-config.yaml
-  → curated service mount                  — fetch encrypted curated PoC set
-  → runner.NewRunner(options)              — build scan engine
-    → options.CreatePocList()              — load PoCs (curated > my > append > local > builtin)
-    → FingerprintPoCs() / ReversePoCs()    — classify PoC types
-    → runner.initOOB(reversePocs)          — OOB adapter + manager setup (oob_coordinator.go)
-    → PortScan (optional)                  — discover open ports → append to targets
-    → webProbe (optional)                  — discover live web services (webprobe.go)
-    → runFingerprintStage                  — fingerprint PoCs (stage_fingerprint.go)
-    → runVulnStage (×2: non-OOB + OOB)     — main vulnerability scan
-      → for each target+Poc pair:
-          checker.Check()                  — validate via CEL expression evaluation
-            → executor.Execute()           — send HTTP/RawHTTP/TCP/UDP request
-            → CEL program against response
-      → result collection                  — HTML report, JSON output, webhooks
+  -> config.NewOptions()                    -- parse flags, load afrog-config.yaml
+  -> curated service mount                  -- fetch encrypted curated PoC set
+  -> runner.NewRunner(options)              -- build scan engine
+    -> options.CreatePocList()              -- load PoCs (curated > my > append > local > builtin)
+    -> FingerprintPoCs() / ReversePoCs()    -- classify PoC types
+    -> runner.initOOB(reversePocs)          -- OOB adapter + manager setup (oob_coordinator.go)
+    -> PortScan (optional)                  -- discover open ports -> append to targets
+    -> webProbe (optional)                  -- discover live web services (webprobe.go)
+    -> runFingerprintStage                  -- fingerprint PoCs (stage_fingerprint.go)
+    -> runVulnStage (x2: non-OOB + OOB)     -- main vulnerability scan
+      -> for each target+Poc pair:
+          checker.Check()                  -- validate via CEL expression evaluation
+            -> executor.Execute()           -- send HTTP/RawHTTP/TCP/UDP request
+            -> CEL program against response
+      -> result collection                  -- HTML report, JSON output, webhooks
 ```
 
 ### Key packages
@@ -53,7 +54,7 @@ CLI (cmd/afrog/main.go)
 | `pkg/pocsrepo` | Multi-source PoC repository with priority ordering |
 | `pkg/protocols` | `http/retryhttpclient` (HTTP with retry), `raw` (raw HTTP), `netxclient` (TCP/UDP multi-step sessions), `gox` (specialized exploits: SMB, MySQL, Redis, FTP, etc.) |
 | `pkg/proto` | Protobuf `Request`/`Response` types used across all protocol handlers |
-| `pkg/targets` | `TargetIndex` — normalizes input targets into URL/hostPort/host categories |
+| `pkg/targets` | `TargetIndex` -- normalizes input targets into URL/hostPort/host categories |
 | `pkg/result` | `Result` and `PocResult` data models for scan findings |
 | `pkg/report` | HTML vulnerability report generation |
 | `pkg/fingerprint` | Fingerprint matching engine + `Executor` interface |
@@ -76,11 +77,11 @@ PoCs are YAML files following a format similar to Xray PoC v2:
 
 ### PoC loading priority
 
-1. **curated** — encrypted PoC set from remote service (`~/.config/afrog/pocs-curated/`)
-2. **my** — user directory `./my-pocs/` or `AFROG_POCS_CURATED_DIR` env override
-3. **append** — `--append-pocs` CLI flag
-4. **local** — `-P` / `--poc-file` CLI flag
-5. **builtin** — embedded via `pocs/pocs.go` (Go `embed`)
+1. **curated** -- encrypted PoC set from remote service (`~/.config/afrog/pocs-curated/`)
+2. **my** -- user directory `./my-pocs/` or `AFROG_POCS_CURATED_DIR` env override
+3. **append** -- `--append-pocs` CLI flag
+4. **local** -- `-P` / `--poc-file` CLI flag
+5. **builtin** -- embedded via `pocs/pocs.go` (Go `embed`)
 
 ### Config file
 
@@ -92,7 +93,7 @@ On first run, `~/.config/afrog/afrog-config.yaml` is auto-created. Key sections:
 
 ### SDK (library usage)
 
-`afrog.go` exports `SDKScanner` — the public API for library consumers. Uses `runner.NewRunner(options, runner.WithSDKMode())`. See `examples/` for patterns: basic scan, async scan with callbacks, OOB scan, progress scan, port scan.
+`afrog.go` exports `SDKScanner` -- the public API for library consumers. Uses `runner.NewRunner(options, runner.WithSDKMode())`. See `examples/` for patterns: basic scan, async scan with callbacks, OOB scan, progress scan, port scan.
 
 ## Refactoring notes
 
@@ -112,13 +113,29 @@ engine.go was split (2025-06) into focused files under `pkg/runner/`:
 | `shutdown.go` | ~89 | Graceful signal handling + auto-save (available, not yet integrated) |
 
 Key deduplications and cleanups:
-- `containsOOBToken` / `pocUsesOOB` → exported as `config.ContainsOOBToken` / `config.PocUsesOOB`
-- `isNetOnlyPoc` closures → `poc.Poc.IsNetOnly()` method
-- SDK runner creation → `runner.NewRunner(options, runner.WithSDKMode())`
-- Channel send pattern → `sendOrDrop[T]()` (6 call sites migrated)
-- Target list extraction → `config.Options.TargetStrings()` (4 duplicate loops eliminated)
-- Rate limit defaults → `config.Options.ApplyDefaults()` / `ValidateRateLimitModes()`
+- `containsOOBToken` / `pocUsesOOB` -> exported as `config.ContainsOOBToken` / `config.PocUsesOOB`
+- `isNetOnlyPoc` closures -> `poc.Poc.IsNetOnly()` method
+- SDK runner creation -> `runner.NewRunner(options, runner.WithSDKMode())`
+- Channel send pattern -> `sendOrDrop[T]()` (6 call sites migrated)
+- Target list extraction -> `config.Options.TargetStrings()` (4 duplicate loops eliminated)
+- Rate limit defaults -> `config.Options.ApplyDefaults()` / `ValidateRateLimitModes()`
 - `MMutex` global, `collectOrderedPocPaths`, ~300 lines commented-out code deleted
-- `ReadComplieOptions` typo → `ReadCompileOptions`
+- `ReadComplieOptions` typo -> `ReadCompileOptions`
 - CEL eval errors now logged at debug level instead of silently swallowed
 - Test coverage: 12 packages, 43 new test cases (filter, context, poc, oob_coordinator, fingerprint)
+
+## Code style
+
+- **Formatting**: `gofmt -w .` before every commit. Tabs for indentation, LF line endings (see `.editorconfig`)
+- **Immutability**: Prefer creating new objects over mutating existing ones
+- **Error handling**: Explicit at every level, never silently swallow
+- **Naming**: `camelCase` for variables/functions, `PascalCase` for types/interfaces, `UPPER_SNAKE_CASE` for constants
+- **File size**: Keep under 800 lines; extract utilities from large modules
+- **Function size**: Keep under 50 lines; split large functions into focused pieces
+
+## Common pitfalls
+
+1. **Don't auto-split Go files**: Automated line-based extraction fails on Go nested declarations. Split manually.
+2. **gofmt before string edits**: Tab/space mismatches cause Edit tool failures. Run `gofmt -w .` first.
+3. **String literals with ESC bytes**: ANSI escape sequences in Go strings get corrupted by Python string replacement. Use raw string literals or careful byte handling.
+4. **CRLF on Windows**: gofmt may convert LF to CRLF on Windows. Cosmetic only, no functional impact. Configure `git config --global core.autocrlf false` to avoid.
