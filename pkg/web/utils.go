@@ -1,18 +1,18 @@
 package web
 
 import (
-    "bufio"
-    "net"
-    "net/http"
-    "net/url"
-    "os"
-    "path/filepath"
-    "regexp"
-    "sort"
-    "strings"
-    "time"
+	"bufio"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
 
-    "github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 // context keys
@@ -51,12 +51,12 @@ func generateRandomPassword() string {
 }
 
 func assetRootDir() (string, error) {
-    home, _ := os.UserHomeDir()
-    dir := filepath.Join(home, ".config", "afrog", "assets")
-    if err := os.MkdirAll(dir, 0o700); err != nil {
-        return dir, err
-    }
-    return dir, nil
+	home, _ := os.UserHomeDir()
+	dir := filepath.Join(home, ".config", "afrog", "assets")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return dir, err
+	}
+	return dir, nil
 }
 
 var safeSegRe = regexp.MustCompile(`^[\p{Han}A-Za-z0-9._-]+$`)
@@ -140,11 +140,11 @@ func isValidAddress(line string) bool {
 }
 
 func normalizeAddress(s string) string {
-    s = strings.TrimSpace(s)
-    s = strings.Trim(s, "`\"")
-    if s == "" {
-        return s
-    }
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "`\"")
+	if s == "" {
+		return s
+	}
 	if strings.HasPrefix(strings.ToLower(s), "http://") || strings.HasPrefix(strings.ToLower(s), "https://") {
 		if u, err := url.Parse(s); err == nil {
 			host := strings.ToLower(u.Host)

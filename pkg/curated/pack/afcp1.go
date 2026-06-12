@@ -132,4 +132,3 @@ func extractTarBytes(destDir string, tarBytes []byte) error {
 		}
 	}
 }
-

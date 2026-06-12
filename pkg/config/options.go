@@ -476,13 +476,7 @@ func (opt *Options) VerifyOptions() error {
 		return nil
 	}
 
-	opt.FingerprintFilterMode = strings.ToLower(strings.TrimSpace(opt.FingerprintFilterMode))
-	if opt.FingerprintFilterMode == "" {
-		opt.FingerprintFilterMode = "strict"
-	}
-	if opt.FingerprintFilterMode != "strict" && opt.FingerprintFilterMode != "opportunistic" {
-		opt.FingerprintFilterMode = "strict"
-	}
+	opt.ApplyDefaults()
 
 	opt.PedmSummaryBy = strings.ToLower(strings.TrimSpace(opt.PedmSummaryBy))
 	if opt.PedmSummaryBy == "" {
@@ -522,59 +516,8 @@ func (opt *Options) VerifyOptions() error {
 		return fmt.Errorf("--oob-finalize-timeout must be <= 3600")
 	}
 
-	limitModeCount := 0
-	if opt.ReqLimitPerTarget > 0 {
-		limitModeCount++
-	}
-	if opt.AutoReqLimit {
-		limitModeCount++
-	}
-	if opt.Polite {
-		limitModeCount++
-	}
-	if opt.Balanced {
-		limitModeCount++
-	}
-	if opt.Aggressive {
-		limitModeCount++
-	}
-	if limitModeCount > 1 {
-		return fmt.Errorf("only one of --req-limit-per-target/--auto-req-limit/--polite/--balanced/--aggressive can be used")
-	}
-	if opt.ReqLimitPerTarget < 0 {
-		return fmt.Errorf("--req-limit-per-target must be >= 0")
-	}
-
-	if opt.ReqLimitPerTarget == 0 {
-		if opt.Polite {
-			opt.ReqLimitPerTarget = 5
-		} else if opt.Balanced {
-			opt.ReqLimitPerTarget = 15
-		} else if opt.Aggressive {
-			opt.ReqLimitPerTarget = 50
-		} else if opt.AutoReqLimit {
-			baseRate := opt.RateLimit
-			if baseRate <= 0 {
-				baseRate = 150
-			}
-			r := baseRate / 10
-			if r < 5 {
-				r = 5
-			}
-			if r > 15 {
-				r = 15
-			}
-			con := opt.Concurrency
-			if con <= 0 {
-				con = 1
-			}
-			if con >= 100 && r > 8 {
-				r = 8
-			} else if con >= 50 && r > 12 {
-				r = 12
-			}
-			opt.ReqLimitPerTarget = r
-		}
+	if err := opt.ValidateRateLimitModes(); err != nil {
+		return err
 	}
 
 	// init append poc
@@ -950,7 +893,7 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 	result := []poc.Poc{}
 	other := []poc.Poc{}
 	for _, poc := range allpocs {
-		flag := pocUsesOOB(poc)
+		flag := PocUsesOOB(poc)
 		if flag {
 			result = append(result, poc)
 		} else {
@@ -960,31 +903,31 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 	return result, other
 }
 
-func pocUsesOOB(p poc.Poc) bool {
-	if containsOOBToken(p.Expression) {
+func PocUsesOOB(p poc.Poc) bool {
+	if ContainsOOBToken(p.Expression) {
 		return true
 	}
 	for _, it := range p.Set {
-		if s, ok := it.Value.(string); ok && containsOOBToken(s) {
+		if s, ok := it.Value.(string); ok && ContainsOOBToken(s) {
 			return true
 		}
 	}
 	for _, rm := range p.Rules {
 		r := rm.Value
-		if containsOOBToken(r.Expression) {
+		if ContainsOOBToken(r.Expression) {
 			return true
 		}
 		for _, e := range r.Expressions {
-			if containsOOBToken(e) {
+			if ContainsOOBToken(e) {
 				return true
 			}
 		}
 		req := r.Request
-		if containsOOBToken(req.Path) || containsOOBToken(req.Host) || containsOOBToken(req.Body) || containsOOBToken(req.Raw) || containsOOBToken(req.Data) {
+		if ContainsOOBToken(req.Path) || ContainsOOBToken(req.Host) || ContainsOOBToken(req.Body) || ContainsOOBToken(req.Raw) || ContainsOOBToken(req.Data) {
 			return true
 		}
 		for _, hv := range req.Headers {
-			if containsOOBToken(hv) {
+			if ContainsOOBToken(hv) {
 				return true
 			}
 		}
@@ -992,7 +935,7 @@ func pocUsesOOB(p poc.Poc) bool {
 	return false
 }
 
-func containsOOBToken(s string) bool {
+func ContainsOOBToken(s string) bool {
 	if s == "" {
 		return false
 	}
@@ -1308,45 +1251,101 @@ func GetFileBaseName(options *Options) string {
 	return xid.New().String()
 }
 
-// 在 options.go 中新增一个辅助类型和函数（放在同文件的顶层位置）
-type pocPathItem struct {
-	name   string
-	source string // "embed" / "local" / "append" / "curated" / "my"
-	path   string
-}
-
-func (o *Options) collectOrderedPocPaths() []pocPathItem {
-	// 薄封装：复用仓库层统一路径整合，转换为旧的结构以保持兼容
-	pathItems, _ := pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
-
-	out := make([]pocPathItem, 0, len(pathItems))
-	for _, pi := range pathItems {
-		src := ""
-		switch pi.Source {
-		case pocsrepo.SourceBuiltin:
-			src = "embed"
-		case pocsrepo.SourceLocal:
-			src = "local"
-		case pocsrepo.SourceAppend:
-			src = "append"
-		case pocsrepo.SourceCurated:
-			src = "curated"
-		case pocsrepo.SourceMy:
-			src = "my"
-		default:
+// TargetStrings returns all targets as a deduplicated, trimmed string slice.
+// Eliminates the repeated Target.List() → type-assert → trim → filter pattern.
+func (o *Options) TargetStrings() []string {
+	out := make([]string, 0, o.Targets.Len())
+	for _, t := range o.Targets.List() {
+		s, ok := t.(string)
+		if !ok {
 			continue
 		}
-
-		path := pi.Path
-		if pi.Source == pocsrepo.SourceBuiltin && strings.HasPrefix(path, "embedded:") {
-			path = strings.TrimPrefix(path, "embedded:")
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
 		}
+		out = append(out, s)
+	}
+	return out
+}
 
-		base := filepath.Base(strings.ReplaceAll(path, "\\", "/"))
-		name := strings.TrimSuffix(strings.TrimSuffix(base, ".yaml"), ".yml")
-
-		out = append(out, pocPathItem{name: name, source: src, path: path})
+// ApplyDefaults sets default values for rate limit modes, fingerprint filter, and other
+// conditional defaults. Called by both VerifyOptions (CLI) and convertSDKOptions (SDK path).
+func (o *Options) ApplyDefaults() {
+	o.FingerprintFilterMode = strings.ToLower(strings.TrimSpace(o.FingerprintFilterMode))
+	if o.FingerprintFilterMode == "" {
+		o.FingerprintFilterMode = "strict"
+	}
+	if o.FingerprintFilterMode != "strict" && o.FingerprintFilterMode != "opportunistic" {
+		o.FingerprintFilterMode = "strict"
 	}
 
-	return out
+	if o.MaxRespBodySize <= 0 {
+		o.MaxRespBodySize = 2
+	}
+	if o.OOBRateLimit == 0 {
+		o.OOBRateLimit = 25
+	}
+	if o.OOBConcurrency == 0 {
+		o.OOBConcurrency = 25
+	}
+
+	if o.ReqLimitPerTarget == 0 {
+		if o.Polite {
+			o.ReqLimitPerTarget = 5
+		} else if o.Balanced {
+			o.ReqLimitPerTarget = 15
+		} else if o.Aggressive {
+			o.ReqLimitPerTarget = 50
+		} else if o.AutoReqLimit {
+			baseRate := o.RateLimit
+			if baseRate <= 0 {
+				baseRate = 150
+			}
+			r := baseRate / 10
+			if r < 5 {
+				r = 5
+			}
+			if r > 15 {
+				r = 15
+			}
+			con := o.Concurrency
+			if con <= 0 {
+				con = 1
+			}
+			if con >= 100 && r > 8 {
+				r = 8
+			} else if con >= 50 && r > 12 {
+				r = 12
+			}
+			o.ReqLimitPerTarget = r
+		}
+	}
+}
+
+// validateRateLimitModes checks that only one rate limiting mode is active.
+func (o *Options) ValidateRateLimitModes() error {
+	limitModeCount := 0
+	if o.ReqLimitPerTarget > 0 {
+		limitModeCount++
+	}
+	if o.AutoReqLimit {
+		limitModeCount++
+	}
+	if o.Polite {
+		limitModeCount++
+	}
+	if o.Balanced {
+		limitModeCount++
+	}
+	if o.Aggressive {
+		limitModeCount++
+	}
+	if limitModeCount > 1 {
+		return fmt.Errorf("only one of --req-limit-per-target/--auto-req-limit/--polite/--balanced/--aggressive can be used")
+	}
+	if o.ReqLimitPerTarget < 0 {
+		return fmt.Errorf("--req-limit-per-target must be >= 0")
+	}
+	return nil
 }

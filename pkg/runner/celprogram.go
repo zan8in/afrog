@@ -764,35 +764,6 @@ var (
 					return types.Int(count)
 				},
 			},
-			// reverse
-			// &functions.Overload{
-			// 	Operator: "reverse_wait_int",
-			// 	Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-			// 		reverse, ok := lhs.Value().(*proto.Reverse)
-			// 		if !ok {
-			// 			return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
-			// 		}
-			// 		timeout, ok := rhs.Value().(int64)
-			// 		if !ok {
-			// 			return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
-			// 		}
-			// 		return types.Bool(reverseCheck(reverse, timeout))
-			// 	},
-			// },
-			// &functions.Overload{
-			// 	Operator: "reverse_jndi_int",
-			// 	Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-			// 		reverse, ok := lhs.Value().(*proto.Reverse)
-			// 		if !ok {
-			// 			return types.ValOrErr(lhs, "unexpected type '%v' passed to 'wait'", lhs.Type())
-			// 		}
-			// 		timeout, ok := rhs.Value().(int64)
-			// 		if !ok {
-			// 			return types.ValOrErr(rhs, "unexpected type '%v' passed to 'wait'", rhs.Type())
-			// 		}
-			// 		return types.Bool(jndiCheck(reverse, timeout))
-			// 	},
-			// },
 			// other
 			&functions.Overload{
 				Operator: "sleep_int",
@@ -1241,23 +1212,6 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to submatch", rhs.Type())
 					}
 
-					// re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					// matches, err := re.FindStringMatch(string(v2))
-					// for err == nil && matches != nil {
-					// 	gps := matches.Groups()
-					// 	for n, gp := range gps {
-					// 		if n == 0 {
-					// 			continue
-					// 		}
-					// 		resultMap[gp.Name] += matches.GroupByName(gp.Name).String() + ";"
-					// 	}
-					// 	matches, err = re.FindNextMatch(matches)
-					// }
-
-					// for k, v := range resultMap {
-					// 	resultMap[k] = strings.TrimSuffix(v, ";")
-					// }
-
 					re := regexp2.MustCompile(string(v1), regexp2.RE2)
 					if m, _ := re.FindStringMatch(string(v2)); m != nil {
 						gps := m.Groups()
@@ -1288,24 +1242,6 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to bsubmatch", rhs.Type())
 					}
 
-					// re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					// matches, err := re.FindStringMatch(string([]byte(v2)))
-					// for err == nil && matches != nil {
-					// 	gps := matches.Groups()
-					// 	for n, gp := range gps {
-					// 		if n == 0 {
-					// 			continue
-					// 		}
-					// 		fmt.Printf("%s Value: %s\n", gp.Name, matches.GroupByName(gp.Name).String())
-					// 		resultMap[gp.Name] += matches.GroupByName(gp.Name).String() + ";"
-					// 	}
-					// 	matches, err = re.FindNextMatch(matches)
-					// }
-
-					// for k, v := range resultMap {
-					// 	resultMap[k] = strings.TrimSuffix(v, ";")
-					// }
-
 					re := regexp2.MustCompile(string(v1), regexp2.RE2)
 					raw := string([]byte(v2))
 					m, _ := re.FindStringMatch(raw)
@@ -1328,108 +1264,3 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 	allProgramOpitons = append(allProgramOpitons, NewProgramOptions...)
 	return allProgramOpitons
 }
-
-// func reverseCheck(r *proto.Reverse, timeout int64) bool {
-// 	if r == nil || (len(r.Domain) == 0 && len(r.Ip) == 0) {
-// 		return false
-// 	}
-
-// 	time.Sleep(time.Second * time.Duration(timeout))
-
-// 	// 使用反连平台优先权逻辑如下：
-// 	// 自建eye反连平台 > ceye反连平台 > eyes.sh反连平台
-// 	// @edit 2021.11.29 21:50
-// 	// 关联代码 checker.go line-345
-// 	// sub := strings.Split(r.Domain, ".")[0]
-// 	// if config.ReverseEyeShLive && config.ReverseEyeHost != "eyes.sh" {
-// 	// 	// 自建eye反连平台
-// 	// 	domain := strings.Split(r.Domain, ".")[1]
-// 	// 	if !eyeshDnsCheck(domain, sub) {
-// 	// 		return eyesWebCheck(domain, sub)
-// 	// 	}
-// 	// 	return true
-
-// 	// } else if config.ReverseCeyeLive {
-// 	// 	// ceye反连平台
-// 	// 	return ceyeioCheck(sub)
-
-// 	// } else if config.ReverseEyeShLive {
-// 	// 	// eyes.sh反连平台
-// 	// 	domain := strings.Split(r.Domain, ".")[1]
-// 	// 	if !eyeshDnsCheck(domain, sub) {
-// 	// 		return eyesWebCheck(domain, sub)
-// 	// 	}
-// 	// 	return true
-// 	// }
-
-// 	return false
-// }
-
-// func eyeshDnsCheck(domain, sub string) bool {
-// 	urlStr := fmt.Sprintf("http://%s/api/dns/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
-// 	resp, err := retryhttpclient.ReverseGet(urlStr)
-// 	if err != nil {
-// 		return false
-// 	}
-
-// 	if bytes.Contains(resp, []byte("True")) {
-// 		return true
-// 	}
-
-// 	return false
-// }
-
-// func eyesWebCheck(domain, sub string) bool {
-// 	urlStr := fmt.Sprintf("http://%s/api/web/%s/%s/?token=%s", config.ReverseEyeHost, domain, sub, config.ReverseEyeToken)
-// 	resp, err := retryhttpclient.ReverseGet(urlStr)
-// 	if err != nil {
-// 		return false
-// 	}
-
-// 	if bytes.Contains(resp, []byte("True")) {
-// 		return true
-// 	}
-
-// 	return false
-// }
-
-// func ceyeioCheck(sub string) bool {
-// 	// urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns&filter=%s", config.ReverseCeyeApiKey, sub)
-// 	// 解决 &filter=xxxx 经常显示 500 问题导致漏报问题 @2024/01/06
-// 	urlStr := fmt.Sprintf("http://api.ceye.io/v1/records?token=%s&type=dns", config.ReverseCeyeApiKey)
-// 	resp, err := retryhttpclient.ReverseGet(urlStr)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	if strings.Contains(strings.ToLower(string(resp)), strings.ToLower(sub+".")) {
-// 		return true
-// 	}
-
-// 	return false
-// }
-
-// func jndiCheck(reverse *proto.Reverse, timeout int64) bool {
-// 	// if len(config.ReverseJndi) == 0 && len(config.ReverseApiPort) == 0 {
-// 	// 	return false
-// 	// }
-
-// 	// if !config.ReverseJndiLive {
-// 	// 	return false
-// 	// }
-
-// 	// time.Sleep(time.Second * time.Duration(timeout))
-
-// 	// urlStr := fmt.Sprintf("http://%s:%s/?api=%s", reverse.Url.Domain, config.ReverseApiPort, reverse.Url.Path[1:])
-
-// 	// resp, err := retryhttpclient.ReverseGet(urlStr)
-// 	// if err != nil {
-// 	// 	return false
-// 	// }
-
-// 	// if strings.Contains(string(resp), "yes") {
-
-// 	// 	return true
-// 	// }
-
-// 	return false
-// }
