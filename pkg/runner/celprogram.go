@@ -1212,23 +1212,6 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to submatch", rhs.Type())
 					}
 
-					// re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					// matches, err := re.FindStringMatch(string(v2))
-					// for err == nil && matches != nil {
-					// 	gps := matches.Groups()
-					// 	for n, gp := range gps {
-					// 		if n == 0 {
-					// 			continue
-					// 		}
-					// 		resultMap[gp.Name] += matches.GroupByName(gp.Name).String() + ";"
-					// 	}
-					// 	matches, err = re.FindNextMatch(matches)
-					// }
-
-					// for k, v := range resultMap {
-					// 	resultMap[k] = strings.TrimSuffix(v, ";")
-					// }
-
 					re := regexp2.MustCompile(string(v1), regexp2.RE2)
 					if m, _ := re.FindStringMatch(string(v2)); m != nil {
 						gps := m.Groups()
@@ -1259,24 +1242,6 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to bsubmatch", rhs.Type())
 					}
 
-					// re := regexp2.MustCompile(string(v1), regexp2.RE2)
-					// matches, err := re.FindStringMatch(string([]byte(v2)))
-					// for err == nil && matches != nil {
-					// 	gps := matches.Groups()
-					// 	for n, gp := range gps {
-					// 		if n == 0 {
-					// 			continue
-					// 		}
-					// 		fmt.Printf("%s Value: %s\n", gp.Name, matches.GroupByName(gp.Name).String())
-					// 		resultMap[gp.Name] += matches.GroupByName(gp.Name).String() + ";"
-					// 	}
-					// 	matches, err = re.FindNextMatch(matches)
-					// }
-
-					// for k, v := range resultMap {
-					// 	resultMap[k] = strings.TrimSuffix(v, ";")
-					// }
-
 					re := regexp2.MustCompile(string(v1), regexp2.RE2)
 					raw := string([]byte(v2))
 					m, _ := re.FindStringMatch(raw)
@@ -1299,4 +1264,3 @@ func ReadProgramOptions(reg ref.TypeRegistry) []cel.ProgramOption {
 	allProgramOpitons = append(allProgramOpitons, NewProgramOptions...)
 	return allProgramOpitons
 }
-

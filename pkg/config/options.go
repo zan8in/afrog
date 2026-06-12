@@ -1251,7 +1251,6 @@ func GetFileBaseName(options *Options) string {
 	return xid.New().String()
 }
 
-
 // TargetStrings returns all targets as a deduplicated, trimmed string slice.
 // Eliminates the repeated Target.List() → type-assert → trim → filter pattern.
 func (o *Options) TargetStrings() []string {
