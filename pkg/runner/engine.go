@@ -5,24 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
-	"regexp"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"strconv"
-
 	"github.com/zan8in/afrog/v3/pkg/config"
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
-	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
-	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/report"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -42,418 +36,6 @@ var CheckerPool = sync.Pool{
 			CustomLib:   NewCustomLib(),
 		}
 	},
-}
-
-var titleExtractRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-
-func keyFromTargetWithPath(target string) string {
-	target = strings.TrimSpace(target)
-	if target == "" {
-		return ""
-	}
-	if !strings.Contains(target, "://") {
-		host, port, err := net.SplitHostPort(target)
-		if err == nil && host != "" && port != "" {
-			return net.JoinHostPort(host, port)
-		}
-		return ""
-	}
-	u, err := url.Parse(target)
-	if err != nil || u == nil {
-		return ""
-	}
-	host := strings.TrimSpace(u.Hostname())
-	if host == "" {
-		return ""
-	}
-	port := strings.TrimSpace(u.Port())
-	if port == "" {
-		switch strings.ToLower(u.Scheme) {
-		case "http":
-			port = "80"
-		case "https":
-			port = "443"
-		default:
-			return ""
-		}
-	}
-	base := net.JoinHostPort(host, port)
-	path := strings.TrimSpace(u.EscapedPath())
-	path = strings.TrimRight(path, "/")
-	if path == "" || path == "/" {
-		return base
-	}
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	return base + path
-}
-
-type openPortsCollector struct {
-	mu   sync.Mutex
-	open map[string][]int
-}
-
-func newOpenPortsCollector() *openPortsCollector {
-	return &openPortsCollector{
-		open: make(map[string][]int),
-	}
-}
-
-func extractTitle(body []byte) string {
-	if len(body) == 0 {
-		return ""
-	}
-	m := titleExtractRe.FindSubmatch(body)
-	if len(m) < 2 {
-		return ""
-	}
-	t := strings.TrimSpace(string(m[1]))
-	if t == "" {
-		return ""
-	}
-	t = strings.Join(strings.Fields(t), " ")
-	return t
-}
-
-func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []string {
-	if runner == nil || idx == nil || runner.options == nil {
-		return nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	} else if ctx.Err() != nil {
-		return nil
-	}
-
-	var printSeq uint64
-
-	seen := make(map[string]struct{})
-	candidates := make([]string, 0, len(idx.URLs)+len(idx.HostPorts)+len(idx.Hosts))
-	add := func(s string) {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			return
-		}
-		if _, ok := seen[s]; ok {
-			return
-		}
-		seen[s] = struct{}{}
-		candidates = append(candidates, s)
-	}
-	for _, u := range idx.URLs {
-		add(u)
-	}
-	for _, hp := range idx.HostPorts {
-		add(hp)
-	}
-	for _, h := range idx.Hosts {
-		add(h)
-	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	totalCandidates := len(candidates)
-	var processed uint64
-	var lastPercent int32 = -1
-	if runner.options.OnPhaseProgress != nil {
-		runner.options.OnPhaseProgress("webprobe", "running", 0, int64(totalCandidates), 0)
-	}
-
-	rate := runner.options.RateLimit
-	if rate <= 0 {
-		rate = 1
-	}
-	con := runner.options.Concurrency
-	if con <= 0 {
-		con = 1
-	}
-
-	ticker := time.NewTicker(time.Second / time.Duration(rate))
-	defer ticker.Stop()
-
-	type task struct {
-		raw string
-	}
-	tasks := make(chan task, con*4)
-	var wg sync.WaitGroup
-
-	var mu sync.Mutex
-	webURLs := make([]string, 0)
-	webURLByKey := make(map[string]string)
-	webMetaByKey := make(map[string]WebMeta)
-
-	record := func(urlStr string, meta WebMeta) {
-		key := fingerprint.KeyFromTarget(urlStr)
-		if key == "" {
-			return
-		}
-		if runner.options != nil {
-			runner.options.Targets.SetNum(urlStr, ActiveTarget)
-		}
-		mu.Lock()
-		if _, ok := webURLByKey[key]; ok {
-			mu.Unlock()
-			return
-		}
-		webURLByKey[key] = urlStr
-		webMetaByKey[key] = meta
-		webURLs = append(webURLs, urlStr)
-		mu.Unlock()
-		if runner.OnWebProbe != nil {
-			runner.OnWebProbe(meta)
-		}
-		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
-			extinfo := ""
-			if t := strings.TrimSpace(meta.Title); t != "" {
-				t = utils.Str2UTF8(t)
-				extinfo += "[" + log.LogColor.Title(t) + "]"
-			}
-			serverOrPowered := ""
-			if s := strings.TrimSpace(meta.Server); s != "" {
-				serverOrPowered = s
-			}
-			if p := strings.TrimSpace(meta.PoweredBy); p != "" {
-				if serverOrPowered == "" {
-					serverOrPowered = p
-				} else {
-					serverOrPowered += "," + p
-				}
-			}
-			if serverOrPowered != "" {
-				extinfo += "[" + log.LogColor.DarkGray(serverOrPowered) + "]"
-			}
-
-			number := utils.GetNumberText(int(atomic.AddUint64(&printSeq, 1)))
-			seq := log.LogColor.Time(number)
-			if extinfo == "" {
-				fmt.Printf("\r%v %s\r\n", seq, urlStr)
-			} else {
-				fmt.Printf("\r%v %s %s\r\n", seq, urlStr, extinfo)
-			}
-		}
-	}
-
-	fetchMeta := func(urlStr string) WebMeta {
-		vm := make(map[string]any, 4)
-		if ctx != nil {
-			vm[retryhttpclient.ContextVarKey] = ctx
-		}
-		meta := WebMeta{URL: urlStr}
-		u, err := url.Parse(urlStr)
-		if err != nil {
-			return meta
-		}
-		reqURI := strings.TrimSpace(u.RequestURI())
-		if reqURI == "" {
-			reqURI = "/"
-		}
-		rule := poc.Rule{}
-		rule.Request.Method = "GET"
-		rule.Request.Path = "^" + reqURI
-		rule.Request.FollowRedirects = true
-		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
-
-		resp, _ := vm["response"].(*proto.Response)
-		if resp == nil {
-			return meta
-		}
-		if len(resp.Headers) > 0 {
-			meta.Server = strings.TrimSpace(resp.Headers["server"])
-			meta.PoweredBy = strings.TrimSpace(resp.Headers["x-powered-by"])
-		}
-		meta.Title = extractTitle(resp.Body)
-		return meta
-	}
-
-	for i := 0; i < con; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-runner.ctx.Done():
-					return
-				case <-ctx.Done():
-					return
-				case it, ok := <-tasks:
-					if !ok {
-						return
-					}
-					d := atomic.AddUint64(&processed, 1)
-					if runner.options.OnPhaseProgress != nil && totalCandidates > 0 {
-						percent := int(d * 100 / uint64(totalCandidates))
-						if percent > 100 {
-							percent = 100
-						}
-						if int32(percent) != atomic.LoadInt32(&lastPercent) {
-							atomic.StoreInt32(&lastPercent, int32(percent))
-							runner.options.OnPhaseProgress("webprobe", "running", int64(d), int64(totalCandidates), percent)
-						}
-					}
-					select {
-					case <-runner.ctx.Done():
-						return
-					case <-ctx.Done():
-						return
-					case <-ticker.C:
-					}
-					u, err := retryhttpclient.CheckProtocol(it.raw)
-					if err != nil || strings.TrimSpace(u) == "" {
-						continue
-					}
-					meta := fetchMeta(u)
-					record(u, meta)
-				}
-			}
-		}()
-	}
-
-	for _, c := range candidates {
-		if runner.ctx.Err() != nil || (ctx != nil && ctx.Err() != nil) {
-			break
-		}
-		select {
-		case <-runner.ctx.Done():
-			break
-		case <-ctx.Done():
-			break
-		case tasks <- task{raw: c}:
-		}
-	}
-	close(tasks)
-	wg.Wait()
-	if runner.options.OnPhaseProgress != nil {
-		done := atomic.LoadUint64(&processed)
-		percent := 0
-		if totalCandidates > 0 {
-			percent = int(done * 100 / uint64(totalCandidates))
-			if percent > 100 {
-				percent = 100
-			}
-		}
-		status := "completed"
-		if ctx != nil && ctx.Err() != nil {
-			status = "interrupted"
-		} else if runner.ctx != nil && runner.ctx.Err() != nil {
-			status = "interrupted"
-		} else if int(done) != totalCandidates {
-			status = "interrupted"
-		} else if totalCandidates > 0 {
-			percent = 100
-		}
-		runner.options.OnPhaseProgress("webprobe", status, int64(done), int64(totalCandidates), percent)
-	}
-
-	runner.webMu.Lock()
-	for k, v := range webURLByKey {
-		runner.webURLByKey[k] = v
-	}
-	for k, v := range webMetaByKey {
-		runner.webMetaByKey[k] = v
-	}
-	runner.webMu.Unlock()
-
-	return webURLs
-}
-
-func (c *openPortsCollector) Add(host string, port int) {
-	c.mu.Lock()
-	c.open[host] = append(c.open[host], port)
-	c.mu.Unlock()
-}
-
-func (c *openPortsCollector) Snapshot() map[string][]int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cp := make(map[string][]int, len(c.open))
-	for host, ports := range c.open {
-		cp[host] = append([]int(nil), ports...)
-	}
-	return cp
-}
-
-func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}, testMode bool) bool {
-	if testMode {
-		return false
-	}
-	if len(p.Info.Requires) == 0 {
-		return false
-	}
-	reqSet := make(map[string]struct{}, len(p.Info.Requires))
-	for _, r := range p.Info.Requires {
-		rr := strings.ToLower(strings.TrimSpace(r))
-		if rr == "" {
-			continue
-		}
-		reqSet[rr] = struct{}{}
-	}
-	if len(reqSet) == 0 {
-		return false
-	}
-
-	mode := strings.ToLower(strings.TrimSpace(p.Info.RequiresMode))
-	if mode == "" {
-		mode = "strict"
-	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
-	}
-
-	if len(fingerTagsByKey) == 0 {
-		return mode == "strict"
-	}
-
-	key := ""
-	if keyForTarget != nil {
-		key = keyForTarget(target)
-	}
-	if key == "" {
-		return mode == "strict"
-	}
-
-	tts := fingerTagsByKey[key]
-	if len(tts) == 0 {
-		return mode == "strict"
-	}
-	for r := range reqSet {
-		if _, ok := tts[r]; ok {
-			return false
-		}
-	}
-	return true
-}
-
-func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[string]struct{}, targetTags map[string]struct{}, pocTags map[string]struct{}) bool {
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" {
-		mode = "strict"
-	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
-	}
-	if len(globalFingerTags) == 0 || len(pocTags) == 0 {
-		return false
-	}
-	appSpecific := false
-	for t := range pocTags {
-		if _, ok := globalFingerTags[t]; ok {
-			appSpecific = true
-			break
-		}
-	}
-	if !appSpecific {
-		return false
-	}
-	if len(targetTags) == 0 {
-		return mode == "strict"
-	}
-	for t := range pocTags {
-		if _, ok := targetTags[t]; ok {
-			return false
-		}
-	}
-	return true
 }
 
 func (e *Engine) AcquireChecker() *Checker {
@@ -482,6 +64,7 @@ func (e *Engine) ReleaseChecker(c *Checker) {
 
 type Engine struct {
 	options       *config.Options
+	scanCtx       *ScanContext
 	ticker        *time.Ticker
 	mu            sync.Mutex
 	paused        uint32
@@ -503,6 +86,14 @@ type Engine struct {
 	oobMgr        *OOBManager
 }
 
+// getScanCtx returns the ScanContext, initializing it if nil.
+func (e *Engine) getScanCtx() *ScanContext {
+	if e.scanCtx == nil {
+		e.scanCtx = &ScanContext{}
+	}
+	return e.scanCtx
+}
+
 func NewEngine(options *config.Options) *Engine {
 	engine := &Engine{
 		options:       options,
@@ -513,471 +104,24 @@ func NewEngine(options *config.Options) *Engine {
 	}
 	return engine
 }
-
-type pedmStat struct {
-	mu    sync.Mutex
-	count uint64
-	total time.Duration
-	max   time.Duration
-}
-
-type pedmEntry struct {
-	id     string
-	target string
-	pocID  string
-	count  uint64
-	total  time.Duration
-	max    time.Duration
-}
-
-type pedmActiveTask struct {
-	stage     string
-	pocID     string
-	target    string
-	startedAt time.Time
-	nextLogAt time.Time
-}
-
-type pedmActiveSnapshot struct {
-	Active  int
-	Queued  int
-	Slow    int
-	Longest time.Duration
-	PocID   string
-	Target  string
-}
-
-func (e *Engine) pedmReset() {
-	atomic.StoreUint32(&e.startedTasks, 0)
-	atomic.StoreUint32(&e.slowLogged, 0)
-	e.pedmStopMonitor()
-	e.pedmMu.Lock()
-	e.pedmStatsByID = make(map[string]*pedmStat)
-	e.pedmPairByID = make(map[string]*pedmStat)
-	e.pedmMu.Unlock()
-	e.pedmActiveMu.Lock()
-	e.pedmActive = make(map[uint64]*pedmActiveTask)
-	e.pedmActiveMu.Unlock()
-}
-
-func (e *Engine) pedmRecord(pocID string, dur time.Duration) {
-	if e == nil {
-		return
-	}
-	pocID = strings.TrimSpace(pocID)
-	if pocID == "" {
-		return
-	}
-
-	e.pedmMu.Lock()
-	s := e.pedmEnsureStat(e.pedmStatsByID, pocID)
-	e.pedmMu.Unlock()
-
-	e.pedmApplyDuration(s, dur)
-}
-
-func (e *Engine) pedmRecordPair(target, pocID string, dur time.Duration) {
-	if e == nil {
-		return
-	}
-	key := pedmPairKey(target, pocID)
-	if key == "" {
-		return
-	}
-
-	e.pedmMu.Lock()
-	s := e.pedmEnsureStat(e.pedmPairByID, key)
-	e.pedmMu.Unlock()
-
-	e.pedmApplyDuration(s, dur)
-}
-
-func (e *Engine) pedmEnsureStat(store map[string]*pedmStat, key string) *pedmStat {
-	s := store[key]
-	if s == nil {
-		s = &pedmStat{}
-		store[key] = s
-	}
-	return s
-}
-
-func (e *Engine) pedmApplyDuration(s *pedmStat, dur time.Duration) {
-	if s == nil {
-		return
-	}
-	s.mu.Lock()
-	s.count++
-	s.total += dur
-	if dur > s.max {
-		s.max = dur
-	}
-	s.mu.Unlock()
-}
-
-func (e *Engine) pedmMaybeLogSlow(options *config.Options, stage, pocID, target string, dur time.Duration) {
-	if e == nil || options == nil {
-		return
-	}
-	if options.PedmSlowThresholdSec <= 0 {
-		return
-	}
-	if options.PedmSlowLogLimit <= 0 {
-		return
-	}
-	threshold := time.Duration(options.PedmSlowThresholdSec) * time.Second
-	if dur < threshold {
-		return
-	}
-	if atomic.AddUint32(&e.slowLogged, 1) > uint32(options.PedmSlowLogLimit) {
-		return
-	}
-	e.pedmLog(options, fmt.Sprintf("PEDM-SLOW | completed | stage=%s dur=%s poc=%s target=%s", stage, dur.String(), pocID, target))
-}
-
-func (e *Engine) pedmSummary(options *config.Options) {
-	if e == nil || options == nil {
-		return
-	}
-	if options.PedmSummaryTop <= 0 {
-		return
-	}
-
-	e.pedmMu.Lock()
-	entries := e.pedmCollectEntries(e.pedmStatsByID, false)
-	pairEntries := e.pedmCollectEntries(e.pedmPairByID, true)
-	e.pedmMu.Unlock()
-
-	if len(entries) == 0 && len(pairEntries) == 0 {
-		return
-	}
-
-	by := strings.ToLower(strings.TrimSpace(options.PedmSummaryBy))
-	if by != "avg" && by != "max" {
-		by = "max"
-	}
-
-	top := options.PedmSummaryTop
-	if len(entries) > 0 {
-		e.pedmSortEntries(entries, by)
-		e.pedmPrintSummary("poc", top, by, entries)
-	}
-	if len(pairEntries) > 0 {
-		e.pedmSortEntries(pairEntries, by)
-		e.pedmPrintSummary("target+poc", top, by, pairEntries)
-	}
-}
-
-func (e *Engine) pedmCollectEntries(store map[string]*pedmStat, splitPair bool) []pedmEntry {
-	entries := make([]pedmEntry, 0, len(store))
-	for id, s := range store {
-		if s == nil {
-			continue
-		}
-		s.mu.Lock()
-		c := s.count
-		t := s.total
-		m := s.max
-		s.mu.Unlock()
-		if c == 0 {
-			continue
-		}
-		entry := pedmEntry{id: id, count: c, total: t, max: m}
-		if splitPair {
-			entry.target, entry.pocID = pedmSplitPairKey(id)
-		} else {
-			entry.pocID = id
-		}
-		entries = append(entries, entry)
-	}
-	return entries
-}
-
-func (e *Engine) pedmSortEntries(entries []pedmEntry, by string) {
-	sort.Slice(entries, func(i, j int) bool {
-		a, b := entries[i], entries[j]
-		ai := e.pedmMetric(a, by)
-		aj := e.pedmMetric(b, by)
-		if ai != aj {
-			return ai > aj
-		}
-		if a.pocID != b.pocID {
-			return a.pocID < b.pocID
-		}
-		return a.target < b.target
-	})
-}
-
-func (e *Engine) pedmMetric(entry pedmEntry, by string) time.Duration {
-	if by == "avg" && entry.count > 0 {
-		return entry.total / time.Duration(entry.count)
-	}
-	return entry.max
-}
-
-func (e *Engine) pedmPrintSummary(scope string, top int, by string, entries []pedmEntry) {
-	if len(entries) == 0 {
-		return
-	}
-	if top > len(entries) {
-		top = len(entries)
-	}
-	if top <= 0 {
-		return
-	}
-
-	e.pedmLog(e.options, fmt.Sprintf("PEDM-SUMMARY | scope=%s by=%s top=%d", scope, by, top))
-	for i := 0; i < top; i++ {
-		it := entries[i]
-		avg := it.total / time.Duration(it.count)
-		if scope == "target+poc" {
-			e.pedmLog(e.options, fmt.Sprintf("PEDM #%d | target=%s | poc=%s | count=%d avg=%s max=%s", i+1, it.target, it.pocID, it.count, avg.String(), it.max.String()))
-			continue
-		}
-		e.pedmLog(e.options, fmt.Sprintf("PEDM #%d | poc=%s | count=%d avg=%s max=%s", i+1, it.pocID, it.count, avg.String(), it.max.String()))
-	}
-}
-
-func (e *Engine) pedmLog(options *config.Options, line string) {
-	if strings.TrimSpace(line) == "" {
-		return
-	}
-	if options != nil && options.OnPedmLog != nil {
-		options.OnPedmLog(line)
-		return
-	}
-	gologger.Info().Msg(log.LogColor.Time(line))
-}
-
-func pedmPairKey(target, pocID string) string {
-	target = strings.TrimSpace(target)
-	pocID = strings.TrimSpace(pocID)
-	if target == "" || pocID == "" {
-		return ""
-	}
-	return target + "\x00" + pocID
-}
-
-func pedmSplitPairKey(v string) (string, string) {
-	parts := strings.SplitN(v, "\x00", 2)
-	if len(parts) != 2 {
-		return "", strings.TrimSpace(v)
-	}
-	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
-}
-
-func (e *Engine) pedmStartMonitor(options *config.Options) {
-	if e == nil || options == nil || !options.PocExecutionDurationMonitor || options.PedmSlowThresholdSec <= 0 {
-		return
-	}
-
-	stop := make(chan struct{})
-	e.pedmActiveMu.Lock()
-	if e.pedmStop != nil {
-		close(e.pedmStop)
-	}
-	e.pedmStop = stop
-	e.pedmActiveMu.Unlock()
-
-	threshold := time.Duration(options.PedmSlowThresholdSec) * time.Second
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-ticker.C:
-			}
-
-			now := time.Now()
-			logs := make([]string, 0)
-
-			e.pedmActiveMu.Lock()
-			activeCount := len(e.pedmActive)
-			for _, task := range e.pedmActive {
-				if task == nil || task.startedAt.IsZero() {
-					continue
-				}
-				elapsed := now.Sub(task.startedAt)
-				if elapsed < threshold {
-					continue
-				}
-				if !task.nextLogAt.IsZero() && now.Before(task.nextLogAt) {
-					continue
-				}
-				task.nextLogAt = now.Add(1 * time.Minute)
-				logs = append(logs, fmt.Sprintf("PEDM-SLOW | running | stage=%s dur=%s active=%d poc=%s target=%s", task.stage, elapsed.Truncate(time.Second).String(), activeCount, task.pocID, task.target))
-			}
-			e.pedmActiveMu.Unlock()
-
-			for _, line := range logs {
-				e.pedmLog(options, line)
-			}
-		}
-	}()
-}
-
-func (e *Engine) pedmStopMonitor() {
-	if e == nil {
-		return
-	}
-	e.pedmActiveMu.Lock()
-	stop := e.pedmStop
-	e.pedmStop = nil
-	e.pedmActiveMu.Unlock()
-	if stop != nil {
-		close(stop)
-	}
-}
-
-func (e *Engine) pedmStartTask(stage, pocID, target string) uint64 {
-	if e == nil {
-		return 0
-	}
-	taskID := atomic.AddUint64(&e.pedmTaskSeq, 1)
-	e.pedmActiveMu.Lock()
-	e.pedmActive[taskID] = &pedmActiveTask{
-		stage:     strings.TrimSpace(stage),
-		pocID:     strings.TrimSpace(pocID),
-		target:    strings.TrimSpace(target),
-		startedAt: time.Now(),
-	}
-	e.pedmActiveMu.Unlock()
-	return taskID
-}
-
-func (e *Engine) pedmDoneTask(taskID uint64) {
-	if e == nil || taskID == 0 {
-		return
-	}
-	e.pedmActiveMu.Lock()
-	delete(e.pedmActive, taskID)
-	e.pedmActiveMu.Unlock()
-}
-
-func (e *Engine) pedmSnapshot(options *config.Options) pedmActiveSnapshot {
-	if e == nil {
-		return pedmActiveSnapshot{}
-	}
-	threshold := time.Duration(0)
-	if options != nil && options.PedmSlowThresholdSec > 0 {
-		threshold = time.Duration(options.PedmSlowThresholdSec) * time.Second
-	}
-
-	now := time.Now()
-	snap := pedmActiveSnapshot{}
-	snap.Queued = int(atomic.LoadInt64(&e.queuedTasks))
-	e.pedmActiveMu.Lock()
-	snap.Active = len(e.pedmActive)
-	for _, task := range e.pedmActive {
-		if task == nil || task.startedAt.IsZero() {
-			continue
-		}
-		elapsed := now.Sub(task.startedAt)
-		if threshold > 0 && elapsed >= threshold {
-			snap.Slow++
-		}
-		if elapsed > snap.Longest {
-			snap.Longest = elapsed
-			snap.PocID = task.pocID
-			snap.Target = task.target
-		}
-	}
-	e.pedmActiveMu.Unlock()
-	return snap
-}
-
-func (e *Engine) taskHardTimeout(taskPoc *poc.Poc) time.Duration {
-	if e == nil || e.options == nil {
-		return 0
-	}
-	fixedFallbackSec := 0
-	if e.options.TaskHardTimeoutSec > 0 {
-		fixedFallbackSec = e.options.TaskHardTimeoutSec
-	}
-	if e.options.TaskSmartTimeout {
-		return poc.TaskTimeoutDuration(taskPoc, fixedFallbackSec)
-	}
-	if fixedFallbackSec <= 0 {
-		return 0
-	}
-	return time.Duration(fixedFallbackSec) * time.Second
-}
-
-func (e *Engine) taskTimeoutLog(stage, pocID, target string, dur, limit time.Duration) {
-	if e == nil || e.options == nil || !e.options.PocExecutionDurationMonitor {
-		return
-	}
-	if dur <= 0 {
-		dur = limit
-	}
-	e.pedmLog(e.options, fmt.Sprintf("TASK-TIMEOUT | stage=%s elapsed=%s limit=%s poc=%s target=%s", stage, dur.Truncate(time.Second).String(), limit.String(), pocID, target))
-}
-
 func (runner *Runner) Execute() {
 
 	options := runner.options
 	if runner.engine != nil {
+		runner.engine.scanCtx = runner.scanCtx
 		runner.engine.pedmReset()
 		defer runner.engine.pedmStopMonitor()
 		if options.PocExecutionDurationMonitor {
 			runner.engine.pedmStartMonitor(options)
 		}
 	}
-	if runner.engine != nil {
-		runner.engine.oobAdapter = nil
-		runner.engine.oobAlive = false
-		runner.engine.oobMgr = nil
-	}
-
 	pocSlice := options.CreatePocList()
 	fingerprintPocs, pocSlice := options.FingerprintPoCs(pocSlice)
 
 	reversePocs, otherPocs := options.ReversePoCs(pocSlice)
-
-	// fmt.Println(len(reversePocs), len(otherPocs), len(pocSlice))
-	// 如果无 OOB PoC 将跳过 OOB 存活检测
-	// 在SDK模式下，只有明确启用OOB时才进行连接检测
-	if len(reversePocs) > 0 {
-		// 检查是否是SDK模式且未启用OOB
-		if options.SDKMode && !options.EnableOOB {
-			if runner.engine != nil {
-				runner.engine.oobAdapter = nil
-				runner.engine.oobAlive = false
-			}
-		} else {
-			// 非SDK模式或已启用OOB，执行正常的连接检测
-			runner.options.SetOOBAdapter()
-			if oobAdapter, err := oobadapter.NewOOBAdapter(options.OOB, &oobadapter.ConnectorParams{
-				Key:     options.OOBKey,
-				Domain:  options.OOBDomain,
-				HTTPUrl: options.OOBHttpUrl,
-				ApiUrl:  options.OOBApiUrl,
-			}); err == nil {
-				if runner.engine != nil {
-					runner.engine.oobAdapter = oobAdapter
-					runner.engine.oobAlive = oobAdapter.IsVaild()
-				}
-			} else {
-				if runner.engine != nil {
-					runner.engine.oobAdapter = nil
-					runner.engine.oobAlive = false
-				}
-			}
-		}
-		// if !OOBAlive {
-		// 	gologger.Error().Msg("Using OOB Server: " + options.OOB + " is not vaild")
-		// }
-	}
-
-	if runner.engine != nil && runner.engine.oobAlive && runner.engine.oobAdapter != nil {
-		pollInterval := time.Duration(options.OOBPollInterval) * time.Second
-		hitRetention := time.Duration(options.OOBHitRetention) * time.Minute
-		runner.engine.oobMgr = NewOOBManager(runner.ctx, runner.engine.oobAdapter, pollInterval, hitRetention)
-	}
+	runner.initOOB(reversePocs)
 	runner.startOOBResolver()
 	defer runner.stopOOBResolver()
-
 	runner.printOOBStatus(reversePocs)
 
 	// portscan pre-scan: run after OOB status output to ensure ordering
@@ -994,15 +138,7 @@ func (runner *Runner) Execute() {
 		if runner.TargetIndex != nil {
 			idx = runner.TargetIndex
 		} else {
-			seeds := make([]string, 0, runner.options.Targets.Len())
-			for _, t := range runner.options.Targets.List() {
-				if s, ok := t.(string); ok {
-					s = strings.TrimSpace(s)
-					if s != "" {
-						seeds = append(seeds, s)
-					}
-				}
-			}
+			seeds := runner.options.TargetStrings()
 			idx = targets.BuildTargetIndex(seeds)
 			runner.TargetIndex = idx
 		}
@@ -1015,14 +151,14 @@ func (runner *Runner) Execute() {
 			psOpts.Debug = !options.Silent
 			psOpts.LiveStats = options.LiveStats
 			psOpts.Quiet = false
-			if options.OnPhaseProgress != nil {
+			if runner.getScanCtx().OnPhaseProgress != nil {
 				psOpts.OnProgress = func(phase string, status string, finished int, total int, percent int) {
-					options.OnPhaseProgress(phase, status, int64(finished), int64(total), percent)
+					runner.getScanCtx().OnPhaseProgress(phase, status, int64(finished), int64(total), percent)
 				}
 			}
-			if options.OnHostDiscovered != nil {
+			if runner.getScanCtx().OnHostDiscovered != nil {
 				psOpts.OnDiscoveredHost = func(host string) {
-					options.OnHostDiscovered(host)
+					runner.getScanCtx().OnHostDiscovered(host)
 				}
 			}
 			if options.PSPorts != "" {
@@ -1046,8 +182,8 @@ func (runner *Runner) Execute() {
 			}
 			collector := newOpenPortsCollector()
 			psOpts.OnResult = func(r *portscan.ScanResult) {
-				if options.OnPortScanResult != nil {
-					options.OnPortScanResult(r.Host, r.Port)
+				if runner.getScanCtx().OnPortScanResult != nil {
+					runner.getScanCtx().OnPortScanResult(r.Host, r.Port)
 				}
 				if !options.SDKMode {
 					gologger.Print().Msgf("%s:%d", r.Host, r.Port)
@@ -1087,30 +223,19 @@ func (runner *Runner) Execute() {
 		} else if !options.SDKMode {
 			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
 			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
-		} else if options.OnPhaseProgress != nil {
-			options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
-			options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
+		} else if runner.getScanCtx().OnPhaseProgress != nil {
+			runner.getScanCtx().OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
+			runner.getScanCtx().OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 		}
 	} else if !options.SDKMode {
 		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
 		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
-	} else if options.OnPhaseProgress != nil {
-		options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
-		options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
+	} else if runner.getScanCtx().OnPhaseProgress != nil {
+		runner.getScanCtx().OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
+		runner.getScanCtx().OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 	}
 
-	allTargets := make([]string, 0, runner.options.Targets.Len())
-	for _, t := range runner.options.Targets.List() {
-		s, ok := t.(string)
-		if !ok {
-			continue
-		}
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		allTargets = append(allTargets, s)
-	}
+	allTargets := runner.options.TargetStrings()
 
 	idx := runner.TargetIndex
 
@@ -1254,35 +379,12 @@ func (runner *Runner) Execute() {
 
 	webScanTargets := dedupWebTargets(mergeTargets(idx.URLs, resolvedHosts, webTargets, idx.HostPorts))
 
-	isNetOnlyPoc := func(p poc.Poc) bool {
-		hasHTTP := false
-		hasNet := false
-		hasGo := false
-		for _, rm := range p.Rules {
-			t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
-			switch t {
-			case "", poc.HTTP_Type, poc.HTTPS_Type:
-				hasHTTP = true
-			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
-				hasNet = true
-			case poc.GO_Type:
-				hasGo = true
-			default:
-				hasHTTP = true
-			}
-		}
-		if hasGo {
-			return false
-		}
-		return hasNet && !hasHTTP
-	}
-
 	taskCount := 0
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
 		fingerNet := make([]poc.Poc, 0)
 		fingerWeb := make([]poc.Poc, 0)
 		for _, p := range fingerprintPocs {
-			if isNetOnlyPoc(p) {
+			if p.IsNetOnly() {
 				fingerNet = append(fingerNet, p)
 			} else {
 				fingerWeb = append(fingerWeb, p)
@@ -1296,20 +398,20 @@ func (runner *Runner) Execute() {
 		}
 	}
 	for _, p := range pocSlice {
-		if !isNetOnlyPoc(p) {
+		if !p.IsNetOnly() {
 			taskCount += len(webScanTargets)
 		} else {
 			taskCount += len(netTargetsStrict)
 		}
 	}
 	options.Count += taskCount
-	if options.OnScanInfoUpdate != nil {
+	if runner.getScanCtx().OnScanInfoUpdate != nil {
 		pocTotal := len(pocSlice)
 		if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
 			pocTotal += len(fingerprintPocs)
 		}
 		oobEnabled, oobStatus := runner.getOOBStatus(reversePocs)
-		options.OnScanInfoUpdate(config.ScanInfoUpdate{
+		runner.getScanCtx().OnScanInfoUpdate(config.ScanInfoUpdate{
 			TotalTargets: len(webScanTargets),
 			Targets:      append([]string(nil), webScanTargets...),
 			TotalPocs:    pocTotal,
@@ -1335,7 +437,7 @@ func (runner *Runner) Execute() {
 		fingerNet := make([]poc.Poc, 0)
 		fingerWeb := make([]poc.Poc, 0)
 		for _, p := range fingerprintPocs {
-			if isNetOnlyPoc(p) {
+			if p.IsNetOnly() {
 				fingerNet = append(fingerNet, p)
 			} else {
 				fingerWeb = append(fingerWeb, p)
@@ -1369,10 +471,6 @@ func (runner *Runner) Execute() {
 			return nil
 		}
 		return out
-	}
-
-	keyForTarget := func(target string) string {
-		return keyFromTargetWithPath(target)
 	}
 
 	fingerTagsByKey := make(map[string]map[string]struct{})
@@ -1410,7 +508,7 @@ func (runner *Runner) Execute() {
 
 	pocTagsCache := make(map[string]map[string]struct{})
 	shouldSkipFingerprintFiltered := func(target string, p poc.Poc) bool {
-		if isNetOnlyPoc(p) {
+		if p.IsNetOnly() {
 			return false
 		}
 		if len(globalFingerTags) == 0 {
@@ -1434,7 +532,7 @@ func (runner *Runner) Execute() {
 		if !appSpecific {
 			return false
 		}
-		key := keyForTarget(target)
+		key := keyFromTargetWithPath(target)
 		if key == "" {
 			return false
 		}
@@ -1520,7 +618,7 @@ func (runner *Runner) Execute() {
 				break
 			}
 			targetView := webScanTargets
-			if isNetOnlyPoc(pocItem) {
+			if pocItem.IsNetOnly() {
 				targetView = netTargetsStrict
 			}
 
@@ -1546,7 +644,7 @@ func (runner *Runner) Execute() {
 					continue
 				}
 
-				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey, runner.options.Test) {
+				if shouldSkipRequires(t, pocItem, keyFromTargetWithPath, fingerTagsByKey, runner.options.Test) {
 					runner.ScanProgress.IncrementTask(pocItem.Id, t)
 					runner.NotVulCallback()
 					continue
@@ -1595,7 +693,7 @@ func (runner *Runner) Execute() {
 				break
 			}
 			targetView := webScanTargets
-			if isNetOnlyPoc(pocItem) {
+			if pocItem.IsNetOnly() {
 				targetView = netTargetsStrict
 			}
 
@@ -1722,156 +820,6 @@ func (runner *Runner) executeExpression(ctx context.Context, target string, poc 
 	runner.OnResult(c.Result)
 }
 
-type runnerFingerprintExecutor struct {
-	runner *Runner
-}
-
-func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *poc.Poc) (matched bool, resolvedTarget string, err error) {
-	if e.runner == nil || e.runner.engine == nil {
-		return false, "", nil
-	}
-	if e.runner.options != nil && e.runner.options.Resume != "" && e.runner.ScanProgress != nil {
-		fpID := "finger:" + p.Id
-		if e.runner.ScanProgress.ContainsPoc(fpID) {
-			if e.runner.options.ResumeDoneTasks == 0 {
-				e.runner.NotVulCallback()
-			}
-			return false, "", nil
-		}
-		if e.runner.ScanProgress.ContainsTask(fpID, target) {
-			if e.runner.options.ResumeDoneTasks == 0 {
-				e.runner.NotVulCallback()
-			}
-			return false, "", nil
-		}
-	}
-	c := e.runner.engine.AcquireChecker()
-	defer e.runner.engine.ReleaseChecker(c)
-	defer e.runner.NotVulCallback()
-	if e.runner.ScanProgress != nil && p != nil && p.Id != "" && target != "" {
-		fpID := "finger:" + p.Id
-		defer e.runner.ScanProgress.IncrementTask(fpID, target)
-	}
-
-	var start time.Time
-	var taskID uint64
-	taskCtx := ctx
-	cancel := func() {}
-	hardTimeout := e.runner.engine.taskHardTimeout(p)
-	if taskCtx == nil {
-		taskCtx = context.Background()
-	}
-	if hardTimeout > 0 {
-		taskCtx, cancel = context.WithTimeout(taskCtx, hardTimeout)
-	}
-	defer cancel()
-	if e.runner.options != nil && e.runner.options.PocExecutionDurationMonitor {
-		taskID = e.runner.engine.pedmStartTask("FINGER", p.Id, target)
-		defer e.runner.engine.pedmDoneTask(taskID)
-		start = time.Now()
-	} else if hardTimeout > 0 {
-		start = time.Now()
-	}
-	c.VariableMap[retryhttpclient.ContextVarKey] = taskCtx
-	err = c.Check(target, p)
-	if !start.IsZero() {
-		dur := time.Since(start)
-		if e.runner.options != nil && e.runner.options.PocExecutionDurationMonitor {
-			e.runner.engine.pedmRecord(p.Id, dur)
-			e.runner.engine.pedmRecordPair(target, p.Id, dur)
-			e.runner.engine.pedmMaybeLogSlow(e.runner.options, "FINGER", p.Id, target, dur)
-		}
-		if hardTimeout > 0 && errors.Is(taskCtx.Err(), context.DeadlineExceeded) {
-			e.runner.engine.taskTimeoutLog("FINGER", p.Id, target, dur, hardTimeout)
-		}
-	}
-	if c.Result == nil {
-		return false, "", err
-	}
-	if e.runner.options != nil && e.runner.options.Debug {
-		pocID := ""
-		if c.Result.PocInfo != nil {
-			pocID = c.Result.PocInfo.Id
-		}
-		for i, pr := range c.Result.AllPocResult {
-			idx := i + 1
-			gologger.Info().Msgf("\r\n[%d][%s] Dumped Request\n", idx, pocID)
-			if pr != nil && pr.ResultRequest != nil {
-				gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(pr.ResultRequest.GetRaw())))
-			} else {
-				gologger.Print().Msgf("%s\n", "")
-			}
-			gologger.Info().Msgf("\r\n[%d][%s] Dumped Response\n", idx, pocID)
-			if pr != nil && pr.ResultResponse != nil {
-				gologger.Print().Msgf("%s\n", utils.Str2UTF8(string(pr.ResultResponse.GetRaw())))
-			} else {
-				gologger.Print().Msgf("%s\n", "")
-			}
-		}
-	}
-	if c.Result.IsVul {
-		key := keyFromTargetWithPath(c.Result.Target)
-		if key == "" {
-			key = keyFromTargetWithPath(target)
-		}
-		if key != "" {
-			e.runner.setFingerprintResult(key, p.Id, c.Result)
-			hit := fingerprint.Hit{
-				ID:       p.Id,
-				Name:     p.Info.Name,
-				Tags:     p.Info.Tags,
-				Severity: p.Info.Severity,
-			}
-			e.runner.fingerMu.Lock()
-			e.runner.fingerByKey[key] = append(e.runner.fingerByKey[key], hit)
-			e.runner.fingerMu.Unlock()
-			if e.runner.OnFingerprint != nil {
-				e.runner.OnFingerprint(key, []fingerprint.Hit{hit})
-			}
-		}
-	}
-	return c.Result.IsVul, c.Result.Target, err
-}
-
-func (runner *Runner) runFingerprintStage(ctx context.Context, targets []string, pocs []poc.Poc) {
-	if runner == nil || runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 {
-		return
-	}
-	if len(targets) == 0 || len(pocs) == 0 {
-		return
-	}
-	if ctx != nil && ctx.Err() != nil {
-		return
-	}
-
-	e := &fingerprint.Engine{Rate: runner.options.RateLimit, Concurrency: runner.options.Concurrency}
-	e.Run(ctx, targets, pocs, runnerFingerprintExecutor{runner: runner})
-	if runner.ScanProgress != nil {
-		for _, p := range pocs {
-			if p.Id == "" {
-				continue
-			}
-			runner.ScanProgress.MarkPocDone("finger:" + p.Id)
-		}
-	}
-}
-
-func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {
-	key := keyFromTargetWithPath(target)
-	if key == "" {
-		return nil
-	}
-	runner.fingerMu.Lock()
-	hits := runner.fingerByKey[key]
-	runner.fingerMu.Unlock()
-	if len(hits) == 0 {
-		return nil
-	}
-	out := make([]fingerprint.Hit, len(hits))
-	copy(out, hits)
-	return out
-}
-
 func (e *Engine) waitTick() {
 	if e.ticker == nil {
 		return
@@ -1928,118 +876,3 @@ type TransData struct {
 	Target string
 	Poc    poc.Poc
 }
-
-// 获取OOB状态信息
-func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
-	if len(reversePocs) == 0 {
-		return true, "Not required (no OOB PoCs)"
-	}
-
-	runner.options.SetOOBAdapter()
-
-	// 从配置中获取当前OOB服务名称
-	serviceName := strings.ToLower(runner.options.OOB)
-
-	if runner.engine == nil || runner.engine.oobAdapter == nil {
-		return false, fmt.Sprintf("%s (Not configured)", serviceName)
-	}
-
-	if !runner.engine.oobAdapter.IsVaild() {
-		return false, fmt.Sprintf("%s (Connection failed)", serviceName)
-	}
-
-	return true, fmt.Sprintf("%s (Active)", serviceName)
-}
-
-// 新增OOB状态显示函数
-func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
-	// 在SDK模式下，不显示OOB状态信息，由SDK自己控制显示
-	if runner.options.SDKMode {
-		return
-	}
-
-	status, msg := runner.getOOBStatus(reversePocs)
-
-	if !status {
-		config.PrintStatusLine(
-			log.LogColor.Red(config.GetErrorSymbol()),
-			"OOB: ",
-			log.LogColor.Red(msg),
-			"",
-		)
-		config.PrintSeparator()
-
-		return
-	}
-	config.PrintStatusLine(
-		log.LogColor.Low(config.GetOkSymbol()),
-		"OOB: ",
-		log.LogColor.Green(msg),
-		"",
-	)
-
-	config.PrintSeparator()
-}
-
-// func parseElaspsedTime(time time.Duration) string {
-// 	s := fmt.Sprintf("%v", time)
-// 	if len(s) > 0 {
-// 		if strings.HasSuffix(s, "s") && !strings.HasSuffix(s, "ms") {
-// 			t := strings.Replace(s, "s", "", -1)
-// 			ts, err := strconv.ParseFloat(t, 64)
-// 			if err != nil {
-// 				return s
-// 			}
-// 			if ts >= 40 {
-// 				return log.LogColor.Midium(s)
-// 			}
-// 		}
-// 		if strings.HasSuffix(s, "m") {
-// 			return log.LogColor.Red(s)
-// 		}
-// 	}
-// 	return log.LogColor.Green(s)
-// }
-
-// func JndiTest() bool {
-// 	url := "http://" + config.ReverseJndi + ":" + config.ReverseApiPort + "/?api=test"
-// 	resp, _, err := retryhttpclient.Get(url)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	if strings.Contains(string(resp), "no") || strings.Contains(string(resp), "yes") {
-// 		return true
-// 	}
-// 	return false
-// }
-
-// func CeyeTest() bool {
-// 	url := fmt.Sprintf("http://%s.%s", "test", config.ReverseCeyeDomain)
-// 	resp, _, err := retryhttpclient.Get(url)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	if strings.Contains(string(resp), "\"meta\":") || strings.Contains(string(resp), "201") {
-// 		return true
-// 	}
-// 	return false
-// }
-
-// func EyeTest() bool {
-// 	index := strings.Index(config.ReverseEyeDomain, ".")
-// 	domain := config.ReverseEyeDomain
-
-// 	if index != -1 {
-// 		domain = config.ReverseEyeDomain[:index]
-// 	}
-
-// 	url := fmt.Sprintf("http://%s/api/dns/%s/test/?token=%s", config.ReverseEyeHost, domain, config.ReverseEyeToken)
-// 	resp, _, err := retryhttpclient.Get(url)
-// 	if err != nil {
-// 		return false
-// 	}
-// 	if strings.Contains(string(resp), "False") {
-// 		return true
-// 	}
-// 	return false
-// }

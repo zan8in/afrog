@@ -521,6 +521,31 @@ func (poc *Poc) IsReverse() bool {
 	return false
 }
 
+// IsNetOnly returns true if the PoC only has network-layer rules (TCP/UDP/SSL)
+// and no HTTP, HTTPS, or Go-based rules.
+func (poc *Poc) IsNetOnly() bool {
+	hasHTTP := false
+	hasNet := false
+	hasGo := false
+	for _, rm := range poc.Rules {
+		t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
+		switch t {
+		case "", HTTP_Type, HTTPS_Type:
+			hasHTTP = true
+		case TCP_Type, UDP_Type, SSL_Type:
+			hasNet = true
+		case GO_Type:
+			hasGo = true
+		default:
+			hasHTTP = true
+		}
+	}
+	if hasGo {
+		return false
+	}
+	return hasNet && !hasHTTP
+}
+
 type Extractors struct {
 	Type      string        `yaml:"type"`      // regex,str
 	Extractor yaml.MapSlice `yaml:"extractor"` //
@@ -688,14 +713,14 @@ func MigrateLegacyPocs(root string) (MigrateReport, error) {
 }
 
 var (
-	reOobWaitObjCall       = regexp.MustCompile(`\boobWait\s*\(\s*oob\s*,\s*`)
-	reOobCheckObjCall      = regexp.MustCompile(`\boobCheck\s*\(\s*oob\s*,\s*`)
-	reOobCheckTokenObjCall = regexp.MustCompile(`\boobCheckToken\s*\(\s*oob\s*,\s*`)
-	reOobCheckLeadSpace    = regexp.MustCompile(`\boobCheck\s*\(\s+`)
+	reOobWaitObjCall         = regexp.MustCompile(`\boobWait\s*\(\s*oob\s*,\s*`)
+	reOobCheckObjCall        = regexp.MustCompile(`\boobCheck\s*\(\s*oob\s*,\s*`)
+	reOobCheckTokenObjCall   = regexp.MustCompile(`\boobCheckToken\s*\(\s*oob\s*,\s*`)
+	reOobCheckLeadSpace      = regexp.MustCompile(`\boobCheck\s*\(\s+`)
 	reOobCheckTokenLeadSpace = regexp.MustCompile(`\boobCheckToken\s*\(\s+`)
-	reOobDNSTpl            = regexp.MustCompile(`\{\{\s*oobDNS\s*\}\}`)
-	reOobHTTPTpl           = regexp.MustCompile(`\{\{\s*oobHTTP\s*\}\}`)
-	reOobFilterTpl         = regexp.MustCompile(`\{\{\s*oobFilter\s*\}\}`)
+	reOobDNSTpl              = regexp.MustCompile(`\{\{\s*oobDNS\s*\}\}`)
+	reOobHTTPTpl             = regexp.MustCompile(`\{\{\s*oobHTTP\s*\}\}`)
+	reOobFilterTpl           = regexp.MustCompile(`\{\{\s*oobFilter\s*\}\}`)
 
 	reWordOobDNS    = regexp.MustCompile(`\boobDNS\b`)
 	reWordOobHTTP   = regexp.MustCompile(`\boobHTTP\b`)

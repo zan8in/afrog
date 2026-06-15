@@ -28,6 +28,7 @@ type OnResult func(*result.Result)
 
 type Runner struct {
 	options           *config.Options
+	scanCtx           *ScanContext
 	catalog           *catalog.Catalog
 	Report            *report.Report
 	JsonReport        *report.JsonReport
@@ -78,7 +79,32 @@ func (r *Runner) Done() <-chan struct{} {
 	return r.ctx.Done()
 }
 
-func NewRunner(options *config.Options) (*Runner, error) {
+// getScanCtx returns the ScanContext, initializing it if nil.
+func (r *Runner) getScanCtx() *ScanContext {
+	if r.scanCtx == nil {
+		r.scanCtx = &ScanContext{}
+	}
+	return r.scanCtx
+}
+
+// RunnerOption is a functional option for configuring a Runner.
+type RunnerOption func(*runnerConfig)
+
+type runnerConfig struct {
+	sdkMode bool
+}
+
+// WithSDKMode configures the runner for SDK/library usage: skips HTML/JSON
+// report creation, disables console output, and avoids config-file side effects.
+func WithSDKMode() RunnerOption {
+	return func(c *runnerConfig) { c.sdkMode = true }
+}
+
+func NewRunner(options *config.Options, opts ...RunnerOption) (*Runner, error) {
+	cfg := &runnerConfig{}
+	for _, o := range opts {
+		o(cfg)
+	}
 	var err error
 
 	retryhttpclient.Init(&retryhttpclient.Options{
@@ -92,7 +118,14 @@ func NewRunner(options *config.Options) (*Runner, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := &Runner{
-		options:           options,
+		options: options,
+		scanCtx: &ScanContext{
+			OnPhaseProgress:  options.OnPhaseProgress,
+			OnPortScanResult: options.OnPortScanResult,
+			OnHostDiscovered: options.OnHostDiscovered,
+			OnScanInfoUpdate: options.OnScanInfoUpdate,
+			OnPedmLog:        options.OnPedmLog,
+		},
 		ctx:               ctx,
 		cancel:            cancel,
 		fingerByKey:       make(map[string][]fingerprint.Hit),
@@ -148,8 +181,8 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		options.CurrentCount = runner.ScanProgress.DoneTasks
 	}
 
-	// 在SDK模式下，不创建任何报告实例，避免自动创建reports目录
-	if !options.SDKMode {
+	// SDK mode: skip report creation to avoid creating reports directory
+	if !cfg.sdkMode {
 		jr, err := report.NewJsonReport(options.Json, options.JsonAll)
 		if err != nil {
 			return runner, fmt.Errorf("%s", err.Error())
@@ -213,18 +246,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		return runner, errors.New("target not found")
 	}
 
-	targetSeeds := make([]string, 0, runner.options.Targets.Len())
-	for _, t := range runner.options.Targets.List() {
-		s, ok := t.(string)
-		if !ok {
-			continue
-		}
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		targetSeeds = append(targetSeeds, s)
-	}
+	targetSeeds := runner.options.TargetStrings()
 	runner.TargetIndex = targets.BuildTargetIndex(targetSeeds)
 
 	// init pocs

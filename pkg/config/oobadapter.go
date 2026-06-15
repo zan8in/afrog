@@ -1,11 +1,11 @@
 package config
 
 var (
-	OOBCeyeio   = "ceyeio"
-	OOBDnslogcn = "dnslogcn"
-	OOBAlphalog = "alphalog"
-	OOBXray     = "xray"
-	OOBRevsuit  = "revsuit"
+	OOBCeyeio     = "ceyeio"
+	OOBDnslogcn   = "dnslogcn"
+	OOBAlphalog   = "alphalog"
+	OOBXray       = "xray"
+	OOBRevsuit    = "revsuit"
 	OOBInteractsh = "interactsh"
 )
 
