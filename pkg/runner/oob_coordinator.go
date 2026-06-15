@@ -19,7 +19,6 @@ func (runner *Runner) initOOB(reversePocs []poc.Poc) {
 		return
 	}
 
-	runner.engine.oobAdapter = nil
 	runner.engine.oobAlive = false
 	runner.engine.oobMgr = nil
 

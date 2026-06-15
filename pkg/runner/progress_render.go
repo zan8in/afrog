@@ -132,16 +132,6 @@ func (pr *ProgressRenderer) StopTicker() {
 	}
 }
 
-// clearLine writes the ANSI escape to clear the current terminal line.
-func (pr *ProgressRenderer) clearLine() {
-	fmt.Fprint(os.Stderr, "\r\033[2K\r")
-}
-
-// ClearLineForResult clears the line before printing a scan result.
-func (pr *ProgressRenderer) ClearLineForResult() {
-	pr.clearLine()
-}
-
 // WrapOnPhaseProgress returns a callback that intercepts OOB finalize updates
 // for progress display, chaining to the previous handler.
 func (pr *ProgressRenderer) WrapOnPhaseProgress(prev func(string, string, int64, int64, int)) func(string, string, int64, int64, int) {

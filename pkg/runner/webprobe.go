@@ -164,13 +164,13 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		if key == "" {
 			return
 		}
-		if runner.options != nil {
-			runner.options.Targets.SetNum(urlStr, ActiveTarget)
-		}
 		mu.Lock()
 		if _, ok := webURLByKey[key]; ok {
 			mu.Unlock()
 			return
+		}
+		if runner.options != nil {
+			runner.options.Targets.SetNum(urlStr, ActiveTarget)
 		}
 		webURLByKey[key] = urlStr
 		webMetaByKey[key] = meta

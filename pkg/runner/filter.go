@@ -6,6 +6,14 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/poc"
 )
 
+func normalizeRequiresMode(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if mode != "strict" && mode != "opportunistic" {
+		return "strict"
+	}
+	return mode
+}
+
 func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}, testMode bool) bool {
 	if testMode {
 		return false
@@ -25,13 +33,7 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 		return false
 	}
 
-	mode := strings.ToLower(strings.TrimSpace(p.Info.RequiresMode))
-	if mode == "" {
-		mode = "strict"
-	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
-	}
+	mode := normalizeRequiresMode(p.Info.RequiresMode)
 
 	if len(fingerTagsByKey) == 0 {
 		return mode == "strict"
@@ -58,13 +60,7 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 }
 
 func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[string]struct{}, targetTags map[string]struct{}, pocTags map[string]struct{}) bool {
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" {
-		mode = "strict"
-	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
-	}
+	mode = normalizeRequiresMode(mode)
 	if len(globalFingerTags) == 0 || len(pocTags) == 0 {
 		return false
 	}
