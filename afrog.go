@@ -176,14 +176,14 @@ type SDKOptions struct {
 	Headers []string
 
 	// ========== OOB配置 ==========
-	EnableOOB      bool   // 是否启用OOB检测 (默认: false)
-	OOB            string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
-	OOBKey         string // OOB API密钥
-	OOBDomain      string // OOB域名
-	OOBApiUrl      string // OOB API地址
-	OOBHttpUrl     string // OOB HTTP地址
-	OOBRateLimit   int
-	OOBConcurrency int
+	EnableOOB          bool   // 是否启用OOB检测 (默认: false)
+	OOB                string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
+	OOBKey             string // OOB API密钥
+	OOBDomain          string // OOB域名
+	OOBApiUrl          string // OOB API地址
+	OOBHttpUrl         string // OOB HTTP地址
+	OOBRateLimit       int
+	OOBConcurrency     int
 	OOBFinalizeTimeout int
 
 	// ========== 输出配置 ==========

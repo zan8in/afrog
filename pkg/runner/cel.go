@@ -262,7 +262,7 @@ func NewCustomLib() *CustomLib {
 		ruleFuncs: make(map[string]bool),
 	}
 	reg := types.NewEmptyRegistry()
-	c.baseEnvOptions = ReadComplieOptions(reg)
+	c.baseEnvOptions = ReadCompileOptions(reg)
 	c.baseProgramOptions = ReadProgramOptions(reg)
 	return c
 }

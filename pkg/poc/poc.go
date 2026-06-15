@@ -688,14 +688,14 @@ func MigrateLegacyPocs(root string) (MigrateReport, error) {
 }
 
 var (
-	reOobWaitObjCall       = regexp.MustCompile(`\boobWait\s*\(\s*oob\s*,\s*`)
-	reOobCheckObjCall      = regexp.MustCompile(`\boobCheck\s*\(\s*oob\s*,\s*`)
-	reOobCheckTokenObjCall = regexp.MustCompile(`\boobCheckToken\s*\(\s*oob\s*,\s*`)
-	reOobCheckLeadSpace    = regexp.MustCompile(`\boobCheck\s*\(\s+`)
+	reOobWaitObjCall         = regexp.MustCompile(`\boobWait\s*\(\s*oob\s*,\s*`)
+	reOobCheckObjCall        = regexp.MustCompile(`\boobCheck\s*\(\s*oob\s*,\s*`)
+	reOobCheckTokenObjCall   = regexp.MustCompile(`\boobCheckToken\s*\(\s*oob\s*,\s*`)
+	reOobCheckLeadSpace      = regexp.MustCompile(`\boobCheck\s*\(\s+`)
 	reOobCheckTokenLeadSpace = regexp.MustCompile(`\boobCheckToken\s*\(\s+`)
-	reOobDNSTpl            = regexp.MustCompile(`\{\{\s*oobDNS\s*\}\}`)
-	reOobHTTPTpl           = regexp.MustCompile(`\{\{\s*oobHTTP\s*\}\}`)
-	reOobFilterTpl         = regexp.MustCompile(`\{\{\s*oobFilter\s*\}\}`)
+	reOobDNSTpl              = regexp.MustCompile(`\{\{\s*oobDNS\s*\}\}`)
+	reOobHTTPTpl             = regexp.MustCompile(`\{\{\s*oobHTTP\s*\}\}`)
+	reOobFilterTpl           = regexp.MustCompile(`\{\{\s*oobFilter\s*\}\}`)
 
 	reWordOobDNS    = regexp.MustCompile(`\boobDNS\b`)
 	reWordOobHTTP   = regexp.MustCompile(`\boobHTTP\b`)
