@@ -151,6 +151,7 @@ func celSafeIdent(s string) string {
 func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
+			gologger.Debug().Msgf("panic recovered in Check: %v", r)
 			c.Result.IsVul = false
 		}
 	}()

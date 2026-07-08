@@ -115,7 +115,7 @@ func testProxyConnection(proxyURL url.URL, timeoutDelay int) error {
 	timeout := time.Duration(timeoutDelay) * time.Second
 	_, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", proxyURL.Hostname(), proxyURL.Port()), timeout)
 	if err != nil {
-		fmt.Println("testproxy error: ", err, proxyURL)
+		fmt.Println("testproxy error: ", err, proxyURL.Redacted())
 		return err
 	}
 	return nil

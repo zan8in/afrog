@@ -12,7 +12,6 @@ import (
 
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
 
-	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/curated/service"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
@@ -21,8 +20,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
 	"github.com/zan8in/afrog/v3/pkg/targets"
-	"github.com/zan8in/afrog/v3/pkg/utils"
-	"github.com/zan8in/afrog/v3/pocs"
 )
 
 // SDKScanner SDK版本的扫描器，专为库调用优化
@@ -94,6 +91,17 @@ type ScanStats struct {
 	TotalScans     int
 	CompletedScans int32
 	FoundVulns     int32
+}
+
+// sendOrDrop sends a value to a channel without blocking.
+// If the channel is full or ctx is cancelled, the value is dropped.
+func sendOrDrop[T any](ch chan T, v T, ctx context.Context) {
+	defer func() { _ = recover() }()
+	select {
+	case ch <- v:
+	case <-ctx.Done():
+	default:
+	}
 }
 
 type PortScanResult struct {
@@ -176,14 +184,14 @@ type SDKOptions struct {
 	Headers []string
 
 	// ========== OOB配置 ==========
-	EnableOOB      bool   // 是否启用OOB检测 (默认: false)
-	OOB            string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
-	OOBKey         string // OOB API密钥
-	OOBDomain      string // OOB域名
-	OOBApiUrl      string // OOB API地址
-	OOBHttpUrl     string // OOB HTTP地址
-	OOBRateLimit   int
-	OOBConcurrency int
+	EnableOOB          bool   // 是否启用OOB检测 (默认: false)
+	OOB                string // OOB适配器类型: ceyeio, dnslogcn, alphalog, xray, revsuit
+	OOBKey             string // OOB API密钥
+	OOBDomain          string // OOB域名
+	OOBApiUrl          string // OOB API地址
+	OOBHttpUrl         string // OOB HTTP地址
+	OOBRateLimit       int
+	OOBConcurrency     int
 	OOBFinalizeTimeout int
 
 	// ========== 输出配置 ==========
@@ -304,9 +312,9 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	}
 
 	// 创建runner
-	r, err := createSDKRunner(options)
+	r, err := runner.NewRunner(options, runner.WithSDKMode())
 	if err != nil {
-		return nil, fmt.Errorf("创建扫描引擎失败: %w", err)
+		return nil, fmt.Errorf("failed to create scan engine: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -339,16 +347,7 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		scanner.openPortsMu.Unlock()
 
 		if scanner.PortChan != nil {
-			ch := scanner.PortChan
-			func() {
-				defer func() { _ = recover() }()
-				select {
-				case ch <- PortScanResult{Host: host, Port: port}:
-				case <-scanner.ctx.Done():
-					return
-				default:
-				}
-			}()
+			sendOrDrop(scanner.PortChan, PortScanResult{Host: host, Port: port}, scanner.ctx)
 		}
 
 		if scanner.OnPort != nil {
@@ -362,16 +361,7 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 			return
 		}
 		if scanner.HostChan != nil {
-			ch := scanner.HostChan
-			func() {
-				defer func() { _ = recover() }()
-				select {
-				case ch <- HostDiscoveryResult{Host: host}:
-				case <-scanner.ctx.Done():
-					return
-				default:
-				}
-			}()
+			sendOrDrop(scanner.HostChan, HostDiscoveryResult{Host: host}, scanner.ctx)
 		}
 	}
 
@@ -386,16 +376,7 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 			PoweredBy: strings.TrimSpace(meta.PoweredBy),
 		}
 		if scanner.WebProbeChan != nil {
-			ch := scanner.WebProbeChan
-			func() {
-				defer func() { _ = recover() }()
-				select {
-				case ch <- r:
-				case <-scanner.ctx.Done():
-					return
-				default:
-				}
-			}()
+			sendOrDrop(scanner.WebProbeChan, r, scanner.ctx)
 		}
 		if scanner.OnWebProbe != nil {
 			scanner.OnWebProbe(r)
@@ -440,16 +421,7 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		scanner.phases[phase] = pp
 		scanner.phaseMu.Unlock()
 		if scanner.PhaseProgressChan != nil {
-			ch := scanner.PhaseProgressChan
-			func() {
-				defer func() { _ = recover() }()
-				select {
-				case ch <- pp:
-				case <-scanner.ctx.Done():
-					return
-				default:
-				}
-			}()
+			sendOrDrop(scanner.PhaseProgressChan, pp, scanner.ctx)
 		}
 	}
 
@@ -458,7 +430,6 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 		scanner.stats.TotalPocs = info.TotalPocs
 		scanner.stats.TotalScans = info.TotalScans
 		if scanner.ScanInfoChan != nil {
-			ch := scanner.ScanInfoChan
 			up := ScanInfoUpdate{
 				TotalTargets: info.TotalTargets,
 				Targets:      append([]string(nil), info.Targets...),
@@ -467,15 +438,7 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 				OOBEnabled:   info.OOBEnabled,
 				OOBStatus:    info.OOBStatus,
 			}
-			func() {
-				defer func() { _ = recover() }()
-				select {
-				case ch <- up:
-				case <-scanner.ctx.Done():
-					return
-				default:
-				}
-			}()
+			sendOrDrop(scanner.ScanInfoChan, up, scanner.ctx)
 		}
 	}
 
@@ -483,50 +446,16 @@ func NewSDKScanner(opts *SDKOptions) (*SDKScanner, error) {
 	pocSlice := options.CreatePocList()
 	fingerprintPocs, pocSlice := options.FingerprintPoCs(pocSlice)
 
-	allTargets := make([]string, 0, options.Targets.Len())
-	for _, t := range options.Targets.List() {
-		s, ok := t.(string)
-		if !ok {
-			continue
-		}
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		allTargets = append(allTargets, s)
-	}
+	allTargets := options.TargetStrings()
 	idx := targets.BuildTargetIndex(allTargets)
 	netTargets := idx.NetTargets()
-
-	isNetOnlyPoc := func(p poc.Poc) bool {
-		hasHTTP := false
-		hasNet := false
-		hasGo := false
-		for _, rm := range p.Rules {
-			t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
-			switch t {
-			case "", poc.HTTP_Type, poc.HTTPS_Type:
-				hasHTTP = true
-			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
-				hasNet = true
-			case poc.GO_Type:
-				hasGo = true
-			default:
-				hasHTTP = true
-			}
-		}
-		if hasGo {
-			return false
-		}
-		return hasNet && !hasHTTP
-	}
 
 	taskCount := 0
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
 		taskCount += len(fingerprintPocs) * len(allTargets)
 	}
 	for _, p := range pocSlice {
-		if !isNetOnlyPoc(p) {
+		if !p.IsNetOnly() {
 			taskCount += len(allTargets)
 		} else {
 			taskCount += len(netTargets)
@@ -638,16 +567,7 @@ func (s *SDKScanner) run() error {
 
 			// 流式输出
 			if s.ResultChan != nil {
-				ch := s.ResultChan
-				func() {
-					defer func() { _ = recover() }()
-					select {
-					case ch <- r:
-					case <-s.ctx.Done():
-						return
-					default:
-					}
-				}()
+				sendOrDrop(s.ResultChan, r, s.ctx)
 			}
 
 			// 如果设置了发现漏洞即停止
@@ -993,7 +913,7 @@ func (s *SDKScanner) checkOOBConnection() (bool, string) {
 			return false, fmt.Sprintf("%s (连接失败)", serviceName)
 		}
 	} else {
-		return false, fmt.Sprintf("%s (初始化失败: %v)", serviceName, err)
+		return false, fmt.Sprintf("%s (connection failed, check config)", serviceName)
 	}
 }
 
@@ -1112,7 +1032,7 @@ func applyCuratedMount(options *config.Options) error {
 
 	dir, err := svc.Mount(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "curated mount failed: %s\n", strings.TrimSpace(err.Error()))
+		fmt.Fprintln(os.Stderr, "curated mount failed")
 		return nil
 	}
 	if strings.TrimSpace(dir) != "" {
@@ -1168,49 +1088,7 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 		CuratedForceUpdate:             opts.CuratedForceUpdate,
 	}
 
-	if options.MaxRespBodySize <= 0 {
-		options.MaxRespBodySize = 2
-	}
-	if strings.TrimSpace(options.FingerprintFilterMode) == "" {
-		options.FingerprintFilterMode = "strict"
-	}
-	if options.OOBRateLimit == 0 {
-		options.OOBRateLimit = 25
-	}
-	if options.OOBConcurrency == 0 {
-		options.OOBConcurrency = 25
-	}
-	if options.ReqLimitPerTarget == 0 {
-		if options.Polite {
-			options.ReqLimitPerTarget = 5
-		} else if options.Balanced {
-			options.ReqLimitPerTarget = 15
-		} else if options.Aggressive {
-			options.ReqLimitPerTarget = 50
-		} else if options.AutoReqLimit {
-			baseRate := options.RateLimit
-			if baseRate <= 0 {
-				baseRate = 150
-			}
-			r := baseRate / 10
-			if r < 5 {
-				r = 5
-			}
-			if r > 15 {
-				r = 15
-			}
-			con := options.Concurrency
-			if con <= 0 {
-				con = 1
-			}
-			if con >= 100 && r > 8 {
-				r = 8
-			} else if con >= 50 && r > 12 {
-				r = 12
-			}
-			options.ReqLimitPerTarget = r
-		}
-	}
+	options.ApplyDefaults()
 
 	if len(opts.Headers) > 0 {
 		for _, h := range opts.Headers {
@@ -1230,35 +1108,8 @@ func convertSDKOptions(opts *SDKOptions) *config.Options {
 
 // validateSDKConfig SDK配置验证
 func validateSDKConfig(options *config.Options) error {
-	limitModeCount := 0
-	if options.ReqLimitPerTarget > 0 {
-		limitModeCount++
-	}
-	if options.AutoReqLimit {
-		limitModeCount++
-	}
-	if options.Polite {
-		limitModeCount++
-	}
-	if options.Balanced {
-		limitModeCount++
-	}
-	if options.Aggressive {
-		limitModeCount++
-	}
-	if limitModeCount > 1 {
-		return errors.New("only one of ReqLimitPerTarget/AutoReqLimit/Polite/Balanced/Aggressive can be used")
-	}
-	if options.ReqLimitPerTarget < 0 {
-		return errors.New("ReqLimitPerTarget must be >= 0")
-	}
-
-	options.FingerprintFilterMode = strings.ToLower(strings.TrimSpace(options.FingerprintFilterMode))
-	if options.FingerprintFilterMode == "" {
-		options.FingerprintFilterMode = "strict"
-	}
-	if options.FingerprintFilterMode != "strict" && options.FingerprintFilterMode != "opportunistic" {
-		options.FingerprintFilterMode = "strict"
+	if err := options.ValidateRateLimitModes(); err != nil {
+		return err
 	}
 
 	// 验证目标
@@ -1298,79 +1149,4 @@ func validateSDKConfig(options *config.Options) error {
 	}
 
 	return nil
-}
-
-// createSDKRunner 创建SDK专用的Runner
-func createSDKRunner(options *config.Options) (*runner.Runner, error) {
-	// 初始化HTTP客户端
-	retryhttpclient.Init(&retryhttpclient.Options{
-		Proxy:             options.Proxy,
-		Timeout:           options.Timeout,
-		Retries:           options.Retries,
-		MaxRespBodySize:   options.MaxRespBodySize,
-		ReqLimitPerTarget: options.ReqLimitPerTarget,
-		DefaultAccept:     options.DefaultAccept,
-	})
-
-	// 处理目标
-	seen := make(map[string]struct{})
-
-	// 添加命令行目标
-	if len(options.Target) > 0 {
-		for _, rawTarget := range options.Target {
-			trimmedTarget := strings.TrimSpace(rawTarget)
-			if _, ok := seen[trimmedTarget]; !ok {
-				seen[trimmedTarget] = struct{}{}
-				options.Targets.Append(trimmedTarget)
-			}
-		}
-	}
-
-	// 从文件读取目标
-	if len(options.TargetsFile) > 0 {
-		allTargets, err := utils.ReadFileLineByLine(options.TargetsFile)
-		if err != nil {
-			return nil, err
-		}
-		for _, rawTarget := range allTargets {
-			trimmedTarget := strings.TrimSpace(rawTarget)
-			if len(trimmedTarget) > 0 {
-				if _, ok := seen[trimmedTarget]; !ok {
-					seen[trimmedTarget] = struct{}{}
-					options.Targets.Append(trimmedTarget)
-				}
-			}
-		}
-	}
-
-	// 验证目标
-	if options.Targets.Len() == 0 {
-		return nil, errors.New("未找到有效目标")
-	}
-
-	// 设置POC目录
-	if options.PocFile != "" {
-		options.PocsDirectory.Set(options.PocFile)
-	}
-	for _, p := range options.AppendPoc {
-		options.PocsDirectory.Set(p)
-	}
-
-	// 清空Target切片
-	options.Target = nil
-
-	// 创建Runner
-	r, err := runner.NewRunner(options)
-	if err != nil {
-		return nil, err
-	}
-
-	// SDK模式特殊处理
-	c := catalog.New(options.PocsDirectory.String())
-	allPocsYamlSlice := c.GetPocsPath(options.PocsDirectory)
-	if len(allPocsYamlSlice) == 0 && len(pocs.EmbedFileList) == 0 {
-		return nil, errors.New("未找到POC文件")
-	}
-
-	return r, nil
 }

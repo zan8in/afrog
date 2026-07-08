@@ -344,7 +344,7 @@ func ensureCuratedSection(configPath string, curated Curated) error {
 			lines = append(lines, "")
 		}
 		lines = append(lines, curatedSectionLines(0, curated)...)
-		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0600)
 	}
 
 	baseIndent := leadingSpaces(lines[curatedIdx])
@@ -386,7 +386,7 @@ func ensureCuratedSection(configPath string, curated Curated) error {
 	out = append(out, lines[:end]...)
 	out = append(out, insert...)
 	out = append(out, lines[end:]...)
-	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0600)
 }
 
 func ensureInteractshSection(configPath string, interactsh Interactsh) error {
@@ -414,7 +414,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 			lines = append(lines, "")
 		}
 		lines = append(lines, reverseInteractshSectionLines(0, interactsh)...)
-		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0600)
 	}
 
 	baseIndent := leadingSpaces(lines[reverseIdx])
@@ -451,7 +451,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 		}
 		out = append(out, insert...)
 		out = append(out, lines[reverseEnd:]...)
-		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0600)
 	}
 
 	interactshEnd := reverseEnd
@@ -492,7 +492,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 	out = append(out, lines[:interactshEnd]...)
 	out = append(out, insert...)
 	out = append(out, lines[interactshEnd:]...)
-	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0600)
 }
 
 func reverseInteractshSectionLines(baseIndent int, interactsh Interactsh) []string {
@@ -599,7 +599,7 @@ func WriteConfiguration(config *Config, configFile string) error {
 	// 	return err
 	// }
 
-	file, err := os.OpenFile(afrogConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(afrogConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
