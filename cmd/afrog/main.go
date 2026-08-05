@@ -313,6 +313,13 @@ func main() {
 				rst.FullTarget = rst.Target
 			}
 
+			if len(options.Severity) > 0 {
+				sev := strings.ToLower(strings.TrimSpace(rst.PocInfo.Info.Severity))
+				if !stringsInSlice(sev, options.SeverityKeywords) {
+					continue
+				}
+			}
+
 			lock.Lock()
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 
@@ -381,6 +388,13 @@ func main() {
 		}
 
 		if result.IsVul {
+			if len(options.Severity) > 0 {
+				sev := strings.ToLower(strings.TrimSpace(result.PocInfo.Info.Severity))
+				if !stringsInSlice(sev, options.SeverityKeywords) {
+					return
+				}
+			}
+
 			lock.Lock()
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 
@@ -538,4 +552,13 @@ func expandTildePath(v string) string {
 		return filepath.Join(home, strings.TrimPrefix(s, "~"+sep))
 	}
 	return filepath.Clean(s)
+}
+
+func stringsInSlice(target string, slice []string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(target, s) {
+			return true
+		}
+	}
+	return false
 }
