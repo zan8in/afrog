@@ -683,6 +683,202 @@ func TestCompat_SecondRunIsRejected(t *testing.T) {
 	}
 }
 
+// A field can sit on SDKOptions, compile fine, and still never reach the
+// engine. That failure is invisible: the caller sets it, the scan runs, and
+// the setting is ignored. This pins every field that maps onto an engine
+// setting to the value the engine actually ends up with.
+func TestCompat_EveryOptionReachesTheEngine(t *testing.T) {
+	srv := newCompatServer(t)
+	dir := t.TempDir()
+	writeCompatPoc(t, dir, "reach")
+
+	opts := NewSDKOptions()
+	opts.Silent = true
+	opts.Targets = []string{srv.URL}
+	opts.PocFile = dir
+	opts.DisableFingerprint = true
+
+	opts.Concurrency = 7
+	opts.RateLimit = 11
+	opts.Timeout = 13
+	opts.Retries = 4
+	opts.MaxHostError = 9
+	opts.MaxRespBodySize = 5
+	opts.BruteMaxRequests = 123
+	opts.DefaultAccept = false
+	opts.ReqLimitPerTarget = 6
+	opts.Smart = true
+	opts.EnableWebProbe = true
+	opts.Search = "reach"
+	opts.Severity = "info"
+	opts.ExcludePocs = []string{"nope"}
+	opts.Headers = []string{"X-Test: 1"}
+	opts.VulnerabilityScannerBreakpoint = true
+	opts.FingerprintFilterMode = "opportunistic"
+	opts.Proxy = ""
+
+	scanner, err := NewSDKScanner(opts)
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	in := scanner.Scanner().EngineOptions()
+	checks := []struct {
+		field string
+		got   any
+		want  any
+	}{
+		{"Concurrency", in.Concurrency, 7},
+		{"RateLimit", in.RateLimit, 11},
+		{"Timeout", in.Timeout, 13},
+		{"Retries", in.Retries, 4},
+		{"MaxHostError", in.MaxHostError, 9},
+		{"MaxRespBodySize", in.MaxRespBodySize, 5},
+		{"BruteMaxRequests", in.BruteMaxRequests, 123},
+		{"DefaultAccept", in.DefaultAccept, false},
+		{"ReqLimitPerTarget", in.ReqLimitPerTarget, 6},
+		{"Smart", in.Smart, true},
+		{"EnableWebProbe", in.EnableWebProbe, true},
+		{"Search", in.Search, "reach"},
+		{"Severity", in.Severity, "info"},
+		{"DisableFingerprint", in.DisableFingerprint, true},
+		{"FingerprintFilterMode", in.FingerprintFilterMode, "opportunistic"},
+		{"VulnerabilityScannerBreakpoint", in.VulnerabilityScannerBreakpoint, true},
+		{"PocPathsOnly", in.PocPathsOnly, true}, // PocFile keeps its exclusive meaning
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("SDKOptions.%s did not reach the engine: got %v, want %v", c.field, c.got, c.want)
+		}
+	}
+	if len(in.Header) != 1 {
+		t.Errorf("Headers did not reach the engine: %v", in.Header)
+	}
+	if len(in.ExcludePocs) != 1 {
+		t.Errorf("ExcludePocs did not reach the engine: %v", in.ExcludePocs)
+	}
+}
+
+// The port pre-scan block is a nested struct in the old options, so each of
+// its fields needs its own mapping.
+func TestCompat_PortScanOptionsReachTheEngine(t *testing.T) {
+	srv := newCompatServer(t)
+	opts := newCompatOptions(t, srv.URL)
+	opts.PortScan = true
+	opts.PSPorts = "80,443"
+	opts.PSRateLimit = 33
+	opts.PSTimeout = 700
+	opts.PSRetries = 2
+	opts.PSSkipDiscovery = true
+	opts.PSS4Chunk = 250
+
+	scanner, err := NewSDKScanner(opts)
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	in := scanner.Scanner().EngineOptions()
+	checks := []struct {
+		field string
+		got   any
+		want  any
+	}{
+		{"PortScan", in.PortScan, true},
+		{"PSPorts", in.PSPorts, "80,443"},
+		{"PSRateLimit", in.PSRateLimit, 33},
+		{"PSTimeout", in.PSTimeout, 700},
+		{"PSRetries", in.PSRetries, 2},
+		{"PSSkipDiscovery", in.PSSkipDiscovery, true},
+		{"PSS4Chunk", in.PSS4Chunk, 250},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("SDKOptions.%s did not reach the engine: got %v, want %v", c.field, c.got, c.want)
+		}
+	}
+}
+
+// The OOB block likewise has to arrive field by field.
+func TestCompat_OOBOptionsReachTheEngine(t *testing.T) {
+	srv := newCompatServer(t)
+	opts := newCompatOptions(t, srv.URL)
+	opts.EnableOOB = true
+	opts.OOB = "ceyeio"
+	opts.OOBKey = "test-key"
+	opts.OOBDomain = "test.example.com"
+	opts.OOBRateLimit = 8
+	opts.OOBConcurrency = 9
+	opts.OOBFinalizeTimeout = 15
+	opts.OOBPollInterval = 4
+	opts.OOBHitRetention = 6
+
+	scanner, err := NewSDKScanner(opts)
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	in := scanner.Scanner().EngineOptions()
+	checks := []struct {
+		field string
+		got   any
+		want  any
+	}{
+		{"EnableOOB", in.EnableOOB, true},
+		{"OOB", in.OOB, "ceyeio"},
+		{"OOBKey", in.OOBKey, "test-key"},
+		{"OOBDomain", in.OOBDomain, "test.example.com"},
+		{"OOBRateLimit", in.OOBRateLimit, 8},
+		{"OOBConcurrency", in.OOBConcurrency, 9},
+		{"OOBFinalizeTimeout", in.OOBFinalizeTimeout, 15},
+		{"OOBPollInterval", in.OOBPollInterval, 4},
+		{"OOBHitRetention", in.OOBHitRetention, 6},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("SDKOptions.%s did not reach the engine: got %v, want %v", c.field, c.got, c.want)
+		}
+	}
+	if !scanner.IsOOBEnabled() {
+		t.Error("IsOOBEnabled = false with OOB configured")
+	}
+}
+
+// The capabilities added after the facade must reach the engine too.
+func TestCompat_NewOptionsReachTheEngine(t *testing.T) {
+	srv := newCompatServer(t)
+	opts := newCompatOptions(t, srv.URL)
+	opts.TaskHardTimeoutSec = 45
+	opts.TaskSmartTimeout = true
+	opts.MonitorTargets = true
+	opts.ResumeFile = filepath.Join(t.TempDir(), "reach.afg")
+
+	scanner, err := NewSDKScanner(opts)
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	in := scanner.Scanner().EngineOptions()
+	checks := []struct {
+		field string
+		got   any
+		want  any
+	}{
+		{"TaskHardTimeoutSec", in.TaskHardTimeoutSec, 45},
+		{"TaskSmartTimeout", in.TaskSmartTimeout, true},
+		{"MonitorTargets", in.MonitorTargets, true},
+		{"Resume", in.Resume, opts.ResumeFile},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("SDKOptions.%s did not reach the engine: got %v, want %v", c.field, c.got, c.want)
+		}
+	}
+}
+
 // The facade must expose the current SDK for callers that want to migrate
 // gradually.
 func TestCompat_ScannerAccessorExposesTheModernAPI(t *testing.T) {

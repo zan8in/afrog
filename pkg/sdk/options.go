@@ -686,6 +686,28 @@ func WithMaxRespBodySize(mb int) Option {
 	}
 }
 
+// WithBruteMaxRequests caps how many requests a brute-force rule may send.
+// Zero disables the cap. Exceeding it sets Exchange.BruteTruncated.
+func WithBruteMaxRequests(n int) Option {
+	return func(o *Options) error {
+		if n < 0 {
+			return fmt.Errorf("%w: brute max requests must be >= 0, got %d", ErrInvalidOptions, n)
+		}
+		o.BruteMaxRequests = n
+		return nil
+	}
+}
+
+// WithDefaultAccept controls whether requests carry a default Accept header.
+// It is enabled by default; disable it for targets that behave differently
+// when one is present.
+func WithDefaultAccept(enabled bool) Option {
+	return func(o *Options) error {
+		o.DefaultAccept = enabled
+		return nil
+	}
+}
+
 // WithRequestLimitPerTarget caps concurrent requests per target.
 func WithRequestLimitPerTarget(n int) Option {
 	return func(o *Options) error {

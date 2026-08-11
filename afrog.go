@@ -338,6 +338,10 @@ func (s *SDKScanner) build() (*sdk.Scanner, error) {
 	if o.MaxHostError >= 0 {
 		options = append(options, sdk.WithMaxHostError(o.MaxHostError))
 	}
+	if o.BruteMaxRequests >= 0 {
+		options = append(options, sdk.WithBruteMaxRequests(o.BruteMaxRequests))
+	}
+	options = append(options, sdk.WithDefaultAccept(o.DefaultAccept))
 	if strings.TrimSpace(o.TargetsFile) != "" {
 		options = append(options, sdk.WithTargetsFile(o.TargetsFile))
 	}

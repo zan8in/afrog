@@ -899,6 +899,16 @@ func (s *Scanner) PocDiagnostics() []config.PocLoadError {
 	return out
 }
 
+// EngineOptions returns the engine configuration this scanner resolved from
+// its options.
+//
+// This is an escape hatch for advanced integrations — notably the
+// backward-compatible facade in the root package, which uses it to verify that
+// every legacy option still reaches the engine. Treat the result as read-only:
+// the scanner keeps using it, and config.Options is an internal detail whose
+// shape may change between releases.
+func (s *Scanner) EngineOptions() *config.Options { return s.internal }
+
 // CuratedError reports why the optional curated PoC source failed to mount.
 // It is never fatal; nil means the source mounted or was disabled.
 func (s *Scanner) CuratedError() error { return s.curatedErr }
