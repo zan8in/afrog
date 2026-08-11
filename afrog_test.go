@@ -5,12 +5,49 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/result"
 )
+
+func captureStdout(t *testing.T) (*os.File, *os.File, *os.File) {
+	t.Helper()
+	stdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+	return stdout, r, w
+}
+
+func restoreStdout(t *testing.T, stdout, r, w *os.File) string {
+	t.Helper()
+	os.Stdout = stdout
+	_ = w.Close()
+
+	var sb strings.Builder
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		buf := make([]byte, 4096)
+		for {
+			n, err := r.Read(buf)
+			if n > 0 {
+				sb.Write(buf[:n])
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	<-done
+	_ = r.Close()
+	return sb.String()
+}
 
 const compatToken = "AFROG_COMPAT_TOKEN"
 
@@ -425,6 +462,224 @@ func TestCompat_NewCapabilitiesAreReachable(t *testing.T) {
 	}
 	if _, err := os.Stat(opts.ResumeFile); err != nil {
 		t.Errorf("resume file was not written: %v", err)
+	}
+}
+
+// Pause, Resume and IsPaused must still gate the scan.
+func TestCompat_PauseResume(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	if scanner.IsPaused() {
+		t.Error("IsPaused = true before anything happened")
+	}
+
+	scanner.Pause()
+	if !scanner.IsPaused() {
+		t.Error("IsPaused = false after Pause")
+	}
+
+	scanner.Resume()
+	if scanner.IsPaused() {
+		t.Error("IsPaused = true after Resume")
+	}
+
+	// The scan must still complete normally after a pause/resume cycle.
+	if err := scanner.Run(); err != nil {
+		t.Fatalf("Run after pause/resume: %v", err)
+	}
+	if got := scanner.GetVulnerabilityCount(); got != 1 {
+		t.Errorf("found %d results, want 1", got)
+	}
+}
+
+// IsStopping reflects Stop, and a stopped scan must not hang.
+func TestCompat_StopAndIsStopping(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	if scanner.IsStopping() {
+		t.Error("IsStopping = true before Stop")
+	}
+
+	if err := scanner.RunAsync(); err != nil {
+		t.Fatalf("RunAsync: %v", err)
+	}
+	scanner.Stop()
+
+	if !scanner.IsStopping() {
+		t.Error("IsStopping = false after Stop")
+	}
+
+	done := make(chan struct{})
+	go func() { defer close(done); scanner.Close() }()
+	select {
+	case <-done:
+	case <-time.After(60 * time.Second):
+		t.Fatal("Close blocked after Stop")
+	}
+}
+
+// GetOpenPorts returns an empty map rather than nil when no pre-scan ran, so
+// callers can range over it unconditionally.
+func TestCompat_GetOpenPorts(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	ports := scanner.GetOpenPorts()
+	if ports == nil {
+		t.Fatal("GetOpenPorts returned nil")
+	}
+	if len(ports) != 0 {
+		t.Errorf("GetOpenPorts returned %d hosts without a port pre-scan", len(ports))
+	}
+
+	if err := scanner.Run(); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := scanner.GetOpenPorts(); got == nil {
+		t.Error("GetOpenPorts returned nil after the scan")
+	}
+}
+
+// SetProxy re-initialises the shared HTTP client, so it must not break a scan
+// when pointed back at no proxy.
+func TestCompat_SetProxy(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	scanner.SetProxy("")
+	if scanner.opts.Proxy != "" {
+		t.Errorf("Proxy = %q, want empty", scanner.opts.Proxy)
+	}
+
+	if err := scanner.Run(); err != nil {
+		t.Fatalf("Run after SetProxy: %v", err)
+	}
+	if got := scanner.GetVulnerabilityCount(); got != 1 {
+		t.Errorf("found %d results, want 1", got)
+	}
+}
+
+// The OOB helpers must report "not configured" without probing anything when
+// OOB was never enabled.
+func TestCompat_OOBReportsDisabledWhenUnconfigured(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	if scanner.IsOOBEnabled() {
+		t.Error("IsOOBEnabled = true without any OOB configuration")
+	}
+	enabled, status := scanner.GetOOBStatus()
+	if enabled {
+		t.Error("GetOOBStatus reported enabled without configuration")
+	}
+	if strings.TrimSpace(status) == "" {
+		t.Error("GetOOBStatus returned an empty description")
+	}
+}
+
+// IsOOBEnabled keeps its original shape: the explicit flag wins, and failing
+// that a configured adapter plus a key or domain counts as enabled.
+func TestCompat_IsOOBEnabledMatchesOriginalRules(t *testing.T) {
+	tests := []struct {
+		name string
+		opts *SDKOptions
+		want bool
+	}{
+		{"nothing set", &SDKOptions{}, false},
+		{"explicit flag", &SDKOptions{EnableOOB: true}, true},
+		{"adapter only", &SDKOptions{OOB: "ceyeio"}, false},
+		{"adapter and key", &SDKOptions{OOB: "ceyeio", OOBKey: "k"}, true},
+		{"adapter and domain", &SDKOptions{OOB: "ceyeio", OOBDomain: "d"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &SDKScanner{opts: tt.opts}
+			if got := s.IsOOBEnabled(); got != tt.want {
+				t.Errorf("IsOOBEnabled = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Run prints the scan summary the way the original SDK did, and Silent turns
+// that off for callers that want the quiet behaviour of the new API.
+func TestCompat_PrintsSummaryUnlessSilent(t *testing.T) {
+	srv := newCompatServer(t)
+
+	tests := []struct {
+		name       string
+		silent     bool
+		wantOutput bool
+	}{
+		{"default prints", false, true},
+		{"silent is quiet", true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := newCompatOptions(t, srv.URL)
+			opts.Silent = tt.silent
+
+			scanner, err := NewSDKScanner(opts)
+			if err != nil {
+				t.Fatalf("NewSDKScanner: %v", err)
+			}
+			defer scanner.Close()
+
+			stdout, r, w := captureStdout(t)
+			runErr := scanner.Run()
+			output := restoreStdout(t, stdout, r, w)
+
+			if runErr != nil {
+				t.Fatalf("Run: %v", runErr)
+			}
+			if tt.wantOutput && !strings.Contains(output, "扫描信息") {
+				t.Errorf("expected the scan summary on stdout, got:\n%s", output)
+			}
+			if !tt.wantOutput && output != "" {
+				t.Errorf("Silent still wrote to stdout:\n%s", output)
+			}
+		})
+	}
+}
+
+// A second Run on the same scanner must report the single-use error rather
+// than silently doing nothing.
+func TestCompat_SecondRunIsRejected(t *testing.T) {
+	srv := newCompatServer(t)
+	scanner, err := NewSDKScanner(newCompatOptions(t, srv.URL))
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer scanner.Close()
+
+	if err := scanner.Run(); err != nil {
+		t.Fatalf("first Run: %v", err)
+	}
+	if err := scanner.Run(); err == nil {
+		t.Error("second Run should have failed on a single-use scanner")
 	}
 }
 

@@ -1,5 +1,15 @@
 # Afrog SDK Usage Guide
 
+> ## ⚠️ Upgrade notice
+>
+> **This is a substantial change.** The SDK has been rebuilt as a dedicated `pkg/sdk` package with functional options and a `context`-driven lifecycle, and a number of defects were fixed along the way: leaked goroutines, data races, and PoCs being dropped without a word.
+>
+> **Migrating to `pkg/sdk` is recommended for both new and existing projects.** It is materially better on type safety, resource cleanup, error visibility and data completeness, and it is what the rest of this guide documents. See "Two APIs, one implementation" below for the mapping.
+>
+> **Existing code keeps working untouched.** The root package `github.com/zan8in/afrog/v3` still exposes the complete original surface (`NewSDKOptions`, `NewSDKScanner` and every method and field). Entry points and call patterns are **unchanged**; the improvements and fixes happen inside. We compared the root package's `go doc` output before and after item by item: **nothing was removed and no signature changed** — only optional fields were added.
+>
+> One old behaviour was corrected: setting `PocFile` and `AppendPoc` together used to drop `AppendPoc` silently, and both are now loaded. That is a bug fix, not an interface change.
+
 ## Overview
 
 The Afrog SDK is the Go API for embedding vulnerability scanning into your own programs. The import path is `github.com/zan8in/afrog/v3/pkg/sdk`.
