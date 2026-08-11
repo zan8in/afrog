@@ -15,6 +15,42 @@ Afrog SDK 是把漏洞扫描能力嵌入自己程序的 Go 接口，包路径为
 - **类型化错误** —— 使用 `errors.Is` 判断失败原因
 - **资源可控** —— `Close` 释放所有后台协程，无泄漏
 
+### 两套 API 共存
+
+| 包 | 入口 | 适用 |
+|---|---|---|
+| `github.com/zan8in/afrog/v3/pkg/sdk` | `sdk.New(ctx, opts...)` | 新代码，本文档主要介绍这套 |
+| `github.com/zan8in/afrog/v3` | `afrog.NewSDKScanner(opts)` | 已有集成，保持原样即可 |
+
+根包是旧 API 的兼容门面，内部委托给 `pkg/sdk`，因此**这次的缺陷修复和新能力对两套 API 同时生效**。旧写法无需改动：
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"https://example.com"}
+options.PocFile = pocPath
+options.Concurrency = 10
+
+scanner, err := afrog.NewSDKScanner(options)
+if err != nil {
+	log.Fatal(err)
+}
+defer scanner.Close()
+
+scanner.OnResult = func(r *result.Result) {
+	log.Printf("发现: %s", r.PocInfo.Id)
+}
+if err := scanner.Run(); err != nil {
+	log.Fatal(err)
+}
+results := scanner.GetResults()
+```
+
+`SDKOptions` 上新增了若干可选字段，把这次的新能力开放给旧写法：`PocPaths`/`PocPathsOnly`（glob 与追加语义）、`ResumeFile`（断点续扫）、`TaskHardTimeoutSec`/`TaskSmartTimeout`、`Cyberspace`/`Query`/`QueryCount`、`MonitorTargets`、`OOBPollInterval`/`OOBHitRetention`、`MaxStoredResults`、`RedactedHeaders`、`OnFailure`、`Silent`。留空则行为与以前完全一致。
+
+想逐步迁移的话，`scanner.Scanner()` 会返回底层的 `*sdk.Scanner`，可以直接用新 API 的流式订阅与诊断能力。
+
+有一处旧行为被修正：同时指定 `PocFile` 与 `AppendPoc` 时，旧版会静默丢弃 `AppendPoc`，现在两者都会加载。
+
 ## 安装
 
 ```bash

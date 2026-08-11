@@ -15,6 +15,42 @@ The Afrog SDK is the Go API for embedding vulnerability scanning into your own p
 - **Typed errors** — failures are matched with `errors.Is`
 - **Deterministic cleanup** — `Close` releases every background goroutine
 
+### Two APIs, one implementation
+
+| Package | Entry point | Use for |
+|---|---|---|
+| `github.com/zan8in/afrog/v3/pkg/sdk` | `sdk.New(ctx, opts...)` | New code. This guide covers it. |
+| `github.com/zan8in/afrog/v3` | `afrog.NewSDKScanner(opts)` | Existing integrations, unchanged |
+
+The root package is a compatibility facade that delegates to `pkg/sdk`, so **the fixes and features described here reach both APIs**. Existing code needs no changes:
+
+```go
+options := afrog.NewSDKOptions()
+options.Targets = []string{"https://example.com"}
+options.PocFile = pocPath
+options.Concurrency = 10
+
+scanner, err := afrog.NewSDKScanner(options)
+if err != nil {
+	log.Fatal(err)
+}
+defer scanner.Close()
+
+scanner.OnResult = func(r *result.Result) {
+	log.Printf("found: %s", r.PocInfo.Id)
+}
+if err := scanner.Run(); err != nil {
+	log.Fatal(err)
+}
+results := scanner.GetResults()
+```
+
+`SDKOptions` gained optional fields that expose the newer capabilities to the old style: `PocPaths`/`PocPathsOnly` (globs and append semantics), `ResumeFile`, `TaskHardTimeoutSec`/`TaskSmartTimeout`, `Cyberspace`/`Query`/`QueryCount`, `MonitorTargets`, `OOBPollInterval`/`OOBHitRetention`, `MaxStoredResults`, `RedactedHeaders`, `OnFailure` and `Silent`. Leaving them zero reproduces the previous behaviour exactly.
+
+To migrate gradually, `scanner.Scanner()` returns the underlying `*sdk.Scanner`, giving access to the streams and diagnostics of the current API.
+
+One old behaviour was corrected: setting `PocFile` and `AppendPoc` together used to drop `AppendPoc` silently; both are now loaded.
+
 ## Installation
 
 ```bash
