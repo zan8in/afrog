@@ -1,70 +1,96 @@
+// Vulnerability Scan Example / 漏洞扫描示例
+//
+// Demonstrates streaming results while the scan runs, and exiting non-zero when
+// something is found — the shape a CI security gate usually needs.
+//
+// 演示扫描过程中实时消费结果，并在发现漏洞时以非零状态码退出，
+// 这是 CI 安全门禁常见的用法。
+//
+// Run / 运行:
+//
+//	go run ./examples/vuln_scan -target https://example.com -search CVE-2024-1234
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"path/filepath"
+	"os"
+	"os/signal"
+	"sync"
 	"time"
 
-	"github.com/zan8in/afrog/v3"
+	"github.com/zan8in/afrog/v3/examples/internal/examplepath"
+	"github.com/zan8in/afrog/v3/pkg/sdk"
 )
 
 func main() {
-	// Create SDK scan options
-	options := afrog.NewSDKOptions()
+	target := flag.String("target", "https://scanme.sh", "target to scan")
+	pocs := examplepath.PocsFlag()
+	search := flag.String("search", "", "poc search keyword")
+	severity := flag.String("severity", "", "severity filter, e.g. \"high,critical\"")
+	failOnFind := flag.Bool("fail-on-find", false, "exit 1 when a vulnerability is found")
+	flag.Parse()
 
-	// Set scan target
-	options.Targets = []string{
-		"https://mmw.keshvacredit.com",
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	options := []sdk.Option{
+		sdk.WithTargets(*target),
+		sdk.WithPocPaths(*pocs),
+		sdk.WithPocPathsOnly(),
+		sdk.WithConcurrency(8),
+		sdk.WithRateLimit(30),
+		sdk.WithTimeout(12),
+	}
+	if *search != "" {
+		options = append(options, sdk.WithSearch(*search))
+	}
+	if *severity != "" {
+		options = append(options, sdk.WithSeverity(*severity))
 	}
 
-	// Set POC path (required)
-	pocPath, err := filepath.Abs("./pocs/afrog-pocs") // Adjust path as needed
+	scanner, err := sdk.New(ctx, options...)
 	if err != nil {
-		log.Fatalf("Failed to get POC path: %v", err)
-	}
-	options.PocFile = pocPath
-
-	// Configuration for scanning
-	options.Concurrency = 8
-	options.RateLimit = 30
-	options.Timeout = 12
-	options.Search = "CVE-2025-55182" // Search for specific POC
-	options.EnableStream = true
-
-	fmt.Println("Creating SDK scanner for vulnerability scanning...")
-
-	// Create scanner instance
-	scanner, err := afrog.NewSDKScanner(options)
-	if err != nil {
-		log.Fatalf("Failed to create scanner: %v", err)
+		log.Fatalf("create scanner / 创建扫描器失败: %v", err)
 	}
 	defer scanner.Close()
 
-	// Start async scan
-	err = scanner.RunAsync()
-	if err != nil {
-		log.Printf("Failed to start async scan: %v", err)
-		return
+	// Subscribe before Start so that no finding is missed.
+	// 在 Start 之前订阅，避免漏掉任何结果。
+	results := scanner.ResultStream()
+
+	if err := scanner.Start(ctx); err != nil {
+		log.Fatalf("start scan / 启动扫描失败: %v", err)
 	}
 
-	// Process results in real-time
-	startTime := time.Now()
-	var totalVulns int
+	start := time.Now()
+	found := 0
 
-	for res := range scanner.ResultChan {
-		if res == nil {
-			break
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// The stream closes when the scan finishes, so range terminates.
+		// 扫描结束时流会关闭，range 自然退出。
+		for r := range results {
+			found++
+			fmt.Printf("\n[%d] %s\n", found, r.FullTarget)
+			fmt.Printf("    poc:      %s (%s)\n", r.PocName, r.PocID)
+			fmt.Printf("    severity: %s\n", r.Severity)
 		}
+	}()
 
-		totalVulns++
-		fmt.Printf("\nVulnerability found:\n")
-		fmt.Printf("   Target: %s\n", res.Target)
-		fmt.Printf("   POC: %s\n", res.PocInfo.Info.Name)
-		fmt.Printf("   Severity: %s\n", res.PocInfo.Info.Severity)
+	if err := scanner.Wait(ctx); err != nil {
+		log.Printf("scan finished with error / 扫描出错: %v", err)
 	}
+	wg.Wait()
 
-	// Scan completed
-	fmt.Printf("\nScan completed! Total vulnerabilities: %d\n", totalVulns)
-	fmt.Printf("Duration: %v\n", time.Since(startTime))
+	fmt.Printf("\nscan completed / 扫描完成: %d vulnerabilities in %v\n", found, time.Since(start))
+
+	if *failOnFind && found > 0 {
+		fmt.Println("vulnerabilities found, failing / 发现漏洞，返回失败状态")
+		os.Exit(1)
+	}
 }

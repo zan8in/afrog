@@ -1,82 +1,82 @@
+// Basic Scan Example / 基础扫描示例
+//
+// Demonstrates the smallest useful afrog SDK program: configure a target,
+// point at a PoC directory, run the scan and read the results.
+//
+// 演示 afrog SDK 最小可用程序：配置目标、指定 PoC 目录、执行扫描并读取结果。
+//
+// Run / 运行:
+//
+//	go run ./examples/basic_scan
+//	go run ./examples/basic_scan -target https://example.com -pocs /path/to/pocs
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"path/filepath"
+	"os"
+	"os/signal"
 
-	"github.com/zan8in/afrog/v3"
+	"github.com/zan8in/afrog/v3/examples/internal/examplepath"
+	"github.com/zan8in/afrog/v3/pkg/sdk"
 )
 
-// Basic Scan Example / 基础扫描示例
-//
-// This example demonstrates the most basic usage of the Afrog SDK.
-// It performs a simple vulnerability scan on a target URL.
-//
-// 此示例演示了 Afrog SDK 的最基本用法。
-// 它对目标 URL 执行简单的漏洞扫描。
-
 func main() {
-	// Create SDK scan options / 创建 SDK 扫描选项
-	options := afrog.NewSDKOptions()
+	target := flag.String("target", "https://scanme.sh", "target to scan")
+	pocs := examplepath.PocsFlag()
+	severity := flag.String("severity", "info", "severity filter, e.g. \"high,critical\"")
+	flag.Parse()
 
-	// Set scan targets / 设置扫描目标
-	options.Targets = []string{"https://www.example.com"}
+	// Ctrl+C cancels the context, which stops the scan cleanly.
+	// Ctrl+C 取消 context，扫描会干净地停止。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	// Set POC path (required) / 设置 POC 路径（必需）
-	pocPath, err := filepath.Abs("../pocs/afrog-pocs")
+	// WithPocPaths accepts a single file, a directory, or a glob pattern.
+	// WithPocPaths 支持单个文件、目录，以及 glob 通配符。
+	scanner, err := sdk.New(ctx,
+		sdk.WithTargets(*target),
+		sdk.WithPocPaths(*pocs),
+		sdk.WithPocPathsOnly(),
+		sdk.WithSeverity(*severity),
+		sdk.WithConcurrency(10),
+		sdk.WithRateLimit(50),
+		sdk.WithTimeout(10),
+	)
 	if err != nil {
-		log.Fatalf("Failed to get POC path / 获取 POC 路径失败: %v", err)
+		log.Fatalf("create scanner / 创建扫描器失败: %v", err)
 	}
-	options.PocFile = pocPath
+	defer scanner.Close()
 
-	// Basic configuration / 基础配置
-	options.Concurrency = 10  // Concurrent threads / 并发线程数
-	options.RateLimit = 50    // Request rate limit / 请求速率限制
-	options.Timeout = 10      // Timeout in seconds / 超时时间（秒）
-	options.Search = "info"   // Search for info-level POCs / 搜索信息级别的 POC
-	options.Severity = "info" // Only scan info severity / 只扫描信息严重级别
-
-	fmt.Println("Creating SDK scanner... / 创建 SDK 扫描器...")
-
-	// Create scanner instance / 创建扫描器实例
-	scanner, err := afrog.NewSDKScanner(options)
-	if err != nil {
-		log.Fatalf("Failed to create scanner / 创建扫描器失败: %v", err)
-	}
-	defer scanner.Close() // Always close the scanner / 始终关闭扫描器
-
-	fmt.Println("Starting scan... / 开始扫描...")
-
-	// Execute scan (synchronous) / 执行扫描（同步）
-	err = scanner.Run()
-	if err != nil {
-		log.Printf("Scan error occurred / 扫描出现错误: %v", err)
+	// Inspect what was loaded before spending time on the network.
+	// 在真正发起网络请求之前，先确认加载到了哪些 PoC。
+	fmt.Printf("loaded %d pocs / 已加载 %d 个 PoC\n", scanner.PocCount(), scanner.PocCount())
+	for _, d := range scanner.PocDiagnostics() {
+		log.Printf("skipped poc / 跳过 PoC: %v", d)
 	}
 
-	// Get scan results / 获取扫描结果
-	results := scanner.GetResults()
-	stats := scanner.GetStats()
+	fmt.Println("scanning... / 扫描中...")
+	if err := scanner.Execute(ctx); err != nil {
+		log.Printf("scan finished with error / 扫描出错: %v", err)
+	}
 
-	// Print results / 打印结果
-	fmt.Printf("\n========== Scan Results / 扫描结果 ==========\n")
-	fmt.Printf("Vulnerabilities found / 发现漏洞: %d\n", len(results))
-	fmt.Printf("Scan progress / 扫描进度: %.1f%%\n", scanner.GetProgress())
-	fmt.Printf("Scan duration / 扫描耗时: %v\n", stats.EndTime.Sub(stats.StartTime))
+	results := scanner.Results()
+	stats := scanner.Stats()
 
-	// Display vulnerability details / 显示漏洞详情
-	if len(results) > 0 {
-		fmt.Printf("\n========== Vulnerability Details / 漏洞详情 ==========\n")
-		for i, result := range results {
-			fmt.Printf("%d. Target / 目标: %s\n", i+1, result.Target)
-			fmt.Printf("   POC Name / POC 名称: %s\n", result.PocInfo.Info.Name)
-			fmt.Printf("   Severity / 严重程度: %s\n", result.PocInfo.Info.Severity)
-			fmt.Printf("   Description / 描述: %s\n", result.PocInfo.Info.Description)
-			fmt.Println("   ---")
+	fmt.Printf("\n========== Results / 扫描结果 ==========\n")
+	fmt.Printf("vulnerabilities / 漏洞数: %d\n", len(results))
+	fmt.Printf("duration / 耗时: %v\n", stats.Duration())
+
+	for i, v := range results {
+		fmt.Printf("%d. [%s] %s\n", i+1, v.Severity, v.FullTarget)
+		fmt.Printf("   poc: %s (%s)\n", v.PocName, v.PocID)
+		if v.Description != "" {
+			fmt.Printf("   description / 描述: %s\n", v.Description)
 		}
-	} else {
-		fmt.Println("No vulnerabilities found / 未发现漏洞")
 	}
-
-	fmt.Println("Scan completed! / 扫描完成!")
+	if len(results) == 0 {
+		fmt.Println("no vulnerabilities found / 未发现漏洞")
+	}
 }

@@ -2,14 +2,18 @@
 
 ## 概述
 
-Afrog SDK 提供了一个简洁、高效的 Go 编程接口，专为集成漏洞扫描功能而设计。SDK 具有以下核心特性：
+Afrog SDK 是把漏洞扫描能力嵌入自己程序的 Go 接口，包路径为 `github.com/zan8in/afrog/v3/pkg/sdk`。
 
-### 🚀 核心特性
-- ✅ **结构化返回** - 直接返回 Go 结构体，便于程序处理
-- ✅ **实时结果流** - 支持同步回调和异步流式输出
-- ✅ **OOB 检测支持** - 完整的带外检测配置和管理
-- ✅ **详细统计信息** - 提供扫描进度、性能和结果统计
-- ✅ **并发安全** - 所有 API 都是线程安全的
+### 核心特性
+
+- **结构化返回** —— 纯 Go 结构体，可直接 `json.Marshal`
+- **完整数据输出** —— 每一步扫描的原始请求与响应报文都可获取
+- **灵活的 PoC 输入** —— 单个文件、目录（递归）、glob 通配符
+- **同步与异步** —— `Execute` 同步阻塞；`Start` + `Wait`/`Done` 异步
+- **回调与流** —— 多回调注册，或按需订阅事件通道
+- **默认静默** —— 不向 stdout/stderr 输出任何内容
+- **类型化错误** —— 使用 `errors.Is` 判断失败原因
+- **资源可控** —— `Close` 释放所有后台协程，无泄漏
 
 ## 安装
 
@@ -19,617 +23,750 @@ go get -u github.com/zan8in/afrog/v3
 
 ## 快速开始
 
-### 基础扫描示例
-
-最简单的使用方式，适合快速集成：
-
 ```go
 package main
 
 import (
-    "fmt"
-    "log"
-    "path/filepath"
-    "github.com/zan8in/afrog/v3"
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/zan8in/afrog/v3/pkg/sdk"
 )
 
 func main() {
-    // 创建扫描选项
-    options := afrog.NewSDKOptions()
-    
-    // 设置扫描目标
-    options.Targets = []string{"https://www.example.com"}
-    
-    // 设置 POC 路径（必须）
-    pocPath, _ := filepath.Abs("./pocs/afrog-pocs")
-    options.PocFile = pocPath
-    
-    // 创建扫描器
-    scanner, err := afrog.NewSDKScanner(options)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer scanner.Close()
-    
-    // 执行扫描
-    scanner.Run()
-    
-    // 获取结果
-    results := scanner.GetResults()
-    fmt.Printf("发现 %d 个漏洞\n", len(results))
+	ctx := context.Background()
+
+	scanner, err := sdk.New(ctx,
+		sdk.WithTargets("https://example.com"),
+		sdk.WithPocPaths("./pocs/afrog-pocs"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer scanner.Close()
+
+	if err := scanner.Execute(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	for _, r := range scanner.Results() {
+		fmt.Printf("[%s] %s - %s\n", r.Severity, r.FullTarget, r.PocName)
+	}
 }
 ```
 
-## SDK 配置选项详解
+## PoC 输入
 
-### SDKOptions 结构体
+`WithPocPaths` 支持三种形式，可以混用、可以传多个：
 
 ```go
-type SDKOptions struct {
-    // ========== 目标配置 ==========
-    Targets     []string // 扫描目标列表
-    TargetsFile string   // 目标文件路径
-    
-    // ========== POC 配置 ==========
-    PocFile  string // POC 文件或目录路径（必须）
-    Search   string // POC 搜索关键词
-    Severity string // 严重程度过滤
-    
-    // ========== 性能配置 ==========
-    RateLimit    int // 请求速率限制 (默认: 150)
-    Concurrency  int // 并发数 (默认: 25)
-    Retries      int // 重试次数 (默认: 1)
-    Timeout      int // 超时时间秒 (默认: 10)
-    MaxHostError int // 主机最大错误数 (默认: 3)
+sdk.WithPocPaths(
+	"/path/to/single.yaml",   // 单个文件
+	"/path/to/pocs",          // 目录（递归查找 .yaml/.yml）
+	"/path/to/pocs/*.yaml",   // glob 通配符
+)
+```
 
-    // ========== PortScan 预扫描配置 ==========
-    PortScan        bool   // 启用端口预扫描（等价于 CLI 的 -ps）
-    PSPorts         string // 预扫描端口定义：top/full/all/80,443/1-1024 等（等价于 -p）
-    PSRateLimit     int    // 预扫描速率限制（等价于 -prate）
-    PSTimeout       int    // 预扫描超时（毫秒，等价于 -ptimeout）
-    PSRetries       int    // 预扫描重试（等价于 -ptries）
-    PSSkipDiscovery bool   // 跳过存活探测（等价于 -Pn）
-    PSS4Chunk       int    // 全端口扫描 chunk（等价于 --ps-s4-chunk）
-    
-    // ========== 网络配置 ==========
-    Proxy string // HTTP/SOCKS5 代理
-    
-    // ========== OOB 配置 ==========
-    EnableOOB  bool   // 是否启用 OOB 检测
-    OOB        string // OOB 适配器类型
-    OOBKey     string // OOB API 密钥
-    OOBDomain  string // OOB 域名
-    OOBApiUrl  string // OOB API 地址
-    OOBHttpUrl string // OOB HTTP 地址
-    
-    // ========== 输出配置 ==========
-    EnableStream bool // 启用流式输出
+### 追加还是独占
+
+| 配置 | 行为 |
+|-----|-----|
+| `WithPocPaths(...)` | **追加**：与内置 PoC、curated、my、local 合并，同名时以显式路径优先 |
+| `WithPocPaths(...)` + `WithPocPathsOnly()` | **独占**：只使用显式指定的 PoC |
+
+### 检查加载结果
+
+在发起任何网络请求之前，可以先确认加载到了什么：
+
+```go
+fmt.Printf("已加载 %d 个 PoC\n", scanner.PocCount())
+
+for _, p := range scanner.Pocs() {
+	fmt.Println(p.Id, p.Info.Name)
+}
+
+// 哪些 PoC 被跳过了，以及为什么
+for _, d := range scanner.PocDiagnostics() {
+	fmt.Printf("跳过 %s：%s\n", d.Path, d.Reason)
 }
 ```
 
-### 配置选项说明
+`PocLoadError.Reason` 的取值：
 
-#### 目标配置
-- `Targets`: 直接指定扫描目标列表
-- `TargetsFile`: 从文件读取目标列表（每行一个）
+| 常量 | 含义 |
+|-----|-----|
+| `config.PocLoadNotFound` | 路径不存在或通配符没匹配到文件 |
+| `config.PocLoadReadFailed` | 文件读取失败 |
+| `config.PocLoadParseFailed` | YAML 解析失败 |
+| `config.PocLoadLegacyOOB` | 使用了已废弃的 v2 OOB 语法 |
 
-#### POC 配置
-- `PocFile`: **必须**指定 POC 文件或目录路径
-- `Search`: 按关键词过滤 POC，如 "tomcat,phpinfo"
-- `Severity`: 按严重程度过滤，如 "high,critical"
+## 完整数据输出
 
-#### 性能调优
-- `Concurrency`: 并发扫描线程数，建议根据目标数量调整
-- `RateLimit`: 每秒请求数限制，避免触发防护
-- `Timeout`: 单个请求超时时间
-- `Retries`: 失败重试次数
-
-## 核心功能示例
-
-### 1. 实时结果回调
-
-在发现漏洞时立即处理：
+`Results()` 返回 `sdk.Result`，其中 `Exchanges` 携带每一步的完整请求/响应：
 
 ```go
-scanner.OnResult = func(r *result.Result) {
-    fmt.Printf("发现漏洞: %s - %s [%s]\n", 
-        r.Target, 
-        r.PocInfo.Info.Name,
-        r.PocInfo.Info.Severity)
-    
-    // 立即处理逻辑
-    if r.PocInfo.Info.Severity == "critical" {
-        sendAlert(r)
-    }
-}
+for _, r := range scanner.Results() {
+	fmt.Printf("%s [%s] %s\n", r.PocID, r.Severity, r.FullTarget)
 
-scanner.Run()
+	for _, ex := range r.Exchanges {
+		fmt.Printf("%s %s -> %d (%d ms)\n", ex.Method, ex.URL, ex.StatusCode, ex.LatencyMs)
+
+		fmt.Println("--- 原始请求 ---")
+		fmt.Println(ex.Request)
+
+		fmt.Println("--- 原始响应 ---")
+		fmt.Println(ex.Response)
+
+		if ex.BodyTruncated {
+			fmt.Println("警告：响应体在 MaxRespBodySize 上限处被截断")
+		}
+	}
+}
 ```
 
-### 2. 进度监控
-
-实时监控扫描进度：
+### Result 结构
 
 ```go
+type Result struct {
+	PocID       string   `json:"poc_id"`
+	PocName     string   `json:"poc_name,omitempty"`
+	Severity    string   `json:"severity,omitempty"`
+	Author      string   `json:"author,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Reference   []string `json:"reference,omitempty"`
+	Tags        []string `json:"tags,omitempty"`
+
+	CveID       string  `json:"cve_id,omitempty"`
+	CweID       string  `json:"cwe_id,omitempty"`
+	CvssScore   float64 `json:"cvss_score,omitempty"`
+	CvssMetrics string  `json:"cvss_metrics,omitempty"`
+
+	Target     string `json:"target"`
+	FullTarget string `json:"full_target,omitempty"`
+
+	Extractors   map[string]string `json:"extractors,omitempty"`
+	Fingerprints []Fingerprint     `json:"fingerprints,omitempty"`
+	Exchanges    []Exchange        `json:"exchanges,omitempty"`
+
+	FoundAt time.Time `json:"found_at"`
+}
+```
+
+### Exchange 结构
+
+```go
+type Exchange struct {
+	Request  string `json:"request,omitempty"`  // 原始请求报文
+	Response string `json:"response,omitempty"` // 原始响应报文
+
+	Method          string            `json:"method,omitempty"`
+	URL             string            `json:"url,omitempty"`
+	RequestHeaders  map[string]string `json:"request_headers,omitempty"`
+	RequestBody     string            `json:"request_body,omitempty"`
+	StatusCode      int               `json:"status_code,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	ResponseBody    string            `json:"response_body,omitempty"`
+	ContentType     string            `json:"content_type,omitempty"`
+	LatencyMs       int64             `json:"latency_ms,omitempty"`
+
+	Matched        bool `json:"matched"`
+	BodyTruncated  bool `json:"body_truncated,omitempty"`
+	BruteTruncated bool `json:"brute_truncated,omitempty"`
+	BruteRequests  int  `json:"brute_requests,omitempty"`
+}
+```
+
+原始报文是字符串而不是 `[]byte`，可以直接序列化，不会变成 base64：
+
+```go
+data, err := json.MarshalIndent(scanner.Results(), "", "  ")
+```
+
+### 控制内存占用
+
+```go
+sdk.WithRequestResponse(false),   // 不保留 Exchanges
+sdk.WithMaxStoredResults(1000),   // 最多累积 1000 条
+```
+
+`MaxStoredResults` 只限制内部累积，**不影响回调和流**，所有结果仍会被推送出来。
+
+### 响应体截断
+
+响应体读取上限由 `MaxRespBodySize` 控制（默认 2 MB）。超出部分会被丢弃，此时 `Exchange.BodyTruncated` 为 `true`，据此可以判断拿到的是不是完整响应。
+
+```go
+sdk.WithMaxRespBodySize(10) // 提高到 10 MB
+```
+
+## 同步与异步
+
+### 同步
+
+```go
+if err := scanner.Execute(ctx); err != nil {
+	log.Fatal(err)
+}
+results := scanner.Results()
+```
+
+### 异步
+
+```go
+if err := scanner.Start(ctx); err != nil {
+	log.Fatal(err)
+}
+
 go func() {
-    ticker := time.NewTicker(1 * time.Second)
-    defer ticker.Stop()
-    
-    for range ticker.C {
-        progress := scanner.GetProgress()
-        stats := scanner.GetStats()
-        fmt.Printf("进度: %.2f%% (%d/%d) 发现漏洞: %d\n", 
-            progress, 
-            stats.CompletedScans,
-            stats.TotalScans,
-            stats.FoundVulns)
-    }
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Printf("进度: %.1f%%\n", scanner.Progress())
+		case <-scanner.Done():
+			return
+		}
+	}
 }()
 
-scanner.Run()
-```
-
-### 3. 异步扫描与流式输出
-
-非阻塞扫描，实时获取结果：
-
-```go
-options.EnableStream = true
-scanner, _ := afrog.NewSDKScanner(options)
-
-// 启动异步扫描
-scanner.RunAsync()
-
-// 从通道读取实时结果
-for result := range scanner.ResultChan {
-    fmt.Printf("实时发现: %s - %s\n", 
-        result.Target, 
-        result.PocInfo.Info.Name)
-    
-    // 实时处理每个结果
-    processResult(result)
+if err := scanner.Wait(ctx); err != nil {
+	log.Printf("扫描出错: %v", err)
 }
 ```
 
-### 4. OOB（带外）检测配置
+### 生命周期方法
 
-#### CEYE.io 配置（推荐）
+| 方法 | 说明 |
+|-----|-----|
+| `Execute(ctx)` | 同步执行，直到扫描结束才返回 |
+| `Start(ctx)` | 异步启动，立即返回 |
+| `Wait(ctx)` | 阻塞等待扫描结束，返回扫描错误 |
+| `Done()` | 返回扫描结束时关闭的通道 |
+| `Err()` | 返回扫描错误，未结束时为 nil |
+| `Stop()` | 请求停止，立即返回 |
+| `Close()` | 停止扫描、等待协程退出、释放全部资源 |
+| `Pause()` / `Resume()` / `IsPaused()` | 暂停控制 |
+| `IsStopping()` / `IsRunning()` | 状态查询 |
+
+扫描器是**一次性**的：
+
 ```go
-options.EnableOOB = true
-options.OOB = "ceyeio"
-options.OOBKey = "your-ceye-api-token"
-options.OOBDomain = "your-subdomain.ceye.io"
+scanner.Execute(ctx) // 第一次：正常
+scanner.Execute(ctx) // 第二次：返回 ErrAlreadyFinished
 ```
 
-#### DNSLog.cn 配置（免费）
+需要重新扫描请新建实例。`Close()` 是幂等的，可以在 `New` 之后立即 `defer`。
+
+## 回调与流
+
+### 回调
+
 ```go
-options.EnableOOB = true
-options.OOB = "dnslogcn"
-options.OOBDomain = "your.dnslog.cn"
+scanner, _ := sdk.New(ctx,
+	sdk.WithResultHandler(saveToDatabase),
+	sdk.WithResultHandler(sendAlert),        // 可注册多个
+	sdk.WithFailureHandler(func(f sdk.Failure) {
+		log.Printf("PoC %s 在 %s 上失败: %v", f.PocID, f.Target, f.Err)
+	}),
+	sdk.WithPortHandler(func(p sdk.PortEvent) { /* ... */ }),
+	sdk.WithHostHandler(func(h sdk.HostEvent) { /* ... */ }),
+	sdk.WithWebProbeHandler(func(w sdk.WebProbeEvent) { /* ... */ }),
+	sdk.WithProgressHandler(func(p sdk.PhaseProgress) { /* ... */ }),
+	sdk.WithScanInfoHandler(func(i sdk.ScanInfo) { /* ... */ }),
+)
 ```
 
-#### 其他 OOB 服务
-```go
-// Alphalog
-options.OOB = "alphalog"
-options.OOBDomain = "your.alphalog.cn"
-options.OOBApiUrl = "https://api.alphalog.cn"
+回调由扫描工作协程**并发触发**，实现方需要自行保证并发安全。
 
-// XRay
-options.OOB = "xray"
-options.OOBDomain = "your.xray.domain"
-options.OOBApiUrl = "http://xray-api:8777"
-options.OOBKey = "your-xray-token"
+### 流
+
+流是按需订阅的：**首次调用订阅方法之前不会产生任何数据**，因此没用到的流零开销、也绝不会阻塞扫描。
+
+```go
+results := scanner.ResultStream() // 在 Start 之前订阅
+
+scanner.Start(ctx)
+
+go func() {
+	for r := range results {   // 扫描结束时通道关闭，range 自然退出
+		fmt.Println(r.PocID, r.FullTarget)
+	}
+}()
+
+scanner.Wait(ctx)
 ```
 
-#### OOB 状态检查
+| 方法 | 事件类型 |
+|-----|---------|
+| `ResultStream()` | `Result` |
+| `PortStream()` | `PortEvent` |
+| `HostStream()` | `HostEvent` |
+| `WebProbeStream()` | `WebProbeEvent` |
+| `ProgressStream()` | `PhaseProgress` |
+| `ScanInfoStream()` | `ScanInfo` |
+
+> **重要**：一旦订阅就必须消费。为了保证漏洞不被静默丢弃，通道写满时发送会**阻塞**而不是丢弃数据。取消 context 或调用 `Stop()` 会释放被阻塞的发送。
+>
+> 扫描结束后再订阅会得到一个已关闭的通道，`range` 立即退出，不会死锁。
+
+### 高级：拿到引擎原始结果
+
+需要 `Result` 未暴露的字段（例如按引擎内部结构持久化）时：
+
 ```go
-if oobEnabled, oobStatus := scanner.GetOOBStatus(); oobEnabled {
-    fmt.Printf("✓ OOB 状态: %s\n", oobStatus)
-} else {
-    fmt.Printf("✗ OOB 状态: %s\n", oobStatus)
+sdk.WithRawResultHandler(func(r *result.Result) {
+	_ = persist(r)
+})
+```
+
+`result.Result` 是内部类型，其结构不在 SDK 的稳定性保证范围内，优先使用 `WithResultHandler`。
+
+## 错误处理
+
+```go
+scanner, err := sdk.New(ctx, opts...)
+switch {
+case errors.Is(err, sdk.ErrNoTargets):
+	log.Fatal("未指定扫描目标")
+case errors.Is(err, sdk.ErrPocPathNotFound):
+	log.Fatal("PoC 路径无法解析")
+case errors.Is(err, sdk.ErrInvalidOptions):
+	log.Fatal("选项配置非法")
+case err != nil:
+	log.Fatal(err)
 }
 ```
 
-### 5. 端口预扫描（PortScan）
+| 错误 | 含义 |
+|-----|-----|
+| `ErrNoTargets` | 未指定扫描目标 |
+| `ErrNoPocs` | 没有可执行的 PoC |
+| `ErrPocPathNotFound` | PoC 路径无法解析为任何文件 |
+| `ErrAlreadyRunning` | 扫描已在进行中 |
+| `ErrAlreadyFinished` | 扫描已结束，扫描器不可复用 |
+| `ErrClosed` | 扫描器已关闭 |
+| `ErrNotStarted` | 尚未启动扫描 |
+| `ErrInvalidOptions` | 选项组合非法 |
+| `ErrWebhookTokenRequired` | 启用了 webhook 但未配置 token |
 
-SDK 支持在 PoC 扫描之前做一次端口预扫描：扫描到的开放端口会自动追加进内部 Targets（以 `host:port` 形式），后续 PoC 会按新的目标集合执行。
+`CuratedMountError` 表示可选的 curated PoC 源挂载失败，它**不是致命错误**，扫描会继续，可通过 `scanner.CuratedError()` 查询。
 
-SDK 模式下不会默认把开放端口输出到控制台，可以通过回调或获取结果来消费。
+## 端口预扫描
 
-```go
-options := afrog.NewSDKOptions()
-options.Targets = []string{"1.2.3.4"}
-options.PocFile = pocPath
-
-options.PortScan = true
-options.PSPorts = "top" // 或 "full"/"all"/"80,443"/"1-1024"
-options.PSSkipDiscovery = true
-options.PSTimeout = 500
-
-scanner, _ := afrog.NewSDKScanner(options)
-
-scanner.OnPort = func(host string, port int) {
-    fmt.Printf("open: %s:%d\n", host, port)
-}
-
-scanner.Run()
-
-open := scanner.GetOpenPorts()
-_ = open
-```
-
-也可以通过 `PortChan` 异步消费端口预扫描结果：启用 `PortScan` 时会自动初始化该通道，扫描结束后会自动关闭。
+发现的开放端口会以 `host:port` 形式追加为扫描目标：
 
 ```go
-options := afrog.NewSDKOptions()
-options.Targets = []string{"1.2.3.4"}
-options.PocFile = pocPath
-options.PortScan = true
+scanner, _ := sdk.New(ctx,
+	sdk.WithTargets("192.168.1.0/24"),
+	sdk.WithPocPaths(pocPath),
+	sdk.WithPortScan(sdk.PortScanOptions{
+		Ports:         "top",  // top|full|all|80,443|1-1024
+		TimeoutMs:     500,
+		SkipDiscovery: true,
+	}),
+	sdk.WithPortHandler(func(p sdk.PortEvent) {
+		fmt.Printf("open: %s:%d\n", p.Host, p.Port)
+	}),
+)
 
-scanner, _ := afrog.NewSDKScanner(options)
+scanner.Execute(ctx)
 
-_ = scanner.RunAsync()
+open := scanner.OpenPorts() // map[string][]int
+```
 
-for r := range scanner.PortChan {
-    fmt.Printf("open: %s:%d\n", r.Host, r.Port)
+## OOB（带外）检测
+
+```go
+scanner, _ := sdk.New(ctx,
+	sdk.WithTargets(target),
+	sdk.WithPocPaths(pocPath),
+	sdk.WithOOB(sdk.OOBOptions{
+		Adapter: "ceyeio",
+		Key:     "your-ceye-api-token",
+		Domain:  "your-subdomain.ceye.io",
+	}),
+)
+
+// 注意：这会对 OOB 服务发起一次真实的网络探测
+if enabled, status := scanner.OOBStatus(); !enabled {
+	log.Printf("OOB 不可用: %s", status)
 }
 ```
 
-也可以直接运行示例：`examples/sdk_portscan/`。
+| Adapter | 必填字段 |
+|---------|---------|
+| `ceyeio` | `Key`、`Domain` |
+| `dnslogcn` | `Domain` |
+| `alphalog` | `Domain`、`ApiURL` |
+| `xray` | `Key`、`Domain`、`ApiURL` |
+| `revsuit` | `Key`、`Domain`、`ApiURL`、`HttpURL` |
+
+未显式配置时，SDK 会尝试从 `~/.config/afrog/afrog-config.yaml` 读取。该文件**只读**，SDK 不会创建或改写它。
+
+`OOBOptions` 还可以调整轮询节奏，默认值与 CLI 一致：
+
+| 字段 | 默认 | 说明 |
+|------|------|------|
+| `PollInterval` | `2` | 轮询 OOB 服务的间隔（秒） |
+| `HitRetention` | `10` | 命中记录的保留时长（分钟） |
+| `RateLimit` | `25` | OOB 阶段的速率限制 |
+| `Concurrency` | `25` | OOB 阶段的并发 |
+| `FinalizeTimeout` | `-1` | 收敛等待上限（秒），`-1` 表示由 PoC 自身决定 |
+
+### v3 的 OOB PoC 语法
+
+```yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?dns=ping%20{{oob.DNS}}
+    expression: oobCheck(oob.ProtocolDNS, 5)
+expression: r0()
+```
+
+v2 时代的 `set: oob: oob()`、`{{oobDNS}}`、`oobWait(...)`、`oobCheck(oob, ...)` 均已废弃，使用旧语法的 PoC 会被跳过并出现在 `PocDiagnostics()` 中。
+
+## 控制台输出
+
+SDK **默认完全静默**。需要摘要时用结构化 API：
+
+```go
+info := scanner.Info()
+log.Printf("目标 %d 个，PoC %d 个，任务 %d 个",
+	info.TotalTargets, info.TotalPocs, info.TotalScans)
+```
+
+或显式开启打印：`sdk.WithVerbose()`。
+
+## 任务级超时
+
+单次请求的超时用 `WithTimeout`，但一个规则很多的 PoC 可能远超单次请求时长地占住 worker。`WithTaskTimeout` 给「单个目标 + 单个 PoC」这一整个任务加上限：
+
+```go
+sdk.WithTaskTimeout(sdk.TaskTimeoutOptions{
+	HardSec: 120,  // 固定上限（秒），0 表示不限
+	Smart:   true, // 依据 PoC 内容估算上限
+})
+```
+
+`Smart` 会根据规则数量、sleep、爆破、payload 等估算超时。两者同时设置时**取较大值**，也就是 `HardSec` 起下限作用而不是覆盖估算值。
+
+估算值按协议族分别设上限，默认与 CLI 一致：`VisibleCapSec` 300（普通 HTTP）、`NetCapSec` 360（tcp/udp/ssl）、`GoCapSec` 420（go 类 PoC）。
+
+## 执行耗时监控
+
+对应 CLI 的 `-pedm`，用于定位跑得慢或卡住的 PoC：
+
+```go
+sdk.WithExecutionMonitor(sdk.ExecutionMonitorOptions{
+	SlowThresholdSec: 20, // 超过多少秒算慢任务
+	SummaryTop:       10, // 结束时列出最慢的 N 个 PoC
+	SummaryBy:        sdk.MonitorSummaryByMax, // 或 MonitorSummaryByAvg
+}),
+sdk.WithMonitorHandler(func(line string) {
+	log.Println(line)
+}),
+```
+
+监控内容只会送到 `WithMonitorHandler` 注册的回调，SDK 不会打印到控制台。**不注册回调时监控照常运行但输出无处可去**，所以这两个选项应当配套使用。
+
+## 断点续扫
+
+对应 CLI 的 `-resume`。启动时读取检查点跳过已完成的任务，扫描过程中周期性回写：
+
+```go
+sdk.WithCheckpoint(sdk.CheckpointOptions{
+	Path:         "scan.afg",
+	SaveInterval: 10 * time.Second, // 0 表示使用默认的 10 秒
+})
+```
+
+进度以「PoC id + 目标」为键记录，因此**续扫时目标集与 PoC 集必须与中断前一致**，否则跳过关系会错位。文件不存在时视为全新扫描，不报错。
+
+注意与 `Scanner.Resume()` 区分：后者是解除 `Pause()` 的暂停，与断点续扫无关。
+
+## 从空间测绘获取目标
+
+对应 CLI 的 `-cs` / `-q` / `-qc`。目标可以完全来自搜索，不必再传 `WithTargets`：
+
+```go
+scanner, _ := sdk.New(ctx,
+	sdk.WithCyberspace(sdk.CyberspaceOptions{
+		Engine: sdk.CyberspaceZoomEye,
+		Query:  `app:"tomcat"`,
+		Count:  100,
+	}),
+	sdk.WithPocPaths(pocPath),
+)
+```
+
+目前**只实现了 ZoomEye**，传其他引擎名会返回 `ErrInvalidOptions`。API Key 从配置文件的 `cyberspace.zoom_eyes` 读取，缺失时 `sdk.New` 返回错误。搜索命中为 0 时返回 `ErrNoTargets`。
+
+## 目标预探测
+
+对应 CLI 的 `-mt`。它会在扫描的同时并发探测每个目标的协议与存活情况，错误次数超过 `MaxHostError` 的主机会被拉黑：
+
+```go
+sdk.WithTargetPreProbe()
+```
+
+尽管 CLI 的参数名叫 monitor-targets，它并**不会**监视目标文件的变化。
+
+## 配置选项完整列表
+
+### 目标
+
+| 选项 | 说明 |
+|-----|-----|
+| `WithTargets(...)` | 扫描目标列表 |
+| `WithTargetsFile(path)` | 目标文件，每行一个 |
+| `WithCyberspace(cfg)` | 从空间测绘搜索获取目标（目前仅 ZoomEye） |
+| `WithTargetPreProbe()` | 并发预探测目标协议与存活（CLI `-mt`） |
+
+### PoC
+
+| 选项 | 说明 |
+|-----|-----|
+| `WithPocPaths(...)` | 文件/目录/glob，追加语义 |
+| `WithPocPathsOnly()` | 只用显式指定的 PoC |
+| `WithSearch(kw)` | 关键词过滤 |
+| `WithSeverity(sev)` | 严重程度过滤 |
+| `WithExcludePocs(...)` | 排除指定 PoC |
+| `WithExcludePocsFile(path)` | 排除列表文件 |
+
+### 性能
+
+| 选项 | 默认值 |
+|-----|-------|
+| `WithConcurrency(n)` | `25` |
+| `WithRateLimit(n)` | `150` |
+| `WithTimeout(sec)` | `50` |
+| `WithRetries(n)` | `1` |
+| `WithMaxHostError(n)` | `3` |
+| `WithMaxRespBodySize(mb)` | `2` |
+| `WithRequestLimitPerTarget(n)` | `0` |
+| `WithPolite()` / `WithBalanced()` / `WithAggressive()` | — |
+| `WithAutoRequestLimit()` | — |
+| `WithSmartConcurrency()` | — |
+| `WithStopOnFirstMatch()` | — |
+
+`WithRequestLimitPerTarget`、`WithAutoRequestLimit`、`WithPolite`、`WithBalanced`、`WithAggressive` 五者互斥，同时设置多个会返回 `ErrInvalidOptions`。
+
+### 指纹与探测
+
+| 选项 | 默认值 |
+|-----|-------|
+| `WithFingerprintDisabled()` | 指纹默认开启 |
+| `WithFingerprintFilterMode(mode)` | `"strict"`（可选 `"opportunistic"`） |
+| `WithWebProbe()` | 默认关闭 |
+
+### 网络
+
+| 选项 | 说明 |
+|-----|-----|
+| `WithProxy(p)` | HTTP/SOCKS5 代理 |
+| `WithHeaders(...)` | 自定义请求头，格式 `"Name: value"` |
+
+### 输出
+
+| 选项 | 默认值 |
+|-----|-------|
+| `WithRequestResponse(b)` | `true` |
+| `WithMaxStoredResults(n)` | `0`（不限） |
+| `WithStreamBuffer(n)` | `256` |
+| `WithRedactedHeaders(...)` | 默认不脱敏 |
+| `WithVerbose()` | 默认静默 |
+
+### 敏感信息脱敏
+
+`Exchange` 默认携带完整的原始请求/响应，其中可能包含 `Authorization`、`Cookie`、`Set-Cookie` 等凭证。如果结果会写日志、落库或经 API 返回，应开启脱敏：
+
+```go
+sdk.WithRedactedHeaders()                       // 脱敏默认的凭证类头
+sdk.WithRedactedHeaders("authorization", "x-token") // 自定义要脱敏的头
+```
+
+脱敏会同时作用于 `Exchange.Request`/`Response` 原始报文和 `RequestHeaders`/`ResponseHeaders`，把对应值替换为 `[REDACTED]`，只影响头部、不触碰响应体。脱敏是**可选**的，因为原始报文正是 `Exchange` 的核心价值，默认全脱敏会削弱调试能力。
+
+### 其他
+
+| 选项 | 说明 |
+|-----|-----|
+| `WithOOB(cfg)` | 带外检测 |
+| `WithPortScan(cfg)` | 端口预扫描 |
+| `WithCurated(cfg)` | curated PoC 源 |
+| `WithTaskTimeout(cfg)` | 单个目标+PoC 任务的超时上限 |
+| `WithExecutionMonitor(cfg)` | PoC 执行耗时监控（CLI `-pedm`） |
+| `WithMonitorHandler(fn)` | 接收耗时监控输出 |
+| `WithCheckpoint(cfg)` | 断点续扫（CLI `-resume`） |
+| `WithDingtalk()` / `WithWecom()` | webhook 通知 |
+| `WithOptions(o)` | 直接使用一份完整 `Options` |
 
 ## API 方法参考
 
-### SDKScanner 核心方法
+### 构造
 
-| 方法 | 描述 | 返回值 |
-|-----|-----|-------|
-| `NewSDKScanner(opts)` | 创建扫描器实例 | `*SDKScanner, error` |
-| `Run()` | 同步执行扫描 | `error` |
-| `RunAsync()` | 异步执行扫描 | `error` |
-| `GetResults()` | 获取所有扫描结果 | `[]*result.Result` |
-| `GetOpenPorts()` | 获取预扫描开放端口 | `map[string][]int` |
-| `GetStats()` | 获取扫描统计信息 | `ScanStats` |
-| `GetProgress()` | 获取扫描进度(0-100) | `float64` |
-| `GetVulnerabilityCount()` | 获取漏洞数量 | `int` |
-| `HasVulnerabilities()` | 检查是否有漏洞 | `bool` |
-| `Stop()` | 停止扫描 | - |
-| `Close()` | 关闭扫描器，释放资源 | - |
+| 方法 | 返回值 |
+|-----|-------|
+| `New(ctx, options...)` | `*Scanner, error` |
+| `NewOptions()` | `*Options` |
 
-### 动态配置方法
+### 结果
 
-| 方法 | 描述 |
-|-----|-----|
-| `SetProxy(proxy)` | 动态设置代理 |
-| `SetRateLimit(n)` | 动态设置速率限制 |
-| `SetConcurrency(n)` | 动态设置并发数 |
+| 方法 | 返回值 |
+|-----|-------|
+| `Results()` | `[]Result` |
+| `ResultCount()` | `int` |
+| `HasResults()` | `bool` |
+| `OpenPorts()` | `map[string][]int` |
+| `Stats()` | `Stats` |
+| `Progress()` | `float64` |
 
-### OOB 相关方法
+### PoC 与信息
 
-| 方法 | 描述 | 返回值 |
-|-----|-----|-------|
-| `IsOOBEnabled()` | 检查是否启用 OOB | `bool` |
-| `GetOOBStatus()` | 获取 OOB 状态信息 | `bool, string` |
+| 方法 | 返回值 |
+|-----|-------|
+| `Pocs()` | `[]poc.Poc` |
+| `PocCount()` | `int` |
+| `PocDiagnostics()` | `[]config.PocLoadError` |
+| `Info()` | `ScanInfo` |
+| `OOBStatus()` | `bool, string` |
+| `CuratedError()` | `error` |
 
-### ScanStats 统计结构
+## 并发限制
 
-```go
-type ScanStats struct {
-    StartTime      time.Time  // 扫描开始时间
-    EndTime        time.Time  // 扫描结束时间
-    TotalTargets   int        // 总目标数
-    TotalPocs      int        // 总 POC 数
-    TotalScans     int        // 总扫描任务数
-    CompletedScans int32      // 已完成扫描数
-    FoundVulns     int32      // 发现的漏洞数
-}
-```
+**单个扫描器实例是并发安全的**，可以从多个协程调用它的方法。
 
-## 高级用法示例
-
-### 批量扫描与结果分析
+**但同一进程内不支持多个扫描器并行运行。** HTTP 客户端、限速器和协议探测缓存都是进程级全局状态，并行的扫描器会互相覆盖代理、超时和速率配置。
 
 ```go
-options := afrog.NewSDKOptions()
-options.TargetsFile = "targets.txt"  // 从文件读取大量目标
-options.PocFile = "/path/to/pocs"
-options.Severity = "high,critical"   // 只扫描高危漏洞
-options.Concurrency = 50            // 提高并发数
-
-scanner, _ := afrog.NewSDKScanner(options)
-
-// 分类处理不同严重程度的漏洞
-scanner.OnResult = func(r *result.Result) {
-    switch r.PocInfo.Info.Severity {
-    case "critical":
-        sendUrgentAlert(r)
-    case "high":
-        logHighRiskVuln(r)
-    default:
-        saveToDatabase(r)
-    }
-}
-
-scanner.Run()
-results := scanner.GetResults()
-generateReport(results)
-```
-
-### 智能扫描控制
-
-```go
-scanner.OnResult = func(r *result.Result) {
-    // 发现严重漏洞时停止扫描
-    if r.PocInfo.Info.Severity == "critical" {
-        fmt.Println("发现严重漏洞，停止扫描")
-        scanner.Stop()
-    }
-}
-
-// 动态调整扫描参数
-go func() {
-    time.Sleep(30 * time.Second)
-    // 30秒后降低速率
-    scanner.SetRateLimit(50)
-}()
-```
-
-### 多目标并行扫描
-
-```go
-targets := [][]string{
-    {"https://site1.com", "https://site2.com"},
-    {"https://site3.com", "https://site4.com"},
-}
-
-var wg sync.WaitGroup
-results := make(chan []*result.Result, len(targets))
-
-for _, targetGroup := range targets {
-    wg.Add(1)
-    go func(targets []string) {
-        defer wg.Done()
-        
-        options := afrog.NewSDKOptions()
-        options.Targets = targets
-        options.PocFile = pocPath
-        
-        scanner, _ := afrog.NewSDKScanner(options)
-        defer scanner.Close()
-        
-        scanner.Run()
-        results <- scanner.GetResults()
-    }(targetGroup)
-}
-
-wg.Wait()
-close(results)
-
-// 汇总所有结果
-allResults := []*result.Result{}
-for groupResults := range results {
-    allResults = append(allResults, groupResults...)
-}
-```
-
-## 性能优化建议
-
-### 1. 并发数优化
-
-```go
-targetCount := len(options.Targets)
-
-// 根据目标数量动态调整并发数
-switch {
-case targetCount <= 10:
-    options.Concurrency = 5
-case targetCount <= 100:
-    options.Concurrency = 25
-case targetCount <= 1000:
-    options.Concurrency = 50
-default:
-    options.Concurrency = 100
-}
-```
-
-### 2. 内存优化
-
-```go
-// 对于大规模扫描，使用流式输出避免内存积累
-options.EnableStream = true
-
-// 及时处理结果，不要积累
-scanner.OnResult = func(r *result.Result) {
-    processImmediately(r)
-    // 不要存储到切片中
-}
-```
-
-### 3. 网络优化
-
-```go
-// 网络不稳定时的配置
-options.Retries = 3
-options.Timeout = 30
-options.RateLimit = 50  // 降低请求频率
-
-// 使用代理池
-proxies := []string{"proxy1:8080", "proxy2:8080"}
-scanner.SetProxy(proxies[rand.Intn(len(proxies))])
-```
-
-## 错误处理最佳实践
-
-### 完整的错误处理
-
-```go
-scanner, err := afrog.NewSDKScanner(options)
-if err != nil {
-    switch {
-    case strings.Contains(err.Error(), "POC文件"):
-        log.Fatal("POC 配置错误:", err)
-    case strings.Contains(err.Error(), "目标"):
-        log.Fatal("目标配置错误:", err)
-    default:
-        log.Fatal("初始化失败:", err)
-    }
-}
-
-// 扫描错误处理
-if err := scanner.Run(); err != nil {
-    log.Printf("扫描异常: %v", err)
-    
-    // 即使出错也可以获取部分结果
-    results := scanner.GetResults()
-    if len(results) > 0 {
-        fmt.Printf("获得部分结果: %d 个漏洞\n", len(results))
-    }
-}
-```
-
-### 超时和取消处理
-
-```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-defer cancel()
-
-go func() {
-    scanner.RunAsync()
-}()
-
-select {
-case <-ctx.Done():
-    scanner.Stop()
-    fmt.Println("扫描超时，已停止")
-case <-scanner.ResultChan:
-    // 正常完成
+// 正确：串行复用
+for _, group := range targetGroups {
+	scanner, _ := sdk.New(ctx, sdk.WithTargets(group...), sdk.WithPocPaths(pocPath))
+	if err := scanner.Execute(ctx); err != nil {
+		log.Print(err)
+	}
+	results = append(results, scanner.Results()...)
+	scanner.Close()
 }
 ```
 
 ## 集成示例
 
+### CI 安全门禁
+
+```go
+scanner, err := sdk.New(ctx,
+	sdk.WithTargetsFile("staging-urls.txt"),
+	sdk.WithPocPaths("/security/pocs"),
+	sdk.WithSeverity("high,critical"),
+)
+if err != nil {
+	log.Fatal(err)
+}
+defer scanner.Close()
+
+if err := scanner.Execute(ctx); err != nil {
+	log.Fatal(err)
+}
+
+if results := scanner.Results(); len(results) > 0 {
+	for _, v := range results {
+		fmt.Printf("- [%s] %s: %s\n", v.Severity, v.FullTarget, v.PocName)
+	}
+	os.Exit(1)
+}
+```
+
+### 超时控制
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+defer cancel()
+
+if err := scanner.Execute(ctx); err != nil {
+	if errors.Is(err, context.DeadlineExceeded) {
+		log.Println("扫描超时")
+	}
+}
+
+results := scanner.Results() // 超时后仍可获取部分结果
+```
+
+### 信号处理
+
+```go
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+defer stop()
+
+scanner.Execute(ctx) // Ctrl+C 会停止扫描并返回 context.Canceled
+```
+
 ### Web 服务集成
 
 ```go
 func scanHandler(w http.ResponseWriter, r *http.Request) {
-    target := r.URL.Query().Get("target")
-    
-    options := afrog.NewSDKOptions()
-    options.Targets = []string{target}
-    options.PocFile = os.Getenv("POC_PATH")
-    
-    scanner, err := afrog.NewSDKScanner(options)
-    if err != nil {
-        http.Error(w, err.Error(), 500)
-        return
-    }
-    defer scanner.Close()
-    
-    scanner.Run()
-    results := scanner.GetResults()
-    
-    // 返回 JSON 结果
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "vulnerabilities": len(results),
-        "results": results,
-    })
+	scanner, err := sdk.New(r.Context(),
+		sdk.WithTargets(r.URL.Query().Get("target")),
+		sdk.WithPocPaths(os.Getenv("POC_PATH")),
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer scanner.Close()
+
+	if err := scanner.Execute(r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(scanner.Results())
 }
 ```
 
-### CI/CD 集成
+## 示例程序
 
-```go
-func main() {
-    options := afrog.NewSDKOptions()
-    options.TargetsFile = "staging-urls.txt"
-    options.PocFile = "/security/pocs"
-    options.Severity = "high,critical"
-    
-    scanner, err := afrog.NewSDKScanner(options)
-    if err != nil {
-        os.Exit(1)
-    }
-    defer scanner.Close()
-    
-    scanner.Run()
-    
-    if scanner.HasVulnerabilities() {
-        fmt.Println("❌ 发现安全漏洞，阻止部署")
-        results := scanner.GetResults()
-        for _, r := range results {
-            fmt.Printf("- %s: %s\n", r.Target, r.PocInfo.Info.Name)
-        }
-        os.Exit(1)
-    }
-    
-    fmt.Println("✅ 安全检查通过")
-}
+`examples/` 下的示例均可直接运行，PoC 路径会自动定位到仓库内的 `pocs/afrog-pocs`，也可用 `-pocs` 覆盖：
+
+```bash
+go run ./examples/basic_scan
+go run ./examples/full_output -json
+go run ./examples/async_scan
+go run ./examples/progress_scan
+go run ./examples/oob_scan -oob dnslogcn -oob-domain your.dnslog.cn
+go run ./examples/sdk_portscan -target 127.0.0.1
+go run ./examples/vuln_scan -target https://example.com
+go run ./examples/port_scan -targets 127.0.0.1
 ```
 
-## 常见问题解答
+## 常见问题
 
-### Q: 如何让弱口令/默认口令 PoC 仅在命中指纹后执行？
-A: 在 PoC 的 `info` 中使用 `requires` 与 `requires-mode` 声明指纹依赖，并使用 `requires-mode: strict` 实现“先指纹后执行”。完整用法与排障请参考：[requires 指纹门控：用法教程与问题答疑](requires-gating-guide.md)
+### 指定了 PoC 目录，为什么内置 PoC 没有执行？
 
-### Q: 如何处理大量目标的扫描？
-A: 使用流式输出和适当的并发控制：
+你可能加了 `WithPocPathsOnly()`。去掉它即可与内置 PoC 合并。
+
+### 扫描卡住不动了？
+
+检查是否订阅了某个流却没有消费。订阅后的流写满会阻塞扫描，这是为了不丢弃漏洞。
+
+### 为什么 `Wait` 返回 `context.Canceled`？
+
+扫描被 `Stop()` 或外部 context 取消了。此时仍可通过 `Results()` 获取已发现的结果。
+
+### 大规模扫描内存增长过快？
+
 ```go
-options.EnableStream = true
-options.Concurrency = 50
-scanner.OnResult = func(r *result.Result) {
-    // 立即处理，不要积累
-    processImmediately(r)
-}
+sdk.WithRequestResponse(false),
+sdk.WithMaxStoredResults(1000),
 ```
 
-### Q: 如何确保 OOB 检测正常工作？
-A: 在扫描前检查 OOB 状态：
-```go
-if enabled, status := scanner.GetOOBStatus(); !enabled {
-    log.Printf("OOB 警告: %s", status)
-}
-```
-
-### Q: 如何优化扫描性能？
-A: 根据网络和目标情况调整参数：
-```go
-// 内网扫描
-options.Concurrency = 100
-options.RateLimit = 500
-
-// 外网扫描
-options.Concurrency = 25
-options.RateLimit = 150
-options.Timeout = 15
-```
-
-### Q: 如何处理扫描中断？
-A: 使用 context 和信号处理：
-```go
-c := make(chan os.Signal, 1)
-signal.Notify(c, os.Interrupt)
-
-go func() {
-    <-c
-    scanner.Stop()
-    fmt.Println("扫描已停止")
-}()
-```
-
-## 注意事项
-
-1. **POC 路径必须指定** - SDK 不会自动下载或查找 POC
-2. **完全静默运行** - 不会有控制台输出，适合程序集成
-3. **无文件生成** - 不会创建任何报告文件
-4. **资源管理** - 必须调用 `Close()` 释放资源
-5. **并发安全** - 所有方法都是并发安全的
-6. **OOB 配置** - 需要正确配置才能检测带外漏洞
+配合回调实时处理结果，不要依赖 `Results()` 累积。
 
 ## 许可证
 
 MIT License
-
----
-
-更多示例和详细文档，请参考 `examples/` 目录中的示例代码。

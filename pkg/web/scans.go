@@ -2,6 +2,7 @@ package web
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,13 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
-	afrog "github.com/zan8in/afrog/v3"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/pkg/sdk"
 	"github.com/zan8in/gologger"
 )
 
@@ -31,22 +33,60 @@ const (
 	TaskCancelled TaskStatus = "cancelled"
 )
 
+// isActive reports whether a task still occupies a slot in the task manager.
+func isActive(s TaskStatus) bool {
+	return s == TaskRunning || s == TaskPaused || s == TaskStarting
+}
+
 type ScanEvent struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
 }
 
+// Task tracks one scan. Its mutable fields are read and written from the HTTP
+// handler goroutines and from the event-drain goroutine at the same time, so
+// they are reached only through the accessors below.
 type Task struct {
 	ID            string
 	Name          string
 	CreatedAt     time.Time
-	Status        TaskStatus
-	Scanner       *afrog.SDKScanner
+	Scanner       *sdk.Scanner
 	SeverityStats map[string]int
 	Subscribers   map[chan ScanEvent]struct{}
-	mu            sync.Mutex
-	startTime     time.Time
-	lastProgress  time.Time
+
+	mu        sync.Mutex
+	status    TaskStatus
+	startTime time.Time
+
+	// finalized makes finalizeTask run exactly once. Both the stop handler and
+	// the drain goroutine reach it when a scan is cancelled, and running it
+	// twice would decrement the manager's running count twice and let the
+	// queue admit more scans than maxRunning allows.
+	finalized atomic.Bool
+}
+
+func (t *Task) Status() TaskStatus {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.status
+}
+
+func (t *Task) setStatus(s TaskStatus) {
+	t.mu.Lock()
+	t.status = s
+	t.mu.Unlock()
+}
+
+func (t *Task) started() time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.startTime
+}
+
+func (t *Task) setStarted(at time.Time) {
+	t.mu.Lock()
+	t.startTime = at
+	t.mu.Unlock()
 }
 
 type TaskManager struct {
@@ -141,23 +181,25 @@ func startTask(m *TaskManager, t *Task) {
 	m.running++
 	m.mu.Unlock()
 
-	t.Status = TaskRunning
-	t.startTime = time.Now()
+	t.setStatus(TaskRunning)
+	t.setStarted(time.Now())
 	gologger.Debug().Msgf("start scan running: taskId=%s capacity available", t.ID)
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "running"}})
+
+	// Subscribe before starting the scan so that no event is missed.
+	resultCh := t.Scanner.ResultStream()
+	portCh := t.Scanner.PortStream()
+	hostCh := t.Scanner.HostStream()
+	webProbeCh := t.Scanner.WebProbeStream()
+	phaseCh := t.Scanner.ProgressStream()
+	scanInfoCh := t.Scanner.ScanInfoStream()
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
-		resultCh := t.Scanner.ResultChan
-		portCh := t.Scanner.PortChan
-		hostCh := t.Scanner.HostChan
-		webProbeCh := t.Scanner.WebProbeChan
-		phaseCh := t.Scanner.PhaseProgressChan
-		scanInfoCh := t.Scanner.ScanInfoChan
 		for {
 			if resultCh == nil && portCh == nil && hostCh == nil && webProbeCh == nil && phaseCh == nil && scanInfoCh == nil {
-				if t.Status != TaskCancelled {
+				if t.Status() != TaskCancelled {
 					finalizeTask(m, t, TaskCompleted)
 				}
 				return
@@ -168,20 +210,19 @@ func startTask(m *TaskManager, t *Task) {
 					resultCh = nil
 					continue
 				}
-				sev := strings.ToLower(r.PocInfo.Info.Severity)
+				sev := strings.ToLower(r.Severity)
 				if t.SeverityStats == nil {
 					t.SeverityStats = make(map[string]int)
 				}
 				t.SeverityStats[sev]++
-				_ = persistHit(t.ID, r)
 				publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
 					"target":   r.FullTarget,
-					"severity": r.PocInfo.Info.Severity,
+					"severity": r.Severity,
 					"poc": map[string]string{
-						"id":   r.PocInfo.Id,
-						"name": r.PocInfo.Info.Name,
+						"id":   r.PocID,
+						"name": r.PocName,
 					},
-					"message": fmt.Sprintf("命中 %s", r.PocInfo.Info.Severity),
+					"message": fmt.Sprintf("命中 %s", r.Severity),
 					"ts":      time.Now().UnixMilli(),
 				}})
 			case pr, ok := <-portCh:
@@ -247,34 +288,37 @@ func startTask(m *TaskManager, t *Task) {
 					"ts":            time.Now().UnixMilli(),
 				}})
 			case <-ticker.C:
-				st := t.Scanner.GetStats()
-				prog := t.Scanner.GetProgress()
+				st := t.Scanner.Stats()
+				prog := t.Scanner.Progress()
 				publish(t, ScanEvent{Type: "progress", Data: map[string]interface{}{
 					"percent":   int(prog + 0.5),
 					"finished":  int(st.CompletedScans),
 					"total":     st.TotalScans,
-					"rate":      calcRate(t.startTime, st.CompletedScans),
-					"elapsedMs": time.Since(t.startTime).Milliseconds(),
+					"rate":      calcRate(t.started(), st.CompletedScans),
+					"elapsedMs": time.Since(t.started()).Milliseconds(),
 				}})
 			}
 		}
 	}()
-	_ = t.Scanner.RunAsync()
+	_ = t.Scanner.Start(context.Background())
 }
 
 func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
-	t.Status = status
+	if t.finalized.Swap(true) {
+		return
+	}
+	t.setStatus(status)
 	if t.Scanner != nil {
-		st := t.Scanner.GetStats()
-		prog := t.Scanner.GetProgress()
+		st := t.Scanner.Stats()
+		prog := t.Scanner.Progress()
 		publish(t, ScanEvent{Type: "progress", Data: map[string]interface{}{
 			"percent":   int(prog + 0.5),
 			"finished":  int(st.CompletedScans),
 			"total":     st.TotalScans,
-			"rate":      calcRate(t.startTime, st.CompletedScans),
-			"elapsedMs": time.Since(t.startTime).Milliseconds(),
+			"rate":      calcRate(t.started(), st.CompletedScans),
+			"elapsedMs": time.Since(t.started()).Milliseconds(),
 		}})
-		oobEnabled, oobStatus := t.Scanner.GetOOBStatus()
+		oobEnabled, oobStatus := t.Scanner.OOBStatus()
 		publish(t, ScanEvent{Type: "scan_info", Data: map[string]interface{}{
 			"total_targets": st.TotalTargets,
 			"total_pocs":    st.TotalPocs,
@@ -285,20 +329,25 @@ func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 		}})
 	}
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(status)}})
+
+	// Release the scanner's background goroutines. Without this a long-running
+	// server accumulates one engine and one OOB poller per finished task.
+	if t.Scanner != nil {
+		_ = t.Scanner.Close()
+	}
+
 	m.mu.Lock()
 	if m.running > 0 {
 		m.running--
 	}
-	var nextID string
+	var next *Task
 	if len(m.queue) > 0 {
-		nextID = m.queue[0]
+		next = m.tasks[m.queue[0]]
 		m.queue = m.queue[1:]
 	}
 	m.mu.Unlock()
-	if nextID != "" {
-		if nt, ok := m.tasks[nextID]; ok {
-			startTask(m, nt)
-		}
+	if next != nil {
+		startTask(m, next)
 	}
 }
 
@@ -398,56 +447,68 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sdkOpts := afrog.NewSDKOptions()
-	sdkOpts.Targets = targets
-	sdkOpts.PocFile = pocPath
-	sdkOpts.AppendPoc = appendPocs
-	if useIDs {
-		sdkOpts.Search = ""
-		sdkOpts.Severity = ""
-	} else {
-		sdkOpts.Search = strings.TrimSpace(req.Search)
-		sdkOpts.Severity = strings.TrimSpace(req.Severity)
+	taskID := nextTaskID(getTaskManager())
+
+	sdkOpts := []sdk.Option{
+		sdk.WithTargets(targets...),
+		sdk.WithPocPaths(pocPath),
+		sdk.WithPocPathsOnly(),
+		// Persist the engine-level result so that the stored request and
+		// response keep the exact shape the reports and UI expect.
+		sdk.WithRawResultHandler(func(r *result.Result) {
+			_ = persistHit(taskID, r)
+		}),
+	}
+	if len(appendPocs) > 0 {
+		sdkOpts = append(sdkOpts, sdk.WithPocPaths(appendPocs...))
+	}
+	if !useIDs {
+		sdkOpts = append(sdkOpts,
+			sdk.WithSearch(strings.TrimSpace(req.Search)),
+			sdk.WithSeverity(strings.TrimSpace(req.Severity)),
+		)
 	}
 	if req.Concurrency > 0 {
-		sdkOpts.Concurrency = req.Concurrency
+		sdkOpts = append(sdkOpts, sdk.WithConcurrency(req.Concurrency))
 	}
 	if req.RateLimit > 0 {
-		sdkOpts.RateLimit = req.RateLimit
+		sdkOpts = append(sdkOpts, sdk.WithRateLimit(req.RateLimit))
 	}
 	if req.Timeout > 0 {
-		sdkOpts.Timeout = req.Timeout
+		sdkOpts = append(sdkOpts, sdk.WithTimeout(req.Timeout))
 	}
-	if req.Retries >= 0 {
-		sdkOpts.Retries = req.Retries
+	if req.Retries > 0 {
+		sdkOpts = append(sdkOpts, sdk.WithRetries(req.Retries))
 	}
 	if req.MaxHostError > 0 {
-		sdkOpts.MaxHostError = req.MaxHostError
+		sdkOpts = append(sdkOpts, sdk.WithMaxHostError(req.MaxHostError))
 	}
-	if strings.TrimSpace(req.Proxy) != "" {
-		sdkOpts.Proxy = strings.TrimSpace(req.Proxy)
+	if v := strings.TrimSpace(req.Proxy); v != "" {
+		sdkOpts = append(sdkOpts, sdk.WithProxy(v))
 	}
 	if req.Smart {
-		sdkOpts.Smart = true
+		sdkOpts = append(sdkOpts, sdk.WithSmartConcurrency())
 	}
-
-	sdkOpts.EnableOOB = req.EnableOOB
-	sdkOpts.OOB = strings.TrimSpace(req.OOB)
-	sdkOpts.OOBKey = strings.TrimSpace(req.OOBKey)
-	sdkOpts.OOBDomain = strings.TrimSpace(req.OOBDomain)
-	sdkOpts.OOBApiUrl = strings.TrimSpace(req.OOBApiUrl)
-	sdkOpts.OOBHttpUrl = strings.TrimSpace(req.OOBHttpUrl)
-	sdkOpts.PortScan = req.PortScan || req.PortScanCompat
-	sdkOpts.PSSkipDiscovery = req.SkipHostDisc
-	if v := strings.TrimSpace(req.Ports); v != "" {
-		sdkOpts.PSPorts = v
+	if req.EnableOOB {
+		sdkOpts = append(sdkOpts, sdk.WithOOB(sdk.OOBOptions{
+			Adapter: strings.TrimSpace(req.OOB),
+			Key:     strings.TrimSpace(req.OOBKey),
+			Domain:  strings.TrimSpace(req.OOBDomain),
+			ApiURL:  strings.TrimSpace(req.OOBApiUrl),
+			HttpURL: strings.TrimSpace(req.OOBHttpUrl),
+		}))
+	}
+	if req.PortScan || req.PortScanCompat {
+		sdkOpts = append(sdkOpts, sdk.WithPortScan(sdk.PortScanOptions{
+			Ports:         strings.TrimSpace(req.Ports),
+			SkipDiscovery: req.SkipHostDisc,
+		}))
 	}
 	if req.WebProbe || req.WebFingerprint {
-		sdkOpts.EnableWebProbe = true
+		sdkOpts = append(sdkOpts, sdk.WithWebProbe())
 	}
-	sdkOpts.EnableStream = true
 
-	scanner, err := afrog.NewSDKScanner(sdkOpts)
+	scanner, err := sdk.New(context.Background(), sdkOpts...)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		gologger.Debug().Str("path", r.URL.Path).Str("error", err.Error()).Msg("start scan failed: create scanner error")
@@ -456,8 +517,8 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := getTaskManager()
-	id := nextTaskID(m)
-	t := &Task{ID: id, Name: strings.TrimSpace(req.TaskName), Status: TaskStarting, Scanner: scanner, CreatedAt: time.Now()}
+	id := taskID
+	t := &Task{ID: id, Name: strings.TrimSpace(req.TaskName), status: TaskStarting, Scanner: scanner, CreatedAt: time.Now()}
 	m.mu.Lock()
 	m.tasks[id] = t
 	m.mu.Unlock()
@@ -551,8 +612,8 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	startTask(m, t)
 
 	// 获取扫描初始化信息
-	stats := scanner.GetStats()
-	oobEnabled, oobStatus := scanner.GetOOBStatus()
+	stats := scanner.Stats()
+	oobEnabled, oobStatus := scanner.OOBStatus()
 
 	// 获取扫描目标（截取前5个用于展示，与CLI保持一致）
 	displayTargets := []string{}
@@ -631,8 +692,9 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 		fl.Flush()
 	}
 
-	writeEvent(ScanEvent{Type: "status", Data: map[string]string{"status": string(t.Status)}})
-	if t.Status == TaskCompleted || t.Status == TaskFailed || t.Status == TaskCancelled {
+	current := t.Status()
+	writeEvent(ScanEvent{Type: "status", Data: map[string]string{"status": string(current)}})
+	if current == TaskCompleted || current == TaskFailed || current == TaskCancelled {
 		return
 	}
 
@@ -683,15 +745,15 @@ func scanStatusHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
-	st := t.Scanner.GetStats()
+	st := t.Scanner.Stats()
 	resp := ScanStatusData{
-		Status: string(t.Status),
+		Status: string(t.Status()),
 		Progress: ScanProgressData{
-			Percent:   int(t.Scanner.GetProgress() + 0.5),
+			Percent:   int(t.Scanner.Progress() + 0.5),
 			Finished:  int(st.CompletedScans),
 			Total:     st.TotalScans,
-			Rate:      calcRate(t.startTime, st.CompletedScans),
-			ElapsedMs: time.Since(t.startTime).Milliseconds(),
+			Rate:      calcRate(t.started(), st.CompletedScans),
+			ElapsedMs: time.Since(t.started()).Milliseconds(),
 		},
 		TaskID:     taskID,
 		InstanceID: serverInstanceID,
@@ -730,7 +792,7 @@ func scanPauseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.Scanner.Pause()
-	t.Status = TaskPaused
+	t.setStatus(TaskPaused)
 	if t.Scanner.IsPaused() {
 		gologger.Debug().Str("taskId", taskID).Msg("pause succeeded: engine gated")
 	} else {
@@ -767,7 +829,7 @@ func scanResumeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.Scanner.Resume()
-	t.Status = TaskRunning
+	t.setStatus(TaskRunning)
 	if !t.Scanner.IsPaused() {
 		gologger.Debug().Str("taskId", taskID).Msg("resume succeeded: engine released")
 	} else {
@@ -808,17 +870,15 @@ func scanStopHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		gologger.Debug().Str("taskId", taskID).Msg("stop uncertain: cancel flag not set")
 	}
-	t.Status = TaskCancelled
+	t.setStatus(TaskCancelled)
 	finalizeTask(m, t, TaskCancelled)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
 }
 
-func calcRate(start time.Time, completed int32) int {
+func calcRate(start time.Time, completed int64) int {
 	secs := time.Since(start).Seconds()
 	if secs <= 0 {
 		return 0
 	}
 	return int(float64(completed) / secs)
 }
-
-// 使用 SDKScanner 自带的统计，已在 scanStatus/progress 中读取

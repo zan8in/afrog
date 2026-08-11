@@ -180,7 +180,7 @@ func serverInfoHandler(w http.ResponseWriter, r *http.Request) {
 	activeTaskCount := 0
 	m.mu.Lock()
 	for _, t := range m.tasks {
-		if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
+		if isActive(t.Status()) {
 			activeTaskCount++
 		}
 	}
@@ -206,7 +206,7 @@ func instancesListHandler(w http.ResponseWriter, r *http.Request) {
 	active := make([]string, 0, 16)
 	m.mu.Lock()
 	for id, t := range m.tasks {
-		if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
+		if isActive(t.Status()) {
 			active = append(active, id)
 		}
 	}
@@ -262,37 +262,26 @@ func instanceForceStopHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := getTaskManager()
-	found := false
 	m.mu.Lock()
-	for id, t := range m.tasks {
-		if id == req.TaskID {
-			// 仅允许关闭属于该实例的活跃任务
-			if t.Status == TaskRunning || t.Status == TaskPaused || t.Status == TaskStarting {
-				found = true
-			}
-			break
-		}
-	}
+	t := m.tasks[req.TaskID]
 	m.mu.Unlock()
-	if !found {
+
+	// 仅允许关闭属于该实例的活跃任务
+	if t == nil || !isActive(t.Status()) {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "taskId 不属于该实例或非活跃任务"})
 		return
 	}
-	m.mu.Lock()
-	t := m.tasks[req.TaskID]
-	m.mu.Unlock()
-	if t != nil {
-		t.Scanner.Stop()
-		t.Status = TaskCancelled
-		publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskCancelled)}})
-		finalizeTask(m, t, TaskCancelled)
-		if t.Scanner.IsStopping() {
-			gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop succeeded: task cancelled and server shutting down")
-		} else {
-			gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop uncertain: cancel flag not set")
-		}
+	t.Scanner.Stop()
+	t.setStatus(TaskCancelled)
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskCancelled)}})
+	finalizeTask(m, t, TaskCancelled)
+	if t.Scanner.IsStopping() {
+		gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop succeeded: task cancelled and server shutting down")
+	} else {
+		gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop uncertain: cancel flag not set")
 	}
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

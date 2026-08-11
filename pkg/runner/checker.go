@@ -148,6 +148,15 @@ func celSafeIdent(s string) string {
 	return string(b)
 }
 
+// responseBodyTruncated 读取最近一次 HTTP 响应是否因 MaxRespBodySize 被截断。
+func (c *Checker) responseBodyTruncated() bool {
+	if c == nil || c.VariableMap == nil {
+		return false
+	}
+	t, _ := c.VariableMap[retryhttpclient.VarResponseBodyTruncated].(bool)
+	return t
+}
+
 func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -438,9 +447,15 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			last.IsVul = isMatch
 			last.BruteTruncated = bruteTruncated
 			last.BruteRequests = bruteRequests
+			last.BodyTruncated = c.responseBodyTruncated()
 			c.Result.AllPocResult = append(c.Result.AllPocResult, stepResults...)
 		} else {
-			pocRstTemp := result.PocResult{IsVul: isMatch, BruteTruncated: bruteTruncated, BruteRequests: bruteRequests}
+			pocRstTemp := result.PocResult{
+				IsVul:          isMatch,
+				BruteTruncated: bruteTruncated,
+				BruteRequests:  bruteRequests,
+				BodyTruncated:  c.responseBodyTruncated(),
+			}
 			if c.VariableMap["response"] != nil {
 				pocRstTemp.ResultResponse = c.VariableMap["response"].(*proto.Response)
 			}

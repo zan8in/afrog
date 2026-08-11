@@ -450,7 +450,9 @@ func (s *Scanner) maybeAdaptiveDelay() {
 // Returns the open connection (if successful) or error.
 // Caller is responsible for closing the connection.
 func (s *Scanner) checkPortOpen(host string, port int) (net.Conn, error) {
-	address := fmt.Sprintf("%s:%d", host, port)
+	// net.JoinHostPort brackets IPv6 literals; fmt.Sprintf("%s:%d") does not
+	// and produces an address net.Dial cannot parse.
+	address := net.JoinHostPort(host, strconv.Itoa(port))
 	var conn net.Conn
 	var err error
 

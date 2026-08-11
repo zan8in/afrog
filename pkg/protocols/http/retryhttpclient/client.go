@@ -46,6 +46,10 @@ var (
 	taskGateWaitCount int64
 )
 
+// VarResponseBodyTruncated 是写入 variableMap 的内部键（不参与 CEL 求值），
+// 用于把“响应体被 MaxRespBodySize 截断”这一事实传递给上层结果构造。
+const VarResponseBodyTruncated = "__response_body_truncated"
+
 type Options struct {
 	Proxy             string
 	Timeout           int
@@ -693,8 +697,17 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 			return err
 		}
 	}
+	// 读满上限时再探一个字节，用来区分“正好等于上限”和“确实被截断”。
+	bodyTruncated := false
+	if lr.N <= 0 {
+		var probe [1]byte
+		if n, _ := resp.Body.Read(probe[:]); n > 0 {
+			bodyTruncated = true
+		}
+	}
 	resp.Body.Close()
 	respBody := buf.Bytes()
+	variableMap[VarResponseBodyTruncated] = bodyTruncated
 
 	responseText := ""
 	if len(respBody) > 0 {

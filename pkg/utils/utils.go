@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/hex"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -180,15 +179,17 @@ func GetNumberText(number int) string {
 	return num
 }
 
-// 16进制解码
+// HexDecode 解码十六进制字符串，输入非法时返回 nil。
+//
+// 这里刻意不使用 log.Fatal：作为库函数，它不能因为一个畸形的 PoC 输入
+// 就终止宿主进程。
 func HexDecode(s string) []byte {
-	dst := make([]byte, hex.DecodedLen(len(s))) //申请一个切片, 指明大小. 必须使用hex.DecodedLen
-	n, err := hex.Decode(dst, []byte(s))        //进制转换, src->dst
+	dst := make([]byte, hex.DecodedLen(len(s)))
+	n, err := hex.Decode(dst, []byte(s))
 	if err != nil {
-		log.Fatal(err)
 		return nil
 	}
-	return dst[:n] //返回0:n的数据.
+	return dst[:n]
 }
 
 // 字符串转为16进制

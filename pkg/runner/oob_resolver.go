@@ -25,7 +25,7 @@ func (r *Runner) registerOOBPendings(res *result.Result, pendings []OOBPending) 
 	if r == nil || res == nil || len(pendings) == 0 {
 		return
 	}
-	if r.engine == nil || r.engine.oobMgr == nil {
+	if r.engine == nil || r.engine.OOBMgr() == nil {
 		return
 	}
 	for _, p := range pendings {
@@ -77,12 +77,12 @@ func (r *Runner) registerOOBPendings(res *result.Result, pendings []OOBPending) 
 		}
 		r.oobPendingMu.Unlock()
 
-		r.engine.oobMgr.Watch(filter, filterType)
+		r.engine.OOBMgr().Watch(filter, filterType)
 	}
 }
 
 func (r *Runner) startOOBResolver() {
-	if r == nil || r.engine == nil || r.engine.oobMgr == nil {
+	if r == nil || r.engine == nil || r.engine.OOBMgr() == nil {
 		return
 	}
 	if r.oobResolverStop != nil || r.oobResolverDone != nil {
@@ -127,7 +127,7 @@ func (r *Runner) stopOOBResolver() {
 }
 
 func (r *Runner) resolveOOBPendingsOnce() int {
-	if r == nil || r.engine == nil || r.engine.oobMgr == nil || r.OnResult == nil {
+	if r == nil || r.engine == nil || r.engine.OOBMgr() == nil || r.OnResult == nil {
 		return 0
 	}
 
@@ -150,15 +150,15 @@ func (r *Runner) resolveOOBPendingsOnce() int {
 	resolved := 0
 	for _, it := range items {
 		ent := it.ent
-		_, ok := r.engine.oobMgr.HitSnapshot(ent.filter, ent.filterType)
+		_, ok := r.engine.OOBMgr().HitSnapshot(ent.filter, ent.filterType)
 		if !ok {
 			continue
 		}
-		if ent.token != "" && !r.engine.oobMgr.TokenMatches(ent.filter, ent.filterType, ent.token) {
+		if ent.token != "" && !r.engine.OOBMgr().TokenMatches(ent.filter, ent.filterType, ent.token) {
 			continue
 		}
 
-		ev := r.engine.oobMgr.Evidence(ent.filter, ent.filterType, 5)
+		ev := r.engine.OOBMgr().Evidence(ent.filter, ent.filterType, 5)
 		if strings.TrimSpace(ev) == "" {
 			continue
 		}
@@ -241,7 +241,7 @@ func (r *Runner) finalizeOOBPendings() {
 	if r == nil {
 		return
 	}
-	if r.engine == nil || r.engine.oobMgr == nil {
+	if r.engine == nil || r.engine.OOBMgr() == nil {
 		if r.options != nil && r.options.OnPhaseProgress != nil {
 			r.options.OnPhaseProgress("oob_finalize", "skipped", 0, 0, 100)
 		}

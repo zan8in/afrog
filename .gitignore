@@ -25,6 +25,7 @@ urls*
 .vscode
 .idea
 .trae
+.cursor
 .DS_Store
 .config
 

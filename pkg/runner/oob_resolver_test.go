@@ -37,10 +37,10 @@ func TestResolveOOBPendingsOncePreservesRequestResponse(t *testing.T) {
 	}
 
 	var got *result.Result
+	engine := &Engine{}
+	engine.oobMgr.Store(mgr)
 	r := &Runner{
-		engine: &Engine{
-			oobMgr: mgr,
-		},
+		engine: engine,
 		OnResult: func(rst *result.Result) {
 			got = rst
 		},

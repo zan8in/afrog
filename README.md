@@ -709,20 +709,72 @@ afrog -t https://example.com -ja result.json
 
 ## As Library
 
-### Simple Example
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/zan8in/afrog/v3/pkg/sdk"
+)
+
+func main() {
+	ctx := context.Background()
+
+	scanner, err := sdk.New(ctx,
+		sdk.WithTargets("https://example.com"),
+		sdk.WithPocPaths("./pocs/afrog-pocs"), // file, directory or glob
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer scanner.Close()
+
+	if err := scanner.Execute(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	for _, r := range scanner.Results() {
+		fmt.Printf("[%s] %s - %s\n", r.Severity, r.FullTarget, r.PocName)
+
+		// The complete request and response of every step is available.
+		for _, ex := range r.Exchanges {
+			fmt.Println(ex.Request)
+			fmt.Println(ex.Response)
+		}
+	}
+}
+```
+
+`Execute` runs synchronously; `Start` plus `Wait`/`Done` runs the scan in the
+background. The SDK writes nothing to stdout or stderr, returns typed errors
+that work with `errors.Is`, and `Results()` is JSON serialisable as-is.
 
 For comprehensive SDK documentation:
 
 - [SDK Usage Guide (English)](docs/SDK_Usage_Guide_English.md)
 - [SDK使用指南 (中文)](docs/SDK使用指南_中文.md)
 
-### More Examples & Documentation
+### Runnable Examples
 
-- [Basic scanner](examples/basic_scan/main.go)
-- [Async scanner](examples/async_scan/main.go)  
-- [OOB scanner](examples/oob_scan/main.go)
-- [Progress scanner](examples/progress_scan/main.go)
-- [SDK PortScan (sync/async)](examples/sdk_portscan/main.go)
+Every example resolves the bundled PoC directory automatically and accepts
+`-pocs` to override it:
+
+```sh
+go run ./examples/basic_scan
+go run ./examples/full_output -json
+```
+
+- [Basic scanner](examples/basic_scan/main.go) — smallest useful program
+- [Full output](examples/full_output/main.go) — complete request/response data and JSON
+- [Async scanner](examples/async_scan/main.go) — streaming results and progress
+- [Progress scanner](examples/progress_scan/main.go) — progress bar
+- [OOB scanner](examples/oob_scan/main.go) — out-of-band detection
+- [SDK PortScan (sync/async)](examples/sdk_portscan/main.go) — port pre-scanning
+- [Vulnerability scan](examples/vuln_scan/main.go) — CI-style streaming consumption
+- [Port scan](examples/port_scan/main.go) — using the portscan package directly
 
 
 

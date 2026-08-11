@@ -33,6 +33,9 @@ type PocResult struct {
 	IsVul          bool
 	BruteTruncated bool
 	BruteRequests  int
+	// BodyTruncated 表示响应体在 MaxRespBodySize 上限处被截断，
+	// 此时 ResultResponse.Body 不是完整的服务端响应。
+	BodyTruncated bool
 }
 
 func DebugDumpRequestText(pr *PocResult) string {
@@ -102,6 +105,7 @@ func (pr *PocResult) Snapshot() *PocResult {
 		IsVul:          pr.IsVul,
 		BruteTruncated: pr.BruteTruncated,
 		BruteRequests:  pr.BruteRequests,
+		BodyTruncated:  pr.BodyTruncated,
 	}
 }
 

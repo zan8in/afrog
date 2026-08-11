@@ -27,13 +27,16 @@ import (
 type OnResult func(*result.Result)
 
 type Runner struct {
-	options           *config.Options
-	catalog           *catalog.Catalog
-	Report            *report.Report
-	JsonReport        *report.JsonReport
-	OnResult          OnResult
-	OnFingerprint     func(targetKey string, hits []fingerprint.Hit)
-	OnWebProbe        func(meta WebMeta)
+	options       *config.Options
+	catalog       *catalog.Catalog
+	Report        *report.Report
+	JsonReport    *report.JsonReport
+	OnResult      OnResult
+	OnFingerprint func(targetKey string, hits []fingerprint.Hit)
+	OnWebProbe    func(meta WebMeta)
+	// OnFailure 在单个 PoC 执行失败时触发（请求错误、表达式异常、panic）。
+	// 以前这些失败会被完全吞掉，调用方无从得知。
+	OnFailure         func(target string, pocID string, err error)
 	PocsYaml          utils.StringSlice
 	PocsEmbedYaml     utils.StringSlice
 	engine            *Engine
@@ -134,6 +137,7 @@ func NewRunner(options *config.Options) (*Runner, error) {
 		if err != nil {
 			return nil, err
 		}
+		cyberspace.Quiet = options.SDKMode || options.Silent
 		runner.Cyberspace = cyberspace
 	}
 
@@ -297,6 +301,24 @@ func (r *Runner) Stop() {
 	}
 	if r.engine != nil {
 		r.engine.Stop()
+	}
+}
+
+// Release stops the runner and frees every resource it owns: the scan engine,
+// the OOB poll loop, the OOB resolver and the progress store.
+//
+// Stop only signals the scan to halt; Release additionally guarantees that no
+// background goroutine survives. Embedders must call it, otherwise a
+// long-running host process accumulates one poller per completed scan.
+func (r *Runner) Release() {
+	if r == nil {
+		return
+	}
+	r.Stop()
+	r.stopOOBResolver()
+	if r.engine != nil {
+		r.engine.stopOOBManager()
+		r.engine.pedmStopMonitor()
 	}
 }
 

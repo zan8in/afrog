@@ -26,6 +26,15 @@ type OOBManager struct {
 	maxSeen       int
 	lastPolledAt  map[string]time.Time
 	lastPollError map[string]time.Time
+
+	// stop terminates the poll loop independently of the parent context.
+	// Without it the poller would outlive a completed scan, because the
+	// runner context is only cancelled on an explicit Stop.
+	stop     chan struct{}
+	stopOnce sync.Once
+	// done is closed once the poll loop has exited, so callers can wait for
+	// the goroutine to be gone instead of merely signalled.
+	done chan struct{}
 }
 
 type OOBHitSnapshot struct {
@@ -84,9 +93,21 @@ func NewOOBManager(ctx context.Context, adapter *oobadapter.OOBAdapter, pollInte
 		maxSeen:       200,
 		lastPolledAt:  make(map[string]time.Time),
 		lastPollError: make(map[string]time.Time),
+		stop:          make(chan struct{}),
+		done:          make(chan struct{}),
 	}
 	go m.loop(ctx)
 	return m
+}
+
+// Stop terminates the poll loop and waits for it to exit.
+// It is safe to call more than once.
+func (m *OOBManager) Stop() {
+	if m == nil {
+		return
+	}
+	m.stopOnce.Do(func() { close(m.stop) })
+	<-m.done
 }
 
 func (m *OOBManager) Watch(filter string, filterType string) {
@@ -318,12 +339,16 @@ func waitClosed(ch <-chan struct{}, timeout time.Duration) bool {
 }
 
 func (m *OOBManager) loop(ctx context.Context) {
+	defer close(m.done)
+
 	ticker := time.NewTicker(m.pollInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
+			return
+		case <-m.stop:
 			return
 		case <-ticker.C:
 		}

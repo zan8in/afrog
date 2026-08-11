@@ -462,9 +462,9 @@ func (e *Engine) AcquireChecker() *Checker {
 	c.Result.Output = e.options.Output
 	c.OOBAdapter = e.oobAdapter
 	c.OOBAlive = e.oobAlive
-	c.OOBMgr = e.oobMgr
+	c.OOBMgr = e.OOBMgr()
 	if c.CustomLib != nil {
-		c.CustomLib.SetOOBManager(e.oobMgr)
+		c.CustomLib.SetOOBManager(e.OOBMgr())
 	}
 	return c
 }
@@ -481,8 +481,10 @@ func (e *Engine) ReleaseChecker(c *Checker) {
 }
 
 type Engine struct {
-	options       *config.Options
-	ticker        *time.Ticker
+	options *config.Options
+	// ticker paces task scheduling. It is created per stage and stopped from
+	// Stop, which runs on a different goroutine, so access must be atomic.
+	ticker        atomic.Pointer[time.Ticker]
 	mu            sync.Mutex
 	paused        uint32
 	stopped       uint32
@@ -500,7 +502,43 @@ type Engine struct {
 	pedmStop      chan struct{}
 	oobAdapter    *oobadapter.OOBAdapter
 	oobAlive      bool
-	oobMgr        *OOBManager
+	// oobMgr is swapped between scans and read lock-free from the scan hot
+	// path, so it must be an atomic pointer rather than a plain field.
+	oobMgr atomic.Pointer[OOBManager]
+}
+
+// setTicker installs the scheduling ticker, stopping any previous one.
+func (e *Engine) setTicker(t *time.Ticker) {
+	if old := e.ticker.Swap(t); old != nil {
+		old.Stop()
+	}
+}
+
+// stopTicker stops and clears the scheduling ticker. It is safe to call when
+// no ticker is installed and safe to call concurrently.
+func (e *Engine) stopTicker() {
+	if old := e.ticker.Swap(nil); old != nil {
+		old.Stop()
+	}
+}
+
+// OOBMgr returns the active out-of-band manager, or nil when OOB is inactive.
+func (e *Engine) OOBMgr() *OOBManager {
+	if e == nil {
+		return nil
+	}
+	return e.oobMgr.Load()
+}
+
+// setOOBManager installs a manager, stopping any previous one so its poll
+// goroutine cannot outlive the swap.
+func (e *Engine) setOOBManager(m *OOBManager) {
+	if e == nil {
+		return
+	}
+	if old := e.oobMgr.Swap(m); old != nil {
+		old.Stop()
+	}
 }
 
 func NewEngine(options *config.Options) *Engine {
@@ -925,9 +963,11 @@ func (runner *Runner) Execute() {
 		}
 	}
 	if runner.engine != nil {
+		// Stop any manager left over from a previous run before dropping the
+		// reference, otherwise its poll goroutine would leak.
+		runner.engine.stopOOBManager()
 		runner.engine.oobAdapter = nil
 		runner.engine.oobAlive = false
-		runner.engine.oobMgr = nil
 	}
 
 	pocSlice := options.CreatePocList()
@@ -973,7 +1013,11 @@ func (runner *Runner) Execute() {
 	if runner.engine != nil && runner.engine.oobAlive && runner.engine.oobAdapter != nil {
 		pollInterval := time.Duration(options.OOBPollInterval) * time.Second
 		hitRetention := time.Duration(options.OOBHitRetention) * time.Minute
-		runner.engine.oobMgr = NewOOBManager(runner.ctx, runner.engine.oobAdapter, pollInterval, hitRetention)
+		runner.engine.setOOBManager(NewOOBManager(runner.ctx, runner.engine.oobAdapter, pollInterval, hitRetention))
+		// The poll loop must not outlive the scan. Without this the goroutine
+		// survives every completed scan, because runner.ctx is only cancelled
+		// by an explicit Stop.
+		defer runner.engine.stopOOBManager()
 	}
 	runner.startOOBResolver()
 	defer runner.stopOOBResolver()
@@ -1453,13 +1497,14 @@ func (runner *Runner) Execute() {
 			concurrency = 1
 		}
 
-		runner.engine.ticker = time.NewTicker(time.Second / time.Duration(rate))
-		defer func() {
-			if runner.engine.ticker != nil {
-				runner.engine.ticker.Stop()
-				runner.engine.ticker = nil
-			}
-		}()
+		interval := time.Second / time.Duration(rate)
+		if interval <= 0 {
+			// time.NewTicker panics on a non-positive interval, which a very
+			// high rate limit would otherwise produce.
+			interval = time.Nanosecond
+		}
+		runner.engine.setTicker(time.NewTicker(interval))
+		defer runner.engine.stopTicker()
 
 		type stageTask struct {
 			tap   *TransData
@@ -1692,6 +1737,18 @@ func (runner *Runner) exec(tap *TransData) {
 	}
 }
 
+// emitFailure 把单个 PoC 的执行失败上报给调用方，不影响扫描继续进行。
+func (runner *Runner) emitFailure(target string, p *poc.Poc, err error) {
+	if runner == nil || runner.OnFailure == nil || err == nil {
+		return
+	}
+	pocID := ""
+	if p != nil {
+		pocID = p.Id
+	}
+	runner.OnFailure(target, pocID, err)
+}
+
 func (runner *Runner) executeExpression(ctx context.Context, target string, poc *poc.Poc) {
 	c := runner.engine.AcquireChecker()
 	defer runner.engine.ReleaseChecker(c)
@@ -1703,6 +1760,7 @@ func (runner *Runner) executeExpression(ctx context.Context, target string, poc 
 		// https://github.com/zan8in/afrog/v3/issues/7
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
+			runner.emitFailure(target, poc, fmt.Errorf("panic: %v", r))
 			runner.OnResult(c.Result)
 		}
 	}()
@@ -1710,7 +1768,9 @@ func (runner *Runner) executeExpression(ctx context.Context, target string, poc 
 	if ctx != nil {
 		c.VariableMap[retryhttpclient.ContextVarKey] = ctx
 	}
-	c.Check(target, poc)
+	if err := c.Check(target, poc); err != nil {
+		runner.emitFailure(target, poc, err)
+	}
 	if c.Result != nil {
 		c.Result.FingerResult = runner.fingerprintForTarget(c.Result.Target)
 	}
@@ -1865,12 +1925,13 @@ func (runner *Runner) fingerprintForTarget(target string) []fingerprint.Hit {
 }
 
 func (e *Engine) waitTick() {
-	if e.ticker == nil {
+	ticker := e.ticker.Load()
+	if ticker == nil {
 		return
 	}
 	start := time.Now()
 	select {
-	case <-e.ticker.C:
+	case <-ticker.C:
 	case <-e.quit:
 		return
 	}
@@ -1903,13 +1964,21 @@ func (e *Engine) Stop() {
 	if !atomic.CompareAndSwapUint32(&e.stopped, 0, 1) {
 		return
 	}
-	e.mu.Lock()
-	if e.ticker != nil {
-		e.ticker.Stop()
-	}
-	e.mu.Unlock()
+	e.stopTicker()
 	close(e.quit)
+	e.stopOOBManager()
 	gologger.Debug().Msgf("engine stopped: ticker stopped and scheduling halted")
+}
+
+// stopOOBManager terminates the OOB poll goroutine and clears the reference.
+// It is safe to call when no manager is running.
+func (e *Engine) stopOOBManager() {
+	if e == nil {
+		return
+	}
+	if mgr := e.oobMgr.Swap(nil); mgr != nil {
+		mgr.Stop()
+	}
 }
 
 func (runner *Runner) NotVulCallback() {

@@ -1,177 +1,122 @@
+// Progress Scan Example / 带进度条的扫描示例
+//
+// Demonstrates monitoring scan progress in real time while the scan runs in
+// the background.
+//
+// 演示在扫描后台运行的同时实时监控进度。
+//
+// Run / 运行:
+//
+//	go run ./examples/progress_scan
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"path/filepath"
+	"os"
+	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/zan8in/afrog/v3"
-	"github.com/zan8in/afrog/v3/pkg/result"
+	"github.com/zan8in/afrog/v3/examples/internal/examplepath"
+	"github.com/zan8in/afrog/v3/pkg/sdk"
 )
 
-// Progress Scan Example / 带进度条的扫描示例
-//
-// This example demonstrates how to monitor scan progress in real-time
-// and display a progress bar during the scanning process.
-//
-// 此示例演示如何实时监控扫描进度，
-// 并在扫描过程中显示进度条。
-
 func main() {
-	// Create SDK scan options / 创建 SDK 扫描选项
-	options := afrog.NewSDKOptions()
+	target := flag.String("target", "https://scanme.sh", "target to scan")
+	pocs := examplepath.PocsFlag()
+	flag.Parse()
 
-	// Set multiple scan targets for better progress demonstration
-	// 设置多个扫描目标以更好地演示进度
-	options.Targets = []string{
-		"https://www.example.com",
-	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	// Set POC path (required) / 设置 POC 路径（必需）
-	pocPath, err := filepath.Abs("../pocs/afrog-pocs")
-	if err != nil {
-		log.Fatalf("Failed to get POC path / 获取 POC 路径失败: %v", err)
-	}
-	options.PocFile = pocPath
-
-	// Configuration for better progress visibility / 配置以更好地显示进度
-	options.Concurrency = 5        // Lower concurrency for visible progress / 较低并发以显示进度
-	options.RateLimit = 20         // Lower rate limit / 较低速率限制
-	options.Timeout = 15           // Longer timeout / 更长超时时间
-	options.Search = "fingerprint" // Search fingerprint POCs / 搜索指纹识别 POC
-	options.Severity = "info,low"  // Multiple severity levels / 多个严重级别
-
-	fmt.Println("Creating SDK scanner... / 创建 SDK 扫描器...")
-
-	// Create scanner instance / 创建扫描器实例
-	scanner, err := afrog.NewSDKScanner(options)
-	if err != nil {
-		log.Fatalf("Failed to create scanner / 创建扫描器失败: %v", err)
-	}
-	defer scanner.Close() // Always close the scanner / 始终关闭扫描器
-
-	// Real-time result callback / 实时结果回调
-	var vulnCount int
+	// Handlers are invoked concurrently from scan workers, so shared state
+	// (here: stdout) needs a lock.
+	// 回调由扫描工作协程并发触发，共享状态（这里是 stdout）需要加锁。
 	var mu sync.Mutex
-	scanner.OnResult = func(r *result.Result) {
-		mu.Lock()
-		vulnCount++
-		fmt.Printf("\n[Real-time Discovery / 实时发现] %s - %s [%s]\n",
-			r.Target,
-			r.PocInfo.Info.Name,
-			r.PocInfo.Info.Severity)
-		mu.Unlock()
+
+	scanner, err := sdk.New(ctx,
+		sdk.WithTargets(*target),
+		sdk.WithPocPaths(*pocs),
+		sdk.WithPocPathsOnly(),
+		sdk.WithConcurrency(5),
+		sdk.WithRateLimit(20),
+		sdk.WithTimeout(15),
+		sdk.WithResultHandler(func(r sdk.Result) {
+			mu.Lock()
+			defer mu.Unlock()
+			fmt.Printf("\n[found / 发现] %s - %s [%s]\n", r.Target, r.PocName, r.Severity)
+		}),
+	)
+	if err != nil {
+		log.Fatalf("create scanner / 创建扫描器失败: %v", err)
+	}
+	defer scanner.Close()
+
+	start := time.Now()
+	if err := scanner.Start(ctx); err != nil {
+		log.Fatalf("start scan / 启动扫描失败: %v", err)
 	}
 
-	// Start progress monitoring goroutine / 启动进度监控协程
-	done := make(chan bool)
+	// The progress goroutine terminates on Done, so no sleep-based
+	// synchronisation is needed.
+	// 进度协程由 Done 通道终止，不需要用 sleep 做同步。
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		ticker := time.NewTicker(500 * time.Millisecond) // Update every 0.5 seconds / 每0.5秒更新
+		defer wg.Done()
+		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
-
 		for {
 			select {
 			case <-ticker.C:
-				progress := scanner.GetProgress()
-				stats := scanner.GetStats()
-
-				// Create progress bar / 创建进度条
-				progressBar := createProgressBar(progress, 50)
-
-				// Clear line and print progress / 清除行并打印进度
-				fmt.Printf("\r[Progress / 进度] %s %.2f%% (%d/%d) Found / 发现: %d",
-					progressBar,
-					progress,
-					stats.CompletedScans,
-					stats.TotalScans,
-					stats.FoundVulns)
-
-			case <-done:
+				st := scanner.Stats()
+				percent := scanner.Progress()
+				mu.Lock()
+				fmt.Printf("\r[progress / 进度] %s %.2f%% (%d/%d) found / 发现: %d",
+					progressBar(percent, 40), percent, st.CompletedScans, st.TotalScans, st.FoundVulns)
+				mu.Unlock()
+			case <-scanner.Done():
 				return
 			}
 		}
 	}()
 
-	fmt.Println("Starting scan with progress monitoring... / 开始带进度监控的扫描...")
-
-	// Execute scan (synchronous) / 执行扫描（同步）
-	start := time.Now()
-	err = scanner.Run()
-	if err != nil {
-		log.Printf("Scan error occurred / 扫描出现错误: %v", err)
+	if err := scanner.Wait(ctx); err != nil {
+		log.Printf("\nscan finished with error / 扫描出错: %v", err)
 	}
+	wg.Wait()
 
-	// Stop progress monitoring / 停止进度监控
-	done <- true
-	time.Sleep(100 * time.Millisecond) // Wait for goroutine to finish / 等待协程结束
+	results := scanner.Results()
+	st := scanner.Stats()
 
-	// Get final results / 获取最终结果
-	results := scanner.GetResults()
-	stats := scanner.GetStats()
-	duration := time.Since(start)
-
-	// Print final results / 打印最终结果
 	fmt.Printf("\n\n========== Scan Completed / 扫描完成 ==========\n")
-	fmt.Printf("Total targets / 总目标数: %d\n", stats.TotalTargets)
-	fmt.Printf("Total POCs / 总 POC 数: %d\n", stats.TotalPocs)
-	fmt.Printf("Total scans / 总扫描数: %d\n", stats.TotalScans)
-	fmt.Printf("Completed scans / 完成扫描数: %d\n", stats.CompletedScans)
-	fmt.Printf("Vulnerabilities found / 发现漏洞: %d\n", len(results))
-	fmt.Printf("Scan duration / 扫描耗时: %v\n", duration)
-	fmt.Printf("Average speed / 平均速度: %.2f scans/sec\n",
-		float64(stats.CompletedScans)/duration.Seconds())
+	fmt.Printf("targets / 目标数:   %d\n", st.TotalTargets)
+	fmt.Printf("pocs / PoC 数:      %d\n", st.TotalPocs)
+	fmt.Printf("tasks / 任务数:     %d/%d\n", st.CompletedScans, st.TotalScans)
+	fmt.Printf("vulnerabilities:    %d\n", len(results))
+	fmt.Printf("duration / 耗时:    %v\n", time.Since(start))
 
-	// Display vulnerability summary / 显示漏洞摘要
-	if len(results) > 0 {
-		fmt.Printf("\n========== Vulnerability Summary / 漏洞摘要 ==========\n")
-		severityCount := make(map[string]int)
-
-		for _, result := range results {
-			severityCount[result.PocInfo.Info.Severity]++
-		}
-
-		for severity, count := range severityCount {
-			fmt.Printf("  %s: %d\n", severity, count)
-		}
-
-		fmt.Printf("\n========== Vulnerability Details / 漏洞详情 ==========\n")
-		for i, result := range results {
-			fmt.Printf("%d. [%s] %s\n", i+1, result.PocInfo.Info.Severity, result.Target)
-			fmt.Printf("   POC: %s\n", result.PocInfo.Info.Name)
-			if result.PocInfo.Info.Description != "" {
-				fmt.Printf("   Description / 描述: %s\n", result.PocInfo.Info.Description)
-			}
-			fmt.Println("   ---")
-		}
-	} else {
-		fmt.Println("No vulnerabilities found / 未发现漏洞")
+	bySeverity := map[string]int{}
+	for _, v := range results {
+		bySeverity[v.Severity]++
 	}
-
-	fmt.Println("Scan completed successfully! / 扫描成功完成!")
+	for sev, n := range bySeverity {
+		fmt.Printf("  %s: %d\n", sev, n)
+	}
 }
 
-// createProgressBar creates a visual progress bar / 创建可视化进度条
-func createProgressBar(progress float64, width int) string {
-	if progress > 100 {
-		progress = 100
+// progressBar renders a textual progress bar of the given width.
+func progressBar(percent float64, width int) string {
+	if percent < 0 {
+		percent = 0
 	}
-	if progress < 0 {
-		progress = 0
+	if percent > 100 {
+		percent = 100
 	}
-
-	filled := int(progress * float64(width) / 100)
-	bar := "["
-
-	for i := 0; i < width; i++ {
-		if i < filled {
-			bar += "█"
-		} else {
-			bar += "░"
-		}
-	}
-
-	bar += "]"
-	return bar
+	filled := int(percent * float64(width) / 100)
+	return "[" + strings.Repeat("█", filled) + strings.Repeat("░", width-filled) + "]"
 }

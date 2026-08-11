@@ -14,6 +14,9 @@ type Cyberspace struct {
 	Engine     string
 	Query      string
 	QueryCount int
+	// Quiet suppresses the search progress output. Library embedders such as
+	// the SDK must not have this written to their process stdout.
+	Quiet bool
 }
 
 func New(config *config.Config, engine, query string, queryCount int) (*Cyberspace, error) {
@@ -107,13 +110,16 @@ func (c *Cyberspace) GetTargets() ([]string, error) {
 				break
 			}
 		}
-		fmt.Printf("\rZoomEye Searching... Total: %d, Query Count: %d, Current: %d", total, c.QueryCount, currentTotal)
+		if !c.Quiet {
+			fmt.Printf("\rZoomEye Searching... Total: %d, Query Count: %d, Current: %d", total, c.QueryCount, currentTotal)
+		}
 	}
 
-	fmt.Println("")
-
-	if currentTotal == 0 {
-		gologger.Info().Msg("no result found")
+	if !c.Quiet {
+		fmt.Println("")
+		if currentTotal == 0 {
+			gologger.Info().Msg("no result found")
+		}
 	}
 
 	return results, nil

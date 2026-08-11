@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/rs/xid"
-	"github.com/zan8in/afrog/v3/pkg/catalog"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/output"
@@ -46,8 +45,17 @@ type Options struct {
 	// list of target URLs/hosts to scan (one per line)
 	TargetsFile string
 
-	// PoC file or directory to scan
+	// PoC file or directory to scan.
+	// Deprecated: 语义为“独占”（屏蔽内置与用户目录 PoC），新代码请使用 PocPaths + PocPathsOnly。
 	PocFile string
+
+	// PocPaths 是追加式的 PoC 输入，支持文件、目录和 glob 通配符（如 "dir/*.yaml"）。
+	// 与内置、curated、my、local 来源合并，同名时以 PocPaths 优先。
+	PocPaths []string
+
+	// PocPathsOnly 为 true 时只加载 PocPaths/AppendPoc/PocFile 指定的 PoC，
+	// 屏蔽内置与用户目录来源。
+	PocPathsOnly bool
 
 	// Append PoC file or directory to scan
 	AppendPoc goflags.StringSlice
@@ -1080,23 +1088,22 @@ func detectLegacyOOBReasons(yamlText string) []string {
 	return reasons
 }
 
+// CreatePocList 返回本次扫描要执行的 PoC 列表。
+// 加载过程中被跳过的 PoC 会被丢弃，如需诊断信息请使用 CreatePocListWithDiagnostics。
 func (o *Options) CreatePocList() []poc.Poc {
+	pocList, _ := o.CreatePocListWithDiagnostics()
+	return pocList
+}
+
+// CreatePocListWithDiagnostics 在返回 PoC 列表的同时，返回所有被跳过的 PoC 及其原因。
+func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 	type legacyItem struct {
 		ID      string
 		Path    string
 		Reasons []string
 	}
 
-	pathItems := []pocsrepo.PathItem{}
-	if strings.TrimSpace(o.PocFile) != "" {
-		c := catalog.New(o.PocFile)
-		paths, _ := c.GetPocPath(o.PocFile)
-		for _, pth := range paths {
-			pathItems = append(pathItems, pocsrepo.PathItem{Path: pth, Source: pocsrepo.SourceLocal})
-		}
-	} else {
-		pathItems, _ = pocsrepo.CollectOrderedPocPaths(o.AppendPoc)
-	}
+	pathItems, diagnostics := o.resolvePocPathItems()
 
 	newPocSlice := make([]poc.Poc, 0, len(pathItems))
 	legacy := make([]legacyItem, 0)
@@ -1116,13 +1123,15 @@ func (o *Options) CreatePocList() []poc.Poc {
 			raw, err = os.ReadFile(srcPath)
 		}
 		if err != nil {
-			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, err)
+			diagnostics = append(diagnostics, PocLoadError{Path: it.Path, Reason: PocLoadReadFailed, Err: err})
+			o.logPocDiscarded(srcPath, err)
 			continue
 		}
 
 		pm := poc.PocMeta{}
 		if e := yaml.Unmarshal(raw, &pm); e != nil {
-			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, e)
+			diagnostics = append(diagnostics, PocLoadError{Path: it.Path, Reason: PocLoadParseFailed, Err: e})
+			o.logPocDiscarded(srcPath, e)
 			continue
 		}
 		id := strings.TrimSpace(pm.Id)
@@ -1137,12 +1146,19 @@ func (o *Options) CreatePocList() []poc.Poc {
 		reasons := detectLegacyOOBReasons(string(raw))
 		if len(reasons) > 0 {
 			legacy = append(legacy, legacyItem{ID: id, Path: srcPath, Reasons: reasons})
+			diagnostics = append(diagnostics, PocLoadError{
+				Path:   it.Path,
+				ID:     id,
+				Reason: PocLoadLegacyOOB,
+				Detail: strings.Join(reasons, "; "),
+			})
 			continue
 		}
 
 		pp := poc.Poc{}
 		if e := yaml.Unmarshal(raw, &pp); e != nil {
-			gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", srcPath, e)
+			diagnostics = append(diagnostics, PocLoadError{Path: it.Path, ID: id, Reason: PocLoadParseFailed, Err: e})
+			o.logPocDiscarded(srcPath, e)
 			continue
 		}
 		pp.Id = strings.TrimSpace(pp.Id)
@@ -1161,7 +1177,7 @@ func (o *Options) CreatePocList() []poc.Poc {
 		newPocSlice = append(newPocSlice, pp)
 	}
 
-	if len(legacy) > 0 {
+	if len(legacy) > 0 && !o.consoleQuiet() {
 		total := len(legacy)
 		const limit = 20
 		gologger.Print().Msgf("检测到旧OOB POC（已跳过）：%d 个", total)
@@ -1210,7 +1226,19 @@ func (o *Options) CreatePocList() []poc.Poc {
 		sort.Sort(POCSlices(finalPocSlice))
 	}
 
-	return finalPocSlice
+	return finalPocSlice, diagnostics
+}
+
+// consoleQuiet 表示当前不应该向控制台输出内容（SDK 模式或显式静默）。
+func (o *Options) consoleQuiet() bool {
+	return o != nil && (o.SDKMode || o.Silent)
+}
+
+func (o *Options) logPocDiscarded(path string, err error) {
+	if o.consoleQuiet() {
+		return
+	}
+	gologger.Error().Msgf("Invalid POC format, discard: %s, error: %v", path, err)
 }
 
 // 定义包含 POC 结构的切片

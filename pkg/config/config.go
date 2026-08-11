@@ -205,6 +205,68 @@ func NewConfig(configFile string) (*Config, error) {
 	return ReadConfiguration(configFile)
 }
 
+// LoadConfigReadOnly loads the afrog configuration without touching the filesystem.
+//
+// Unlike [NewConfig], it never creates ~/.config/afrog, never writes
+// afrog-config.yaml, and never rewrites an existing user config to inject new
+// sections. Library consumers must not have side effects on the host's home
+// directory merely by constructing a scanner, so the SDK uses this instead.
+//
+// When no configuration file exists, it returns a Config populated with the
+// same defaults NewConfig would have written.
+func LoadConfigReadOnly(configFile string) (*Config, error) {
+	if len(configFile) > 0 && !strings.HasSuffix(configFile, ".yml") && !strings.HasSuffix(configFile, ".yaml") {
+		return nil, errors.New("afrog config file must be yaml format")
+	}
+
+	path := configFile
+	if path == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return defaultConfig(), nil
+		}
+		path = filepath.Join(homeDir, ".config", "afrog", afrogConfigFilename)
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		if configFile != "" {
+			return nil, err
+		}
+		return defaultConfig(), nil
+	}
+	defer file.Close()
+
+	config := &Config{}
+	if err := yaml.NewDecoder(file).Decode(config); err != nil {
+		return nil, err
+	}
+	normalizeCuratedDefaults(config)
+	normalizeInteractshDefaults(config)
+	return config, nil
+}
+
+// defaultConfig returns the built-in configuration defaults.
+func defaultConfig() *Config {
+	c := &Config{ServerAddress: ":16868"}
+
+	c.Reverse.Dnslogcn.Domain = "dnslog.cn"
+	c.Reverse.Xray.ApiUrl = "http://x.x.x.x:8777"
+	c.Reverse.Interactsh.Server = "oast.pro"
+
+	c.Webhook.Dingtalk.Range = "high,critical"
+	c.Webhook.Wecom.Range = "high,critical"
+	c.Webhook.Wecom.Markdown = true
+
+	autoUpdate := true
+	c.Curated.Enabled = "auto"
+	c.Curated.AutoUpdate = &autoUpdate
+	c.Curated.TimeoutSec = 10
+	c.Curated.Channel = "stable"
+
+	return c
+}
+
 func isExistConfigFile(configFile string) error {
 	if len(configFile) > 0 {
 		if utils.Exists(configFile) {
