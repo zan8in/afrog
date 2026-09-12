@@ -7,6 +7,7 @@ import (
 	crand "crypto/rand"
 	"encoding/base64"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,7 +25,12 @@ var shiroCheckPayload = []byte{
 	0x75, 0x74, 0x69, 0x6c, 0x2f, 0x4d, 0x61, 0x70, 0x3b, 0x78, 0x70, 0x70, 0x77, 0x01, 0x00, 0x78,
 }
 
-var shiroDefaultKeys = []string{
+const (
+	shiroModeCBC = "cbc"
+	shiroModeGCM = "gcm"
+)
+
+var shiroDefaultKeys = shiroUniqueKeys([]string{
 	"kPH+bIxk5D2deZiIxcaaaA==",
 	"2AvVhdsgUs0FSA3SDFAdag==",
 	"3AvVhmFLUs0KTA3Kprsdag==",
@@ -50,6 +56,11 @@ var shiroDefaultKeys = []string{
 	"a2V5AAAAAAAAAAAAAAAAAAAAAA==",
 	"c2hpcm8AAAAAAAAAAAAAAAAA",
 	"c2hpcm8tc2VjcmV0LWtleQ==",
+})
+
+type shiroRememberMeCandidate struct {
+	mode  string
+	value string
 }
 
 func shiro_key(target string, variableMap map[string]any) error {
@@ -61,7 +72,7 @@ func shiro_key(target string, variableMap map[string]any) error {
 		return err
 	}
 
-	shiroDetected, detReq, detResp, followRedirects, err := shiroDetect(fulltarget)
+	shiroDetected, detReq, detResp, _, err := shiroDetect(fulltarget)
 	if err != nil {
 		return err
 	}
@@ -84,31 +95,28 @@ func shiro_key(target string, variableMap map[string]any) error {
 			continue
 		}
 
-		rememberMe, err := shiroEncryptRememberMeCBC(shiroCheckPayload, key)
-		if err != nil {
-			continue
-		}
+		for _, candidate := range shiroRememberMeCandidates(key) {
+			ok, vmap, err := shiroConfirmKey(fulltarget, key, candidate)
+			if err != nil {
+				continue
+			}
+			if !ok {
+				continue
+			}
 
-		ok, vmap, err := shiroConfirmKey(fulltarget, rememberMe, followRedirects)
-		if err != nil {
-			continue
-		}
-		if !ok {
-			continue
-		}
+			if v := vmap["request"]; v != nil {
+				variableMap["request"] = v
+			}
+			if v := vmap["response"]; v != nil {
+				variableMap["response"] = v
+			}
 
-		if v := vmap["request"]; v != nil {
-			variableMap["request"] = v
-		}
-		if v := vmap["response"]; v != nil {
-			variableMap["response"] = v
-		}
+			setTarget(fulltarget, variableMap)
+			setFullTarget(fulltarget, variableMap)
 
-		setTarget(fulltarget, variableMap)
-		setFullTarget(fulltarget, variableMap)
-
-		shiroInjectKeyMarker(variableMap, keyB64)
-		return nil
+			shiroInjectKeyMarker(variableMap, keyB64)
+			return nil
+		}
 	}
 
 	return nil
@@ -196,6 +204,31 @@ func shiroHasDeleteMe(resp *proto.Response) bool {
 	return strings.Contains(h, "rememberme=deleteme")
 }
 
+func shiroRememberMeCandidates(key []byte) []shiroRememberMeCandidate {
+	modes := []string{shiroModeCBC, shiroModeGCM}
+	candidates := make([]shiroRememberMeCandidate, 0, len(modes))
+	for _, mode := range modes {
+		value, err := shiroEncryptRememberMe(shiroCheckPayload, key, mode)
+		if err != nil {
+			continue
+		}
+		candidates = append(candidates, shiroRememberMeCandidate{
+			mode:  mode,
+			value: value,
+		})
+	}
+	return candidates
+}
+
+func shiroEncryptRememberMe(plaintext []byte, key []byte, mode string) (string, error) {
+	switch mode {
+	case shiroModeGCM:
+		return shiroEncryptRememberMeGCM(plaintext, key)
+	default:
+		return shiroEncryptRememberMeCBC(plaintext, key)
+	}
+}
+
 func shiroEncryptRememberMeCBC(plaintext []byte, key []byte) (string, error) {
 	if len(key) != 16 && len(key) != 24 && len(key) != 32 {
 		return "", errors.New("invalid aes key length")
@@ -221,28 +254,97 @@ func shiroEncryptRememberMeCBC(plaintext []byte, key []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(append(iv, out...)), nil
 }
 
-func shiroConfirmKey(target string, rememberMe string, followRedirects bool) (bool, map[string]any, error) {
-	headers := map[string]string{
-		"Cookie": "rememberMe=" + rememberMe + ";",
+func shiroEncryptRememberMeGCM(plaintext []byte, key []byte) (string, error) {
+	if len(key) != 16 && len(key) != 24 && len(key) != 32 {
+		return "", errors.New("invalid aes key length")
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, 16)
+	if _, err := io.ReadFull(crand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	aead, err := cipher.NewGCMWithNonceSize(block, 16)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(append(nonce, aead.Seal(nil, nonce, plaintext, nil)...)), nil
+}
+
+func shiroConfirmKey(target string, key []byte, candidate shiroRememberMeCandidate) (bool, map[string]any, error) {
+	controlRememberMe, err := shiroEncryptRememberMe(shiroCheckPayload, shiroWrongKey(key), candidate.mode)
+	if err != nil {
+		return false, nil, err
 	}
 
 	var lastVars map[string]any
 	for i := 0; i < 2; i++ {
-		vmap := make(map[string]any)
-		resp, err := DoHTTP(http.MethodGet, target, nil, headers, followRedirects, vmap)
+		// Evaluate the first response only. Redirect targets often set their own
+		// rememberMe cookies and can hide the key-validation result.
+		resp, vmap, err := shiroDoRememberMeRequest(target, candidate.value, false)
 		if err != nil {
 			return false, nil, err
-		}
-		if resp == nil {
-			return false, nil, errors.New("empty response")
 		}
 		if shiroHasDeleteMe(resp) {
 			return false, nil, nil
 		}
+
+		controlResp, _, err := shiroDoRememberMeRequest(target, controlRememberMe, false)
+		if err != nil {
+			return false, nil, err
+		}
+		if !shiroHasDeleteMe(controlResp) {
+			return false, nil, nil
+		}
+
 		lastVars = vmap
 	}
 
 	return true, lastVars, nil
+}
+
+func shiroDoRememberMeRequest(target string, rememberMe string, followRedirects bool) (*proto.Response, map[string]any, error) {
+	headers := map[string]string{
+		"Cookie": "rememberMe=" + rememberMe + ";",
+	}
+
+	vmap := make(map[string]any)
+	resp, err := DoHTTP(http.MethodGet, target, nil, headers, followRedirects, vmap)
+	if err != nil {
+		return nil, nil, err
+	}
+	if resp == nil {
+		return nil, nil, errors.New("empty response")
+	}
+	return resp, vmap, nil
+}
+
+func shiroWrongKey(key []byte) []byte {
+	wrong := append([]byte(nil), key...)
+	if len(wrong) == 0 {
+		return wrong
+	}
+	wrong[0] ^= 0x01
+	return wrong
+}
+
+func shiroUniqueKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out
 }
 
 func shiroPKCS7Pad(in []byte, blockSize int) ([]byte, error) {

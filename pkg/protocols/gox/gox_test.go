@@ -258,6 +258,144 @@ func TestShiroKey_Detect(t *testing.T) {
 	}
 }
 
+func TestShiroKey_GCM_Detect(t *testing.T) {
+	keyB64 := "kPH+bIxk5D2deZiIxcaaaA=="
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		t.Fatalf("decode key error: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie("rememberMe")
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+			return
+		}
+		if ck.Value == "123" || ck.Value == "1" || ck.Value == "dGVzdA==" {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("delete"))
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(ck.Value)
+		if err != nil || len(raw) <= 16 {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("bad"))
+			return
+		}
+
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			t.Fatalf("new cipher error: %v", err)
+		}
+		aead, err := cipher.NewGCMWithNonceSize(block, 16)
+		if err != nil {
+			t.Fatalf("new gcm error: %v", err)
+		}
+
+		plaintext, err := aead.Open(nil, raw[:16], raw[16:], nil)
+		if err != nil || !bytes.Equal(plaintext, shiroCheckPayload) {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("reject"))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("accept"))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{}
+	if err := shiro_key(srv.URL, variableMap); err != nil {
+		t.Fatalf("shiro_key error: %v", err)
+	}
+
+	respV := variableMap["response"]
+	resp, ok := respV.(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("response type mismatch: %T", respV)
+	}
+	if !bytes.Contains(resp.GetRaw(), []byte("ShiroKey:"+keyB64)) {
+		t.Fatalf("marker not found, raw=%q", string(resp.GetRaw()))
+	}
+}
+
+func TestShiroKey_ExpandedKeyList_Detect(t *testing.T) {
+	keyB64 := "1QWLxg+NYmxraMoxAXu/Iw=="
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		t.Fatalf("decode key error: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie("rememberMe")
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+			return
+		}
+		if ck.Value == "123" || ck.Value == "1" || ck.Value == "dGVzdA==" {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("delete"))
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(ck.Value)
+		if err != nil || len(raw) < aes.BlockSize || (len(raw)-aes.BlockSize)%aes.BlockSize != 0 {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("bad"))
+			return
+		}
+
+		iv := raw[:aes.BlockSize]
+		ct := raw[aes.BlockSize:]
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			t.Fatalf("new cipher error: %v", err)
+		}
+		pt := make([]byte, len(ct))
+		cipher.NewCBCDecrypter(block, iv).CryptBlocks(pt, ct)
+
+		unpadded, ok := pkcs7Unpad(pt, aes.BlockSize)
+		if !ok || !bytes.Equal(unpadded, shiroCheckPayload) {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("reject"))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("accept"))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{}
+	if err := shiro_key(srv.URL, variableMap); err != nil {
+		t.Fatalf("shiro_key error: %v", err)
+	}
+
+	respV := variableMap["response"]
+	resp, ok := respV.(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("response type mismatch: %T", respV)
+	}
+	if !bytes.Contains(resp.GetRaw(), []byte("ShiroKey:"+keyB64)) {
+		t.Fatalf("marker not found, raw=%q", string(resp.GetRaw()))
+	}
+}
+
 func TestShiroKey_NoBaselineDeleteMe_NoMarker(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +450,119 @@ func TestShiroKey_WAFOnly123_NoMarker(t *testing.T) {
 	}
 	if bytes.Contains(resp.GetRaw(), []byte("ShiroKey:")) {
 		t.Fatalf("unexpected marker, raw=%q", string(resp.GetRaw()))
+	}
+}
+
+func TestShiroKey_WAFBlocksEncryptedCookie_NoMarker(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie("rememberMe")
+		if err != nil {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+			return
+		}
+
+		switch ck.Value {
+		case "123", "1", "dGVzdA==":
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("delete"))
+			return
+		default:
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("waf blocked"))
+			return
+		}
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{}
+	if err := shiro_key(srv.URL, variableMap); err != nil {
+		t.Fatalf("shiro_key error: %v", err)
+	}
+
+	respV := variableMap["response"]
+	resp, ok := respV.(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("response type mismatch: %T", respV)
+	}
+	if bytes.Contains(resp.GetRaw(), []byte("ShiroKey:")) {
+		t.Fatalf("unexpected marker, raw=%q", string(resp.GetRaw()))
+	}
+}
+
+func TestShiroKey_RedirectConfirmUsesFirstResponse(t *testing.T) {
+	keyB64 := "kPH+bIxk5D2deZiIxcaaaA=="
+	key, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil {
+		t.Fatalf("decode key error: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		ck, err := r.Cookie("rememberMe")
+		if err != nil {
+			http.Redirect(w, r, "/admin/login", http.StatusFound)
+			return
+		}
+
+		switch ck.Value {
+		case "123", "1", "dGVzdA==":
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			http.Redirect(w, r, "/admin/login", http.StatusFound)
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(ck.Value)
+		if err != nil || len(raw) < aes.BlockSize || (len(raw)-aes.BlockSize)%aes.BlockSize != 0 {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			http.Redirect(w, r, "/admin/login", http.StatusFound)
+			return
+		}
+
+		iv := raw[:aes.BlockSize]
+		ct := raw[aes.BlockSize:]
+		block, err := aes.NewCipher(key)
+		if err != nil {
+			t.Fatalf("new cipher error: %v", err)
+		}
+		pt := make([]byte, len(ct))
+		cipher.NewCBCDecrypter(block, iv).CryptBlocks(pt, ct)
+
+		unpadded, ok := pkcs7Unpad(pt, aes.BlockSize)
+		if !ok || !bytes.Equal(unpadded, shiroCheckPayload) {
+			w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+			http.Redirect(w, r, "/admin/login", http.StatusFound)
+			return
+		}
+
+		http.Redirect(w, r, "/admin/login", http.StatusFound)
+	})
+	mux.HandleFunc("/admin/login", func(w http.ResponseWriter, r *http.Request) {
+		// This simulates the real target behavior where the login page writes its
+		// own rememberMe cookie after the redirect, masking the first response.
+		w.Header().Add("Set-Cookie", "rememberMe=deleteMe; Path=/; HttpOnly")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("login"))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	variableMap := map[string]any{}
+	if err := shiro_key(srv.URL, variableMap); err != nil {
+		t.Fatalf("shiro_key error: %v", err)
+	}
+
+	respV := variableMap["response"]
+	resp, ok := respV.(*proto.Response)
+	if !ok || resp == nil {
+		t.Fatalf("response type mismatch: %T", respV)
+	}
+	if !bytes.Contains(resp.GetRaw(), []byte("ShiroKey:"+keyB64)) {
+		t.Fatalf("marker not found, raw=%q", string(resp.GetRaw()))
 	}
 }
 
