@@ -1,8 +1,8 @@
 module github.com/zan8in/afrog/v3
 
-go 1.24.0
+go 1.27.0
 
-toolchain go1.24.1
+toolchain go1.27.1
 
 require (
 	gitee.com/chunanyong/dm v1.8.22

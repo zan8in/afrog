@@ -320,6 +320,7 @@ func (r *Runner) Release() {
 		r.engine.stopOOBManager()
 		r.engine.pedmStopMonitor()
 	}
+        retryhttpclient.CloseIdleConnections()
 }
 
 func (r *Runner) LiveStatsSuffix() string {

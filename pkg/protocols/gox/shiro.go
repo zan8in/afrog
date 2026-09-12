@@ -32,6 +32,7 @@ const (
 
 var shiroDefaultKeys = shiroUniqueKeys([]string{
 	"kPH+bIxk5D2deZiIxcaaaA==",
+	"1QWLxg+NYmxraMoxAXu/Iw==",
 	"2AvVhdsgUs0FSA3SDFAdag==",
 	"3AvVhmFLUs0KTA3Kprsdag==",
 	"4AvVhmFLUs0KTA3Kprsdag==",
@@ -118,7 +119,6 @@ func shiro_key(target string, variableMap map[string]any) error {
 			return nil
 		}
 	}
-
 	return nil
 }
 
@@ -302,7 +302,6 @@ func shiroConfirmKey(target string, key []byte, candidate shiroRememberMeCandida
 		if !shiroHasDeleteMe(controlResp) {
 			return false, nil, nil
 		}
-
 		lastVars = vmap
 	}
 

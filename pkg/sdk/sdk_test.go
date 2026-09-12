@@ -583,11 +583,13 @@ func TestScanner_SubscribingAfterScanYieldsClosedStream(t *testing.T) {
 // long-running host process accumulated one goroutine per scan.
 func TestScanner_DoesNotLeakGoroutines(t *testing.T) {
 	// Warm up shared lazily-initialised state so it is not counted as a leak.
-	warm, _ := newTestScanner(t)
+	warm, warmSrv := newTestScanner(t)
 	if err := warm.Execute(context.Background()); err != nil {
 		t.Fatalf("warm-up Execute: %v", err)
 	}
 	_ = warm.Close()
+	warmSrv.CloseClientConnections()
+	warmSrv.Close()
 
 	before := waitGoroutines(t, 0)
 
@@ -611,6 +613,8 @@ func TestScanner_DoesNotLeakGoroutines(t *testing.T) {
 		if err := scanner.Close(); err != nil {
 			t.Fatalf("Close: %v", err)
 		}
+		srv.CloseClientConnections()
+		srv.Close()
 	}
 
 	after := waitGoroutines(t, before)
