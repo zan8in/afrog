@@ -15,5 +15,7 @@ rules:
     request:
       method: GET
       path: /newsedit/e5workspace/Login.jsp
-    expression: response.status == 200 && response.body.bcontains(b'<title>全媒体采编') && response.body.bcontains(b'/e5workspace/security/pubkey.do')
+    expression: |
+      response.status == 200 && 
+      "(?is).*<title>.*?全媒体采编.*?</title>.*".rmatches(response_text)
 expression: r0()
