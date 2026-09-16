@@ -2,7 +2,7 @@
 title: afrog Docs
 slug: /docs
 lang: en
-summary: Official English documentation home for afrog.
+summary: Official afrog docs home with task-oriented entry points and deeper reference links.
 status: published
 source: new
 last_reviewed: 2026-09-16
@@ -10,7 +10,36 @@ last_reviewed: 2026-09-16
 
 Welcome to the official `afrog` documentation.
 
-`afrog` is a security tool for vulnerability verification, PoC authoring, and SDK-based integration. The Chinese documentation is currently the most complete, while the English tree is being filled with the same structure so both paths stay aligned.
+`afrog` is a security tool for vulnerability verification, PoC authoring, and SDK-based integration.
+
+This documentation is designed in two layers:
+
+- the outer layer helps you get to the right task quickly
+- the inner layer lets you drill into exact reference details when you already know what you need
+
+If you are new to the docs, start with the task paths below. If you already have a precise question, jump to the quick reference section.
+
+## Start by task
+
+### I want to get a scan running
+
+This is the shortest path from setup to a real result:
+
+1. [Install](./getting-started/install.md)
+2. [First Scan](./getting-started/first-scan.md)
+3. [CLI Options](./reference/cli-options.md)
+4. [Configuration](./user-guide/configuration.md)
+5. [Output and Report](./user-guide/output-and-report.md)
+
+### I want to write PoCs
+
+Start with this path:
+
+1. [PoC Quickstart](./poc/quickstart.md)
+2. [PoC Syntax](./poc/syntax.md)
+3. [Helper Functions](./poc/helper-functions.md)
+4. [requires](./poc/requires.md)
+5. [OOB](./poc/oob.md)
 
 ## Start by role
 
@@ -57,6 +86,40 @@ The rest of the SDK tree covers:
 - Examples
 - FAQ
 
+## Quick reference by topic
+
+If you already know what you want to look up, start here instead:
+
+### Scan and runtime
+
+- [CLI Options](./reference/cli-options.md)
+- [Configuration](./user-guide/configuration.md)
+- [Output and Report](./user-guide/output-and-report.md)
+
+### PoC authoring
+
+- [PoC Syntax](./poc/syntax.md)
+- [Helper Functions](./poc/helper-functions.md)
+- [requires](./poc/requires.md)
+- [brute](./poc/brute.md)
+- [OOB](./poc/oob.md)
+- [Raw HTTP](./poc/raw-http.md)
+- [TCP / SSL](./poc/tcp.md)
+
+### SDK integration
+
+- [SDK Quickstart](./sdk/quickstart.md)
+- [Sync and Async](./sdk/sync-and-async.md)
+- [Handlers and Streams](./sdk/handlers-and-streams.md)
+- [Config Reference](./sdk/config-reference.md)
+- [API Reference](./sdk/api-reference.md)
+- [Examples](./sdk/examples.md)
+- [FAQ](./sdk/faq.md)
+
+### Community
+
+- [PoC Contributors](./community/contributors.md)
+
 ## Available now
 
 - [Install](./getting-started/install.md)
@@ -67,4 +130,4 @@ The rest of the SDK tree covers:
 
 ## Status
 
-The English entry path is now available for the main onboarding flow, while deeper reference pages are still being expanded in parallel with the Chinese documentation.
+The English path now covers both the main onboarding flow and a usable quick-reference layer, while deeper details continue to stay aligned with the Chinese documentation.

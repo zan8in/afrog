@@ -2,13 +2,36 @@
 title: brute
 slug: /docs/poc/brute
 lang: en
-summary: Iteration modes, defaults, and dynamic-list behavior for brute in afrog PoCs.
+summary: afrog brute reference for deciding when to iterate and how mode, commit, and continue work together.
 status: published
 source: docs/zh/poc/brute.md
 last_reviewed: 2026-09-16
 ---
 
-`brute` lets one rule execute repeatedly against a set of candidate values. Typical use cases include path discovery, username/password combinations, and validating extracted IDs one by one.
+`brute` lets one rule execute repeatedly against a set of candidate values.
+
+This page is meant to answer three practical questions:
+
+- do I actually need `brute` here
+- should I use `clusterbomb` or `pitchfork`
+- what result is kept after a hit when `commit` and `continue` are combined
+
+If you only need to test one value, do not reach for `brute` too early. If you need to iterate across a list or combination of inputs, it is the right tool.
+
+## Decide when to use it first
+
+Good fits for `brute`:
+
+- path dictionary probing
+- username and password combinations
+- extracting many IDs first and validating them one by one
+- iterating across a list of candidate parameters
+
+Usually unnecessary when:
+
+- you only need one fixed value
+- the first extracted value is enough
+- there is no list or combination involved
 
 ## Typical use cases
 
@@ -33,6 +56,15 @@ brute:
     - test
 ```
 
+### Quick field lookup
+
+| Field | Commonness | Purpose | Default |
+| --- | --- | --- | --- |
+| `mode` | common | define how multiple variables are iterated | `clusterbomb` |
+| `commit` | common | define which successful result is kept | `winner` |
+| `continue` | common | decide whether to keep iterating after a hit | `false` |
+| custom variables | required | the candidate lists being iterated | none |
+
 ## Default behavior
 
 If you define only brute variables and omit `mode`, `commit`, and `continue`, the default is effectively:
@@ -53,6 +85,24 @@ This means:
 - keep the first successful variable set, request, and response
 - stop on first hit
 - with only one variable, it behaves like a simple ordered list walk
+
+## The three core decisions
+
+### 1. Do I need full combinations
+
+- full combinations: `clusterbomb`
+- pair values by index: `pitchfork`
+
+### 2. Should it stop on hit
+
+- stop early: `continue: false`
+- run the full list: `continue: true`
+
+### 3. Which hit should be retained
+
+- keep the first: `winner` / `first`
+- keep the last: `last`
+- only care that something matched: `none`
 
 ## `mode`
 
@@ -75,6 +125,10 @@ For example:
 
 - first username with first password
 - second username with second password
+
+### Which one is the better default
+
+Most username-plus-password cases start with `clusterbomb`. `pitchfork` makes more sense only when the two lists are naturally aligned pair by pair.
 
 ## `commit`
 
@@ -107,6 +161,48 @@ Do not commit brute variables themselves, but still keep the successful request 
 - `winner/first + continue: true`: continue iterating, but keep the first hit
 - `last + continue: true`: continue iterating and keep the last hit
 - `none`: brute variables are not committed to the global variable map
+
+## Two common patterns
+
+### Single-variable iteration
+
+```yaml
+rules:
+  r0:
+    brute:
+      p:
+        - /
+        - /admin
+        - /console
+    request:
+      method: GET
+      path: '{{p}}'
+    expression: response.status == 200
+```
+
+This is basically an ordered walk over a simple list.
+
+### Multi-variable combination
+
+```yaml
+rules:
+  r0:
+    brute:
+      mode: clusterbomb
+      user:
+        - admin
+        - test
+      pass:
+        - admin
+        - 123456
+    request:
+      method: POST
+      path: /login
+      body: 'u={{user}}&p={{pass}}'
+    expression: response.status == 200 && response_text.icontains("welcome")
+```
+
+This runs the cartesian product of usernames and passwords.
 
 ## Static list example
 
@@ -163,6 +259,20 @@ expression: r0() && r1()
 2. For Chinese pages or decoded text, prefer extraction with `submatchall(response_text)`
 3. Verification-style PoCs usually prefer `continue: false`
 4. At the moment, `winner` and `first` can be treated as equivalent
+
+## Common pitfalls
+
+### The extracted result is not actually a list
+
+If the value fed into `brute` is not a string list, the behavior will not match what you expect.
+
+### Using brute when one value was enough
+
+Many PoCs only need `submatch` and a direct follow-up request, not a full iteration layer.
+
+### `continue: true` creates more requests than expected
+
+Once the list is large, `continue: true` means you really are asking the engine to run the whole candidate space.
 
 ## Related pages
 

@@ -2,13 +2,40 @@
 title: requires Fingerprint Gating
 slug: /docs/poc/requires
 lang: en
-summary: Gating semantics and usage patterns for requires and requires-mode in afrog PoCs.
+summary: afrog fingerprint gating reference for deciding when to use requires and why a PoC gets skipped.
 status: published
 source: docs/zh/poc/requires.md
 last_reviewed: 2026-09-16
 ---
 
-`requires` and `requires-mode` express a PoC's dependency on fingerprint results. They are especially useful for high-cost checks such as weak-password, default-credential, and brute-force verification.
+`requires` and `requires-mode` are the "identify first, verify second" switches of a PoC.
+
+This page is best for two practical questions:
+
+- should this PoC use `requires` at all
+- why does this PoC exist but not execute
+
+If you are writing a simple low-cost HTTP PoC, you often do not need this page first. If you are writing weak-password, default-credential, brute-force, or otherwise expensive verification PoCs, this page becomes important.
+
+## Decide when to use it first
+
+The shortest rule of thumb:
+
+- low-cost, generic checks: usually **do not need** `requires`
+- expensive checks that only make sense for a specific product: usually **should use** `requires`
+
+Typical fits:
+
+- weak-password checks
+- default credentials
+- brute-force PoCs
+- login probes for a known product or protocol
+
+Less necessary for:
+
+- simple path discovery
+- lightweight HTTP echo checks
+- PoCs that do not meaningfully increase target cost
 
 ## Why fingerprint gating exists
 
@@ -41,6 +68,13 @@ info:
   requires-mode: strict
 ```
 
+### Quick field lookup
+
+| Field | Commonness | Purpose | Default behavior |
+| --- | --- | --- | --- |
+| `requires` | common | declare which fingerprint tags must match first | no gating when omitted |
+| `requires-mode` | common | define what happens when fingerprint data is missing | default `strict` |
+
 ## `requires` syntax
 
 Two forms are supported and they mean the same thing.
@@ -65,6 +99,12 @@ The values are normalized internally:
 - convert to lowercase
 - deduplicate
 
+The code path also accepts these `requires-mode` spellings:
+
+- `requires-mode`
+- `requiresMode`
+- `requires_mode`
+
 ## How execution is allowed
 
 The rule is simple:
@@ -73,6 +113,14 @@ The rule is simple:
 - with `requires`: execute only when the target's matched fingerprint tags intersect with the `requires` values
 
 Those matched tags come from the fingerprint PoC `info.tags`.
+
+### The simplest mental model
+
+The PoC executes only when this is true:
+
+> the current target's fingerprint tags intersect with at least one value in `requires`
+
+Otherwise it is skipped.
 
 ## Multi-value semantics
 
@@ -106,6 +154,8 @@ Useful for:
 - brute-force PoCs
 - other expensive checks you do not want to spray at unrelated targets
 
+In one sentence: **if the engine is not confident enough, do not run it.**
+
 ### `opportunistic`
 
 Behavior:
@@ -114,6 +164,8 @@ Behavior:
 - fingerprint exists but does not match: still skip
 
 Useful for lower-cost PoCs where you want narrowing when possible, but do not want to miss a target purely because fingerprint data is unavailable.
+
+In one sentence: **use fingerprint data when present, but do not block purely because it is missing.**
 
 ## Why target format matters
 
@@ -125,6 +177,30 @@ Recommended:
 - network services as `host:port`, for example `1.2.3.4:21`
 
 In `strict` mode, if the target is neither a URL nor `host:port`, the PoC may be skipped because the fingerprint result cannot be mapped reliably.
+
+## Two common patterns
+
+### Product-specific credential check
+
+```yaml
+info:
+  name: Nacos default credentials
+  author: your-name
+  severity: high
+  requires: [nacos]
+  requires-mode: strict
+```
+
+### Narrow when possible, still run when unknown
+
+```yaml
+info:
+  name: Medium-cost application check
+  author: your-name
+  severity: medium
+  requires: [seata]
+  requires-mode: opportunistic
+```
 
 ## Typical scenarios
 
@@ -170,15 +246,13 @@ So:
 
 This is also the most common explanation when a `requires` PoC appears not to run.
 
-## Recommended conventions
+## Usage suggestions
 
-For reliable gating:
-
-- fingerprint PoC `info.tags` should include:
-  - `fingerprint`
-  - one primary service tag such as `mysql`, `ftp`, or `nacos`
-- high-cost PoCs should depend only on the primary tag in `requires`
-- avoid very broad classification tags in `requires`
+1. For high-cost PoCs, prefer `strict` first
+2. Keep `requires` focused on the primary product tag, not broad categories
+3. Fingerprint PoCs should usually expose one primary tag plus `fingerprint`
+4. If you run with `-nf`, remember that `strict` mode will usually skip
+5. Keep target formatting consistent instead of mixing URLs and bare hosts
 
 ## Troubleshooting
 
@@ -188,6 +262,10 @@ When a PoC does not execute, check:
 2. whether fingerprinting was disabled
 3. whether the fingerprint PoC actually emitted the primary tag
 4. whether the PoC should be `opportunistic` instead of `strict`
+
+## One-line takeaway
+
+`requires` is not about limiting features. It is what makes expensive PoCs behave like a disciplined verification workflow: identify first, then act.
 
 ## Related pages
 

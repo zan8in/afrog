@@ -2,13 +2,35 @@
 title: PoC 编写快速开始
 slug: /docs/poc/quickstart
 lang: zh
-summary: 帮助 PoC 作者写出第一条可运行的 afrog PoC。
+summary: 用最短路径写出第一条可运行的 afrog PoC，并知道下一步该查哪一页。
 status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/04-poc-basics.md
 last_reviewed: 2026-09-16
 ---
 
 这一页的目标很简单：先写出一条能跑起来的 `afrog` PoC。
+
+它不是完整参考手册，而是给第一次写 PoC 的作者一条最短路径。
+
+如果你已经知道：
+
+- 字段该怎么写
+- 函数该怎么选
+- `requires / brute / OOB / TCP` 分别解决什么问题
+
+那你更适合直接去对应专题页；如果你现在只是想“先写出第一条能跑的”，就按这页往下走。
+
+## 先判断你现在要写哪种 PoC
+
+大多数新作者，其实只需要先在下面三种里选一种起步：
+
+| 我现在要做什么 | 先从哪种 PoC 开始 |
+| --- | --- |
+| 验证一个普通 Web 路径或接口 | 普通 HTTP PoC |
+| 验证某个登录、口令、枚举场景 | HTTP PoC + 后续再看 `requires / brute` |
+| 验证非 HTTP 协议或多步会话 | 先看 `TCP / SSL` |
+
+如果你还不确定，就从**最普通的 HTTP PoC**开始，因为它最容易写、最容易调、也最适合作为模板。
 
 ## 一条最小可运行 PoC
 
@@ -36,6 +58,15 @@ expression: r0()
 - `info`：基础信息
 - `rules`：具体请求与判断逻辑
 - 顶层 `expression`：定义最终命中条件
+
+## 第一次写 PoC 的最短工作流
+
+建议直接按这个顺序做：
+
+1. 先找一个最稳定、最容易验证的目标路径
+2. 先写一条只有一个 `rules` 的 PoC
+3. 先只判断一个最可靠的响应特征
+4. 跑通以后，再补变量、更多规则或专题能力
 
 ## 最小结构怎么理解
 
@@ -105,6 +136,20 @@ expression: r0()
 - 在请求头和请求体中引用变量
 - 在表达式中检查状态码和响应体
 
+## 什么时候该停在“最小版本”
+
+第一次写 PoC 时，很容易一上来就想把这些都塞进去：
+
+- 多规则
+- OOB
+- brute
+- requires
+- 动态提取
+
+更稳妥的方式是：
+
+先把“最小能命中”的版本写通，再逐步升级。
+
 ## 本地验证
 
 编写 PoC 后，建议先用单目标和单 PoC 做最小验证，例如：
@@ -114,6 +159,12 @@ afrog -t https://example.com -P ./mypocs -debug
 ```
 
 如果只是想先检查语法是否正确，可以优先使用 `-validate`。
+
+## 第一次调试时最有用的 3 个习惯
+
+1. 单目标验证，不要一开始扫一批资产
+2. 单 PoC 验证，不要一开始把目录全塞进去
+3. 命中条件先简单，确认跑通后再提高稳定性
 
 ## 常见错误
 
@@ -134,13 +185,18 @@ afrog -t https://example.com -P ./mypocs -debug
 
 即使 `rules` 中已经有规则，也仍然需要顶层 `expression` 来定义最终判定逻辑。
 
+### 第一次就选了过难的目标
+
+如果一开始就拿复杂登录流、异步触发、带编码差异的页面来练手，调试成本会明显更高。第一次更适合挑简单、可重复、稳定的目标。
+
 ## 下一步
 
-写出第一条 PoC 后，建议继续阅读：
+写出第一条 PoC 后，建议按问题继续阅读：
 
-- [PoC 语法参考](./syntax.md)
-- [内置函数参考](./helper-functions.md)
-- [requires 指纹门控](./requires.md)
-- [brute 机制](./brute.md)
-- [OOB 带外检测](./oob.md)
-- [TCP / SSL](./tcp.md)
+- 想查字段怎么写：看 [PoC 语法参考](./syntax.md)
+- 想查函数怎么用：看 [内置函数参考](./helper-functions.md)
+- 想限制只对某类目标执行：看 [requires 指纹门控](./requires.md)
+- 想遍历多个值：看 [brute 机制](./brute.md)
+- 想做无回显验证：看 [OOB 带外检测](./oob.md)
+- 想做非 HTTP 协议：看 [TCP / SSL](./tcp.md)
+- 想发更底层的 HTTP 报文：看 [Raw HTTP](./raw-http.md)
