@@ -5,12 +5,12 @@ lang: en
 summary: English placeholder for afrog installation documentation.
 status: draft
 source: docs/zh/getting-started/install.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
-# Install
-
 This page is reserved for the English installation guide.
+
+For source builds and `go install`, afrog currently requires Go 1.27 or later.
 
 ## Planned sections
 

@@ -38,7 +38,7 @@
 
 ### 方法二：源码安装（适合 Go 语言玩家）
 
-如果你本地有 Go 1.19+ 环境，一条命令搞定：
+如果你本地有 Go 1.27+ 环境，一条命令搞定：
 
 ```bash
 go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest

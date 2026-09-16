@@ -23,6 +23,8 @@
 
 ## Install
 
+For source builds or `go install`, use Go 1.27 or later.
+
 ### Binary release
 
 Download the latest release from:
