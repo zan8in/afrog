@@ -1,7 +1,7 @@
 # afrog
 
 <p align="center">
-  <a href="http://afrogx.com"><img src="../images/afrog-logo.svg" width="60px" alt="afrog"></a>
+  <a href="#"><img src="../images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
 
 <h4 align="center">用于漏洞赏金、测试和红队的安全工具</h4>
@@ -100,7 +100,6 @@ PoC 贡献者的公开致谢已经恢复为长期入口，不再随着 README �
 ## 项目链接
 
 - Releases：<https://github.com/zan8in/afrog/releases>
-- 官网：<http://afrogx.com>
 - Wiki 历史入口：<https://github.com/zan8in/afrog/wiki>
 
 ## 讨论群
