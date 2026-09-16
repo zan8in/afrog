@@ -3,9 +3,9 @@ title: 示例程序
 slug: /docs/sdk/examples
 lang: zh
 summary: 汇总 afrog SDK 相关示例程序及其适用场景。
-status: draft
+status: published
 source: docs/SDK使用指南_中文.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 如果你已经看完 [SDK 快速开始](./quickstart.md)，最适合下一步的方式通常不是继续读概念，而是直接跑示例程序。

@@ -3,9 +3,9 @@ title: API 参考
 slug: /docs/sdk/api-reference
 lang: zh
 summary: 汇总 afrog SDK 常用构造方法、结果读取方法和信息查询接口。
-status: draft
+status: published
 source: docs/SDK使用指南_中文.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 本页汇总 `afrog` SDK 中最常用的一批方法，方便在集成时快速查询“有哪些入口”和“能拿到哪些结果”。
