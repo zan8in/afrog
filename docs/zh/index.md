@@ -70,7 +70,7 @@ last_reviewed: 2026-09-16
 3. [内置函数参考](./poc/helper-functions.md)
 4. [PoC 贡献者荣誉墙](./community/contributors.md)
 
-后续还会继续补齐：
+这条主链已经可以直接往下读：
 
 - [requires](./poc/requires.md)
 - [brute](./poc/brute.md)
@@ -85,12 +85,14 @@ last_reviewed: 2026-09-16
 1. [SDK 快速开始](./sdk/quickstart.md)
 2. [输出与报告](./user-guide/output-and-report.md)
 
-后续会继续补充：
+再按这个顺序往下查：
 
-- 同步与异步
-- 回调与流
-- 配置项参考
-- API 参考
+1. [SDK 同步与异步](./sdk/sync-and-async.md)
+2. [SDK 回调与流](./sdk/handlers-and-streams.md)
+3. [SDK 配置参考](./sdk/config-reference.md)
+4. [SDK API 参考](./sdk/api-reference.md)
+5. [SDK 示例程序](./sdk/examples.md)
+6. [SDK 常见问题](./sdk/faq.md)
 
 ## 当前已可阅读的核心页面
 
@@ -128,6 +130,7 @@ last_reviewed: 2026-09-16
 
 ### PoC 编写
 
+- [PoC 编写快速开始](./poc/quickstart.md)
 - [PoC 语法参考](./poc/syntax.md)
 - [内置函数参考](./poc/helper-functions.md)
 - [requires 指纹门控](./poc/requires.md)

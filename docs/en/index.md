@@ -62,7 +62,7 @@ If you want to build custom rules, start with:
 3. [Helper Functions](./poc/helper-functions.md)
 4. [PoC Contributors](./community/contributors.md)
 
-Additional PoC topics already have mirrored paths and will continue to expand:
+The rest of the PoC chain is ready to continue from there:
 
 - [requires](./poc/requires.md)
 - [brute](./poc/brute.md)
@@ -77,14 +77,14 @@ If you want to embed `afrog` into your Go program, start with:
 1. [SDK Quickstart](./sdk/quickstart.md)
 2. [Output and Report](./user-guide/output-and-report.md)
 
-The rest of the SDK tree covers:
+Then continue with:
 
-- Sync and async execution
-- Handlers and streams
-- Configuration options
-- API reference
-- Examples
-- FAQ
+1. [Sync and Async](./sdk/sync-and-async.md)
+2. [Handlers and Streams](./sdk/handlers-and-streams.md)
+3. [Config Reference](./sdk/config-reference.md)
+4. [API Reference](./sdk/api-reference.md)
+5. [Examples](./sdk/examples.md)
+6. [FAQ](./sdk/faq.md)
 
 ## Quick reference by topic
 
@@ -98,6 +98,7 @@ If you already know what you want to look up, start here instead:
 
 ### PoC authoring
 
+- [PoC Quickstart](./poc/quickstart.md)
 - [PoC Syntax](./poc/syntax.md)
 - [Helper Functions](./poc/helper-functions.md)
 - [requires](./poc/requires.md)
@@ -124,10 +125,26 @@ If you already know what you want to look up, start here instead:
 
 - [Install](./getting-started/install.md)
 - [First Scan](./getting-started/first-scan.md)
+- [CLI Options](./reference/cli-options.md)
+- [Configuration](./user-guide/configuration.md)
+- [Output and Report](./user-guide/output-and-report.md)
 - [PoC Quickstart](./poc/quickstart.md)
+- [PoC Syntax](./poc/syntax.md)
+- [Helper Functions](./poc/helper-functions.md)
+- [requires](./poc/requires.md)
+- [brute](./poc/brute.md)
+- [OOB](./poc/oob.md)
+- [Raw HTTP](./poc/raw-http.md)
+- [TCP / SSL](./poc/tcp.md)
 - [SDK Quickstart](./sdk/quickstart.md)
+- [Sync and Async](./sdk/sync-and-async.md)
+- [Handlers and Streams](./sdk/handlers-and-streams.md)
+- [Config Reference](./sdk/config-reference.md)
+- [API Reference](./sdk/api-reference.md)
+- [Examples](./sdk/examples.md)
+- [FAQ](./sdk/faq.md)
 - [PoC Contributors](./community/contributors.md)
 
 ## Status
 
-The English path now covers both the main onboarding flow and a usable quick-reference layer, while deeper details continue to stay aligned with the Chinese documentation.
+The English path now covers the main onboarding flow, the core PoC reference chain, and the primary SDK reference pages, while the broader documentation tree continues to stay aligned with the Chinese documentation.

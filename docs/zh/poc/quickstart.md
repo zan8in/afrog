@@ -200,3 +200,13 @@ afrog -t https://example.com -P ./mypocs -debug
 - 想做无回显验证：看 [OOB 带外检测](./oob.md)
 - 想做非 HTTP 协议：看 [TCP / SSL](./tcp.md)
 - 想发更底层的 HTTP 报文：看 [Raw HTTP](./raw-http.md)
+
+## 相关文档
+
+- [PoC 语法参考](./syntax.md)
+- [内置函数参考](./helper-functions.md)
+- [requires 指纹门控](./requires.md)
+- [brute 机制](./brute.md)
+- [OOB 带外检测](./oob.md)
+- [Raw HTTP](./raw-http.md)
+- [TCP / SSL](./tcp.md)

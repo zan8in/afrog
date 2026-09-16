@@ -279,3 +279,5 @@ expression: r0() && r1()
 
 - [PoC 语法参考](./syntax.md)
 - [PoC 编写快速开始](./quickstart.md)
+- [内置函数参考](./helper-functions.md)
+- [requires 指纹门控](./requires.md)

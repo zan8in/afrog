@@ -278,3 +278,5 @@ Once the list is large, `continue: true` means you really are asking the engine 
 
 - [PoC Syntax](./syntax.md)
 - [PoC Quickstart](./quickstart.md)
+- [Helper Functions](./helper-functions.md)
+- [requires](./requires.md)

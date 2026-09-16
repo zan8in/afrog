@@ -271,3 +271,4 @@ When a PoC does not execute, check:
 
 - [PoC Quickstart](./quickstart.md)
 - [PoC Syntax](./syntax.md)
+- [brute](./brute.md)

@@ -435,3 +435,5 @@ set:
 
 - [PoC 编写快速开始](./quickstart.md)
 - [PoC 语法参考](./syntax.md)
+- [brute 机制](./brute.md)
+- [OOB 带外检测](./oob.md)

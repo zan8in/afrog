@@ -238,5 +238,7 @@ The hard part of TCP / SSL PoCs is usually not "how do I send a packet", but "ho
 
 ## Related pages
 
+- [PoC Quickstart](./quickstart.md)
 - [PoC Syntax](./syntax.md)
 - [Raw HTTP](./raw-http.md)
+- [Helper Functions](./helper-functions.md)

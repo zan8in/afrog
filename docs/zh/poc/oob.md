@@ -260,3 +260,5 @@ OOB 不是“更高级的普通 PoC”，而是针对“结果不回显”场景
 
 - [PoC 编写快速开始](./quickstart.md)
 - [PoC 语法参考](./syntax.md)
+- [内置函数参考](./helper-functions.md)
+- [配置文件说明](../user-guide/configuration.md)

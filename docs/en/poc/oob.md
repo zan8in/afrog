@@ -260,3 +260,5 @@ OOB is not just a "more advanced normal PoC". It is a separate evidence-chain pa
 
 - [PoC Quickstart](./quickstart.md)
 - [PoC Syntax](./syntax.md)
+- [Helper Functions](./helper-functions.md)
+- [Configuration](../user-guide/configuration.md)

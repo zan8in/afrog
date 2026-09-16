@@ -433,3 +433,5 @@ If you do not want to load too much at once, these ten already cover a large sha
 
 - [PoC Quickstart](./quickstart.md)
 - [PoC Syntax](./syntax.md)
+- [brute](./brute.md)
+- [OOB](./oob.md)

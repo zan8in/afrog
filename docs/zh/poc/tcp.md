@@ -238,5 +238,7 @@ TCP / SSL PoC 的难点通常不在“怎么发包”，而在“怎么把会话
 
 ## 相关文档
 
+- [PoC 编写快速开始](./quickstart.md)
 - [PoC 语法参考](./syntax.md)
 - [Raw HTTP](./raw-http.md)
+- [内置函数参考](./helper-functions.md)

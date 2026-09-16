@@ -200,3 +200,13 @@ After the first PoC works, continue by question:
 - want blind verification: [OOB](./oob.md)
 - want non-HTTP protocol support: [TCP / SSL](./tcp.md)
 - want lower-level HTTP packet control: [Raw HTTP](./raw-http.md)
+
+## Related pages
+
+- [PoC Syntax](./syntax.md)
+- [Helper Functions](./helper-functions.md)
+- [requires](./requires.md)
+- [brute](./brute.md)
+- [OOB](./oob.md)
+- [Raw HTTP](./raw-http.md)
+- [TCP / SSL](./tcp.md)
