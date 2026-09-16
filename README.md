@@ -1,7 +1,6 @@
 <p align="center">
-  <a href="http://afrog.net"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
+  <a href="http://afrogx.com"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
-<!-- </a> <h1 align="center">afrog</h1> -->
 
 <h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
 
@@ -11,285 +10,332 @@
 </p>
 
 <p align="center">
-<img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod">
-<a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total">
-<a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog">
-<a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog">
-<!-- <a href="https://github.com/zan8in/afrog/discussions"><img src="https://img.shields.io/github/discussions/zan8in/afrog"> -->
+  <img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod" alt="Go version">
+  <a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total" alt="Downloads"></a>
+  <a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog" alt="Contributors"></a>
+  <a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog" alt="Release"></a>
+  <a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog" alt="Issues"></a>
 </p>
 
-<p align="center" dir="auto">
-  <a href="https://github.com/zan8in/afrog/releases">Download</a> •
-  <a href="https://github.com/zan8in/afrog/wiki">Wiki</a> •
-  <a href="https://github.com/zan8in/afrog/wiki/Afrog-PoC-规则编写权威指南">Afrog PoC 规则编写权威指南</a>
-</p>
+## What is afrog
 
-<!-- <p align="center">
-  <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/planet.png&w=250" alt="Afrog 官方圈 - 知识星球" width="250">
-</p>
-<p align="center">
-  本圈专注更新 PoC，不追求数量，只打磨质量。
-</p> -->
+`afrog` is a high-performance vulnerability scanner with support for built-in and custom PoCs. It is designed for fast verification, low false positives, and practical workflows across web targets, network services, PoC authoring, and SDK-based integration.
+
+## Install
+
+### Binary release
+
+Download the latest release from:
+
+- <https://github.com/zan8in/afrog/releases/latest>
+
+### Build from source
+
+```bash
+git clone https://github.com/zan8in/afrog.git
+cd afrog
+go build cmd/afrog/main.go
+./afrog -h
+```
+
+### Go install
+
+```bash
+go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
+```
+
+## Quick start
+
+Scan a single target:
+
+```bash
+afrog -t https://example.com
+```
+
+Scan multiple targets from a file:
+
+```bash
+afrog -T targets.txt
+```
+
+Run only high and critical checks:
+
+```bash
+afrog -T targets.txt -S high,critical
+```
+
+## Documentation
+
+The documentation is being reorganized into a structured bilingual tree. Chinese content is currently the most complete; English paths are already reserved and will be filled incrementally.
+
+- Chinese docs index: [docs/zh/index.md](docs/zh/index.md)
+- English docs index: [docs/en/index.md](docs/en/index.md)
+- PoC quickstart: [docs/zh/poc/quickstart.md](docs/zh/poc/quickstart.md)
+- SDK quickstart: [docs/zh/sdk/quickstart.md](docs/zh/sdk/quickstart.md)
+- Contributors: [docs/zh/community/contributors.md](docs/zh/community/contributors.md)
 
 ## PoC Contributors
 
+PoC contributors are a core part of the afrog community. This section stays in the repository README on purpose so contributor recognition remains visible in the first place people land.
+
+For contribution guidance, see [the Chinese contributor guide](docs/tutorial/rumen-dao-rutu/06-contribution.md). For a stable docs entry, see [docs/zh/community/contributors.md](docs/zh/community/contributors.md).
+
 <div><table frame=void>
-	<tr>
+        <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/1.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://blog.csdn.net/U_U520"><sub>不动明王</sub></a>
-        </td>    
+        </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/2.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://www.linuxlz.com/"><sub>雪山</sub></a>
-        </td> 
+        </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/3.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/White-hua"><sub>White-hua</sub></a>
-        </td> 
+        </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/5.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0)"><sub>123456</sub></a>
-        </td> 
+        </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/6.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/ifofor"><sub>ifofor</sub></a>
-        </td> 
+        </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/7.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/SkinAir"><sub>Air</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/8.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/zhizhuoshuma"><sub>执着</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/4.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/purple-WL"><sub>purple-WL</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/9.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>throat</sub></a>
         </td>
-	</tr>
+        </tr>
     <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/10.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="http://secx.store:4000/archives/"><sub>Secx</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/11.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/yueyu0740"><sub>冰河</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/12.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>Sheen</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/13.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>a16</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/14.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>A1</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/15.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/rainbow2972"><sub>rainbow2972</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/16.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/wuha0926"><sub>wuha0926</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/17.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>茄子</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/18.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>lei_sec</sub></a>
         </td>
-	</tr>	
+        </tr>
     <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/19.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/G-H-Z"><sub>G-H-Z</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/20.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/LDDP"><sub>wh1te</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/21.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>清月</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/22.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>york</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/23.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>7eleven.eth</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/24.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/Double-q1015"><sub>Double...</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/25.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/iceyjchen"><sub>ICEY_</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/26.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/Ablackcatlazy"><sub>lazy</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/55.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>free2e</sub></a>
         </td>
-    </tr>	
+    </tr>
     <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/28.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>m4sk</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/29.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://www.yuque.com/chenmoshuren/qyxg2k"><sub>沉默树人</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/30.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>陈麻子</sub></a>
         </td>
          <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/31.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/leonardo-o1"><sub>leonardo-o1</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/32.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>江湖人称魏...</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/33.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>若兮风</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/34.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>-sudo</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/35.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/Cuerz"><sub>Cuerz</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/36.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>laohuan12138</sub></a>
@@ -298,128 +344,128 @@
     <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/37.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/exp0l0zzz"><sub>exp0l0zzz</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/38.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/1derian"><sub>1derian</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/39.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/CMDB-M"><sub>CMDB-M</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/40.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:(0);"><sub>li1u</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/41.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/s0nd9r"><sub>oxsonder</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/42.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>Zhiliao</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/43.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>段</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/44.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/HuiTaiL6"><sub>HuiTaiL</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/45.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/Miracles666"><sub>Miracles666</sub></a>
         </td>
-    </td>
-     <tr>
+    </tr>
+    <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/46.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>Observer</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/47.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>黑熊</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/48.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>TryA9ain</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/49.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/fgz00"><sub>fgz00</sub></a>
         </td>
          <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/50.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/Y3y1ng"><sub>Y3y1ng</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/51.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>二大爷</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/52.png&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/wanswu"><sub>Wans</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/53.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://github.com/hbdxmz"><sub>海边的小米粥</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/54.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>Wen</sub></a>
@@ -428,376 +474,63 @@
         <tr>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/56.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>SULAB</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/57.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0);"><sub>ZacharyZcR</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/58.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="https://superhero.blog.csdn.net/"><sub>Superhero</sub></a>
         </td>
         <td align="center">
             <img src="https://images.weserv.nl/?url=raw.githubusercontent.com/zan8in/afrog/main/images/contributors/59.jpg&mask=circle&w=60&h=60"
-                   alt="Typora-Logo"
+                   alt="Contributor avatar"
                  />
             <br>
             <a href="javascript:void(0)"><sub>k5rC85Lma</sub></a>
         </td>
         </tr>
-        
+
 </table></div>
 
-## What is afrog
+## Examples
 
-afrog is a high-performance vulnerability scanner that is fast and stable. It supports user-defined PoC and comes with several built-in types, such as CVE, CNVD, default passwords, information disclosure, fingerprint identification, unauthorized access, arbitrary file reading, and command execution. With afrog, network security professionals can quickly validate and remediate vulnerabilities, which helps to enhance their security defense capabilities.
+- [Basic scanner](examples/basic_scan/main.go)
+- [Async scanner](examples/async_scan/main.go)
+- [OOB scanner](examples/oob_scan/main.go)
+- [Progress scanner](examples/progress_scan/main.go)
+- [Full output](examples/full_output/main.go)
+- [SDK portscan](examples/sdk_portscan/main.go)
+- [Vulnerability scan](examples/vuln_scan/main.go)
+- [Port scan](examples/port_scan/main.go)
 
-## Features
+## Project links
 
-- [x] Open source
-- [x] Fast, stable, with low false positives
-- [x] Detailed HTML vulnerability reports
-- [x] Customizable and stably updatable PoCs
-- [x] Port pre-scan (PortScan) for open port discovery
-- [x] Active community exchange group
+- Releases: <https://github.com/zan8in/afrog/releases>
+- Website: <http://afrogx.com>
+- Wiki archive: <https://github.com/zan8in/afrog/wiki>
 
-## Installation
+## Community
 
-### Prerequisites
+To join the afrog WeChat discussion group, add the afrog account and mark it as `afrog`.
 
-- [Go](https://go.dev/) version 1.24 or higher.
-
-you can install it with:
-
-**Binary**
-
-```sh
-$ https://github.com/zan8in/afrog/releases/latest
-```
-
-**Github**
-
-```sh
-$ git clone https://github.com/zan8in/afrog.git
-$ cd afrog
-$ go build cmd/afrog/main.go
-$ ./afrog -h
-```
-
-**Go**
-
-```sh
-$ go install -v github.com/zan8in/afrog/v3/cmd/afrog@latest
-
-# Confirm Go’s bin path is in your environment
-$ ls ~/go/bin/afrog
-
-# Make it runnable from anywhere (add ~/go/bin to PATH)
-# Permanently (Bash — add to ~/.bashrc):
-$ echo 'export PATH=$PATH:~/go/bin' >> ~/.bashrc
-$ source ~/.bashrc
-
-# If you use Zsh:
-$ echo 'export PATH=$PATH:~/go/bin' >> ~/.zshrc
-$ source ~/.zshrc
-```
-
-## Running afrog
-
-By default, afrog scans all built-in PoCs, and if it finds any vulnerabilities, it automatically creates an HTML report with the date of the scan as the filename.
-
-```sh
-afrog -t https://example.com
-```
-
-
-**Warning occurs when running afrog**
-
-If you see an error message saying:
-
-```
-[ERR] ceye reverse service not set: /home/afrog/.config/afrog/afrog-config.yaml
-```
-
-it means you need to modify the [configuration file](#configuration-file).
-
-To execute a custom PoC directory, you can use the following command:
-
-```sh
-afrog -t https://example.com -P mypocs/
-```
-
-Use the command `-s keyword` to perform a fuzzy search on all PoCs and scan the search results. Multiple keywords can be used, separated by commas. For example: `-s weblogic,jboss`.
-
-```sh
-afrog -t https://example.com -s weblogic,jboss
-```
-
-Use the command `-S keyword` to scan vulnerabilities based on their severity level. Severity levels include: `info`, `low`, `medium`, `high`, and `critical`. For example, to only scan high and critical vulnerabilities, use the command `-S high,critical`.
-
-```sh
-afrog -t https://example.com -S high,critical
-```
-
-You can scan multiple URLs at the same time as well.
-
-```sh
-afrog -T urls.txt
-```
-
-### Port Pre-scan (PortScan)
-
-PortScan runs before PoC scanning to discover open ports. Discovered ports will be appended to the scan target set (as `host:port`), and subsequent PoCs will run against the updated targets.
-
-```sh
-# Single-target full port scan
-afrog -t 1.2.3.4 -ps -p all
-
-# Network segment scan (host discovery + common port scan)
-afrog -t 1.2.3.4/24 -ps
-
-# Skip host discovery (assume target is reachable)
-afrog -T targets.txt -ps -Pn
-
-# Scan only specified ports
-afrog -t example.com -ps -p 80,443,8080
-```
-
-Common flags:
-
-- `-ps` / `--portscan`: enable port pre-scan
-- `-p` / `--ports`: ports definition (e.g. `top`, `full`, `all`, `80,443`, `1-1024`)
-- `-Pn` / `--ps-skip-discovery`: skip host discovery
-- `-prate` / `--ps-rate`: portscan rate limit
-- `-ptimeout` / `--ps-timeout-ms`: portscan timeout (ms)
-- `-ptries` / `--ps-retries`: portscan retries
-- `--ps-s4-chunk`: chunk size when ports=`full`
-
-## -web Command
-
-The `-web` command allows for persistently storing vulnerabilities scanned by afrog into an SQLite3 database. Accessing http://x.x.x.x:16868 via a browser provides access to the vulnerability report webpage, where users can conduct simple keyword searches and filter results by vulnerability severity.
-
-```shell
-afrog -web
-
-```
-
-<img src="https://github.com/zan8in/afrog/blob/main/images/webcommand.png" >
-
-## Configuration file
-
-The first time you start afrog, it will automatically create a configuration file called `afrog-config.yaml`, which will be saved in the current user directory under `$HOME/.config/afrog/afrog-config.yaml`.
-
-Here is an example config file:
-
-```yaml
-curated:
-  enabled: "auto"         # auto|on|off
-  endpoint: ""            # curated service endpoint, leave empty to disable online update
-  auto_update: true       # automatically check for curated updates
-  timeout_sec: 10         # mount/update timeout in seconds
-  channel: "stable"       # curated channel, e.g. stable/beta
-  license_key: ""         # your curated license key (if you have one)
-
-reverse:
-  ceye:
-    api-key: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-    domain: "xxxxxx.cey2e.io"
-  dnslogcn:
-    domain: dnslog.cn
-  alphalog:
-    domain: dnslogxx.sh
-    api_url: "http://dnslogxx.sh/"
-  xray:
-    x_token: "xraytest"
-    domain: dnslogxx.sh
-    api_url: "http://x.x.0.x:8777"
-  revsuit:
-    token: "xx"
-    dns_domain: "log.xx.com"
-    http_url: "http://x.x.x.x/log/"
-    api_url: "http://x.x.x.x/helplog"
-```
-
-### Curated PoCs
-
-Curated PoCs are an additional encrypted PoC set that can be mounted and updated automatically before scanning.
-
-- When `curated.enabled` is `auto` or `on`, afrog tries to mount curated PoCs on startup.
-- If a valid `endpoint` and `license_key` are configured, afrog will:
-  - Log in to the curated service
-  - Periodically check and download the latest curated PoCs
-  - Decrypt and store them under `~/.config/afrog/pocs-curated`
-- PoC loading priority is:
-  - curated > my > append > local > builtin
-  so curated PoCs override other sources with the same PoC id.
-
-If `curated.enabled` is `off`, or `endpoint` is empty, afrog will not connect to any curated service and will only use local/builtin PoCs.
-
-For advanced users, you can override the curated PoC directory with the environment variable `AFROG_POCS_CURATED_DIR`.
-
-
-`reverse` is a reverse connection platform used to verify command execution vulnerabilities that cannot be echoed back. Currently, only ceye can be used for verification.
-
-### Ceye Configuration
-
-
-- Go to the [ceye.io](http://ceye.io/) website and register an account.
-- Log in and go to the personal settings page.
-- Copy the `domain` and `api-key` and correctly configure them in the `afrog-config.yaml` file.
-
-### Dnslogcn
-
-No configuration required, but unstable
-[dnslog.cn](http://dnslog.cn/)
-
-### Alphalog
-
-Need to build services
-[alphalog](https://github.com/AlphabugX/Alphalog)
-
-### Xray
-
-Need to build services
-[xray](https://docs.xray.cool/tools/xray/advanced/reverse)
-
-### Revsuit
-
-Need to build services
-[Revsuit](https://github.com/Li4n0/revsuit)、
-[Tutorial](https://mp.weixin.qq.com/s/hGwcMz8sh7BImBjI3wHqnQ)
-
-## Json Output (For developers)
-
-### Json
-
-Optional command: `-json` `-j`, Save the scan results to a JSON file. The JSON file includes the following contents by default: `target`, `fulltarget`, `id`, and `info`. The info field includes the following sub-fields: `name`, `author`, `severity`, `description`, and `reference`. If you want to save both `request` and `response` contents, please use the [-json-all](#jsonall) command parameter.
-
-```sh
-afrog  -t https://example.com -json result.json
-afrog  -t https://example.com -j result.json
-```
-
-### Warning
-
-The content of the JSON file is updated in real time. However, there is an important note to keep in mind: before the scan is completed, if developers want to parse the file content, they need to add a '`]`' symbol to the end of the file by themselves, otherwise it will cause parsing errors. Of course, if you wait for the scan to complete before parsing the file, this issue will not occur.
-
-### JsonAll
-
-Optional command: `-json-all` `-ja`, The only difference between the `-json-all` and `-json` commands is that `-json-all` writes all vulnerability results, including `request` and `response`, to a JSON file.
-
-```sh
-afrog -t https://example.com -json-all result.json
-afrog -t https://example.com -ja result.json
-```
-
-## Screenshot
-
-![](https://github.com/zan8in/afrog/blob/main/images/1.png)
-
-<!-- ![](https://github.com/zan8in/afrog/blob/main/images/report-new.png) -->
-
-## As Library
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-
-	"github.com/zan8in/afrog/v3/pkg/sdk"
-)
-
-func main() {
-	ctx := context.Background()
-
-	scanner, err := sdk.New(ctx,
-		sdk.WithTargets("https://example.com"),
-		sdk.WithPocPaths("./pocs/afrog-pocs"), // file, directory or glob
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer scanner.Close()
-
-	if err := scanner.Execute(ctx); err != nil {
-		log.Fatal(err)
-	}
-
-	for _, r := range scanner.Results() {
-		fmt.Printf("[%s] %s - %s\n", r.Severity, r.FullTarget, r.PocName)
-
-		// The complete request and response of every step is available.
-		for _, ex := range r.Exchanges {
-			fmt.Println(ex.Request)
-			fmt.Println(ex.Response)
-		}
-	}
-}
-```
-
-`Execute` runs synchronously; `Start` plus `Wait`/`Done` runs the scan in the
-background. The SDK writes nothing to stdout or stderr, returns typed errors
-that work with `errors.Is`, and `Results()` is JSON serialisable as-is.
-
-For comprehensive SDK documentation:
-
-- [SDK Usage Guide (English)](docs/SDK_Usage_Guide_English.md)
-- [SDK使用指南 (中文)](docs/SDK使用指南_中文.md)
-
-### Runnable Examples
-
-Every example resolves the bundled PoC directory automatically and accepts
-`-pocs` to override it:
-
-```sh
-go run ./examples/basic_scan
-go run ./examples/full_output -json
-```
-
-- [Basic scanner](examples/basic_scan/main.go) — smallest useful program
-- [Full output](examples/full_output/main.go) — complete request/response data and JSON
-- [Async scanner](examples/async_scan/main.go) — streaming results and progress
-- [Progress scanner](examples/progress_scan/main.go) — progress bar
-- [OOB scanner](examples/oob_scan/main.go) — out-of-band detection
-- [SDK PortScan (sync/async)](examples/sdk_portscan/main.go) — port pre-scanning
-- [Vulnerability scan](examples/vuln_scan/main.go) — CI-style streaming consumption
-- [Port scan](examples/port_scan/main.go) — using the portscan package directly
-
-
-
-## Discussion group
-
-To join the afrog communication group on WeChat, please first add the afrog personal account and mark it as **afrog**. Then, you will be added to the group by the administrator.
-
-<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" />
+<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" alt="discussion group">
 
 ## 404Starlink
 
-<img src="https://github.com/knownsec/404StarLink-Project/raw/master/logo.png" width="30%">
-
-afrog has joined [404Starlink](https://github.com/knownsec/404StarLink)
+afrog is part of [404Starlink](https://github.com/knownsec/404StarLink).
 
 ## Disclaimer
 
-This tool is intended only for **legally authorized** enterprise security construction purposes. If you want to test the functionality of this tool, you should build a target environment by yourself.
-
-To prevent malicious use, all PoCs included in this project are theoretical assessments of vulnerabilities. The tool does not exploit vulnerabilities, launch real attacks or exploits on targets.
-
-When using this tool for vulnerability scanning, it is important to ensure that your behavior complies with local laws and regulations, and that you have obtained sufficient authorization. **Do not scan unauthorized targets**.
-
-If you engage in any illegal behavior while using this tool, you will be solely responsible for any corresponding consequences, and we will not bear any legal or joint responsibility.
-
-Before installing and using this tool, please **read each clause carefully and thoroughly**. Restrictions, disclaimers, or other clauses that may significantly affect your rights and interests may be highlighted in bold or underlined to draw your attention. Unless you have fully read, fully understood, and agreed to all the terms of this agreement, do not install or use this tool. Your use of the tool or your acceptance of this agreement in any other express or implied manner will be deemed as your acknowledgment and agreement to be bound by this agreement.
+This tool is intended only for legally authorized security work. Do not scan unauthorized targets. The user is solely responsible for any misuse or illegal activity.
