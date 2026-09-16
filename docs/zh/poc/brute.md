@@ -3,9 +3,9 @@ title: brute 机制
 slug: /docs/poc/brute
 lang: zh
 summary: 介绍 afrog PoC 中 brute 的遍历模式、默认行为和动态列表用法。
-status: draft
+status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/05-poc-advanced.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 `brute` 用于让某条规则按一组候选值重复执行，常见于路径探测、用户名密码组合、动态提取 ID 后逐个验证等场景。

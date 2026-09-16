@@ -3,9 +3,9 @@ title: Raw HTTP
 slug: /docs/poc/raw-http
 lang: zh
 summary: 介绍 afrog PoC 中原始 HTTP 报文的适用场景和推荐写法。
-status: draft
+status: published
 source: docs/afrog-poc-guide.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 `Raw HTTP` 适用于那些用普通 `method/path/headers/body` 很难准确表达的请求，例如：

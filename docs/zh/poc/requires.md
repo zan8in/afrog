@@ -3,9 +3,9 @@ title: requires 指纹门控
 slug: /docs/poc/requires
 lang: zh
 summary: 介绍 afrog PoC 中 requires 和 requires-mode 的门控语义与使用方式。
-status: draft
+status: published
 source: docs/requires-gating-guide.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 `requires` 和 `requires-mode` 用来表达 PoC 对指纹结果的依赖关系，尤其适合弱口令、默认口令、爆破类这类高成本检测。

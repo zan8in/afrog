@@ -3,9 +3,9 @@ title: TCP / SSL
 slug: /docs/poc/tcp
 lang: zh
 summary: 介绍 afrog 在 TCP 和 SSL 场景下的多步会话写法与变量保存方式。
-status: draft
+status: published
 source: docs/TCP/tcp-ssl-multi-step-session.md, docs/afrog-poc-guide.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 `afrog` 不只支持 HTTP PoC，也支持 `tcp` 和 `ssl` 类型的网络协议检测。对于需要“先读 banner，再写命令，再读响应”的服务，推荐使用 `steps`。

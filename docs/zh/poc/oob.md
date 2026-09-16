@@ -3,9 +3,9 @@ title: OOB 带外检测
 slug: /docs/poc/oob
 lang: zh
 summary: 介绍 afrog OOB PoC 的推荐写法、证据输出和常见排障思路。
-status: draft
+status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/05-poc-advanced.md, afrog.wiki/OOB 体系大升级：新版写法与证据教程（v3.3.9）.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 OOB（Out-of-Band）适用于那些“打到了但不会在 HTTP 响应里回显”的漏洞，例如 SSRF、XXE、JNDI、无回显命令执行等。

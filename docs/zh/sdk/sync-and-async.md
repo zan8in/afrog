@@ -3,9 +3,9 @@ title: 同步与异步
 slug: /docs/sdk/sync-and-async
 lang: zh
 summary: 介绍 afrog SDK 的同步执行、异步执行和生命周期控制。
-status: draft
+status: published
 source: docs/SDK使用指南_中文.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 `afrog` SDK 同时支持同步和异步两种执行方式。选择哪一种，取决于你是想用最短路径跑完扫描，还是想自己接管进度、状态和调度。
