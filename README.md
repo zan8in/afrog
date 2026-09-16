@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="http://afrogx.com"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
+  <a href="#"><img src="images/afrog-logo.svg" width="60px" alt="afrog"></a>
 </p>
 
 <h4 align="center">A Security Tool for Bug Bounty, Pentest and Red Teaming</h4>
@@ -518,7 +518,6 @@ For contribution guidance, see [the Chinese contributor guide](docs/tutorial/rum
 ## Project links
 
 - Releases: <https://github.com/zan8in/afrog/releases>
-- Website: <http://afrogx.com>
 - Wiki archive: <https://github.com/zan8in/afrog/wiki>
 
 ## Community
