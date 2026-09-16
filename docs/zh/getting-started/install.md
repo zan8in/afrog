@@ -35,7 +35,8 @@ https://github.com/zan8in/afrog/releases/latest
 ```bash
 git clone https://github.com/zan8in/afrog.git
 cd afrog
-go build cmd/afrog/main.go
+go mod tidy
+go build -o afrog cmd/afrog/main.go
 ./afrog -h
 ```
 
