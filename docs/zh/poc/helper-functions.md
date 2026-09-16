@@ -3,9 +3,9 @@ title: 内置函数参考
 slug: /docs/poc/helper-functions
 lang: zh
 summary: afrog PoC 常用内置函数与使用边界的参考页。
-status: draft
+status: published
 source: docs/afrog-helper-function.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 本页整理 `afrog` PoC 中最常用的一批内置函数，重点放在高频函数和使用边界上。

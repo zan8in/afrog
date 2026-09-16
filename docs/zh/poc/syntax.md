@@ -3,9 +3,9 @@ title: PoC 语法参考
 slug: /docs/poc/syntax
 lang: zh
 summary: afrog PoC 顶层字段和基础语法的权威参考页。
-status: draft
+status: published
 source: docs/afrog-poc-guide.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 本页用于沉淀 `afrog` PoC 的基础语法和字段结构，偏向“字段定义”和“写法边界”，不以教程为主。

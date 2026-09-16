@@ -3,9 +3,9 @@ title: afrog 文档
 slug: /docs
 lang: zh
 summary: afrog 官方文档首页，按使用者、PoC 作者和 SDK 用户分发内容。
-status: draft
+status: published
 source: new
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 欢迎来到 `afrog` 官方文档。

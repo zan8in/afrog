@@ -3,9 +3,9 @@ title: PoC 编写快速开始
 slug: /docs/poc/quickstart
 lang: zh
 summary: 帮助 PoC 作者写出第一条可运行的 afrog PoC。
-status: draft
+status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/04-poc-basics.md
-last_reviewed: 2026-09-15
+last_reviewed: 2026-09-16
 ---
 
 这一页的目标很简单：先写出一条能跑起来的 `afrog` PoC。

@@ -3,7 +3,7 @@ title: 安装
 slug: /docs/getting-started/install
 lang: zh
 summary: 介绍 afrog 的安装方式、运行前提和版本确认方法。
-status: draft
+status: published
 source: docs/README_CN.md
 last_reviewed: 2026-09-16
 ---
