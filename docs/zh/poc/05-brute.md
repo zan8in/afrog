@@ -1,4 +1,4 @@
----
+<!--
 title: brute 机制
 slug: /docs/poc/brute
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog PoC brute 参考，帮助你判断什么时候该遍历，以及 
 status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/05-poc-advanced.md
 last_reviewed: 2026-09-16
----
+-->
 
 `brute` 用于让一条规则按一组候选值重复执行。
 

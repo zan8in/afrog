@@ -1,4 +1,4 @@
----
+<!--
 title: What curated PoCs are
 slug: /docs/curated/overview
 lang: en
@@ -6,7 +6,7 @@ summary: What curated PoCs are, how they differ from built-in PoCs, and what you
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 ## What curated PoCs are
 

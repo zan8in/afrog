@@ -1,4 +1,4 @@
----
+<!--
 title: Configuration
 slug: /docs/user-guide/configuration
 lang: en
@@ -6,7 +6,7 @@ summary: Configuration file behavior, reverse platform settings, and common conf
 status: published
 source: docs/zh/user-guide/05-configuration.md
 last_reviewed: 2026-09-16
----
+-->
 
 On first startup, `afrog` creates its configuration file in the current user's home directory:
 

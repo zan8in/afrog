@@ -1,4 +1,4 @@
----
+<!--
 title: 输出与报告
 slug: /docs/user-guide/output-and-report
 lang: zh
@@ -6,7 +6,7 @@ summary: 介绍 afrog 的控制台输出、HTML 报告、JSON 输出和截图能
 status: published
 source: docs/README_CN.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` 支持控制台输出、HTML 报告、JSON 文件和更完整的 `JsonAll` 输出，既能满足人工查看，也适合自动化集成。
 

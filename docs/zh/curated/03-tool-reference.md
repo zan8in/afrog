@@ -1,4 +1,4 @@
----
+<!--
 title: afrog-curated 命令参考
 slug: /docs/curated/tool-reference
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog-curated 的 login / mount / update / status 等命令、环境变
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 `afrog-curated` 是 curated PoC 的客户端管理器：负责与服务端交互、下载加密 PoC 包（AFCP）、解密安装到本地目录，并向 `afrog` 输出已挂载的目录路径。
 

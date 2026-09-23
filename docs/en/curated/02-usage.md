@@ -1,4 +1,4 @@
----
+<!--
 title: Using curated PoCs in afrog
 slug: /docs/curated/usage
 lang: en
@@ -6,7 +6,7 @@ summary: Enable, disable, and update curated PoCs through CLI flags and configur
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 On the `afrog` side there is only one thing to know: at startup `afrog` calls `afrog-curated mount`, then passes the returned directory to the engine through the `AFROG_POCS_CURATED_DIR` environment variable. So "using curated PoCs in afrog" really means configuring an endpoint and a license.
 

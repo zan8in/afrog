@@ -1,4 +1,4 @@
----
+<!--
 title: SDK 快速开始
 slug: /docs/sdk/quickstart
 lang: zh
@@ -6,7 +6,7 @@ summary: 帮助开发者以最短路径将 afrog SDK 集成到自己的程序中
 status: published
 source: docs/SDK使用指南_中文.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` SDK 适合把漏洞扫描能力嵌入你自己的 Go 程序。当前推荐直接使用 `pkg/sdk` 这套新接口。
 

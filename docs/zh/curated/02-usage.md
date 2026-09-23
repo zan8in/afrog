@@ -1,4 +1,4 @@
----
+<!--
 title: 在 afrog 中使用 curated PoC
 slug: /docs/curated/usage
 lang: zh
@@ -6,7 +6,7 @@ summary: 通过 CLI 参数与配置文件在 afrog 中启用、关闭和更新 c
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 `afrog` 侧只做一件事：启动时调用 `afrog-curated mount`，把返回的目录通过环境变量 `AFROG_POCS_CURATED_DIR` 交给引擎加载。所以「让 afrog 用上 curated PoC」本质上就是配好 endpoint 与授权。
 

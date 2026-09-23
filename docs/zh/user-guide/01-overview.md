@@ -1,4 +1,4 @@
----
+<!--
 title: afrog 简介
 slug: /docs/user-guide/overview
 lang: zh
@@ -6,7 +6,7 @@ summary: 使用指南开篇：afrog 是什么、能做什么，以及这本手�
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 ## afrog 是什么
 

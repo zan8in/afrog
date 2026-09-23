@@ -1,4 +1,4 @@
----
+<!--
 title: requires 指纹门控
 slug: /docs/poc/requires
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog PoC 指纹门控参考，帮助你判断什么时候该用 requir
 status: published
 source: docs/requires-gating-guide.md
 last_reviewed: 2026-09-16
----
+-->
 
 `requires` 和 `requires-mode` 是 PoC 的“先识别、再验证”开关。
 

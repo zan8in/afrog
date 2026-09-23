@@ -1,4 +1,4 @@
----
+<!--
 title: Raw HTTP
 slug: /docs/poc/raw-http
 lang: en
@@ -6,7 +6,7 @@ summary: afrog Raw HTTP reference for deciding when to leave structured requests
 status: published
 source: docs/zh/poc/07-raw-http.md
 last_reviewed: 2026-09-16
----
+-->
 
 `Raw HTTP` is useful when regular `method/path/headers/body` form is not expressive enough.
 

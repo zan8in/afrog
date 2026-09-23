@@ -1,4 +1,4 @@
----
+<!--
 title: TCP / SSL
 slug: /docs/poc/tcp
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog TCP / SSL 参考，帮助你判断什么时候该用多步会话�
 status: published
 source: docs/TCP/tcp-ssl-multi-step-session.md, docs/afrog-poc-guide.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` 不只支持 HTTP PoC，也支持 `tcp` 和 `ssl` 类型的网络协议检测。
 

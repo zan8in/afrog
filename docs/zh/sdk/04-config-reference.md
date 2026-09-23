@@ -1,4 +1,4 @@
----
+<!--
 title: 配置参考
 slug: /docs/sdk/config-reference
 lang: zh
@@ -6,7 +6,7 @@ summary: 汇总 afrog SDK 的常用选项、默认值和配置边界。
 status: published
 source: docs/SDK使用指南_中文.md
 last_reviewed: 2026-09-16
----
+-->
 
 本页汇总 `afrog` SDK 中最常用的一批配置选项，方便在集成时快速定位“该配什么”和“默认行为是什么”。
 

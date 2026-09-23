@@ -1,4 +1,4 @@
----
+<!--
 title: TCP / SSL
 slug: /docs/poc/tcp
 lang: en
@@ -6,7 +6,7 @@ summary: afrog TCP / SSL reference for deciding when to use multi-step sessions 
 status: published
 source: docs/zh/poc/08-tcp.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` supports not only HTTP PoCs, but also `tcp` and `ssl` protocol checks.
 

@@ -1,4 +1,4 @@
----
+<!--
 title: PoC Contributors
 slug: /docs/poc/contributors
 lang: en
@@ -6,7 +6,7 @@ summary: Recognition for the people who contribute PoCs to afrog.
 status: published
 source: new
 last_reviewed: 2026-09-16
----
+-->
 
 PoC contributors are a major part of what makes `afrog` practical and trustworthy in real-world use.
 

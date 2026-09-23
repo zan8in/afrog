@@ -1,4 +1,4 @@
----
+<!--
 title: Output and Reports
 slug: /docs/user-guide/output-and-report
 lang: en
@@ -6,7 +6,7 @@ summary: Console output, HTML reports, JSON exports, and automation-oriented res
 status: published
 source: docs/zh/user-guide/06-output-and-report.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` supports console output, HTML reports, JSON files, and fuller `JsonAll` output so the same scan can serve both manual review and automated workflows.
 

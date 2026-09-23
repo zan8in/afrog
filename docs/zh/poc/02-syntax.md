@@ -1,4 +1,4 @@
----
+<!--
 title: PoC 语法参考
 slug: /docs/poc/syntax
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog PoC 语法与字段参考，先帮助你判断该写什么，再�
 status: published
 source: docs/afrog-poc-guide.md
 last_reviewed: 2026-09-16
----
+-->
 
 这页不是“从零到一”的教程，而是 PoC 作者在真正落笔时最常回来看的一页。
 

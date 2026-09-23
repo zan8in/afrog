@@ -1,4 +1,4 @@
----
+<!--
 title: afrog Docs
 slug: /docs
 lang: en
@@ -6,7 +6,7 @@ summary: Official afrog documentation, organized into four handbooks: User Guide
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 Welcome to the official `afrog` documentation.
 

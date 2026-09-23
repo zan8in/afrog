@@ -1,4 +1,4 @@
----
+<!--
 title: OOB 带外检测
 slug: /docs/poc/oob
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog OOB 参考，帮助你判断什么时候该用带外检测、如�
 status: published
 source: docs/afrog-poc-guide.md, docs/tutorial/rumen-dao-rutu/05-poc-advanced.md, afrog.wiki/OOB 体系大升级：新版写法与证据教程（v3.3.9）.md
 last_reviewed: 2026-09-16
----
+-->
 
 OOB（Out-of-Band）适用于那些“目标真的触发了，但 HTTP 响应里看不到证据”的漏洞。
 

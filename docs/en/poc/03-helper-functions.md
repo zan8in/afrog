@@ -1,4 +1,4 @@
----
+<!--
 title: Helper Functions
 slug: /docs/poc/helper-functions
 lang: en
@@ -6,7 +6,7 @@ summary: afrog PoC helper function reference, organized by real usage patterns a
 status: published
 source: docs/zh/poc/03-helper-functions.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page is not meant to make you memorize every helper. It is meant to help you find the right one faster while writing a PoC.
 

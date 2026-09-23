@@ -1,4 +1,4 @@
----
+<!--
 title: PoC Syntax
 slug: /docs/poc/syntax
 lang: en
@@ -6,7 +6,7 @@ summary: afrog PoC syntax and field reference, designed for both writing flow an
 status: published
 source: docs/zh/poc/02-syntax.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page is not the zero-to-one tutorial. It is the page PoC authors come back to while they are actually writing rules.
 

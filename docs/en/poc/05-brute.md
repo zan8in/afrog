@@ -1,4 +1,4 @@
----
+<!--
 title: brute
 slug: /docs/poc/brute
 lang: en
@@ -6,7 +6,7 @@ summary: afrog brute reference for deciding when to iterate and how mode, commit
 status: published
 source: docs/zh/poc/05-brute.md
 last_reviewed: 2026-09-16
----
+-->
 
 `brute` lets one rule execute repeatedly against a set of candidate values.
 

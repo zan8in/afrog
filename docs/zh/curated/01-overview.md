@@ -1,4 +1,4 @@
----
+<!--
 title: Curated PoC 简介
 slug: /docs/curated/overview
 lang: zh
@@ -6,7 +6,7 @@ summary: 介绍 curated PoC 的定位、与内置 PoC 的区别，以及接入�
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 ## 什么是 curated PoC
 

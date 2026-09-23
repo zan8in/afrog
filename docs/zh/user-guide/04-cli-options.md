@@ -1,4 +1,4 @@
----
+<!--
 title: CLI 参数总览
 slug: /docs/user-guide/cli-options
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog 命令行参数的权威参考页。
 status: published
 source: docs/README_CN.md, docs/tutorial/rumen-dao-rutu/02-cli-usage.md
 last_reviewed: 2026-09-16
----
+-->
 
 本页用于沉淀 `afrog` 当前 CLI 的主要参数分组、常用写法和关键默认值，目标是让它既能作为高频总览，也能作为站内参数字典来查。
 

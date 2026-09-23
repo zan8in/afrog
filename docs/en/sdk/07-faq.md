@@ -1,4 +1,4 @@
----
+<!--
 title: FAQ
 slug: /docs/sdk/faq
 lang: en
@@ -6,7 +6,7 @@ summary: Common afrog SDK integration questions and practical guidance.
 status: published
 source: docs/zh/sdk/07-faq.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page collects the questions that appear most often during `afrog` SDK integration.
 

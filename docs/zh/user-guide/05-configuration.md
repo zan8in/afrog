@@ -1,4 +1,4 @@
----
+<!--
 title: 配置文件说明
 slug: /docs/user-guide/configuration
 lang: zh
@@ -6,7 +6,7 @@ summary: 介绍 afrog 配置文件的用途、字段和典型配置方式。
 status: published
 source: docs/README_CN.md, docs/tutorial/rumen-dao-rutu/03-configuration.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` 第一次启动时，会在当前用户目录下自动创建配置文件：
 

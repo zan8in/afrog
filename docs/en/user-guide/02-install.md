@@ -1,4 +1,4 @@
----
+<!--
 title: Install
 slug: /docs/user-guide/install
 lang: en
@@ -6,7 +6,7 @@ summary: Installation methods, prerequisites, and verification steps for afrog.
 status: published
 source: docs/zh/user-guide/02-install.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` supports binary downloads, source builds, and `go install`. For most users, the release binary is the fastest way to get started.
 

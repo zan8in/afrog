@@ -1,4 +1,4 @@
----
+<!--
 title: 内置函数参考
 slug: /docs/poc/helper-functions
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog PoC 内置函数参考，先按用途找工具，再按函数名�
 status: published
 source: docs/afrog-helper-function.md
 last_reviewed: 2026-09-16
----
+-->
 
 这页不是让你把所有函数背下来，而是帮你在写 PoC 时更快找到“现在该用哪一个”。
 

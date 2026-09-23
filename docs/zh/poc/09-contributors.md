@@ -1,4 +1,4 @@
----
+<!--
 title: PoC 贡献者荣誉墙
 slug: /docs/poc/contributors
 lang: zh
@@ -6,7 +6,7 @@ summary: 致谢所有为 afrog 提交与维护 PoC 的贡献者。
 status: published
 source: new
 last_reviewed: 2026-09-16
----
+-->
 
 每一条高质量 PoC，都在帮助更多使用者更快、更准确地完成漏洞验证。
 

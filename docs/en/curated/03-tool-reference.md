@@ -1,4 +1,4 @@
----
+<!--
 title: afrog-curated command reference
 slug: /docs/curated/tool-reference
 lang: en
@@ -6,7 +6,7 @@ summary: afrog-curated commands such as login, mount, update, and status, plus e
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 `afrog-curated` is the client-side manager for curated PoCs: it talks to the service, downloads encrypted PoC packs (AFCP), installs them locally, and prints the mounted directory path for `afrog`.
 

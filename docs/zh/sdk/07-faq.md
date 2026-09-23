@@ -1,4 +1,4 @@
----
+<!--
 title: 常见问题
 slug: /docs/sdk/faq
 lang: zh
@@ -6,7 +6,7 @@ summary: 汇总 afrog SDK 集成中最常见的问题与处理建议。
 status: published
 source: docs/SDK使用指南_中文.md
 last_reviewed: 2026-09-16
----
+-->
 
 本页收集 `afrog` SDK 集成里最常见的一批问题。
 

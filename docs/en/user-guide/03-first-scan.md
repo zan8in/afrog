@@ -1,4 +1,4 @@
----
+<!--
 title: First Scan
 slug: /docs/user-guide/first-scan
 lang: en
@@ -6,7 +6,7 @@ summary: The shortest path from installation to a successful first afrog scan.
 status: published
 source: docs/zh/user-guide/03-first-scan.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page focuses on one goal: run `afrog` successfully as quickly as possible and understand what the result means.
 

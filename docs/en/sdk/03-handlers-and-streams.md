@@ -1,4 +1,4 @@
----
+<!--
 title: Handlers and Streams
 slug: /docs/sdk/handlers-and-streams
 lang: en
@@ -6,7 +6,7 @@ summary: Event handlers, stream subscriptions, and consumption guidance for the 
 status: published
 source: docs/zh/sdk/03-handlers-and-streams.md
 last_reviewed: 2026-09-16
----
+-->
 
 If you want results during the scan rather than only after completion, the `afrog` SDK gives you two main mechanisms:
 

@@ -1,4 +1,4 @@
----
+<!--
 title: 安装
 slug: /docs/user-guide/install
 lang: zh
@@ -6,7 +6,7 @@ summary: 介绍 afrog 的安装方式、运行前提和版本确认方法。
 status: published
 source: docs/README_CN.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` 支持二进制安装、源码构建和 `go install` 三种方式。对大多数用户来说，优先建议直接使用发布版本。
 

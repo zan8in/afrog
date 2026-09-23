@@ -1,4 +1,4 @@
----
+<!--
 title: Config Reference
 slug: /docs/sdk/config-reference
 lang: en
@@ -6,7 +6,7 @@ summary: Common afrog SDK options, defaults, and configuration boundaries.
 status: published
 source: docs/zh/sdk/04-config-reference.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page summarizes the most commonly used SDK options so you can quickly answer two questions during integration: what to configure, and what the default behavior is.
 

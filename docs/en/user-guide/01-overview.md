@@ -1,4 +1,4 @@
----
+<!--
 title: What afrog does
 slug: /docs/user-guide/overview
 lang: en
@@ -6,7 +6,7 @@ summary: Opening page of the User Guide: what afrog is, what it does, and how to
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 ## What afrog is
 

@@ -1,4 +1,4 @@
----
+<!--
 title: PoC Quickstart
 slug: /docs/poc/quickstart
 lang: en
@@ -6,7 +6,7 @@ summary: Write the first working afrog PoC by the shortest path, then know which
 status: published
 source: docs/zh/poc/01-quickstart.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page focuses on the shortest path to a working `afrog` PoC.
 

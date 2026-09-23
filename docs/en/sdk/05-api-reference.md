@@ -1,4 +1,4 @@
----
+<!--
 title: API Reference
 slug: /docs/sdk/api-reference
 lang: en
@@ -6,7 +6,7 @@ summary: Common constructors, result accessors, and scan information APIs in the
 status: published
 source: docs/zh/sdk/05-api-reference.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page summarizes the most commonly used SDK methods so you can quickly answer: what are the main entry points, and what scan information can be read back.
 

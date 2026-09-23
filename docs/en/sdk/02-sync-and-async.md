@@ -1,4 +1,4 @@
----
+<!--
 title: Sync and Async
 slug: /docs/sdk/sync-and-async
 lang: en
@@ -6,7 +6,7 @@ summary: Synchronous and asynchronous execution patterns for the afrog SDK.
 status: published
 source: docs/zh/sdk/02-sync-and-async.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` SDK supports both synchronous and asynchronous execution. Which one to choose depends on whether you want the shortest path to a finished scan or you want to manage progress and scheduling yourself.
 

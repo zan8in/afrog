@@ -1,4 +1,4 @@
----
+<!--
 title: OOB
 slug: /docs/poc/oob
 lang: en
@@ -6,7 +6,7 @@ summary: afrog OOB reference for deciding when to use out-of-band detection, how
 status: published
 source: docs/zh/poc/06-oob.md
 last_reviewed: 2026-09-16
----
+-->
 
 OOB (Out-of-Band) is for vulnerabilities where the target really triggers, but the HTTP response does not give you direct evidence.
 

@@ -1,4 +1,4 @@
----
+<!--
 title: Raw HTTP
 slug: /docs/poc/raw-http
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog Raw HTTP 参考，帮助你判断什么时候该放弃结构化�
 status: published
 source: docs/afrog-poc-guide.md
 last_reviewed: 2026-09-16
----
+-->
 
 `Raw HTTP` 适用于那些用普通 `method/path/headers/body` 很难准确表达的请求。
 

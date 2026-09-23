@@ -1,4 +1,4 @@
----
+<!--
 title: afrog 文档
 slug: /docs
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog 官方文档首页，按四本手册组织：使用指南、PoC �
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 欢迎来到 `afrog` 官方文档。
 

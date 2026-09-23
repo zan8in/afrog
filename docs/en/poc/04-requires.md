@@ -1,4 +1,4 @@
----
+<!--
 title: requires Fingerprint Gating
 slug: /docs/poc/requires
 lang: en
@@ -6,7 +6,7 @@ summary: afrog fingerprint gating reference for deciding when to use requires an
 status: published
 source: docs/zh/poc/04-requires.md
 last_reviewed: 2026-09-16
----
+-->
 
 `requires` and `requires-mode` are the "identify first, verify second" switches of a PoC.
 

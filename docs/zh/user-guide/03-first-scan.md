@@ -1,4 +1,4 @@
----
+<!--
 title: 第一次扫描
 slug: /docs/user-guide/first-scan
 lang: zh
@@ -6,7 +6,7 @@ summary: 帮助新用户在最短路径内完成第一次 afrog 扫描。
 status: published
 source: docs/README_CN.md
 last_reviewed: 2026-09-16
----
+-->
 
 这一页只关注一件事：让你在最短路径内跑通一次 `afrog` 扫描，并看到结果。
 

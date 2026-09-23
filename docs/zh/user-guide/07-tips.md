@@ -1,4 +1,4 @@
----
+<!--
 title: 实战技巧
 slug: /docs/user-guide/tips
 lang: zh
@@ -6,7 +6,7 @@ summary: afrog 的高频实战组合：目标输入、资产探测、性能与�
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 本页不是参数字典，而是把高频参数组合成可以直接照抄的实战用法。完整参数定义见 [CLI 参数总览](./04-cli-options.md)。
 

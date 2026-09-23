@@ -1,4 +1,4 @@
----
+<!--
 title: 回调与流
 slug: /docs/sdk/handlers-and-streams
 lang: zh
@@ -6,7 +6,7 @@ summary: 介绍 afrog SDK 的事件回调、流式订阅和消费注意事项。
 status: published
 source: docs/SDK使用指南_中文.md
 last_reviewed: 2026-09-16
----
+-->
 
 如果你希望在扫描过程中实时拿到结果，而不是等扫描结束后再统一读取，`afrog` SDK 提供了两类能力：
 

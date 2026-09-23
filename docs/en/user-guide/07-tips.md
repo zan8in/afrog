@@ -1,4 +1,4 @@
----
+<!--
 title: Practical Tips
 slug: /docs/user-guide/tips
 lang: en
@@ -6,7 +6,7 @@ summary: High-frequency afrog recipes: target input, asset discovery, performanc
 status: published
 source: new
 last_reviewed: 2026-09-23
----
+-->
 
 This page is not a parameter dictionary. It combines frequently used flags into recipes you can copy directly. For the full parameter reference, see [CLI Options](./04-cli-options.md).
 

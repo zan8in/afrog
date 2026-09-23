@@ -1,4 +1,4 @@
----
+<!--
 title: SDK Quickstart
 slug: /docs/sdk/quickstart
 lang: en
@@ -6,7 +6,7 @@ summary: The shortest path to embed afrog scanning into a Go program.
 status: published
 source: docs/zh/sdk/01-quickstart.md
 last_reviewed: 2026-09-16
----
+-->
 
 `afrog` SDK is designed for embedding scanning capabilities into your own Go applications. For new integrations, the recommended entry point is `pkg/sdk`.
 

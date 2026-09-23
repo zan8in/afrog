@@ -1,4 +1,4 @@
----
+<!--
 title: CLI Options
 slug: /docs/user-guide/cli-options
 lang: en
@@ -6,7 +6,7 @@ summary: Authoritative reference for the most commonly used afrog CLI options.
 status: published
 source: docs/zh/user-guide/04-cli-options.md
 last_reviewed: 2026-09-16
----
+-->
 
 This page summarizes the main `afrog` CLI groups, common usage patterns, and key defaults so it can work both as an onboarding page and as an in-site parameter dictionary.
 

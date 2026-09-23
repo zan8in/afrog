@@ -178,9 +178,10 @@ docs/
 
 ### 9.4 页面元信息
 
-每篇文档统一包含以下 frontmatter：
+每篇文档的元数据统一放在文件开头的 **HTML 注释块**中：
 
-```yaml
+```html
+<!--
 title:
 slug:
 lang:
@@ -188,13 +189,14 @@ summary:
 status:
 source:
 last_reviewed:
+-->
 ```
 
-`status` 取值：
+说明：
 
-- `stable` / `published`
-- `draft`
-- `beta`
+- 最早使用 YAML frontmatter（`---` 包裹），但 GitHub 会把 `---` 渲染成水平线并直接显示键值，因此改为注释包裹，渲染时完全不可见。
+- `status` 取值：`stable` / `published`、`draft`、`beta`。
+- 官网当前解析的是 `---` 形式的 frontmatter，同步到 `afrog-website` 时需要让解析器改为识别该注释块（见 §14）。
 
 ## 10. 已上线范围
 
@@ -267,6 +269,7 @@ last_reviewed:
 1. **同步到 `afrog-website`**（待主仓库内容完善后）：
    - 在 `SECTION_LABELS` / `SECTION_ORDER` 中新增 `curated` 分组；
    - 按新的四本手册结构校对分节标题与顺序；
+   - 让元数据解析器识别文件开头的 HTML 注释块（原 `---` frontmatter 形式已弃用）；
    - 确认新增页面在站内可正常渲染。
 2. 补齐英文正文与后续新增页面。
 3. 建立文档 CI 校验：中英文目录一致性、站内链接有效性。

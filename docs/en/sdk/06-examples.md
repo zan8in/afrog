@@ -1,4 +1,4 @@
----
+<!--
 title: Examples
 slug: /docs/sdk/examples
 lang: en
@@ -6,7 +6,7 @@ summary: Runnable afrog SDK examples and the scenarios they are meant to demonst
 status: published
 source: docs/zh/sdk/06-examples.md
 last_reviewed: 2026-09-16
----
+-->
 
 If you have already read [SDK Quickstart](./01-quickstart.md), the best next step is usually to run an example rather than keep reading concepts.
 
