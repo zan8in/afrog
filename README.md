@@ -10,20 +10,29 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/go-mod/go-version/zan8in/afrog?filename=go.mod" alt="Go version">
-  <a href="https://github.com/zan8in/afrog/releases"><img src="https://img.shields.io/github/downloads/zan8in/afrog/total" alt="Downloads"></a>
-  <a href="https://github.com/zan8in/afrog/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/zan8in/afrog" alt="Contributors"></a>
-  <a href="https://github.com/zan8in/afrog/releases/"><img src="https://img.shields.io/github/release/zan8in/afrog" alt="Release"></a>
+  <img src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go" alt="Go version">
+  <a href="https://github.com/zan8in/afrog/releases/latest"><img src="https://img.shields.io/github/v/release/zan8in/afrog?include_prereleases&sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/zan8in/afrog/stargazers"><img src="https://img.shields.io/github/stars/zan8in/afrog?style=flat-square" alt="GitHub stars"></a>
+  <a href="https://github.com/zan8in/afrog/blob/main/LICENSE"><img src="https://img.shields.io/github/license/zan8in/afrog" alt="License"></a>
   <a href="https://github.com/zan8in/afrog/issues"><img src="https://img.shields.io/github/issues-raw/zan8in/afrog" alt="Issues"></a>
 </p>
 
 ## What is afrog
 
-`afrog` is a high-performance vulnerability scanner with support for built-in and custom PoCs. It is designed for fast verification, low false positives, and practical workflows across web targets, network services, PoC authoring, and SDK-based integration.
+`afrog` is a high-performance security scanning toolkit built for bug bounty, pentest, and red team workflows. It combines fast target probing, built-in vulnerability checks, custom PoC authoring, and SDK-driven automation in a single Go-based workflow.
+
+### What afrog does
+
+- Fast and focused scanning for web targets and network services
+- Built-in and custom PoC support for practical security validation
+- Lower false-positive noise through precise rule design and checks
+- Flexible integration with Go applications, automation flows, and private PoC pipelines
 
 ## Install
 
-For source builds or `go install`, use Go 1.27 or later.
+### Dependencies
+
+- Go 1.27 or later
 
 ### Binary release
 
@@ -69,19 +78,16 @@ afrog -T targets.txt -S high,critical
 
 ## Documentation
 
-The documentation is being reorganized into a structured bilingual tree. Chinese content is currently the most complete; English paths are already reserved and will be filled incrementally.
+The documentation is organized into four handbooks:
 
-- Chinese docs index: [docs/zh/index.md](docs/zh/index.md)
-- English docs index: [docs/en/index.md](docs/en/index.md)
-- PoC quickstart: [docs/zh/poc/quickstart.md](docs/zh/poc/quickstart.md)
-- SDK quickstart: [docs/zh/sdk/quickstart.md](docs/zh/sdk/quickstart.md)
-- Contributors: [docs/zh/community/contributors.md](docs/zh/community/contributors.md)
+| Handbook | Start here |
+| --- | --- |
+| User Guide | [What afrog is and how to use it](docs/en/user-guide/01-overview.md) |
+| PoC Authoring Guide | [Write your first PoC](docs/en/poc/01-quickstart.md) |
+| SDK Usage Guide | [Embed afrog in your Go program](docs/en/sdk/01-quickstart.md) |
+| Curated PoC | [Connect and use curated PoCs](docs/en/curated/01-overview.md) |
 
 ## PoC Contributors
-
-PoC contributors are a core part of the afrog community. This section stays in the repository README on purpose so contributor recognition remains visible in the first place people land.
-
-For contribution guidance, see [the Chinese contributor guide](docs/tutorial/rumen-dao-rutu/06-contribution.md). For a stable docs entry, see [docs/zh/community/contributors.md](docs/zh/community/contributors.md).
 
 <div><table frame=void>
         <tr>
@@ -507,27 +513,12 @@ For contribution guidance, see [the Chinese contributor guide](docs/tutorial/rum
 
 </table></div>
 
-## Examples
-
-- [Basic scanner](examples/basic_scan/main.go)
-- [Async scanner](examples/async_scan/main.go)
-- [OOB scanner](examples/oob_scan/main.go)
-- [Progress scanner](examples/progress_scan/main.go)
-- [Full output](examples/full_output/main.go)
-- [SDK portscan](examples/sdk_portscan/main.go)
-- [Vulnerability scan](examples/vuln_scan/main.go)
-- [Port scan](examples/port_scan/main.go)
-
-## Project links
-
-- Releases: <https://github.com/zan8in/afrog/releases>
-- Wiki archive: <https://github.com/zan8in/afrog/wiki>
 
 ## Community
 
 To join the afrog WeChat discussion group, add the afrog account and mark it as `afrog`.
 
-<img src="https://github.com/zan8in/afrog/blob/main/images/discussion.jpg" width="33%" alt="discussion group">
+<img src="./images/discussion.jpg" width="33%" alt="discussion group">
 
 ## 404Starlink
 

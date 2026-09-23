@@ -2,136 +2,141 @@
 
 ## 1. 说明
 
-本清单用于指导 `afrog` 现有文档向新文档结构迁移，目标是：
+本清单记录 `afrog` 文档向四本手册结构迁移的实际结果，用于：
 
-- 为每一份旧文档明确归宿。
-- 区分“保留、拆分、合并、归档、跳转”几类处理方式。
-- 给迁移工作排定优先级，避免同时改动过多入口。
+- 追溯每一份旧文档的归宿。
+- 明确“保留、移动、重命名、重写、归档”等处理方式。
+- 记录尚未完成的迁移项。
 
-新文档结构以 `docs/zh/` 为主，英文版按同路径镜像创建 `docs/en/`。
+新结构以 `docs/zh/` 为主，英文版按同路径镜像创建 `docs/en/`。两侧目录必须一一对应。
 
 ## 2. 处理动作定义
 
-- `保留`：内容基本稳定，仅换路径或格式。
-- `拆分`：一篇旧文档拆成多篇新文档。
-- `合并`：多篇旧文档合并成一篇新文档。
-- `归档`：保留历史内容，但不再作为权威入口。
-- `跳转`：旧入口保留说明，跳转到新文档。
+- `重命名`：内容不变，仅按章节顺序加数字前缀。
+- `移动`：内容不变，仅调整所属目录。
+- `合并`：多篇旧文档合并进同一篇新文档。
+- `重写`：入口页按新结构重新编写。
+- `新增`：重构时首次编写的页面。
+- `归档`：保留历史内容，但不再作为权威入口，也不进入站点导航。
 
 ## 3. 新文档目标结构
 
 ```text
-docs/zh/
-  index.md
-  getting-started/
-  user-guide/
-  poc/
-  sdk/
-  reference/
-  tutorials/
-  faq/
-  contributing/
-  release-notes/
+docs/{zh,en}/
+  index.md                  # 四本手册目录页（站内文档首页）
+  user-guide/               # ① 使用指南
+    01-overview.md
+    02-install.md
+    03-first-scan.md
+    04-cli-options.md
+    05-configuration.md
+    06-output-and-report.md
+    07-tips.md
+  poc/                      # ② PoC 编写指南
+    01-quickstart.md
+    02-syntax.md
+    03-helper-functions.md
+    04-requires.md
+    05-brute.md
+    06-oob.md
+    07-raw-http.md
+    08-tcp.md
+    09-contributors.md
+  sdk/                      # ③ SDK 使用指南
+    01-quickstart.md
+    02-sync-and-async.md
+    03-handlers-and-streams.md
+    04-config-reference.md
+    05-api-reference.md
+    06-examples.md
+    07-faq.md
+  curated/                  # ④ Curated PoC
+    01-overview.md
+    02-usage.md
+    03-tool-reference.md
 ```
 
-## 4. 迁移总表
+## 4. 迁移总表（已完成）
 
-| 现有路径 | 目标路径 | 处理方式 | 优先级 | 备注 |
-| --- | --- | --- | --- | --- |
-| `README.md` | 根首页入口 | 拆分 | P0 | 精简为项目简介、安装、常用命令、Docs 入口 |
-| `docs/README_CN.md` | `docs/zh/index.md` + `getting-started/*` + `user-guide/*` + `reference/cli-options.md` | 拆分 | P0 | 当前中文入口内容过重，需拆开 |
-| `docs/afrog-poc-guide.md` | `docs/zh/poc/quickstart.md` + `docs/zh/poc/syntax.md` + `docs/zh/poc/rules-and-expression.md` + `docs/zh/poc/extractors.md` + `docs/zh/poc/best-practices.md` | 拆分 | P0 | PoC 主文档，优先重构 |
-| `docs/afrog-helper-function.md` | `docs/zh/poc/helper-functions.md` | 保留/整理 | P0 | 作为参考手册保留 |
-| `docs/requires-gating-guide.md` | `docs/zh/poc/requires.md` | 保留/整理 | P1 | 主题明确，适合单篇迁移 |
-| `docs/SDK使用指南_中文.md` | `docs/zh/sdk/overview.md` + `docs/zh/sdk/quickstart.md` + `docs/zh/sdk/sync-and-async.md` + `docs/zh/sdk/handlers-and-streams.md` + `docs/zh/sdk/config-reference.md` + `docs/zh/sdk/api-reference.md` + `docs/zh/sdk/examples.md` + `docs/zh/sdk/faq.md` | 拆分 | P0 | 体量大，但结构天然适合拆分 |
-| `docs/SDK_Usage_Guide_English.md` | `docs/en/sdk/*` | 拆分 | P2 | 先按中文路径建英文镜像 |
-| `docs/TCP/tcp-ssl-multi-step-session.md` | `docs/zh/poc/tcp.md` | 合并 | P1 | 并入 TCP/SSL 章节 |
-| `docs/tutorial/rumen-dao-rutu/00-outline.md` | `docs/zh/tutorials/index.md` 或归档 | 归档 | P3 | 仅保留为系列说明 |
-| `docs/tutorial/rumen-dao-rutu/01-getting-started.md` | `docs/zh/tutorials/first-web-scan.md` | 保留/整理 | P2 | 归为教程，不做权威参考 |
-| `docs/tutorial/rumen-dao-rutu/02-cli-usage.md` | `docs/zh/tutorials/cli-workflow.md` + `docs/zh/reference/cli-options.md` | 拆分 | P1 | 参数定义与示例分离 |
-| `docs/tutorial/rumen-dao-rutu/03-configuration.md` | `docs/zh/tutorials/configuration-basics.md` + `docs/zh/user-guide/configuration.md` | 拆分 | P1 | 教程与参考分离 |
-| `docs/tutorial/rumen-dao-rutu/03-configuration copy.md` | 无 | 归档/删除候选 | P3 | 明显重复，待确认后清理 |
-| `docs/tutorial/rumen-dao-rutu/04-poc-basics.md` | `docs/zh/tutorials/first-poc.md` + `docs/zh/poc/quickstart.md` | 拆分 | P1 | 保留教程属性 |
-| `docs/tutorial/rumen-dao-rutu/05-poc-advanced.md` | `docs/zh/tutorials/requires-chain.md` + `docs/zh/poc/requires.md` + `docs/zh/poc/brute.md` + `docs/zh/poc/oob.md` | 拆分 | P1 | 高级技巧拆到权威章节 |
-| `docs/tutorial/rumen-dao-rutu/06-contribution.md` | `docs/zh/contributing/poc-contribution.md` | 保留/整理 | P2 | 迁到贡献指南 |
-| `docs/tutorial/rumen-dao-rutu/07-resume.md` | `docs/zh/tutorials/large-scale-resume.md` + `docs/zh/user-guide/resume.md` | 拆分 | P1 | 一篇教程，一篇操作说明 |
-| `docs/tutorial/series-params-to-principles/00-outline.md` | `docs/zh/tutorials/advanced/index.md` 或归档 | 归档 | P3 | 系列规划稿，不作主入口 |
-| `docs/tutorial/series-params-to-principles/01-target-input.md` | `docs/zh/tutorials/target-input-principles.md` + `docs/zh/user-guide/targets.md` | 拆分 | P2 | 原理说明与操作说明分离 |
-| `docs/tutorial/series-params-to-principles/02-task-smart-timeout.md` | `docs/zh/tutorials/smart-timeout.md` + `docs/zh/user-guide/performance.md` | 拆分 | P2 | 场景说明并入性能章节 |
-| `afrog.wiki/Home.md` | `docs/zh/index.md` | 跳转 | P2 | Wiki 首页改为跳转页 |
-| `afrog.wiki/Getting-Started.md` | `docs/zh/getting-started/install.md` + `docs/zh/getting-started/first-scan.md` | 跳转 | P2 | 历史页面保留说明 |
-| `afrog.wiki/Configuration.md` | `docs/zh/user-guide/configuration.md` | 跳转 | P2 | 迁移后不再单独维护 |
-| `afrog.wiki/Usage.md` | `docs/zh/user-guide/*` + `docs/zh/reference/cli-options.md` | 拆分/跳转 | P2 | 使用说明重构后再替换 |
-| `afrog.wiki/Examples.md` | `docs/zh/getting-started/quick-examples.md` + `docs/zh/tutorials/*` | 拆分/跳转 | P2 | 示例与教程统一管理 |
-| `afrog.wiki/FAQ.md` | `docs/zh/faq/common-issues.md` | 合并/跳转 | P2 | FAQ 独立化 |
-| `afrog.wiki/Afrog-PoC-规则编写权威指南.md` | `docs/zh/poc/*` | 拆分/跳转 | P1 | 与 `docs/afrog-poc-guide.md` 同步整合 |
-| `afrog.wiki/Afrog-PoC-内置函数.md` | `docs/zh/poc/helper-functions.md` | 跳转 | P1 | 保留历史入口，正文迁走 |
-| `afrog.wiki/requires 指纹门控：用法教程与问题答疑.md` | `docs/zh/poc/requires.md` | 跳转 | P1 | 作为专项说明迁入 |
-| `afrog.wiki/内置便捷变量与 Helper 速查.md` | `docs/zh/reference/built-in-variables.md` + `docs/zh/poc/helper-functions.md` | 拆分 | P2 | 变量与函数分层 |
-| `afrog.wiki/OOB 体系大升级：新版写法与证据教程（v3.3.9）.md` | `docs/zh/poc/oob.md` + `docs/zh/release-notes/*` | 拆分 | P2 | “教程”与“版本说明”拆开 |
-| `afrog.wiki/Afrog 指纹 PoC 编写保姆级教程：从 0 到 1 实战.md` | `docs/zh/tutorials/fingerprint-poc.md` + `docs/zh/poc/quickstart.md` | 拆分 | P3 | 作为场景教程保留 |
-| `afrog.wiki/Afrog 指纹 PoC 进阶教程：巧用“机会主义”模式 (Opportunistic).md` | `docs/zh/tutorials/opportunistic-mode.md` + `docs/zh/poc/requires.md` | 拆分 | P3 | 机制说明进入权威页 |
-| `afrog.wiki/Afrog 支持星球PoC自动更新功能.md` | `docs/zh/user-guide/poc-source.md` 或 `docs/zh/tutorials/poc-update.md` | 待定 | P3 | 视是否仍为产品主功能决定归类 |
+以下路径同样适用于 `docs/zh/` 与 `docs/en/`。
 
-## 5. 首批交付清单（P0）
+| 旧路径（相对 `docs/{zh,en}/`） | 新路径 | 处理方式 | 备注 |
+| --- | --- | --- | --- |
+| `getting-started/install.md` | `user-guide/02-install.md` | 移动 + 重命名 | 并入使用指南 |
+| `getting-started/first-scan.md` | `user-guide/03-first-scan.md` | 移动 + 重命名 | 并入使用指南 |
+| `reference/cli-options.md` | `user-guide/04-cli-options.md` | 合并 + 移动 | `reference/` 目录取消 |
+| `user-guide/configuration.md` | `user-guide/05-configuration.md` | 重命名 | — |
+| `user-guide/output-and-report.md` | `user-guide/06-output-and-report.md` | 重命名 | — |
+| `community/contributors.md` | `poc/09-contributors.md` | 移动 | 作为 PoC 手册附录 |
+| `poc/quickstart.md` | `poc/01-quickstart.md` | 重命名 | PoC 手册首页 |
+| `poc/syntax.md` | `poc/02-syntax.md` | 重命名 | — |
+| `poc/helper-functions.md` | `poc/03-helper-functions.md` | 重命名 | — |
+| `poc/requires.md` | `poc/04-requires.md` | 重命名 | — |
+| `poc/brute.md` | `poc/05-brute.md` | 重命名 | — |
+| `poc/oob.md` | `poc/06-oob.md` | 重命名 | — |
+| `poc/raw-http.md` | `poc/07-raw-http.md` | 重命名 | — |
+| `poc/tcp.md` | `poc/08-tcp.md` | 重命名 | — |
+| `sdk/quickstart.md` | `sdk/01-quickstart.md` | 重命名 | SDK 手册首页 |
+| `sdk/sync-and-async.md` | `sdk/02-sync-and-async.md` | 重命名 | — |
+| `sdk/handlers-and-streams.md` | `sdk/03-handlers-and-streams.md` | 重命名 | — |
+| `sdk/config-reference.md` | `sdk/04-config-reference.md` | 重命名 | — |
+| `sdk/api-reference.md` | `sdk/05-api-reference.md` | 重命名 | — |
+| `sdk/examples.md` | `sdk/06-examples.md` | 重命名 | — |
+| `sdk/faq.md` | `sdk/07-faq.md` | 重命名 | — |
+| `index.md` | `index.md` | 重写 | 收敛为四本手册目录页 |
 
-建议第一批先落以下内容：
+已删除的空目录：`getting-started/`、`reference/`、`community/`。
 
-1. `docs/plan/afrog-documentation-prd.md`
-2. `docs/plan/afrog-documentation-migration-map.md`
-3. `docs/zh/index.md`
-4. `docs/zh/getting-started/install.md`
-5. `docs/zh/getting-started/first-scan.md`
-6. `docs/zh/reference/cli-options.md`
-7. `docs/zh/user-guide/configuration.md`
-8. `docs/zh/user-guide/output-and-report.md`
-9. `docs/zh/poc/quickstart.md`
-10. `docs/zh/poc/syntax.md`
-11. `docs/zh/poc/helper-functions.md`
-12. `docs/zh/sdk/quickstart.md`
+## 5. 新增页面（已完成）
 
-## 6. 迁移顺序建议
+| 新路径 | 内容 |
+| --- | --- |
+| `user-guide/01-overview.md` | 使用指南开篇：afrog 是什么、能做什么、本书目录 |
+| `user-guide/07-tips.md` | 实战技巧：目标输入、资产探测、性能与稳定性、OOB、输出、断点续扫 |
+| `curated/01-overview.md` | curated PoC 的定位、与内置 PoC 的区别、接入前置条件 |
+| `curated/02-usage.md` | 在 afrog 中启用 / 关闭 / 更新 curated PoC |
+| `curated/03-tool-reference.md` | `afrog-curated` 命令、环境变量与本地文件 |
 
-### 步骤 1：先立新目录
+## 6. 仓库门面迁移（已完成）
 
-- 建立 `docs/zh/` 和 `docs/en/` 结构。
-- 为首批核心页面创建占位文件。
+| 旧入口 | 新入口 | 处理方式 |
+| --- | --- | --- |
+| `README.md` 的 5 个文档链接 | 四本手册入口（英文） | 重写 |
+| `docs/README_CN.md` 的 6 个文档链接 + 「示例 / 项目链接」 | 与 `README.md` 完全对称的章节结构（四本手册入口，中文） | 重写 |
 
-### 步骤 2：迁核心入口
+两份 README 现在包含相同的章节集合：项目简介、安装、快速开始、文档入口、PoC 贡献者、讨论群、404Starlink、免责声明。
 
-- 改造 `README.md` 和中文首页。
-- 建立新文档首页和导航关系。
+## 7. 历史正文归档（保留，不进入站点导航）
 
-### 步骤 3：迁 PoC 与 SDK 核心手册
+以下文件位于 `docs/` 根目录或独立目录，不在 `docs/{zh,en}/` 下，因此不会被站点遍历，仅作为历史归档保留：
 
-- 优先拆 `afrog-poc-guide.md`。
-- 再拆 `SDK使用指南_中文.md`。
+| 历史文件 | 正文去向 | 处理方式 |
+| --- | --- | --- |
+| `docs/afrog-poc-guide.md` | `docs/{zh,en}/poc/*` | 已拆分，保留归档 |
+| `docs/afrog-helper-function.md` | `docs/{zh,en}/poc/03-helper-functions.md` | 已拆分，保留归档 |
+| `docs/requires-gating-guide.md` | `docs/{zh,en}/poc/04-requires.md` | 已拆分，保留归档 |
+| `docs/SDK使用指南_中文.md` | `docs/zh/sdk/*` | 已拆分，保留归档 |
+| `docs/SDK_Usage_Guide_English.md` | `docs/en/sdk/*` | 已拆分，保留归档 |
+| `docs/TCP/tcp-ssl-multi-step-session.md` | `docs/{zh,en}/poc/08-tcp.md` | 已合并，保留归档 |
+| `docs/tutorial/rumen-dao-rutu/*` | 部分内容已并入四本手册 | 保留归档 |
+| `docs/tutorial/series-params-to-principles/*` | 部分内容已并入四本手册 | 保留归档 |
+| `afrog.wiki/*` | `docs/{zh,en}/*` | 待处理（见 §9） |
 
-### 步骤 4：迁教程与 FAQ
+## 8. 校验结果
 
-- 将教程移入 `tutorials/`。
-- FAQ 合并为统一入口。
+- `docs/zh` 与 `docs/en` 各 27 个 Markdown 文件，相对路径一一对应。
+- `docs/{zh,en}` 内共 228 个链接，其中 212 个站内相对链接全部有效，0 失效。
+- 被移动页面的 `frontmatter.slug` 已更新为新的语义化路径（不含数字前缀）。
+- `frontmatter.source` 中指向旧路径的引用已同步更新。
 
-### 步骤 5：处理 Wiki
+## 9. 待处理事项
 
-- 在 Wiki 核心入口加入迁移说明。
-- 逐步将正文转为跳转或历史归档。
+1. `afrog.wiki/*` 的历史入口改为跳转或归档说明。
+2. `docs/{zh,en}` 之外的归档文件在确认无引用后可考虑清理。
+3. 主仓库内容完善后，将本结构与新增页面同步到 `afrog-website`：
 
-## 7. 待确认事项
+   - 在 `SECTION_LABELS` / `SECTION_ORDER` 中新增 `curated` 分组；
+   - 校对分节标题与顺序是否与四本手册一致；
+   - 验证新增页面在站点内正常渲染。
 
-以下内容建议在实施前确认：
-
-1. `afrog-website` 是直接读取主仓库 Markdown，还是通过同步脚本复制。
-2. 是否需要在第一期就引入全文搜索。
-3. `release-notes/` 是否要按版本拆页。
-4. `星球 PoC 自动更新` 是否作为正式产品功能保留在主文档中。
-5. 是否保留部分 Wiki 教程作为“社区文章”区分展示。
-
-## 8. 后续建议
-
-基于本迁移清单，下一步适合继续产出：
-
-1. 首批 10 篇文档的章节提纲
-2. 首页信息架构与导航草图
-3. 文档 frontmatter 模板
-4. 英文占位页策略与 CI 校验规则
+4. 建立文档 CI 校验：中英文目录一致性、站内链接有效性。

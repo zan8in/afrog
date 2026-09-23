@@ -65,7 +65,7 @@ git push origin main
 
 ## 🎁 贡献者的回报
 
-1.  **荣誉**：你的头像会出现在 Afrog 的 [PoC 贡献者荣誉墙](../../zh/community/contributors.md) 中，并同步保留在仓库 README 的 `PoC Contributors` 区域。
+1.  **荣誉**：你的头像会出现在 Afrog 的 [PoC 贡献者荣誉墙](../../zh/poc/09-contributors.md) 中，并同步保留在仓库 README 的 `PoC Contributors` 区域。
 2.  **成长**：与顶尖的安全研究员交流代码，学习更优雅的写法。
 3.  **社区认可**：在面试或晋升时，拥有开源项目的贡献记录是一个巨大的加分项。
 
