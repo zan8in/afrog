@@ -198,6 +198,7 @@ If the first practice target already involves async behavior, complex login flow
 - [OOB](./06-oob.md)
 - [Raw HTTP](./07-raw-http.md)
 - [TCP / SSL](./08-tcp.md)
-- [PoC Contributors](./09-contributors.md)
+- [Writing Guide by Vulnerability Type](./09-category-guide.md)
+- [PoC Contributors](./10-contributors.md)
 
 > **← Docs home:** [afrog Docs](../index.md) ｜ **Next →:** [PoC Syntax](./02-syntax.md)

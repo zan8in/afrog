@@ -236,4 +236,4 @@ When the separator is wrong, the most common outcomes are truncated responses an
 
 The hard part of TCP / SSL PoCs is usually not "how do I send a packet", but "how do I split the session into the right steps and keep the important values".
 
-> **← Previous:** [Raw HTTP](./07-raw-http.md) ｜ **Handbook home:** [PoC Quickstart](./01-quickstart.md) ｜ **Next →:** [PoC Contributors](./09-contributors.md)
+> **← Previous:** [Raw HTTP](./07-raw-http.md) ｜ **Handbook home:** [PoC Quickstart](./01-quickstart.md) ｜ **Next →:** [Writing Guide by Vulnerability Type](./09-category-guide.md)
