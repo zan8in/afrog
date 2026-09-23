@@ -8,15 +8,6 @@ source: new
 last_reviewed: 2026-09-23
 -->
 
-本页按**漏洞类型**组织。每一类只讲本类特有的内容：落点在哪、入口怎么构造、判定该用什么锚点。
-
-跨类型通用的规则（请求怎么拼、判定怎么写、有哪些通用坑）统一收在第一节，后面各类型不再重复。
-
-字段与函数的基础用法见 [PoC 语法参考](./02-syntax.md) 与 [内置函数参考](./03-helper-functions.md)。
-
-> 除注明出处的示例外，本页的 Host、路径与参数均为示意写法，落点请按目标实际情况替换。
-> 引用内置 PoC 时，为便于阅读省略了部分说明性字段（如 `description`），请求与判定逻辑保持原样。
-
 ## 通用约定（各类型都适用）
 
 ### `path` 是怎么拼的
@@ -300,8 +291,6 @@ expression: r0()
 
 ### 命名与检索
 
-内置语料把这一类集中放在 `afrog-pocs/unauthorized/` 目录下。
-
 命名通行做法是文件名与 `id` 以 `-unauth` 结尾，也常见 `-unauthorized`、`-unauthorized-access`、`-unauthenticated` 等变体；`tags` 里带上 `unauth` 或 `unauthorized`（两种都在用）。和文件读取类一样，决定能否被 `-s` 筛到的是 `tags`。
 
 ```bash
@@ -545,8 +534,6 @@ expression: r0() && r1()
 ## 命令执行类 (RCE)
 
 ### 命名与检索
-
-这一类在内置语料里没有独立目录，主要散在 `afrog-pocs/vulnerability/`（部分在 `CVE/`、`CNVD/`）下。
 
 命名通行做法是文件名与 `id` 以 `-rce` 结尾，遇到具体形态时会在中间加限定词，例如 `-ping-rce`、`-cli-rce`、`-jndi-rce`、`-deserialization-rce`；`tags` 里带上 `rce`，并额外标注组件（`log4j`、`fastjson`、`thinkphp`）或漏洞类型（`jndi`、`deserialization`）。
 
