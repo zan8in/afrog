@@ -198,6 +198,7 @@ afrog -t https://example.com -P ./mypocs -debug
 - [OOB 带外检测](./06-oob.md)
 - [Raw HTTP](./07-raw-http.md)
 - [TCP / SSL](./08-tcp.md)
-- [PoC 贡献者荣誉墙](./09-contributors.md)
+- [按漏洞类型的编写指南](./09-category-guide.md)
+- [PoC 贡献者荣誉墙](./10-contributors.md)
 
 > **← 文档首页：** [afrog 文档](../index.md) ｜ **下一篇 →：** [PoC 语法参考](./02-syntax.md)

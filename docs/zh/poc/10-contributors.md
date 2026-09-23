@@ -24,4 +24,4 @@ last_reviewed: 2026-09-16
 - 后续如果 README 再做结构优化，也应保证这里与 README 至少有一个权威荣誉入口始终可访问。
 - 如果贡献展示需要补录或修正，建议在 Issue 或 PR 中说明。
 
-> **← 上一篇：** [TCP / SSL](./08-tcp.md) ｜ **本手册首页：** [PoC 编写快速开始](./01-quickstart.md) ｜ **文档首页 →：** [afrog 文档](../index.md)
+> **← 上一篇：** [按漏洞类型的编写指南](./09-category-guide.md) ｜ **本手册首页：** [PoC 编写快速开始](./01-quickstart.md) ｜ **文档首页 →：** [afrog 文档](../index.md)

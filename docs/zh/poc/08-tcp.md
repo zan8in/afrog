@@ -236,4 +236,4 @@ POP3 常见流程就是：
 
 TCP / SSL PoC 的难点通常不在“怎么发包”，而在“怎么把会话拆成几步，并把关键结果留住”。
 
-> **← 上一篇：** [Raw HTTP](./07-raw-http.md) ｜ **本手册首页：** [PoC 编写快速开始](./01-quickstart.md) ｜ **下一篇 →：** [PoC 贡献者荣誉墙](./09-contributors.md)
+> **← 上一篇：** [Raw HTTP](./07-raw-http.md) ｜ **本手册首页：** [PoC 编写快速开始](./01-quickstart.md) ｜ **下一篇 →：** [按漏洞类型的编写指南](./09-category-guide.md)

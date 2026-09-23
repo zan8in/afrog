@@ -41,7 +41,8 @@ docs/{zh,en}/
     06-oob.md
     07-raw-http.md
     08-tcp.md
-    09-contributors.md
+    09-category-guide.md
+    10-contributors.md
   sdk/                      # ③ SDK 使用指南
     01-quickstart.md
     02-sync-and-async.md
@@ -67,7 +68,7 @@ docs/{zh,en}/
 | `reference/cli-options.md` | `user-guide/04-cli-options.md` | 合并 + 移动 | `reference/` 目录取消 |
 | `user-guide/configuration.md` | `user-guide/05-configuration.md` | 重命名 | — |
 | `user-guide/output-and-report.md` | `user-guide/06-output-and-report.md` | 重命名 | — |
-| `community/contributors.md` | `poc/09-contributors.md` | 移动 | 作为 PoC 手册附录 |
+| `community/contributors.md` | `poc/10-contributors.md` | 移动 | 作为 PoC 手册附录，排在正文章节之后 |
 | `poc/quickstart.md` | `poc/01-quickstart.md` | 重命名 | PoC 手册首页 |
 | `poc/syntax.md` | `poc/02-syntax.md` | 重命名 | — |
 | `poc/helper-functions.md` | `poc/03-helper-functions.md` | 重命名 | — |
@@ -96,6 +97,7 @@ docs/{zh,en}/
 | `curated/01-overview.md` | curated PoC 的定位、与内置 PoC 的区别、接入前置条件 |
 | `curated/02-usage.md` | 在 afrog 中启用 / 关闭 / 更新 curated PoC |
 | `curated/03-tool-reference.md` | `afrog-curated` 命令、环境变量与本地文件 |
+| `poc/09-category-guide.md` | 按漏洞类型的编写指南（当前已收录文件读取类；英文版待补） |
 
 ## 6. 仓库门面迁移（已完成）
 
@@ -145,21 +147,23 @@ docs/{zh,en}/
 
 ### 8.3 校验结果
 
-- `docs/zh` 与 `docs/en` 各 27 个 Markdown 文件，相对路径一一对应。
-- `docs/{zh,en}` 内共 228 个链接，其中 212 个站内相对链接全部有效，0 失效。
-- 54 个页面的元数据块首尾标记完整（`<!--` / `-->`），正文中的 `---` 水平线未被误改。
-- 每本手册页面（各 26 页）末尾均存在导航页脚，引用块中的相对链接全部有效。
+- `docs/zh` 28 个、`docs/en` 27 个 Markdown 文件；除 `poc/09-category-guide.md`（待补英文镜像）外，两侧相对路径一一对应。
+- `docs/{zh,en}` 内的站内相对链接全部有效，0 失效。
+- 所有页面的元数据块首尾标记完整（`<!--` / `-->`），正文中的 `---` 水平线未被误改。
+- 每本手册页面末尾均存在导航页脚，引用块中的相对链接全部有效；PoC 手册的页脚链已随章节调整同步更新（`08-tcp` → `09-category-guide` → `10-contributors`）。
 - `slug` 已更新为新的语义化路径（不含数字前缀），`source` 中指向旧路径的引用已同步更新。
+- `poc/09-category-guide.md`（中文）已完稿：通用约定 + 文件读取类 / 未授权访问类 / 命令执行类 / SQL 注入类 / 文件上传类 / 弱口令爆破类 六类。
 
 ## 9. 待处理事项
 
 1. `afrog.wiki/*` 的历史入口改为跳转或归档说明。
-2. `docs/{zh,en}` 之外的归档文件在确认无引用后可考虑清理。
-3. 主仓库内容完善后，将本结构与新增页面同步到 `afrog-website`：
+2. 补齐 `poc/09-category-guide.md` 的英文镜像（对应 `docs/en/poc/09-category-guide.md`），并把 `docs/en/poc/09-contributors.md` 重命名为 `10-contributors.md`、同步更新英文页脚链与 `docs/en/poc/01-quickstart.md` 的 `## In this handbook` 目录，使中英目录恢复一一对应。
+3. `docs/{zh,en}` 之外的归档文件在确认无引用后可考虑清理。
+4. 主仓库内容完善后，将本结构与新增页面同步到 `afrog-website`：
 
    - 在 `SECTION_LABELS` / `SECTION_ORDER` 中新增 `curated` 分组；
    - 让元数据解析器识别文件开头的 HTML 注释块（原 `---` frontmatter 形式已弃用）；
    - 校对分节标题与顺序是否与四本手册一致；
    - 验证新增页面在站点内正常渲染。
 
-4. 建立文档 CI 校验：中英文目录一致性、站内链接有效性。
+5. 建立文档 CI 校验：中英文目录一致性、站内链接有效性。
