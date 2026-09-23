@@ -2,7 +2,7 @@
 title: 按漏洞类型的编写指南
 slug: /docs/poc/category-guide
 lang: zh
-summary: 按漏洞类型沉淀 afrog PoC 的编写要点与可复制的典型示例，已完整收录文件读取类、未授权访问类、命令执行类、SQL 注入类、文件上传类与弱口令爆破类。
+summary: 按漏洞类型沉淀 afrog PoC 的编写要点与可复制的典型示例，已收录文件读取类、未授权访问类、命令执行类、SQL 注入类、文件上传类、弱口令爆破类与跨站脚本类，并附 PoC 质量检查清单。
 status: published
 source: new
 last_reviewed: 2026-09-23
@@ -28,12 +28,32 @@ last_reviewed: 2026-09-23
 4. 负向条件兜底：`!response.body.bcontains(b"<html")`、`!response_text.icontains("not found")`
 5. 需要正则匹配中文或已解码内容时，优先用 `response_text` 系列函数（`rmatches`、`contains`）
 
+### 规则级控制与自动早停
+
+`rules.<规则名>` 下除了 `request`、`expression`，还可以写三个控制字段：
+
+| 字段 | 作用 | 适合的场景 |
+| --- | --- | --- |
+| `stop_if_match: true` | 本条命中后立即停止执行后续规则 | 探测多个路径/多种特征，任意一个命中就算 |
+| `stop_if_mismatch: true` | 本条不命中就立即停止 | 多步利用链——第一步没拿到 token，后面就不用发 |
+| `before_sleep: 6` | 执行本条前先等 N 秒 | 异步生效（导出、生成文件、缓存刷新）或主动降速 |
+
+此外，**顶层 `expression` 的连接方式会决定是否自动早停**：
+
+- 只含 `&&`（不含 `||`）→ 等价于「任一规则不匹配就停」
+- 只含 `||`（不含 `&&`）→ 等价于「任一规则匹配就停」
+- 两种混用 → 不自动早停，所有规则都会跑
+
+所以顶层尽量只用一种连接符：既表达清楚意图，也顺手省下请求。反过来，混用时要有「全部规则都会执行」的心理预期。
+
 ### 通用坑
 
 - **响应体上限**：`-mrbs` 默认 2 MB，超出部分会被截断，判定锚点应尽量落在内容开头附近
 - **`requires` 门控**：加了 `requires` 后只有指纹命中的目标才会执行；`-nf`、`-test` 会绕过门控，别把它们当常规扫描模式
 - **重定向**：需要跟随跳转时显式加 `follow_redirects`，否则可能只拿到 302 空响应
 - **编码差异**：中文响应未必是 UTF-8，正则不中时先在字节层用 `bsubmatch` 试
+- **POST 的默认头**：`POST` 请求若没写 `Content-Type`，`afrog` 会自动补 `application/x-www-form-urlencoded`；`Accept`、`User-Agent` 缺失时也会补默认值。所以想发 JSON 就必须显式写 `Content-Type: application/json`
+- **`{{...}}` 的渲染范围**：只会在请求字段（`path`、`host`、`body`、`raw`、`data` 与 header 值）里求值，**`expression` 里不会渲染**。所以「把判定条件存进变量再在 `expression` 里引用」是行不通的
 
 ## 文件读取类 (File Read)
 
@@ -1103,6 +1123,54 @@ expression: r0()
 - 随机文件名（`{{r2}}`）在这里承担了「唯一标记」的作用，响应里出现它就说明这次上传确实被受理并落盘
 - 需要跟随跳转时显式加 `follow_redirects: true`
 
+### 少写样板：内置上传变量与自删除 Helper
+
+#### 内置变量：不必再自己声明
+
+文件上传里最常重复的三个随机变量，`afrog` 会按「目标 × PoC」执行周期自动注入，可以直接用：
+
+| 变量 | 默认值 | 常见用途 |
+| --- | --- | --- |
+| `{{rboundary}}` | 8 位随机小写字母 | multipart 的 `boundary` |
+| `{{rfilename}}` | 6 位随机小写字母 | 上传文件名的主体部分 |
+| `{{rbody}}` | 10 位随机小写字母 | 写入内容的标记串 |
+
+也就是说，前面两个示例里 `set: rboundary: randomLowercase(8)` 这一步其实可以省略，直接在 `Content-Type` 和 body 里写 `{{rboundary}}` 就行。同一个 `target × poc` 周期内这些值保持不变，所以「上传」和「回读」两步天然能对上。
+
+**`set` 会覆盖内置值**：确实需要更长的随机串（比如 32 位的标记）时，在 `set` 里显式声明同名变量即可——`set` 在内置注入之后应用，优先级更高。
+
+#### 自删除 Helper：省掉重复的删马代码
+
+上传验证常希望验证文件执行后自清理。`afrog` 内置了四种语言的 Helper，传入标记串即可生成「输出标记 + 删除自身」的文件内容：
+
+| Helper | 生成的代码形态 |
+| --- | --- |
+| `jspDelete(rbody)` | JSP：输出后删除当前文件 |
+| `phpDelete(rbody)` | PHP：`echo` 后 `unlink(__FILE__)` |
+| `aspxDelete(rbody)` | ASPX：输出后删除当前文件 |
+| `aspDelete(rbody)` | ASP：输出后删除当前文件 |
+
+直接放进 body 就是一个自删除的验证文件：
+
+```yaml
+      headers:
+        Content-Type: multipart/form-data; boundary=----{{rboundary}}
+      body: |
+        ------{{rboundary}}
+        Content-Disposition: form-data; name="file"; filename="{{rfilename}}.jsp"
+        Content-Type: image/jpeg
+
+        {{jspDelete(rbody)}}
+        ------{{rboundary}}--
+```
+
+回读时判定 `response.body.bcontains(bytes(rbody))` 即可——Helper 生成的代码里就是输出 `rbody`。
+
+要注意两点：
+
+- Helper 返回的是**文件内容字符串**，只能放在 `body` 这类请求字段里；不要在 `expression` 里调用它
+- 自删除不是判定条件。即使目标禁用了删除操作，只要标记串回读得到，漏洞依然成立
+
 ### 服务端改了文件名怎么办
 
 不少上传接口会重命名文件，这时访问路径不能写死，要从上传响应里**提取**出来。内置 PoC `showdoc-fileupload` 提取的是「日期 + 新文件名」：
@@ -1331,5 +1399,111 @@ expression: r0()
 3. Basic Auth 场景记得先把凭据 `base64()` 编码
 4. 协议类必须写 `requires` 门控，否则等于对任意端口盲跑字典
 5. 字典要小而准：`continue: false` 只在命中后省请求，未命中的目标仍要跑完全部组合
+
+## 跨站脚本类 (XSS)
+
+### 命名与检索
+
+命名通行做法是文件名与 `id` 以 `-xss` 结尾，需要区分形态时可带上 `reflected` / `stored`。`tags` 里带上 `xss`。
+
+```bash
+afrog -t https://example.com -s xss
+```
+
+### 先分流：反射型还是存储型
+
+| 类型 | 证据 | 请求数 |
+| --- | --- | --- |
+| 反射型 | 同一次响应里就把 payload 带回来 | 1 |
+| 存储型 | 先提交，再访问展示页才看到 | 2 |
+
+### 反射型：判定「原样回显」
+
+```yaml
+id: demo-reflected-xss
+
+info:
+  name: 示例 反射型 XSS
+  author: your-name
+  severity: medium
+  tags: demo,xss
+
+set:
+  marker: randomLowercase(8)
+  payload_raw: '"><script>alert("' + marker + '")</script>'
+  payload: urlencode(payload_raw)
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /search?q={{payload}}
+    expression: response.status == 200 && response.body.bcontains(bytes(payload_raw))
+expression: r0()
+```
+
+要点：
+
+- **payload 里必须带一个不可预测的随机串**（`{{marker}}`）。这是本类最容易出错的地方：如果 payload 写成固定的 `<script>alert(1)</script>`，那么任何页面里本来就有这段文字的目标（模板、文档、示例页）都会误报
+- **发送用编码后的 `payload`，判定用编码前的 `payload_raw`**：发送前要 `urlencode` 才能正确进入 query，但比对时必须拿原文——两者缺一个就写不对
+- **判定的是「未经转义地原样回显」**。如果响应里出现的是 `&lt;script&gt;` 这类转义形态，说明被转义处理了，不算 XSS。所以不要用 `icontains("script")`、`icontains("alert")` 这种宽松判定
+
+### 存储型：提交与验证分两步
+
+```yaml
+id: demo-stored-xss
+
+info:
+  name: 示例 存储型 XSS
+  author: your-name
+  severity: medium
+  tags: demo,xss
+
+set:
+  marker: randomLowercase(8)
+  payload_raw: '<img src=x onerror=alert("' + marker + '")>'
+  payload: urlencode(payload_raw)
+
+rules:
+  submit:
+    request:
+      method: POST
+      path: /comment
+      body: "name=test&comment={{payload}}"
+    expression: response.status == 200
+
+  verify:
+    request:
+      method: GET
+      path: /comments
+    expression: response.status == 200 && response.body.bcontains(bytes(payload_raw))
+expression: submit() && verify()
+```
+
+要点：
+
+- **两步分工明确**：`submit` 只负责写入（判定宽松，200 即可），`verify` 才负责判定。存储型不能只看提交响应——提交成功不代表内容会被渲染出来
+- 必须**换一个请求去读展示页**，这是它与反射型的根本区别
+- 展示路径若依赖提交返回的 id，就用 `output` 先提取再拼进去（做法见文件上传类的「服务端改了文件名怎么办」）
+- 顶层用 `&&`：两步都成立才算命中
+
+### 本类降误报要点
+
+1. payload 必须带不可预测的随机串，判定「它原样回显」；固定 payload 极易与页面自带内容撞车
+2. 判定「未转义回显」：命中 `&lt;script&gt;` 这类转义形态不算 XSS
+3. 发送用 `urlencode` 后的字符串，判定用编码前的原文
+4. 存储型必须回读展示页，不能只看提交响应
+5. 不要用 `icontains("alert")`、`icontains("script")` 这类宽松判定
+
+## 附：PoC 质量检查清单
+
+写完一条 PoC 后，按这六条过一遍：
+
+1. **命名一致**：文件名是 `<poc_id>.yaml`，且 YAML 里的 `id` 与文件名一致
+2. **定位明确**：`description`（或 `fofa` 等识别信息）能说清这条 PoC 针对的是哪类目标、哪个接口
+3. **误报控制**：`expression` 至少两个独立条件——例如状态码 + 正文特征，或正文特征 + 响应头特征
+4. **门控优先**：高成本 PoC（弱口令、字典枚举）必须加 `requires`，并确认存在对应的指纹 PoC，详见 [requires 指纹门控](./04-requires.md)
+5. **请求克制**：默认不要高频、多路径爆破；只在必要时才展开成完整的验证链路
+6. **回归可跑**：能在自己的最小回归集里验证——哪怕验证的是「不会误报」
 
 > **← 上一篇：** [TCP / SSL](./08-tcp.md) ｜ **本手册首页：** [PoC 编写快速开始](./01-quickstart.md) ｜ **下一篇 →：** [PoC 贡献者荣誉墙](./10-contributors.md)
