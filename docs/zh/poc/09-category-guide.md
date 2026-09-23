@@ -39,8 +39,6 @@ last_reviewed: 2026-09-23
 
 ### 命名与检索
 
-`afrog-pocs` 的提交规范对 `id` 的要求是 `[公司]产品-漏洞名称` 或 `CVE/CNVD-XXXX-XXXX`，**并没有强制后缀要求**。
-
 社区通行做法是文件名与 `id` 以 `-fileread` 结尾、`tags` 里带上 `fileread`。真正决定能否被筛到的是 `tags`：`-s` 按 `id`、`name`、`tags` 匹配。内置语料里也有不以 `-fileread` 结尾的写法（如 `o2oa-open-read-file`、`ioffice-oa-iofileexport-read-file`、`CNVD-2018-16876`），它们同样靠 `tags` 被筛出。
 
 ```bash
