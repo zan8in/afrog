@@ -85,7 +85,7 @@ The documentation is organized into four handbooks:
 | User Guide | [What afrog is and how to use it](docs/en/user-guide/01-overview.md) |
 | PoC Authoring Guide | [Write your first PoC](docs/en/poc/01-quickstart.md) |
 | SDK Usage Guide | [Embed afrog in your Go program](docs/en/sdk/01-quickstart.md) |
-| Curated PoC | [Connect and use curated PoCs](docs/en/curated/01-overview.md) |
+| Curated PoC | [Enable licensed curated PoCs](docs/en/curated/01-overview.md) |
 
 ## PoC Contributors
 

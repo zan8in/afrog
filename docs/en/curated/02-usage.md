@@ -1,86 +1,112 @@
 <!--
-title: Using curated PoCs in afrog
+title: Configuration and usage
 slug: /docs/curated/usage
 lang: en
-summary: Enable, disable, and update curated PoCs through CLI flags and configuration.
+summary: Two steps to configure curated PoCs, then use afrog exactly as you always have.
 status: published
-source: new
+source: afrog.wiki/Afrog 支持星球PoC自动更新功能.md
 last_reviewed: 2026-09-23
 -->
 
-On the `afrog` side there is only one thing to know: at startup `afrog` calls `afrog-curated mount`, then passes the returned directory to the engine through the `AFROG_POCS_CURATED_DIR` environment variable. So "using curated PoCs in afrog" really means configuring an endpoint and a license.
+Configuration takes two steps, after which you can use `afrog` exactly as you always have.
 
-## Shortest path
+## Step 1: get a license
 
-1. Have your curated service endpoint and `license_key` ready
-2. Fill in `endpoint` and `license_key` in the `curated` section of `afrog-config.yaml`
-3. Scan as usual:
+1. **Obtain the license**: join the [subscription community](https://t.zsxq.com/lV66x) to get your personal **License Key** (the only credential for syncing curated PoCs — keep it safe)
+2. **Check the version**: use the latest `afrog` and run `afrog -v` to see the current version; the client has been built in since v3
 
-```bash
-afrog -t https://example.com
+## Step 2: edit the configuration file
+
+Open the main configuration file:
+
+```text
+~/.config/afrog/afrog-config.yaml
 ```
 
-## CLI flags
+Find or add the `curated:` section and fill in the required fields following the comments:
 
-| Flag | Purpose |
-| --- | --- |
-| `-curated` | Curated mode: `auto` / `on` / `off` |
-| `-curated-endpoint` | Curated service endpoint |
-| `-curated-timeout` | Curated mount timeout in seconds |
-| `-curated-force-update` | Force a curated PoC update check immediately |
+```yaml
+curated:
+  # [required] master switch (auto is recommended)
+  # auto: detect automatically, on as soon as the configuration is valid
+  # on:   force on
+  # off:  disable the feature
+  enabled: "auto"
 
-Examples:
+  # [optional] automatic updates (default true)
+  # when on, updates are checked silently in the background (roughly every 6 hours)
+  # and scan speed is unaffected
+  auto_update: true
 
-```bash
-afrog -t https://example.com -curated on -curated-endpoint https://pro-api.example.com
-afrog -t https://example.com -curated-force-update
-afrog -t https://example.com -curated off
+  # [required] curated PoC service endpoint (provided by the author)
+  # keep whatever value the author gives unless told otherwise
+  endpoint: "https://your-curated-endpoint"
+
+  # [required] your personal License Key
+  # paste it directly and make sure there is no stray whitespace
+  license_key: "LIC_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+  # [optional] update channel, for example stable / beta
+  channel: "stable"
+
+  # [optional] load timeout (default 10)
+  # raise it to 20 or 30 on a poor network
+  timeout_sec: 10
 ```
 
-## Configuration
+### Field quick reference
 
-The `curated` section of `afrog-config.yaml`:
+| Field | Required | Purpose |
+| --- | --- | --- |
+| `enabled` | yes | whether curated PoCs are loaded. `auto` is the least fuss and is recommended |
+| `license_key` | yes | **the core of authentication**. Only a correct key pulls curated PoCs |
+| `endpoint` | yes | the curated service endpoint, normally supplied by the author and rarely changed |
+| `auto_update` | no | set to `true` for effortless updates |
+| `channel` | no | the update channel (for example `stable`, `beta`), controlling which PoC releases are pulled |
+| `timeout_sec` | no | how long to wait on the service, so network hiccups do not stall a scan |
 
-| Field | Type | Purpose | Default |
-| --- | --- | --- | --- |
-| `enabled` | string | Mode: `auto` / `on` / `off` | `auto` |
-| `endpoint` | string | Curated service endpoint | empty |
-| `license_key` | string | License key | empty |
-| `channel` | string | Update channel | `stable` |
-| `auto_update` | bool | Whether to check for updates automatically | `true` |
-| `timeout_sec` | int | Mount / call timeout in seconds | `10` |
-| `bin` | string | Custom `afrog-curated` binary path | empty |
+For the complete field list (including advanced fields such as `bin`), see [Configuration](../user-guide/05-configuration.md).
 
-For the full field list, see [Configuration](../user-guide/05-configuration.md).
+## How to use it
 
-## How enabled or disabled is decided
+### 1. Everyday use, nothing to remember
 
-- `enabled` is `off` / `false` / `0`, **or** `endpoint` is empty → curated is disabled and the local `pocs-curated` directory is cleaned up
-- Otherwise `afrog` mounts at startup and passes the mounted directory to the engine through `AFROG_POCS_CURATED_DIR`
-
-In other words, `auto` effectively means "enabled as soon as an endpoint is configured".
-
-## Environment variables
-
-| Variable | Purpose |
-| --- | --- |
-| `AFROG_CURATED_LICENSE_KEY` | Default license key, so you can keep it out of the config file |
-| `AFROG_POCS_CURATED_DIR` | Set by `afrog` after mounting; the engine loads curated PoCs from it |
-
-## Updates and throttling
-
-- At most one update check every 6 hours by default
-- `auto_update: false` skips automatic checks unless `-curated-force-update` is used explicitly
-- To update right away:
+Once configured there is no new command to learn; just use `afrog` as usual:
 
 ```bash
+afrog -t http://example.com
+```
+
+What you get:
+
+- `afrog` mounts the curated PoC directory at startup (`~/.config/afrog/pocs-curated`)
+- scan tasks automatically include the latest curated PoCs
+- all of it happens in the background, with no manual step
+
+### 2. Force an immediate update
+
+Updates are checked roughly every 6 hours by default. If a critical 0day PoC was just published and you do not want to wait, force it:
+
+```bash
+# force an update check and start scanning
+afrog -t http://example.com -curated-force-update
+
+# update check only (no scan)
 afrog -curated-force-update
+```
+
+### 3. Turn it off temporarily
+
+When a single task should only use open-source PoCs, there is no need to edit the configuration — one flag is enough:
+
+```bash
+afrog -t http://example.com -curated off
 ```
 
 ## Troubleshooting
 
-- `curated mount failed` at startup: check the endpoint, license, and network connectivity first
-- To keep `afrog` away from curated entirely: use `-curated off`, or leave `endpoint` empty
-- For command details and local files, see the [afrog-curated command reference](./03-tool-reference.md)
+- `curated mount failed` at startup: first check that `endpoint` and `license_key` are correct and the network is reachable
+- no new PoCs for a long time: check that the license has not expired and that `channel` is the one you expect; raising `timeout_sec` in the configuration can also help
+- to keep `afrog` away from curated entirely: use `-curated off`, or leave `endpoint` empty
 
-> **← Previous:** [What curated PoCs are](./01-overview.md) ｜ **Next →:** [afrog-curated command reference](./03-tool-reference.md)
+> **← Previous:** [What curated PoCs are](./01-overview.md) ｜ **Docs home →:** [afrog Docs](../index.md)

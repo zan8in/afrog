@@ -85,7 +85,7 @@ afrog -T targets.txt -S high,critical
 | 使用指南 | [afrog 是什么、如何使用](./zh/user-guide/01-overview.md) |
 | PoC 编写指南 | [写出你的第一条 PoC](./zh/poc/01-quickstart.md) |
 | SDK 使用指南 | [把 afrog 集成进 Go 程序](./zh/sdk/01-quickstart.md) |
-| Curated PoC | [接入并使用 curated PoC](./zh/curated/01-overview.md) |
+| Curated PoC | [启用授权 curated PoC](./zh/curated/01-overview.md) |
 
 ## PoC 贡献者
 

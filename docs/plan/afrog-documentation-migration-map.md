@@ -54,7 +54,6 @@ docs/{zh,en}/
   curated/                  # ④ Curated PoC
     01-overview.md
     02-usage.md
-    03-tool-reference.md
 ```
 
 ## 4. 迁移总表（已完成）
@@ -94,10 +93,9 @@ docs/{zh,en}/
 | --- | --- |
 | `user-guide/01-overview.md` | 使用指南开篇：afrog 是什么、能做什么、本书目录 |
 | `user-guide/07-tips.md` | 实战技巧：目标输入、资产探测、性能与稳定性、OOB、输出、断点续扫 |
-| `curated/01-overview.md` | curated PoC 的定位、与内置 PoC 的区别、接入前置条件 |
-| `curated/02-usage.md` | 在 afrog 中启用 / 关闭 / 更新 curated PoC |
-| `curated/03-tool-reference.md` | `afrog-curated` 命令、环境变量与本地文件 |
-| `poc/09-category-guide.md` | 按漏洞类型的编写指南（当前已收录文件读取类；英文版待补） |
+| `curated/01-overview.md` | curated PoC（星球精选）的定位、与内置 PoC 的区别、接入前置条件 |
+| `curated/02-usage.md` | 配置并启用 curated PoC，以及日常使用、强制更新与临时关闭 |
+| `poc/09-category-guide.md` | 按漏洞类型的编写指南（文件读取 / XXE / SSRF / 未授权访问 / RCE / SQL 注入 / 文件上传 / 弱口令爆破 / XSS） |
 
 ## 6. 仓库门面迁移（已完成）
 

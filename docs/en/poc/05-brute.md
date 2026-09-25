@@ -253,6 +253,15 @@ rules:
 expression: r0() && r1()
 ```
 
+## Runtime protection
+
+When a dictionary or a combination set grows very large, `brute` holds itself back so that one rule cannot fire an unbounded number of requests:
+
+- **`--brute-max-requests`**: caps the `brute` requests **per rule**, default `5000`; set it to `0` for no limit
+- **Truncation flag**: once the cap cuts a run short, a `__brute_truncated_<rule>` boolean flag is recorded (for example `__brute_truncated_r0`)
+
+In other words, when a rule's combination count exceeds the cap, it does not walk the whole list: it stops at the cap and leaves the truncation flag behind. When you debug "the credential is clearly in the dictionary but nothing matched", first check whether the run was truncated, then raise `--brute-max-requests` if needed.
+
 ## Usage suggestions
 
 1. If you need only one value, you usually do not need `brute`

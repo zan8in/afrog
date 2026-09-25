@@ -34,7 +34,7 @@ last_reviewed: 2026-09-23
 
 ### 4. Curated PoC
 
-接入 curated PoC 服务：授权、挂载、更新，以及在 `afrog` 中启用。
+启用 curated PoC（星球精选）：获取 License、写配置，以及日常使用与自动更新。
 
 [进入 Curated PoC →](./curated/01-overview.md)
 

@@ -221,39 +221,37 @@ func (c *CustomLib) ProgramOptions() []cel.ProgramOption {
 	return opts
 }
 
+type evalOutcome struct {
+	val ref.Val
+	err error
+}
+
 func (c *CustomLib) RunEval(expression string, variablemap map[string]any) (ref.Val, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	var (
-		val ref.Val
-		err error
-	)
-	resp := make(chan int)
+	// 带缓冲的 channel：调用方超时返回后，求值 goroutine 仍能把结果写入并正常退出，
+	// 避免大量 goroutine 永久阻塞在 chan send 上，导致内存持续增长直至 OOM。
+	resp := make(chan evalOutcome, 1)
 	go func() {
-		defer close(resp)
-
 		env, err := c.NewCelEnv()
 		if err != nil {
-			resp <- 9
+			resp <- evalOutcome{err: err}
+			return
 		}
-		val, err = Eval(env, expression, variablemap)
-		if err != nil {
-			resp <- 9
-		}
-		resp <- 99
+		v, err := Eval(env, expression, variablemap)
+		resp <- evalOutcome{val: v, err: err}
 	}()
 
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("Eval timed out")
-	case v := <-resp:
-		if v == 99 {
-			return val, err
+	case out := <-resp:
+		if out.err != nil {
+			return nil, out.err
 		}
-		return nil, fmt.Errorf("Eval error")
+		return out.val, nil
 	}
-
 }
 
 func NewCustomLib() *CustomLib {

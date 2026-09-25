@@ -34,7 +34,7 @@ Embed `afrog` into your own Go program: sync and async, handlers and streams, co
 
 ### 4. Curated PoC
 
-Connect to the curated PoC service: licensing, mounting, updating, and enabling it in `afrog`.
+Enable curated PoCs (the subscribed feed): getting a license, configuring it, and everyday use with automatic updates.
 
 [Go to Curated PoC →](./curated/01-overview.md)
 

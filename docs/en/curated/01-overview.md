@@ -2,42 +2,40 @@
 title: What curated PoCs are
 slug: /docs/curated/overview
 lang: en
-summary: What curated PoCs are, how they differ from built-in PoCs, and what you need to get started.
+summary: What curated PoCs (the subscribed PoC feed) are, why they beat built-in PoCs, and what you need before you start.
 status: published
-source: new
+source: afrog.wiki/Afrog 支持星球PoC自动更新功能.md
 last_reviewed: 2026-09-23
 -->
 
 ## What curated PoCs are
 
-Curated PoCs are `afrog`'s licensed PoC distribution capability: PoCs are delivered by a curated service, mounted locally by clients with a license, and loaded automatically by `afrog` at startup.
+Curated PoCs are `afrog`'s licensed PoC distribution capability — what is commonly called the **"curated PoC feed"**.
 
-It moves PoC distribution from "shipped with the engine release" to "updated dynamically under a license", while license and channel control both visibility and update track.
+Once you join the subscription community you receive a personal license, and `afrog` mounts and updates the latest high-severity PoCs at startup. **Always current at launch, always battle-ready when scanning** — no manual downloading or unzipping, and your vulnerability knowledge base stays up to date.
+
+It turns PoC updates from "shipped with the engine release" into "updated dynamically under a license".
 
 ## How they differ from built-in PoCs
 
 | Aspect | Built-in PoCs | Curated PoCs |
 | --- | --- | --- |
-| Source | Released with the `afrog` version / repository | Delivered by the curated service (encrypted AFCP pack) |
-| Updates | Tied to `afrog` releases | Automatic update checks once licensed |
-| Distribution control | None | Controlled by license / channel |
-| Offline | Bundled | Supports offline AFCP pack installation |
+| Source | Released with the `afrog` version / repository | Delivered by the curated service |
+| Updates | Tied to `afrog` releases | Automatic update checks at startup |
+| Distribution control | None | license / channel control both visibility and update track |
+| How to get them | Bundled with the engine | Join the [subscription community](https://t.zsxq.com/lV66x) for a license |
 
-## When to use them
+## Highlights
 
-- You need a license to control PoC distribution and updates
-- You want a local PoC directory that updates automatically, can roll back, and can be installed offline
-- You do not want to ship static object-storage credentials to clients
+- **Current at launch**: configure a license once, and every subsequent start mounts and updates automatically
+- **Silent background updates**: checked roughly every 6 hours by default, with no cost to scan time or speed
+- **Nothing new to learn**: no new commands are introduced; usage is exactly as before
+- **Can be turned off temporarily**: when a task should only use open-source PoCs, one flag disables it without touching the configuration
 
 ## What you need
 
-- A curated service endpoint (for example `https://pro-api.example.com`)
-- A `license_key`
-- The `afrog-curated` binary, which handles login, mounting, and updates
+- A personal **License Key**: obtained after joining the [subscription community](https://t.zsxq.com/lV66x), it is the only credential for syncing curated PoCs, so keep it safe
+- A reasonably recent `afrog`: use the latest version (`afrog -v` shows the current one); the client has been built in since v3
+- The `curated` section filled in inside `afrog-config.yaml`, see [Configuration and usage](./02-usage.md)
 
-## In this handbook
-
-1. [Using curated PoCs in afrog](./02-usage.md)
-2. [afrog-curated command reference](./03-tool-reference.md)
-
-> **← Docs home:** [afrog Docs](../index.md) ｜ **Next →:** [Using curated PoCs in afrog](./02-usage.md)
+> **← Docs home:** [afrog Docs](../index.md) ｜ **Next →:** [Configuration and usage](./02-usage.md)

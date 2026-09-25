@@ -137,7 +137,6 @@ docs/
     curated/
       01-overview.md
       02-usage.md
-      03-tool-reference.md
   en/
     # 与 zh 完全一一对应
 ```
@@ -165,7 +164,7 @@ docs/
 - 中文路径：`docs/zh/...`
 - 英文路径：`docs/en/...`
 - 两套目录原则上保持一一对应，文件数量与相对路径完全相同。
-- 例外：新增内容允许先只落中文，但必须在 PRD 与迁移清单中登记「待补英文镜像」，避免长期缺位。当前 `poc/09-category-guide.md` 即属此类。
+- 例外：新增内容允许先只落中文，但必须在 PRD 与迁移清单中登记「待补英文镜像」，避免长期缺位。
 
 ### 9.2 slug 策略
 
@@ -202,19 +201,19 @@ last_reviewed:
 
 ## 10. 已上线范围
 
-中文 28 页、英文 27 页：
+中文 27 页、英文 27 页：
 
 - `index.md`
 - `user-guide/`：各 7 页
-- `poc/`：中文 10 页、英文 9 页
+- `poc/`：各 10 页
 - `sdk/`：各 7 页
-- `curated/`：各 3 页
+- `curated/`：各 2 页
 
 新增页面（重构时首次编写）：
 
 - `user-guide/01-overview.md`、`user-guide/07-tips.md`
-- `curated/01-overview.md`、`curated/02-usage.md`、`curated/03-tool-reference.md`
-- `poc/09-category-guide.md`（按漏洞类型的编写指南，目前只提供中文，英文版待补，因此 `poc/` 目录中英数量暂不一致，待英文镜像补齐后恢复一一对应）
+- `curated/01-overview.md`、`curated/02-usage.md`
+- `poc/09-category-guide.md`（按漏洞类型的编写指南，中英文均已落地）
 
 ## 11. 实施阶段
 
