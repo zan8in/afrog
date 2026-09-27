@@ -18,10 +18,13 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/curated/service"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/jsonstream"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
+	"github.com/zan8in/afrog/v3/pkg/scanapi"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/web"
 	"github.com/zan8in/fileutil"
@@ -44,10 +47,35 @@ func shouldReportFingerprintHit(options *config.Options, severity string) bool {
 
 func main() {
 
+	// 子命令分派：goflags 只认 flag，`afrog serve` 这种子命令必须在解析前分流，
+	// 否则 --listen 之类的参数会被当成未知 flag 报错。
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		if err := scanapi.ServeCommand(os.Args[2:]); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		return
+	}
+
 	options, err := config.NewOptions()
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
+	}
+
+	// -json-stream 模式：stdout 只承载 NDJSON 事件流，人类可读输出一律改道或关闭
+	jsonStreamMode := options.JsonStream
+	var jsonStream *scanstream.Writer
+	if jsonStreamMode {
+		jsonstream.RedirectLogs()
+		// Silent 用来压制引擎里不受 gologger 管辖的直写 stdout（如 Web 探测的 fmt.Printf）
+		options.Silent = true
+		// 由执行器拉起时，任务 ID 由父进程通过 AFROG_TASK_ID 指定，事件信封与
+		// 写库都要用它，父进程才能把事件与结果关联到同一个任务上。
+		taskID := strings.TrimSpace(os.Getenv("AFROG_TASK_ID"))
+		if taskID == "" {
+			taskID = fmt.Sprintf("%s-%s", config.GetFileBaseName(options), time.Now().Format("20060102-150405"))
+		}
+		jsonStream = scanstream.NewWriter(os.Stdout, "local", taskID)
 	}
 
 	if options.Config != nil {
@@ -86,7 +114,7 @@ func main() {
 		}
 	}
 
-	if !options.Web && options.AfrogUpdate != nil {
+	if !options.Web && !jsonStreamMode && options.AfrogUpdate != nil {
 		var curated *config.Curated
 		if options.Config != nil {
 			curated = &options.Config.Curated
@@ -334,7 +362,9 @@ func main() {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 
 			atomic.AddUint32(&number, 1)
-			rst.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			if !jsonStreamMode {
+				rst.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			}
 			if progressEnabled {
 				renderProgress()
 			}
@@ -402,7 +432,9 @@ func main() {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 
 			atomic.AddUint32(&number, 1)
-			result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			if !jsonStreamMode {
+				result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+			}
 			if progressEnabled {
 				renderProgress()
 			}
@@ -446,6 +478,13 @@ func main() {
 			lock.Unlock()
 		}
 
+	}
+
+	var jsonStreamFinish func(status string, found int64, executed int64)
+	if jsonStream != nil {
+		jsonStream.Status("starting")
+		jsonStreamFinish = jsonstream.Attach(jsonStream, options, r, starttime)
+		jsonStream.Status("running")
 	}
 
 	c := make(chan os.Signal, 1)
@@ -494,7 +533,10 @@ func main() {
 		}
 	}()
 
-	if err := r.Run(); err != nil {
+	if err = r.Run(); err != nil {
+		if jsonStream != nil {
+			jsonStream.Error("scan_failed", err.Error())
+		}
 		gologger.Error().Msgf("runner run err: %s\n", err)
 		return
 	}
@@ -523,6 +565,9 @@ func main() {
 	status := "completed"
 	if interrupted.Load() {
 		status = "stopped"
+	}
+	if jsonStreamFinish != nil {
+		jsonStreamFinish(status, int64(atomic.LoadUint32(&number)), int64(atomic.LoadUint32(&options.CurrentCount)))
 	}
 	gologger.Info().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
 		utils.StageVulnScan,

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
@@ -62,11 +63,26 @@ func StartServer(addr string) error {
 
 	serverInstanceID = generateInstanceID()
 	serverStartedAt = time.Now().UTC()
-	serverBaseURL = "http://" + addr
+	// 监听地址常配成 ":16868"（所有网卡），它本身不是合法 URL 的主机部分：
+	// 直接拼成 "http://:16868" 会误导用户去浏览器打开一个打不开的地址，
+	// 也会让前端拿到一个解析不了的 base_url。
+	serverBaseURL = "http://" + browsableAddr(addr)
 	serverPID = os.Getpid()
 	serverArgv = os.Args
 	httpSrv = srv
 
-	gologger.Info().Msgf("Web服务器启动于: http://%s", addr)
+	gologger.Info().Msgf("Web服务器启动于: %s", serverBaseURL)
 	return srv.ListenAndServe()
+}
+
+// browsableAddr 把监听地址转成浏览器/客户端可直接使用的地址。
+func browsableAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return "127.0.0.1"
+	}
+	if strings.HasPrefix(addr, ":") {
+		return "127.0.0.1" + addr
+	}
+	return addr
 }

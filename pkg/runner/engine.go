@@ -2014,8 +2014,9 @@ func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 
 // 新增OOB状态显示函数
 func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
-	// 在SDK模式下，不显示OOB状态信息，由SDK自己控制显示
-	if runner.options.SDKMode {
+	// 在SDK模式下，不显示OOB状态信息，由SDK自己控制显示；
+	// Silent 模式下也不输出，避免污染 -json-stream 的 stdout 事件流
+	if runner.options.SDKMode || runner.options.Silent {
 		return
 	}
 

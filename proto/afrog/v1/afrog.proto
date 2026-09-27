@@ -1,0 +1,280 @@
+// afrog 扫描能力服务协议。
+//
+// 本文件是 docs/plan/afrog-grpc-protocol.md 第 6 节 proto 草案的落地实现，
+// 两者必须逐字对应：字段名、编号、语义一律不得私自改动。
+// 重新生成代码：cd proto/afrog/v1 && go generate ./...
+syntax = "proto3";
+
+package afrog.v1;
+
+option go_package = "github.com/zan8in/afrog/v3/proto/afrog/v1;afrogv1";
+
+// ==================== 公开接口（第三方语言 / 未来 MCP 适配层） ====================
+service AfrogScanner {
+  rpc SubmitScan(SubmitScanRequest) returns (SubmitScanResponse);
+  rpc StreamEvents(StreamEventsRequest) returns (stream ScanEvent);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc GetResults(GetResultsRequest) returns (GetResultsResponse);
+  rpc Control(ControlRequest) returns (ControlResponse);
+  rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
+}
+
+// ==================== 内部接口（节点 ↔ 控制面） ====================
+service AfrogAgent {
+  // 用一次性注册令牌换取长期凭据
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // 建立双向流：控制面在流内下发任务/控制，agent 在同一流内回传事件
+  rpc Connect(stream AgentMessage) returns (stream ConsoleMessage);
+}
+
+// -------------------- 扫描规格（与 CLI 参数一一对应） --------------------
+message ScanSpec {
+  repeated string targets = 1;
+
+  // PoC 选择
+  string poc_source = 2; // default | curated | my
+  repeated string poc_ids = 3;
+  string poc_file = 4;
+  string search = 5;
+  string severity = 6; // 例："high,critical"
+
+  // 性能
+  int32 concurrency = 10;
+  int32 rate_limit = 11;
+  int32 timeout_seconds = 12;
+  int32 retries = 13;
+  bool smart = 14;
+
+  // 网络
+  string proxy = 15;
+  repeated string headers = 16;
+  bool follow_redirects = 17;
+
+  // 前置阶段
+  bool port_scan = 18;
+  string ports = 19;
+  bool skip_host_discovery = 20;
+  bool web_fingerprint = 21;
+
+  // OOB
+  bool enable_oob = 22;
+  string oob_adapter = 23;
+  string oob_key = 24;
+  string oob_domain = 25;
+
+  // 任务元信息
+  string task_name = 30;
+  repeated string labels = 31;
+  string node_selector = 32; // 标签表达式；空表示本机执行
+}
+
+// -------------------- 事件 --------------------
+message ScanEvent {
+  string v = 1;
+  string node = 2;
+  string task = 3;
+  uint64 seq = 4;
+  int64 ts_ms = 5;
+  oneof body {
+    StatusEvent status = 10;
+    ProgressEvent progress = 11;
+    PhaseEvent phase = 12;
+    ResultEvent result = 13;
+    PortEvent port = 14;
+    WebProbeEvent webprobe = 15;
+    LogEvent log = 16;
+    DoneEvent done = 17;
+    ErrorEvent error = 18;
+    HostEvent host = 19;
+    ScanInfoEvent scan_info = 20;
+  }
+}
+
+message StatusEvent {
+  string status = 1;
+}
+message ScanInfoEvent {
+  int32 total_targets = 1;
+  int32 total_pocs = 2;
+  int32 total_scans = 3;
+  bool oob_enabled = 4;
+  string oob_status = 5;
+}
+message ProgressEvent {
+  int32 percent = 1;
+  int64 finished = 2;
+  int64 total = 3;
+  int32 rate = 4;
+  int64 elapsed_ms = 5;
+}
+message PhaseEvent {
+  string phase = 1;
+  string status = 2;
+  int64 finished = 3;
+  int64 total = 4;
+  int32 percent = 5;
+}
+message ResultEvent {
+  string severity = 1;
+  string poc_id = 2;
+  string poc_name = 3;
+  string target = 4;
+  Evidence evidence = 5;
+}
+message PortEvent {
+  string host = 1;
+  int32 port = 2;
+}
+message WebProbeEvent {
+  string url = 1;
+  int32 status = 2;
+  string title = 3;
+  string fingerprint = 4;
+}
+message HostEvent {
+  string host = 1;
+}
+message LogEvent {
+  string level = 1;
+  string text = 2;
+}
+message DoneEvent {
+  string status = 1;
+  Summary summary = 2;
+}
+message ErrorEvent {
+  string code = 1;
+  string message = 2;
+}
+
+message Evidence {
+  repeated Exchange exchanges = 1;
+  map<string, string> extractors = 2;
+}
+message Exchange {
+  string request = 1;
+  string response = 2;
+  bool matched = 3;
+}
+
+message Summary {
+  int64 executed = 1; // 实际执行任务数
+  int64 found = 2;
+  map<string, int64> by_severity = 3;
+  int64 elapsed_ms = 4;
+}
+
+// -------------------- 公开接口消息 --------------------
+message SubmitScanRequest {
+  ScanSpec spec = 1;
+}
+message SubmitScanResponse {
+  string task_id = 1;
+  string node = 2;
+}
+
+message StreamEventsRequest {
+  string task_id = 1;
+  uint64 from_seq = 2;
+}
+message GetStatusRequest {
+  string task_id = 1;
+}
+message GetStatusResponse {
+  string status = 1;
+  ProgressEvent progress = 2;
+  Summary summary = 3;
+  bool pausable = 4;
+  string node = 5;
+}
+message GetResultsRequest {
+  string task_id = 1;
+  string severity = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  DetailLevel detail = 5;
+}
+message GetResultsResponse {
+  repeated ResultEvent items = 1;
+  int64 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+enum DetailLevel {
+  SUMMARY = 0;
+  FULL = 1;
+}
+
+message ControlRequest {
+  string task_id = 1;
+  ControlAction action = 2;
+}
+message ControlResponse {
+  bool ok = 1;
+  string message = 2;
+}
+enum ControlAction {
+  PAUSE = 0;
+  RESUME = 1;
+  CANCEL = 2;
+}
+
+message ListCapabilitiesRequest {}
+message ListCapabilitiesResponse {
+  string version = 1;
+  string protocol_version = 2;
+  int32 poc_count = 3;
+  bool curated = 4;
+  bool pausable = 5;
+  repeated string nodes = 6;
+}
+
+// -------------------- 内部接口消息 --------------------
+message RegisterRequest {
+  string register_token = 1; // 一次性注册令牌
+  string node_name = 2;
+  string version = 3;      // afrog 版本
+  string protocol_version = 4;
+  string hostname = 5;
+  string os_arch = 6;
+  repeated string labels = 7; // 节点标签，如 ["intranet-a"]
+}
+message RegisterResponse {
+  string node_id = 1;
+  string node_secret = 2; // 长期凭据，agent 侧以 0600 权限落盘
+}
+
+message AgentMessage {
+  oneof body {
+    Heartbeat heartbeat = 1;
+    ScanEvent event = 2;
+    TaskAck ack = 3;
+  }
+}
+message ConsoleMessage {
+  oneof body {
+    HeartbeatAck heartbeat_ack = 1;
+    AssignTask assign = 2;
+    ControlRequest control = 3;
+    Revoke revoke = 4;
+  }
+}
+message Heartbeat {
+  int64 ts_ms = 1;
+  int32 active_tasks = 2;
+}
+message HeartbeatAck {
+  int64 ts_ms = 1;
+}
+message AssignTask {
+  string task_id = 1;
+  ScanSpec spec = 2;
+  uint64 from_seq = 3;
+}
+message TaskAck {
+  string task_id = 1;
+  uint64 last_seq = 2;
+}
+message Revoke {
+  string reason = 1;
+}

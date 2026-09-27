@@ -203,6 +203,9 @@ type Options struct {
 	Debug     bool
 	LiveStats bool
 
+	// 以 NDJSON 事件流输出到 stdout，供程序消费
+	JsonStream bool
+
 	// sort
 	// -sort severity (default low, info, medium, high, critical)
 	// -sort a-z
@@ -351,6 +354,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVarP(&options.NoColor, "no-color", "nc", false, "disable output content coloring (ANSI escape codes)"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),
+		flagSet.BoolVar(&options.JsonStream, "json-stream", false, "以 NDJSON 事件流输出到 stdout，供程序消费"),
 	)
 
 	flagSet.CreateGroup("pedm", "PEDM",

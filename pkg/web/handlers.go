@@ -272,15 +272,14 @@ func instanceForceStopHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "taskId 不属于该实例或非活跃任务"})
 		return
 	}
-	t.Scanner.Stop()
+	// 先结束子进程，再收尾任务。
+	if h := t.getHandle(); h != nil {
+		_ = h.Cancel()
+	}
 	t.setStatus(TaskCancelled)
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskCancelled)}})
 	finalizeTask(m, t, TaskCancelled)
-	if t.Scanner.IsStopping() {
-		gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop succeeded: task cancelled and server shutting down")
-	} else {
-		gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop uncertain: cancel flag not set")
-	}
+	gologger.Debug().Str("taskId", req.TaskID).Str("instanceId", instanceID).Msg("force-stop succeeded: task cancelled and server shutting down")
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

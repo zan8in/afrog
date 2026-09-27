@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -110,10 +111,20 @@ var (
 var SnowFlake *snowflake.Snowflake
 
 func init() {
-	TaskID = createTaskID()
+	TaskID = resolveTaskID()
 	if err := NewSnowFlake(); err != nil {
 		gologger.Fatal().Msgf("New SnowFlake failed: %v", err)
 	}
+}
+
+// resolveTaskID 优先使用父进程通过 AFROG_TASK_ID 指定的任务 ID。
+// 本地进程执行器会给子进程注入该变量，使子进程写入 sqlite 的结果能与父进程
+// （控制面）持有的任务关联；未设置时维持原有的自生成逻辑。
+func resolveTaskID() string {
+	if v := strings.TrimSpace(os.Getenv("AFROG_TASK_ID")); v != "" {
+		return v
+	}
+	return createTaskID()
 }
 
 func createTaskID() string {

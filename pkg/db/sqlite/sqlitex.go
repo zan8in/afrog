@@ -451,6 +451,83 @@ func SelectPage(severity, keyword string, page, pageSize int, expandPoc, expandR
 	}
 	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
 
+	return runResultQuery(query, args, expandPoc, expandResult)
+}
+
+// SelectPageByTask 是按任务筛选的分页查询，供控制面 GetResults 使用。
+func SelectPageByTask(taskID, severity string, page, pageSize int, expandPoc, expandResult bool) ([]db2.ResultData, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 500 {
+		pageSize = 500
+	}
+	offset := (page - 1) * pageSize
+
+	where, args := taskResultFilters(taskID, severity)
+	query := "SELECT * FROM " + db2.TableName
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
+
+	return runResultQuery(query, args, expandPoc, expandResult)
+}
+
+// CountByTask 统计某个任务的命中数（可按 severity 过滤）。
+func CountByTask(taskID, severity string) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	where, args := taskResultFilters(taskID, severity)
+	query := "SELECT COUNT(*) FROM " + db2.TableName
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var total int64
+	if err := dbx.GetContext(ctx, &total, query, args...); err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// taskResultFilters 组装「按任务 + 严重级别」的过滤条件，分页与计数共用。
+func taskResultFilters(taskID, severity string) ([]string, []interface{}) {
+	where := []string{"taskid = ?"}
+	args := []interface{}{strings.TrimSpace(taskID)}
+
+	sev := strings.TrimSpace(severity)
+	if sev == "" {
+		return where, args
+	}
+	var holders []string
+	for _, s := range strings.Split(sev, ",") {
+		t := strings.ToLower(strings.TrimSpace(s))
+		if t == "" {
+			continue
+		}
+		holders = append(holders, "?")
+		args = append(args, t)
+	}
+	if len(holders) > 0 && len(holders) < 5 {
+		where = append(where, "LOWER(severity) IN ("+strings.Join(holders, ",")+")")
+	}
+	// 5 个或以上视为全选
+	return where, args
+}
+
+// runResultQuery 执行结果查询并统一做展示层归一化（severity 大写、按需展开 JSON）。
+func runResultQuery(query string, args []interface{}, expandPoc, expandResult bool) ([]db2.ResultData, error) {
 	// 查询设置超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

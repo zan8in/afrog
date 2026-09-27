@@ -156,6 +156,8 @@ type ScanStatusData struct {
 		TotalScans     int `json:"totalScans"`
 		FoundVulns     int `json:"foundVulns"`
 	} `json:"stats"`
+	// Error 是任务失败原因（如子进程拉不起来），正常任务为空。
+	Error      string `json:"error,omitempty"`
 	TaskID     string `json:"taskId,omitempty"`
 	InstanceID string `json:"instance_id,omitempty"`
 	BaseURL    string `json:"base_url,omitempty"`

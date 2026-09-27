@@ -2,8 +2,8 @@ package web
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,10 +15,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
-	"github.com/zan8in/afrog/v3/pkg/result"
-	"github.com/zan8in/afrog/v3/pkg/sdk"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 	"github.com/zan8in/gologger"
 )
 
@@ -47,16 +46,28 @@ type ScanEvent struct {
 // handler goroutines and from the event-drain goroutine at the same time, so
 // they are reached only through the accessors below.
 type Task struct {
-	ID             string
-	Name           string
-	CreatedAt      time.Time
-	Scanner        *sdk.Scanner
-	SeverityStats  map[string]int
-	Subscribers    map[chan ScanEvent]struct{}
+	ID            string
+	Name          string
+	CreatedAt     time.Time
+	SeverityStats map[string]int
+	Subscribers   map[chan ScanEvent]struct{}
+
+	// spec 是本次扫描的规格快照，排队到真正执行时由 runScanTask 使用。
+	spec *executor.Spec
+	// targets 保留原始目标列表，scan_info 事件只展示前 5 个。
+	targets []string
 
 	mu        sync.Mutex
 	status    TaskStatus
 	startTime time.Time
+	handle    executor.Handle
+	// progress / scanInfo / summary 都是引擎口径的数据：progress 来自每秒一次的
+	// 进度事件，scanInfo 来自开始执行前的前置汇总，summary 来自 done 事件。
+	progress   *scanstream.ProgressEvent
+	scanInfo   *scanstream.ScanInfoEvent
+	summary    *scanstream.Summary
+	doneStatus string
+	errText    string
 
 	// finalized makes finalizeTask run exactly once. Both the stop handler and
 	// the drain goroutine reach it when a scan is cancelled, and running it
@@ -87,6 +98,159 @@ func (t *Task) setStarted(at time.Time) {
 	t.mu.Lock()
 	t.startTime = at
 	t.mu.Unlock()
+}
+
+func (t *Task) setHandle(h executor.Handle) {
+	t.mu.Lock()
+	t.handle = h
+	t.mu.Unlock()
+}
+
+func (t *Task) getHandle() executor.Handle {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.handle
+}
+
+func (t *Task) getTargets() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.targets
+}
+
+func (t *Task) setProgress(p *scanstream.ProgressEvent) {
+	t.mu.Lock()
+	t.progress = p
+	t.mu.Unlock()
+}
+
+func (t *Task) getProgress() *scanstream.ProgressEvent {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.progress
+}
+
+func (t *Task) setScanInfo(info *scanstream.ScanInfoEvent) {
+	t.mu.Lock()
+	t.scanInfo = info
+	t.mu.Unlock()
+}
+
+func (t *Task) getScanInfo() *scanstream.ScanInfoEvent {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.scanInfo
+}
+
+func (t *Task) setDone(status string, summary *scanstream.Summary) {
+	t.mu.Lock()
+	t.doneStatus = status
+	if summary != nil {
+		t.summary = summary
+	}
+	t.mu.Unlock()
+}
+
+func (t *Task) getSummary() *scanstream.Summary {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.summary
+}
+
+func (t *Task) setErrText(msg string) {
+	if strings.TrimSpace(msg) == "" {
+		return
+	}
+	t.mu.Lock()
+	t.errText = msg
+	t.mu.Unlock()
+}
+
+func (t *Task) errMessage() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.errText
+}
+
+// doneState 返回引擎自报的收尾状态（completed/stopped）与错误信息。
+func (t *Task) doneState() (string, string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.doneStatus, t.errText
+}
+
+// addHit 累加严重级别计数。
+func (t *Task) addHit(severity string) {
+	t.mu.Lock()
+	if t.SeverityStats == nil {
+		t.SeverityStats = make(map[string]int)
+	}
+	t.SeverityStats[severity]++
+	t.mu.Unlock()
+}
+
+// hitCount 返回命中总数。
+func (t *Task) hitCount() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	total := 0
+	for _, n := range t.SeverityStats {
+		total += n
+	}
+	return total
+}
+
+// terminalStatus 把引擎自报的收尾状态与子进程退出码折算成任务状态。
+// 注意 cmd/afrog 在 runner 报错时是先发 error 事件再正常 return（退出码 0），
+// 因此只要收到过 error 事件就判为失败。
+func (t *Task) terminalStatus(exitErr error) TaskStatus {
+	done, errText := t.doneState()
+	switch done {
+	case "stopped":
+		return TaskCancelled
+	case "completed":
+		return TaskCompleted
+	}
+	if exitErr != nil || errText != "" {
+		return TaskFailed
+	}
+	return TaskCompleted
+}
+
+// progressSnapshot 汇总任务当前的进度口径。
+//
+// total 优先取引擎上报的 scan_info.total_scans（与命令行 tasks= 同源，见协议文档 5.2）：
+// 主机发现/端口扫描/Web 探测这些前置阶段里引擎还没算出任务总数，此间的 progress
+// 事件会带 total=0，只看最后一次事件会把总数显示成 0。finished 则用 done 事件里的
+// 实际执行数修正。
+func progressSnapshot(t *Task) ScanProgressData {
+	snap := ScanProgressData{}
+	if p := t.getProgress(); p != nil {
+		snap.Percent = p.Percent
+		snap.Finished = int(p.Finished)
+		snap.Total = int(p.Total)
+		snap.ElapsedMs = p.ElapsedMs
+	}
+	if info := t.getScanInfo(); info != nil && info.TotalScans > 0 {
+		snap.Total = info.TotalScans
+	}
+	if s := t.getSummary(); s != nil {
+		snap.Finished = int(s.Executed)
+		if s.ElapsedMs > 0 {
+			snap.ElapsedMs = s.ElapsedMs
+		}
+	}
+	if snap.ElapsedMs <= 0 {
+		if started := t.started(); !started.IsZero() {
+			snap.ElapsedMs = time.Since(started).Milliseconds()
+		}
+	}
+	snap.Rate = calcRate(t.started(), int64(snap.Finished))
+	if t.Status() == TaskCompleted {
+		// 引擎只在扫描真正跑完时才让百分数到 100，整数取整会停在 99。
+		snap.Percent = 100
+	}
+	return snap
 }
 
 type TaskManager struct {
@@ -169,6 +333,7 @@ func removeSubscriber(t *Task, ch chan ScanEvent) {
 	close(ch)
 }
 
+// startTask 取得一个运行名额（名额用尽则排队），随后拉起扫描子进程。
 func startTask(m *TaskManager, t *Task) {
 	m.mu.Lock()
 	if m.running >= m.maxRunning {
@@ -186,155 +351,32 @@ func startTask(m *TaskManager, t *Task) {
 	gologger.Debug().Msgf("start scan running: taskId=%s capacity available", t.ID)
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "running"}})
 
-	// Subscribe before starting the scan so that no event is missed.
-	resultCh := t.Scanner.ResultStream()
-	portCh := t.Scanner.PortStream()
-	hostCh := t.Scanner.HostStream()
-	webProbeCh := t.Scanner.WebProbeStream()
-	phaseCh := t.Scanner.ProgressStream()
-	scanInfoCh := t.Scanner.ScanInfoStream()
-
-	go func() {
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-		for {
-			if resultCh == nil && portCh == nil && hostCh == nil && webProbeCh == nil && phaseCh == nil && scanInfoCh == nil {
-				if t.Status() != TaskCancelled {
-					finalizeTask(m, t, TaskCompleted)
-				}
-				return
-			}
-			select {
-			case r, ok := <-resultCh:
-				if !ok {
-					resultCh = nil
-					continue
-				}
-				sev := strings.ToLower(r.Severity)
-				if t.SeverityStats == nil {
-					t.SeverityStats = make(map[string]int)
-				}
-				t.SeverityStats[sev]++
-				publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
-					"target":   r.FullTarget,
-					"severity": r.Severity,
-					"poc": map[string]string{
-						"id":   r.PocID,
-						"name": r.PocName,
-					},
-					"message": fmt.Sprintf("命中 %s", r.Severity),
-					"ts":      time.Now().UnixMilli(),
-				}})
-			case pr, ok := <-portCh:
-				if !ok {
-					portCh = nil
-					continue
-				}
-				publish(t, ScanEvent{Type: "port", Data: map[string]interface{}{
-					"host": pr.Host,
-					"port": pr.Port,
-					"ts":   time.Now().UnixMilli(),
-				}})
-			case hr, ok := <-hostCh:
-				if !ok {
-					hostCh = nil
-					continue
-				}
-				publish(t, ScanEvent{Type: "host", Data: map[string]interface{}{
-					"host": hr.Host,
-					"ts":   time.Now().UnixMilli(),
-				}})
-			case wp, ok := <-webProbeCh:
-				if !ok {
-					webProbeCh = nil
-					continue
-				}
-				publish(t, ScanEvent{Type: "webprobe", Data: map[string]interface{}{
-					"url":        wp.URL,
-					"title":      wp.Title,
-					"server":     wp.Server,
-					"powered_by": wp.PoweredBy,
-					"ts":         time.Now().UnixMilli(),
-				}})
-			case pp, ok := <-phaseCh:
-				if !ok {
-					phaseCh = nil
-					continue
-				}
-				publish(t, ScanEvent{Type: "phase_progress", Data: map[string]interface{}{
-					"phase":    pp.Phase,
-					"status":   pp.Status,
-					"finished": pp.Finished,
-					"total":    pp.Total,
-					"percent":  pp.Percent,
-					"ts":       time.Now().UnixMilli(),
-				}})
-			case si, ok := <-scanInfoCh:
-				if !ok {
-					scanInfoCh = nil
-					continue
-				}
-				displayTargets := si.Targets
-				if len(displayTargets) > 5 {
-					displayTargets = displayTargets[:5]
-				}
-				publish(t, ScanEvent{Type: "scan_info", Data: map[string]interface{}{
-					"total_targets": si.TotalTargets,
-					"total_pocs":    si.TotalPocs,
-					"total_scans":   si.TotalScans,
-					"targets":       displayTargets,
-					"oob_enabled":   si.OOBEnabled,
-					"oob_status":    si.OOBStatus,
-					"ts":            time.Now().UnixMilli(),
-				}})
-			case <-ticker.C:
-				st := t.Scanner.Stats()
-				prog := t.Scanner.Progress()
-				publish(t, ScanEvent{Type: "progress", Data: map[string]interface{}{
-					"percent":   int(prog + 0.5),
-					"finished":  int(st.CompletedScans),
-					"total":     st.TotalScans,
-					"rate":      calcRate(t.started(), st.CompletedScans),
-					"elapsedMs": time.Since(t.started()).Milliseconds(),
-				}})
-			}
-		}
-	}()
-	_ = t.Scanner.Start(context.Background())
+	go runScanTask(m, t)
 }
 
+// finalizeTask 收尾一个任务：补发最终进度与汇总、通知订阅者、释放名额并放行队列。
+// 它由多个路径到达（子进程退出、终止接口、启动失败），靠 finalized 保证只生效一次。
 func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	if t.finalized.Swap(true) {
 		return
 	}
 	t.setStatus(status)
-	if t.Scanner != nil {
-		st := t.Scanner.Stats()
-		prog := t.Scanner.Progress()
+
+	// 最后一次 progress 采样最多滞后 1 秒，补发一次避免前端停在半截数字上。
+	if t.getProgress() != nil || t.getSummary() != nil {
+		snap := progressSnapshot(t)
 		publish(t, ScanEvent{Type: "progress", Data: map[string]interface{}{
-			"percent":   int(prog + 0.5),
-			"finished":  int(st.CompletedScans),
-			"total":     st.TotalScans,
-			"rate":      calcRate(t.started(), st.CompletedScans),
-			"elapsedMs": time.Since(t.started()).Milliseconds(),
+			"percent":   snap.Percent,
+			"finished":  snap.Finished,
+			"total":     snap.Total,
+			"rate":      snap.Rate,
+			"elapsedMs": snap.ElapsedMs,
 		}})
-		oobEnabled, oobStatus := t.Scanner.OOBStatus()
-		publish(t, ScanEvent{Type: "scan_info", Data: map[string]interface{}{
-			"total_targets": st.TotalTargets,
-			"total_pocs":    st.TotalPocs,
-			"total_scans":   st.TotalScans,
-			"oob_enabled":   oobEnabled,
-			"oob_status":    oobStatus,
-			"ts":            time.Now().UnixMilli(),
-		}})
+	}
+	if info := t.getScanInfo(); info != nil {
+		publish(t, ScanEvent{Type: "scan_info", Data: scanInfoPayload(t, info)})
 	}
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(status)}})
-
-	// Release the scanner's background goroutines. Without this a long-running
-	// server accumulates one engine and one OOB poller per finished task.
-	if t.Scanner != nil {
-		_ = t.Scanner.Close()
-	}
 
 	m.mu.Lock()
 	if m.running > 0 {
@@ -349,94 +391,6 @@ func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	if next != nil {
 		startTask(m, next)
 	}
-}
-
-func persistHit(taskID string, r *result.Result) error {
-	_, err := sqlite.InsertResultWithTaskID(r, taskID)
-	return err
-}
-
-// buildScanSDKOptions maps the web request to SDK options.
-//
-// The SDK treats WithPocPaths as additive and WithPocPathsOnly as the explicit
-// switch to "scan only these PoCs". The web layer keeps builtin PoCs in scope
-// by default, and only enters exclusive mode when the request clearly selects
-// an explicit PoC set.
-func buildScanSDKOptions(req ScanCreateRequest, targets []string, taskID string, pocPath string, appendPocs []string, useIDs bool) []sdk.Option {
-	sdkOpts := []sdk.Option{
-		sdk.WithTargets(targets...),
-		// Persist the engine-level result so that the stored request and
-		// response keep the exact shape the reports and UI expect.
-		sdk.WithRawResultHandler(func(r *result.Result) {
-			_ = persistHit(taskID, r)
-		}),
-	}
-
-	if v := strings.TrimSpace(pocPath); v != "" {
-		sdkOpts = append(sdkOpts, sdk.WithPocPaths(v))
-	}
-	if len(appendPocs) > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithPocPaths(appendPocs...))
-	}
-
-	exclusivePocs := useIDs || strings.TrimSpace(pocPath) != ""
-	switch strings.ToLower(strings.TrimSpace(req.PocSource)) {
-	case "curated", "my":
-		// A single-source selection means "scan only this source" rather than
-		// "append this source to builtin".
-		exclusivePocs = true
-	}
-	if exclusivePocs {
-		sdkOpts = append(sdkOpts, sdk.WithPocPathsOnly())
-	}
-
-	if !useIDs {
-		sdkOpts = append(sdkOpts,
-			sdk.WithSearch(strings.TrimSpace(req.Search)),
-			sdk.WithSeverity(strings.TrimSpace(req.Severity)),
-		)
-	}
-	if req.Concurrency > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithConcurrency(req.Concurrency))
-	}
-	if req.RateLimit > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithRateLimit(req.RateLimit))
-	}
-	if req.Timeout > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithTimeout(req.Timeout))
-	}
-	if req.Retries > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithRetries(req.Retries))
-	}
-	if req.MaxHostError > 0 {
-		sdkOpts = append(sdkOpts, sdk.WithMaxHostError(req.MaxHostError))
-	}
-	if v := strings.TrimSpace(req.Proxy); v != "" {
-		sdkOpts = append(sdkOpts, sdk.WithProxy(v))
-	}
-	if req.Smart {
-		sdkOpts = append(sdkOpts, sdk.WithSmartConcurrency())
-	}
-	if req.EnableOOB {
-		sdkOpts = append(sdkOpts, sdk.WithOOB(sdk.OOBOptions{
-			Adapter: strings.TrimSpace(req.OOB),
-			Key:     strings.TrimSpace(req.OOBKey),
-			Domain:  strings.TrimSpace(req.OOBDomain),
-			ApiURL:  strings.TrimSpace(req.OOBApiUrl),
-			HttpURL: strings.TrimSpace(req.OOBHttpUrl),
-		}))
-	}
-	if req.PortScan || req.PortScanCompat {
-		sdkOpts = append(sdkOpts, sdk.WithPortScan(sdk.PortScanOptions{
-			Ports:         strings.TrimSpace(req.Ports),
-			SkipDiscovery: req.SkipHostDisc,
-		}))
-	}
-	if req.WebProbe || req.WebFingerprint {
-		sdkOpts = append(sdkOpts, sdk.WithWebProbe())
-	}
-
-	return sdkOpts
 }
 
 func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -532,19 +486,16 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	taskID := nextTaskID(getTaskManager())
 
-	sdkOpts := buildScanSDKOptions(req, targets, taskID, pocPath, appendPocs, useIDs)
-
-	scanner, err := sdk.New(context.Background(), sdkOpts...)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		gologger.Debug().Str("path", r.URL.Path).Str("error", err.Error()).Msg("start scan failed: create scanner error")
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
-		return
-	}
-
 	m := getTaskManager()
 	id := taskID
-	t := &Task{ID: id, Name: strings.TrimSpace(req.TaskName), status: TaskStarting, Scanner: scanner, CreatedAt: time.Now()}
+	t := &Task{
+		ID:        id,
+		Name:      strings.TrimSpace(req.TaskName),
+		status:    TaskStarting,
+		CreatedAt: time.Now(),
+		spec:      buildScanSpec(req, targets, pocPath, appendPocs, useIDs),
+		targets:   targets,
+	}
 	m.mu.Lock()
 	m.tasks[id] = t
 	m.mu.Unlock()
@@ -637,27 +588,16 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
 	startTask(m, t)
 
-	// 获取扫描初始化信息
-	stats := scanner.Stats()
-	oobEnabled, oobStatus := scanner.OOBStatus()
-
-	// 获取扫描目标（截取前5个用于展示，与CLI保持一致）
-	displayTargets := []string{}
-
-	count := len(targets)
-	if count > 5 {
-		displayTargets = targets[:5]
-	} else {
-		displayTargets = targets
+	// 引擎的真实汇总（total_pocs/total_scans/oob_status）要等子进程跑起来才知道，
+	// 由 scan_info 事件补发；这里先返回本地已知的目标信息，让前端立刻可渲染。
+	displayTargets := targets
+	if len(displayTargets) > 5 {
+		displayTargets = displayTargets[:5]
 	}
-
 	scanInfo := ScanInitInfo{
-		TotalTargets: stats.TotalTargets,
-		TotalPocs:    stats.TotalPocs,
-		TotalScans:   stats.TotalScans,
+		TotalTargets: len(targets),
 		Targets:      displayTargets,
-		OOBEnabled:   oobEnabled,
-		OOBStatus:    oobStatus,
+		OOBEnabled:   req.EnableOOB,
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -771,23 +711,18 @@ func scanStatusHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
-	st := t.Scanner.Stats()
+	snap := progressSnapshot(t)
 	resp := ScanStatusData{
-		Status: string(t.Status()),
-		Progress: ScanProgressData{
-			Percent:   int(t.Scanner.Progress() + 0.5),
-			Finished:  int(st.CompletedScans),
-			Total:     st.TotalScans,
-			Rate:      calcRate(t.started(), st.CompletedScans),
-			ElapsedMs: time.Since(t.started()).Milliseconds(),
-		},
+		Status:     string(t.Status()),
+		Progress:   snap,
 		TaskID:     taskID,
 		InstanceID: serverInstanceID,
 		BaseURL:    serverBaseURL,
 	}
-	resp.Stats.CompletedScans = int(st.CompletedScans)
-	resp.Stats.TotalScans = st.TotalScans
-	resp.Stats.FoundVulns = int(st.FoundVulns)
+	resp.Stats.CompletedScans = snap.Finished
+	resp.Stats.TotalScans = snap.Total
+	resp.Stats.FoundVulns = t.hitCount()
+	resp.Error = t.errMessage()
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: resp})
 }
 
@@ -817,13 +752,23 @@ func scanPauseHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
-	t.Scanner.Pause()
-	t.setStatus(TaskPaused)
-	if t.Scanner.IsPaused() {
-		gologger.Debug().Str("taskId", taskID).Msg("pause succeeded: engine gated")
-	} else {
-		gologger.Debug().Str("taskId", taskID).Msg("pause uncertain: engine not gated")
+	// 暂停/继续作用在子进程上：排队中（还没拉起子进程）与已结束的任务都没有
+	// 可控制的进程，直接如实返回失败，避免前端显示一个假的「已暂停」。
+	h := t.getHandle()
+	if h == nil {
+		w.WriteHeader(http.StatusConflict)
+		gologger.Debug().Str("taskId", taskID).Msg("pause failed: task has no running process")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务尚未开始或已结束，无法暂停"})
+		return
 	}
+	if err := h.Pause(); err != nil {
+		w.WriteHeader(http.StatusConflict)
+		gologger.Debug().Str("taskId", taskID).Str("error", err.Error()).Msg("pause failed")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: pauseErrorMessage(err, "暂停")})
+		return
+	}
+	t.setStatus(TaskPaused)
+	gologger.Debug().Str("taskId", taskID).Msg("pause succeeded: process suspended")
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskPaused)}})
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "paused", Data: map[string]bool{"paused": true}})
 }
@@ -854,15 +799,35 @@ func scanResumeHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
-	t.Scanner.Resume()
-	t.setStatus(TaskRunning)
-	if !t.Scanner.IsPaused() {
-		gologger.Debug().Str("taskId", taskID).Msg("resume succeeded: engine released")
-	} else {
-		gologger.Debug().Str("taskId", taskID).Msg("resume uncertain: engine still gated")
+	h := t.getHandle()
+	if h == nil {
+		w.WriteHeader(http.StatusConflict)
+		gologger.Debug().Str("taskId", taskID).Msg("resume failed: task has no running process")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务尚未开始或已结束，无法继续"})
+		return
 	}
+	if err := h.Resume(); err != nil {
+		w.WriteHeader(http.StatusConflict)
+		gologger.Debug().Str("taskId", taskID).Str("error", err.Error()).Msg("resume failed")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: pauseErrorMessage(err, "继续")})
+		return
+	}
+	t.setStatus(TaskRunning)
+	gologger.Debug().Str("taskId", taskID).Msg("resume succeeded: process resumed")
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskRunning)}})
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "resumed", Data: map[string]bool{"resumed": true}})
+}
+
+// pauseErrorMessage 把执行器的暂停/继续错误翻译成给用户看的话术。
+func pauseErrorMessage(err error, action string) string {
+	switch {
+	case errors.Is(err, executor.ErrPauseUnsupported):
+		return "当前平台不支持" + action
+	case errors.Is(err, executor.ErrAlreadyDone):
+		return "任务已结束，无法" + action
+	default:
+		return action + "失败：" + err.Error()
+	}
 }
 
 func scanStopHandler(w http.ResponseWriter, r *http.Request) {
@@ -890,11 +855,13 @@ func scanStopHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
 		return
 	}
-	t.Scanner.Stop()
-	if t.Scanner.IsStopping() {
-		gologger.Debug().Str("taskId", taskID).Msg("stop succeeded: context cancelled")
-	} else {
-		gologger.Debug().Str("taskId", taskID).Msg("stop uncertain: cancel flag not set")
+	// 先结束子进程（SIGTERM → 宽限期 → SIGKILL），再收尾任务。
+	if h := t.getHandle(); h != nil {
+		if err := h.Cancel(); err != nil && !errors.Is(err, executor.ErrAlreadyDone) {
+			gologger.Debug().Str("taskId", taskID).Str("error", err.Error()).Msg("stop: cancel process failed")
+		} else {
+			gologger.Debug().Str("taskId", taskID).Msg("stop succeeded: process terminated")
+		}
 	}
 	t.setStatus(TaskCancelled)
 	finalizeTask(m, t, TaskCancelled)
