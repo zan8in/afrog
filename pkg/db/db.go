@@ -56,6 +56,61 @@ type ResultData struct {
 	PocInfo     poc.Poc
 }
 
+// LedgerRow 是漏洞台账的一行：由 result 表按「PoC + 目标」聚合，再叠加人工状态与备注。
+type LedgerRow struct {
+	VulID      string `db:"vulid" json:"vulid"`
+	VulName    string `db:"vulname" json:"vulname"`
+	Target     string `db:"target" json:"target"`
+	FullTarget string `db:"fulltarget" json:"fulltarget"`
+	Severity   string `db:"severity" json:"severity"`
+	FirstSeen  string `db:"first_seen" json:"first_seen"`
+	LastSeen   string `db:"last_seen" json:"last_seen"`
+	HitCount   int64  `db:"hit_count" json:"hit_count"`
+	Status     string `db:"status" json:"status"`
+	Note       string `db:"note" json:"note"`
+	ProjectID  string `db:"project_id" json:"project_id"`
+	UpdatedAt  string `db:"updated_at" json:"updated_at"`
+}
+
+// LedgerStats 是各状态的数量分布。
+type LedgerStats struct {
+	Pending       int64 `json:"pending"`
+	Confirmed     int64 `json:"confirmed"`
+	FalsePositive int64 `json:"false_positive"`
+	Fixed         int64 `json:"fixed"`
+}
+
+// TaskFinding 是一次扫描中的一条命中（按「PoC + 目标」聚合后的最小单元），
+// 用于扫描差异对比。
+type TaskFinding struct {
+	VulID      string `db:"vulid" json:"vulid"`
+	VulName    string `db:"vulname" json:"vulname"`
+	Target     string `db:"target" json:"target"`
+	FullTarget string `db:"fulltarget" json:"fulltarget"`
+	Severity   string `db:"severity" json:"severity"`
+	HitCount   int64  `db:"hit_count" json:"hit_count"`
+}
+
+// AssetRow 是一条资产。address（归一化后）是唯一键，也是 id。
+//
+// TagsRaw 只用于扫描落库，对外 JSON 走 Tags 数组，避免前端再关心存储格式。
+type AssetRow struct {
+	ID          string   `db:"id" json:"id"`
+	Address     string   `db:"address" json:"address"`
+	Type        string   `db:"type" json:"type"`
+	TagsRaw     string   `db:"tags" json:"-"`
+	Tags        []string `db:"-" json:"tags"`
+	Source      string   `db:"source" json:"source"`
+	SourceRef   string   `db:"source_ref" json:"source_ref"`
+	Starred     bool     `db:"starred" json:"starred"`
+	Archived    bool     `db:"archived" json:"archived"`
+	Note        string   `db:"note" json:"note"`
+	FirstSeenAt string   `db:"first_seen_at" json:"first_seen_at"`
+	LastScanAt  string   `db:"last_scan_at" json:"last_scan_at"`
+	LastTaskID  string   `db:"last_task_id" json:"last_task_id"`
+	ScanCount   int64    `db:"scan_count" json:"scan_count"`
+}
+
 var (
 	LIMIT        = "100"
 	DBName       = "afrog"

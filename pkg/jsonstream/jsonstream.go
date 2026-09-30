@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
@@ -96,6 +97,25 @@ func buildResultEvent(res *result.Result) *scanstream.ResultEvent {
 		ev.Severity = res.PocInfo.Info.Severity
 	}
 	return ev
+}
+
+// ShouldReportFingerprint 判断某个指纹命中是否应该计入报告 / 台账 / 事件流。
+//
+// -S 指定了严重级别时只有匹配的级别会上报；未指定则全部上报。
+// 命令行的指纹落库（曾出现「台账有、事件流没有」）与事件流共用这一个判定，
+// 保证前端看到的命中集合与台账一致。
+func ShouldReportFingerprint(options *config.Options, severity string) bool {
+	if options == nil || strings.TrimSpace(options.Severity) == "" {
+		return true
+	}
+
+	severity = strings.ToLower(strings.TrimSpace(severity))
+	for _, item := range strings.Split(options.Severity, ",") {
+		if strings.EqualFold(severity, strings.TrimSpace(item)) {
+			return true
+		}
+	}
+	return false
 }
 
 // webProbeFingerprint 把 WebMeta 的 Server/PoweredBy 合并为协议里的 fingerprint 字段。
@@ -185,6 +205,38 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 		bySeverity[ev.Severity]++
 		statMu.Unlock()
 		w.Result(ev)
+	}
+
+	// 指纹命中（多为 info，例如 nginx-detect）走的是独立回调：它此前只写报告/台账，
+	// 从不进事件流，于是「台账里有、扫描详情的漏洞列表是 0」。这里补上同一条通路，
+	// 过滤规则与落库共用 ShouldReportFingerprint，避免前端比台账多出被过滤的命中。
+	prevFingerprint := r.OnFingerprint
+	r.OnFingerprint = func(targetKey string, hits []fingerprint.Hit) {
+		if prevFingerprint != nil {
+			prevFingerprint(targetKey, hits)
+		}
+		for _, hit := range hits {
+			sev := strings.TrimSpace(hit.Severity)
+			if sev == "" {
+				sev = "info"
+			}
+			if !ShouldReportFingerprint(options, sev) {
+				continue
+			}
+			name := strings.TrimSpace(hit.Name)
+			if name == "" {
+				name = strings.TrimSpace(hit.ID)
+			}
+			statMu.Lock()
+			bySeverity[sev]++
+			statMu.Unlock()
+			w.Result(&scanstream.ResultEvent{
+				Target:   targetKey,
+				PocID:    hit.ID,
+				PocName:  name,
+				Severity: sev,
+			})
+		}
 	}
 
 	// 扫描级进度：每秒上报一次，口径与命令行 tasks= 一致。

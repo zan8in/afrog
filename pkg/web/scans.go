@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,9 +16,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 )
 
@@ -37,9 +40,20 @@ func isActive(s TaskStatus) bool {
 	return s == TaskRunning || s == TaskPaused || s == TaskStarting
 }
 
+// 提交扫描时的业务错误。定义成哨兵值是为了让 Web 起扫与计划调度器共用同一套
+// 目标解析逻辑，同时各自决定如何呈现（HTTP 状态码 / 计划状态）。
+var (
+	errProjectNotFound  = errors.New("项目不存在")
+	errNoProjectTargets = errors.New("该项目没有有效目标")
+	errNoValidTargets   = errors.New("缺少有效扫描目标")
+)
+
 type ScanEvent struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data"`
+	// Seq 是任务内单调递增的事件序号。它既用于「补发」时定位起点，
+	// 也作为 SSE 的 id 字段，让浏览器重连时能带上 Last-Event-ID 续传。
+	Seq uint64 `json:"seq,omitempty"`
 }
 
 // Task tracks one scan. Its mutable fields are read and written from the HTTP
@@ -52,6 +66,13 @@ type Task struct {
 	SeverityStats map[string]int
 	Subscribers   map[chan ScanEvent]struct{}
 
+	// 发起入口与归属：创建后不再变更，读时无需加锁。
+	// source 为 manual（页面手动起扫）或 schedule（计划扫描），
+	// 供任务列表标出来源并让「计划扫描」的任务在前端可见。
+	source     string
+	scheduleID string
+	projectID  string
+
 	// spec 是本次扫描的规格快照，排队到真正执行时由 runScanTask 使用。
 	spec *executor.Spec
 	// targets 保留原始目标列表，scan_info 事件只展示前 5 个。
@@ -60,7 +81,12 @@ type Task struct {
 	mu        sync.Mutex
 	status    TaskStatus
 	startTime time.Time
+	endedAt   time.Time
 	handle    executor.Handle
+	// seq 是已派发事件的最大序号；buf 保留最近 eventBufferSize 条事件，
+	// 供「补录」的订阅者（计划扫描触发的任务）补看开扫以来的过程事件。
+	seq uint64
+	buf []ScanEvent
 	// progress / scanInfo / summary 都是引擎口径的数据：progress 来自每秒一次的
 	// 进度事件，scanInfo 来自开始执行前的前置汇总，summary 来自 done 事件。
 	progress   *scanstream.ProgressEvent
@@ -97,6 +123,13 @@ func (t *Task) started() time.Time {
 func (t *Task) setStarted(at time.Time) {
 	t.mu.Lock()
 	t.startTime = at
+	t.mu.Unlock()
+}
+
+// setEnded 记录任务收尾时刻，供任务列表展示。
+func (t *Task) setEnded(at time.Time) {
+	t.mu.Lock()
+	t.endedAt = at
 	t.mu.Unlock()
 }
 
@@ -200,6 +233,19 @@ func (t *Task) hitCount() int {
 	return total
 }
 
+// severitySnapshot 返回命中级别分布的副本，供通知汇总使用。
+// 直接读 SeverityStats 会与事件排空协程的写入竞争。
+func (t *Task) severitySnapshot() map[string]int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	out := make(map[string]int, len(t.SeverityStats))
+	for k, v := range t.SeverityStats {
+		out[k] = v
+	}
+	return out
+}
+
 // terminalStatus 把引擎自报的收尾状态与子进程退出码折算成任务状态。
 // 注意 cmd/afrog 在 runner 报错时是先发 error 事件再正常 return（退出码 0），
 // 因此只要收到过 error 事件就判为失败。
@@ -286,16 +332,29 @@ func getMaxRunning() int {
 	return i
 }
 
+// taskIDSuffix 是本进程的随机后缀。序号只是进程内计数器，重启后会从 1 重来，
+// 而同一天先后启动的进程会生成同一个 taskid；sqlite 的命中是按 taskid 关联的，
+// 没有后缀就会把旧任务的命中算到新任务（及其所属项目）头上。
+var taskIDSuffix = utils.CreateRandomString(6)
+
 func nextTaskID(m *TaskManager) string {
 	d := time.Now().Format("20060102")
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.seqByDate[d]++
-	return fmt.Sprintf("%s-%05d", d, m.seqByDate[d])
+	return fmt.Sprintf("%s-%05d-%s", d, m.seqByDate[d], taskIDSuffix)
 }
+
+// eventBufferSize 是每个任务保留的事件条数上限。计划扫描触发的任务要在前端
+// 「补看」开扫以来的过程（Web 探测 / 端口 / 命中），事件只发一次、不重放的话
+// 后加入的订阅者就永远看不到；所以按条数留一个窗口，超出后丢弃最旧的。
+const eventBufferSize = 3000
 
 func publish(t *Task, ev ScanEvent) {
 	t.mu.Lock()
+	t.seq++
+	ev.Seq = t.seq
+	t.recordEventLocked(ev)
 	for ch := range t.Subscribers {
 		select {
 		case ch <- ev:
@@ -315,15 +374,37 @@ func publish(t *Task, ev ScanEvent) {
 	t.mu.Unlock()
 }
 
-func addSubscriber(t *Task) chan ScanEvent {
+// recordEventLocked 把事件写入环形窗口。调用方必须持有 t.mu。
+func (t *Task) recordEventLocked(ev ScanEvent) {
+	t.buf = append(t.buf, ev)
+	over := len(t.buf) - eventBufferSize
+	if over <= 0 {
+		return
+	}
+	copy(t.buf, t.buf[over:])
+	t.buf = t.buf[:len(t.buf)-over]
+}
+
+// addSubscriber 注册订阅者，并在 replay 为真时一并返回缓冲区中 Seq > fromSeq 的
+// 历史事件：补录场景（前端刚发现一个非本页发起的任务）需要从头补发，
+// 重连场景由浏览器带 Last-Event-ID 续传，二者都不会漏事件。
+func addSubscriber(t *Task, fromSeq uint64, replay bool) (chan ScanEvent, []ScanEvent) {
 	ch := make(chan ScanEvent, 256)
 	t.mu.Lock()
 	if t.Subscribers == nil {
 		t.Subscribers = make(map[chan ScanEvent]struct{})
 	}
 	t.Subscribers[ch] = struct{}{}
+	var history []ScanEvent
+	if replay {
+		for _, ev := range t.buf {
+			if ev.Seq > fromSeq {
+				history = append(history, ev)
+			}
+		}
+	}
 	t.mu.Unlock()
-	return ch
+	return ch, history
 }
 
 func removeSubscriber(t *Task, ch chan ScanEvent) {
@@ -360,6 +441,7 @@ func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	if t.finalized.Swap(true) {
 		return
 	}
+	t.setEnded(time.Now())
 	t.setStatus(status)
 
 	// 最后一次 progress 采样最多滞后 1 秒，补发一次避免前端停在半截数字上。
@@ -416,6 +498,236 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	id, scanInfo, err := launchScan(req, scanOrigin{Source: scanSourceManual})
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		gologger.Debug().Str("path", r.URL.Path).Str("error", err.Error()).Msg("start scan rejected")
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "created",
+		Data: map[string]interface{}{
+			"taskId":   id,
+			"scanInfo": scanInfo,
+		},
+	})
+}
+
+// 任务发起入口。计划扫描的任务与手动扫描共用同一条执行路径，
+// 只在列表里用 source 区分，方便前端标出「计划」来源。
+const (
+	scanSourceManual   = "manual"
+	scanSourceSchedule = "schedule"
+)
+
+// scanOrigin 描述任务的发起入口。
+type scanOrigin struct {
+	Source     string
+	ScheduleID string
+}
+
+// scansListHandler 返回本实例内存中的任务列表（运行中 + 已完成，新的在前）。
+//
+// 任务状态是进程内存态：重启后不复存在，历史命中仍可从报告/台账查询。
+// 这个接口的作用是让「不是本页面发起」的扫描（典型是计划扫描）也能在前端可见。
+func scansListHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	items := getTaskManager().listScans()
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]interface{}{
+		"items": items,
+		"total": len(items),
+	}})
+}
+
+// scanListItem 是任务列表项，字段刻意保持扁平，便于前端直接渲染。
+type scanListItem struct {
+	TaskID     string   `json:"task_id"`
+	Name       string   `json:"name"`
+	Status     string   `json:"status"`
+	Source     string   `json:"source"` // manual | schedule
+	ScheduleID string   `json:"schedule_id,omitempty"`
+	ProjectID  string   `json:"project_id,omitempty"`
+	Targets    []string `json:"targets"`
+	CreatedAt  string   `json:"created_at,omitempty"`
+	StartedAt  string   `json:"started_at,omitempty"`
+	EndedAt    string   `json:"ended_at,omitempty"`
+
+	Progress ScanProgressData `json:"progress"`
+	Hits     map[string]int   `json:"hits"`
+	HitTotal int              `json:"hit_total"`
+	Error    string           `json:"error,omitempty"`
+
+	// ScanInfo 是引擎开扫前的前置汇总。前端「补录」一个非本页发起的任务时，
+	// 目标数 / PoC 数 / 总扫描数只能来自这里——scan_info 事件早就发过了，不会重放。
+	ScanInfo *scanInfoItem `json:"scan_info,omitempty"`
+}
+
+// scanInfoItem 与前端 ScanInfo 一一对应。
+type scanInfoItem struct {
+	TotalTargets int    `json:"total_targets"`
+	TotalPocs    int    `json:"total_pocs"`
+	TotalScans   int    `json:"total_scans"`
+	OOBEnabled   bool   `json:"oob_enabled"`
+	OOBStatus    string `json:"oob_status"`
+}
+
+// formatScanTime 用与 reports/ledger 一致的本地时间格式，空值返回空串。
+func formatScanTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02 15:04:05")
+}
+
+// listItem 组装任务列表项。
+func (t *Task) listItem() scanListItem {
+	t.mu.Lock()
+	source := t.source
+	if source == "" {
+		source = scanSourceManual
+	}
+	item := scanListItem{
+		TaskID:     t.ID,
+		Name:       t.Name,
+		Status:     string(t.status),
+		Source:     source,
+		ScheduleID: t.scheduleID,
+		ProjectID:  t.projectID,
+		Targets:    append([]string(nil), t.targets...),
+		CreatedAt:  formatScanTime(t.CreatedAt),
+		StartedAt:  formatScanTime(t.startTime),
+		EndedAt:    formatScanTime(t.endedAt),
+		Error:      t.errText,
+	}
+	t.mu.Unlock()
+
+	item.Progress = progressSnapshot(t)
+	item.Hits = t.severitySnapshot()
+	for _, n := range item.Hits {
+		item.HitTotal += n
+	}
+	if info := t.getScanInfo(); info != nil {
+		item.ScanInfo = &scanInfoItem{
+			TotalTargets: info.TotalTargets,
+			TotalPocs:    info.TotalPocs,
+			TotalScans:   info.TotalScans,
+			OOBEnabled:   info.OOBEnabled,
+			OOBStatus:    info.OOBStatus,
+		}
+	}
+	return item
+}
+
+// listScans 按创建时间倒序返回任务列表项（新的在前）。
+func (m *TaskManager) listScans() []scanListItem {
+	m.mu.Lock()
+	tasks := make([]*Task, 0, len(m.tasks))
+	for _, t := range m.tasks {
+		tasks = append(tasks, t)
+	}
+	m.mu.Unlock()
+
+	sort.Slice(tasks, func(i, j int) bool { return tasks[i].CreatedAt.After(tasks[j].CreatedAt) })
+
+	out := make([]scanListItem, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, t.listItem())
+	}
+	return out
+}
+
+// launchScan 是「提交一次扫描」的核心路径：解析目标与 PoC 范围、登记任务、
+// 沉淀资产、登记通知状态并放行执行。
+//
+// Web 起扫与计划调度器共用这条路径，保证两个入口的扫描行为完全一致；差异只在
+// 前端特有的 enable_stream 校验（调度器没有订阅者，不需要事件流）。
+func launchScan(req ScanCreateRequest, origin scanOrigin) (string, ScanInitInfo, error) {
+	targets, err := resolveScanTargets(req)
+	if err != nil {
+		return "", ScanInitInfo{}, err
+	}
+
+	pocPath, appendPocs, useIDs := resolveScanPocs(req)
+
+	source := strings.TrimSpace(origin.Source)
+	if source == "" {
+		source = scanSourceManual
+	}
+
+	id := nextTaskID(getTaskManager())
+	m := getTaskManager()
+	t := &Task{
+		ID:         id,
+		Name:       strings.TrimSpace(req.TaskName),
+		status:     TaskStarting,
+		CreatedAt:  time.Now(),
+		spec:       buildScanSpec(req, targets, pocPath, appendPocs, useIDs),
+		targets:    targets,
+		source:     source,
+		scheduleID: strings.TrimSpace(origin.ScheduleID),
+		projectID:  strings.TrimSpace(req.ProjectID),
+	}
+	m.mu.Lock()
+	m.tasks[id] = t
+	m.mu.Unlock()
+
+	// 资产自动沉淀：这次扫了哪些目标就记进资产表（source=scan/project）。
+	// 用户零维护——扫过的目标自然成为「资产」，失败只记日志，不影响扫描。
+	recordScanTargets(id, req.ProjectID, targets)
+
+	logScanStart(id, req, targets)
+	// 登记任务与项目的归属，供台账按项目聚合与项目扫描历史使用。
+	_ = sqlite.LinkTaskProject(id, req.ProjectID)
+	// 登记通知状态，后续命中与收尾消息要按任务去重与限流。
+	getNotifier().OnTaskStart(id, t.Name)
+	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
+	startTask(m, t)
+
+	// 引擎的真实汇总（total_pocs/total_scans/oob_status）要等子进程跑起来才知道，
+	// 由 scan_info 事件补发；这里先返回本地已知的目标信息，让前端立刻可渲染。
+	displayTargets := targets
+	if len(displayTargets) > 5 {
+		displayTargets = displayTargets[:5]
+	}
+	scanInfo := ScanInitInfo{
+		TotalTargets: len(targets),
+		Targets:      displayTargets,
+		OOBEnabled:   req.EnableOOB,
+	}
+	return id, scanInfo, nil
+}
+
+// resolveScanTargets 决定本次扫描的目标。
+//
+// 选中项目时以「项目引用的资产」为唯一目标来源：请求里手输的目标不再参与本次扫描，
+// 否则任务会被整体归属到项目，导致手输/残留目标被计入项目，进而污染项目资产与台账。
+func resolveScanTargets(req ScanCreateRequest) ([]string, error) {
+	if projectID := strings.TrimSpace(req.ProjectID); projectID != "" {
+		if _, ok := findProject(projectID); !ok {
+			return nil, errProjectNotFound
+		}
+		targets := make([]string, 0, 128)
+		for _, t := range resolveProjectTargets(projectID) {
+			if isValidAddress(t) {
+				targets = append(targets, normalizeAddress(t))
+			}
+		}
+		if len(targets) == 0 {
+			return nil, errNoProjectTargets
+		}
+		return targets, nil
+	}
+
 	targets := make([]string, 0, 128)
 	for _, t := range req.Targets {
 		ts := strings.TrimSpace(t)
@@ -423,26 +735,16 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 			targets = append(targets, normalizeAddress(ts))
 		}
 	}
-	if req.AssetSetID != "" {
-		path, _, _, err := assetFilePathFromID(req.AssetSetID)
-		if err == nil {
-			lines, _ := readLines(path)
-			for _, line := range lines {
-				if isValidAddress(line) {
-					targets = append(targets, normalizeAddress(line))
-				}
-			}
-		}
-	}
 	if len(targets) == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		gologger.Debug().Str("path", r.URL.Path).Msg("start scan failed: no valid targets")
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少有效扫描目标"})
-		return
+		return nil, errNoValidTargets
 	}
+	return targets, nil
+}
 
-	pocPath := strings.TrimSpace(req.PocFile)
-	var appendPocs []string
+// resolveScanPocs 解析 PoC 范围：优先显式 poc_file，其次按 poc_ids 落成临时目录，
+// 都没有时按 poc_source 追加 curated / my 目录。
+func resolveScanPocs(req ScanCreateRequest) (pocPath string, appendPocs []string, useIDs bool) {
+	pocPath = strings.TrimSpace(req.PocFile)
 
 	if pocPath == "" {
 		src := strings.ToLower(strings.TrimSpace(req.PocSource))
@@ -459,21 +761,20 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	useIDs := false
 	if len(req.PocIDs) > 0 {
 		tmpDir, err := os.MkdirTemp("", "afrog-pocids-")
 		if err == nil {
 			created := 0
-			for _, id := range req.PocIDs {
-				id = strings.TrimSpace(id)
-				if id == "" {
+			for _, pid := range req.PocIDs {
+				pid = strings.TrimSpace(pid)
+				if pid == "" {
 					continue
 				}
-				y, err := readPocYamlByID(id)
+				y, err := readPocYamlByID(pid)
 				if err != nil || y == nil || len(y) == 0 {
 					continue
 				}
-				if writeErr := os.WriteFile(filepath.Join(tmpDir, id+".yaml"), y, 0o600); writeErr == nil {
+				if writeErr := os.WriteFile(filepath.Join(tmpDir, pid+".yaml"), y, 0o600); writeErr == nil {
 					created++
 				}
 			}
@@ -483,23 +784,11 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	return pocPath, appendPocs, useIDs
+}
 
-	taskID := nextTaskID(getTaskManager())
-
-	m := getTaskManager()
-	id := taskID
-	t := &Task{
-		ID:        id,
-		Name:      strings.TrimSpace(req.TaskName),
-		status:    TaskStarting,
-		CreatedAt: time.Now(),
-		spec:      buildScanSpec(req, targets, pocPath, appendPocs, useIDs),
-		targets:   targets,
-	}
-	m.mu.Lock()
-	m.tasks[id] = t
-	m.mu.Unlock()
-
+// logScanStart 记录一次扫描的受理信息（含非默认参数），便于排查「到底按什么参数跑的」。
+func logScanStart(id string, req ScanCreateRequest, targets []string) {
 	var logParts []string = []string{"start scan accepted:"}
 	logParts = append(logParts, fmt.Sprintf("taskId=%s", id))
 	logParts = append(logParts, fmt.Sprintf("targets=%d", len(targets)))
@@ -572,9 +861,6 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	if req.SkipHostDisc {
 		logParts = append(logParts, fmt.Sprintf("skip_host_discovery=%t", req.SkipHostDisc))
 	}
-	if req.AssetSetID != "" {
-		logParts = append(logParts, fmt.Sprintf("asset_set_id=%s", req.AssetSetID))
-	}
 	if len(req.Labels) > 0 {
 		logParts = append(logParts, fmt.Sprintf("labels=%d", len(req.Labels)))
 	}
@@ -585,30 +871,6 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 		logParts = append(logParts, fmt.Sprintf("smart=%t", req.Smart))
 	}
 	gologger.Debug().Msg(strings.Join(logParts, " "))
-	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
-	startTask(m, t)
-
-	// 引擎的真实汇总（total_pocs/total_scans/oob_status）要等子进程跑起来才知道，
-	// 由 scan_info 事件补发；这里先返回本地已知的目标信息，让前端立刻可渲染。
-	displayTargets := targets
-	if len(displayTargets) > 5 {
-		displayTargets = displayTargets[:5]
-	}
-	scanInfo := ScanInitInfo{
-		TotalTargets: len(targets),
-		Targets:      displayTargets,
-		OOBEnabled:   req.EnableOOB,
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(APIResponse{
-		Success: true,
-		Message: "created",
-		Data: map[string]interface{}{
-			"taskId":   id,
-			"scanInfo": scanInfo,
-		},
-	})
 }
 
 func readPocYamlByID(id string) ([]byte, error) {
@@ -643,6 +905,12 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 		_, _ = bw.WriteString("event: ")
 		_, _ = bw.WriteString(ev.Type)
 		_, _ = bw.WriteString("\n")
+		// 带序号的事件同时写下 id：浏览器重连时会自动带上 Last-Event-ID 续传。
+		if ev.Seq > 0 {
+			_, _ = bw.WriteString("id: ")
+			_, _ = bw.WriteString(strconv.FormatUint(ev.Seq, 10))
+			_, _ = bw.WriteString("\n")
+		}
 		b, _ := json.Marshal(ev.Data)
 		_, _ = bw.WriteString("data: ")
 		_, _ = bw.Write(b)
@@ -658,14 +926,23 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 		fl.Flush()
 	}
 
+	fromSeq, replay := subscriptionStart(r)
+	// 先订阅再补发，保证「补发期间产生的新事件」不会漏：
+	// 订阅注册与历史快照在同一把锁内完成，二者按 seq 天然有序。
+	ch, history := addSubscriber(t, fromSeq, replay)
+	defer removeSubscriber(t, ch)
+
+	for _, ev := range history {
+		writeEvent(ev)
+	}
+
 	current := t.Status()
+	// 兜底补一条当前状态：历史里最后一条 status 可能已被窗口截断。
 	writeEvent(ScanEvent{Type: "status", Data: map[string]string{"status": string(current)}})
 	if current == TaskCompleted || current == TaskFailed || current == TaskCancelled {
 		return
 	}
 
-	ch := addSubscriber(t)
-	defer removeSubscriber(t, ch)
 	for {
 		select {
 		case <-r.Context().Done():
@@ -692,6 +969,28 @@ func scanEventsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// subscriptionStart 解析订阅起点：
+//   - replay=1（前端补录一个非本页发起的任务时显式要求）→ 从头补发缓冲区内的事件；
+//   - Last-Event-ID / last_seq（浏览器自动重连或客户端自报进度）→ 从该序号之后续传；
+//   - 都没有 → 只订阅新事件，保持既有行为，避免与本地已有记录重复。
+func subscriptionStart(r *http.Request) (uint64, bool) {
+	switch strings.ToLower(strings.TrimSpace(r.URL.Query().Get("replay"))) {
+	case "1", "true":
+		return 0, true
+	}
+
+	raw := strings.TrimSpace(r.Header.Get("Last-Event-ID"))
+	if raw == "" {
+		raw = strings.TrimSpace(r.URL.Query().Get("last_seq"))
+	}
+	if raw != "" {
+		if n, err := strconv.ParseUint(raw, 10, 64); err == nil {
+			return n, true
+		}
+	}
+	return 0, false
 }
 
 func scanStatusHandler(w http.ResponseWriter, r *http.Request) {

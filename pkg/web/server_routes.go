@@ -33,28 +33,29 @@ func setupHandler() (http.Handler, error) {
 	registerAPIRoutes(api)
 	api.NotFoundHandler = http.HandlerFunc(apiNotFoundHandler)
 
-	// 同时在根路径下注册一组兼容路由，满足当前前端依赖的无 /api 前缀接口
+	// -----------------------
+	// 兼容路由（无 /api 前缀）
+	//
+	// 旧版前端（当前嵌在 webpath 里的构建）只调用根路径接口，因此这组别名
+	// 必须保留。但其中 /reports、/pocs、/projects、/ledger 与新前端的页面
+	// 路由同名，且新前端只走 /api/*；两条规则路径完全一致，只能靠请求特征
+	// 区分，见 legacyAPIRoute。
+	//
+	// 注意：定位了冲突的 4 条之外，其余别名与页面不重名，不需要这一层判定，
+	// 这样直接拿浏览器打开 /me、/server/info 依然能看到 JSON。
+	// -----------------------
 	r.HandleFunc("/login", loginRateLimitMiddleware(loginHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/vulns", jwtAuthMiddleware(vulnsHandler)).Methods(http.MethodGet)
-	r.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
 	r.HandleFunc("/reports/detail/{id}", jwtAuthMiddleware(reportsDetailHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/reports/poc/{id}", jwtAuthMiddleware(pocDetailHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
-	r.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
 	r.HandleFunc("/pocs/yaml/{pocId}", jwtAuthMiddleware(pocsYamlHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/pocs/create", jwtAuthMiddleware(pocsCreateHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/pocs/update/{id}", jwtAuthMiddleware(pocsUpdateHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsDeleteHandler)).Methods(http.MethodDelete)
-
-	r.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsSetsListHandler)).Methods(http.MethodGet)
-	r.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsCreateSetHandler)).Methods(http.MethodPost)
-	r.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsGetSetHandler)).Methods(http.MethodGet)
-	r.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsUpdateSetHandler)).Methods(http.MethodPut)
-	r.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsDeleteSetHandler)).Methods(http.MethodDelete)
-	r.HandleFunc("/assets/sets/{id}/import", jwtAuthMiddleware(assetsImportHandler)).Methods(http.MethodPost)
-	r.HandleFunc("/assets/search", jwtAuthMiddleware(assetsSearchHandler)).Methods(http.MethodGet)
-	r.HandleFunc("/assets/export", jwtAuthMiddleware(assetsExportHandler)).Methods(http.MethodGet)
 
 	r.HandleFunc("/scans", jwtAuthMiddleware(scansCreateHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/events", jwtAuthMiddleware(scanEventsHandler)).Methods(http.MethodGet)
@@ -62,10 +63,47 @@ func setupHandler() (http.Handler, error) {
 	r.HandleFunc("/scans/{taskId}/pause", jwtAuthMiddleware(scanPauseHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
+	r.HandleFunc("/scans/{taskId}/diff", jwtAuthMiddleware(requireCurated(scanDiffHandler))).Methods(http.MethodGet)
 
+	// 计划扫描（Curated 会员）：定时/周期性地重跑同一份扫描配置。
+	// 与 /reports 等同理：/schedules 也是新前端的页面路由，浏览器导航必须落到 SPA。
+	r.HandleFunc("/schedules", jwtAuthMiddleware(requireCurated(schedulesListHandler))).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
+	r.HandleFunc("/schedules", jwtAuthMiddleware(requireCurated(schedulesSaveHandler))).Methods(http.MethodPost)
+	r.HandleFunc("/schedules/{id}", jwtAuthMiddleware(requireCurated(schedulesDeleteHandler))).Methods(http.MethodDelete)
+	r.HandleFunc("/schedules/{id}/toggle", jwtAuthMiddleware(requireCurated(schedulesToggleHandler))).Methods(http.MethodPost)
+	r.HandleFunc("/schedules/{id}/run", jwtAuthMiddleware(requireCurated(schedulesRunHandler))).Methods(http.MethodPost)
+
+	r.HandleFunc("/exports/task/{taskId}", jwtAuthMiddleware(exportTaskHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/exports/reports", jwtAuthMiddleware(exportReportsHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/exports/project/{projectId}", jwtAuthMiddleware(exportProjectHandler)).Methods(http.MethodGet)
+
+	r.HandleFunc("/me", jwtAuthMiddleware(meHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/nav/badges", jwtAuthMiddleware(navBadgesHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/curated/status", jwtAuthMiddleware(curatedStatusHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/curated/activate", jwtAuthMiddleware(curatedActivateHandler)).Methods(http.MethodPost)
+	r.HandleFunc("/curated/update", jwtAuthMiddleware(requireCurated(curatedUpdateHandler))).Methods(http.MethodPost)
+	r.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
+	r.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
+	r.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
+	r.HandleFunc("/projects", jwtAuthMiddleware(projectSaveHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodPost)
+	r.HandleFunc("/projects/{id}", jwtAuthMiddleware(projectGetHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/projects/{id}", jwtAuthMiddleware(projectDeleteHandler)).Methods(http.MethodDelete)
+	r.HandleFunc("/notifications", jwtAuthMiddleware(requireCurated(notificationsGetHandler))).Methods(http.MethodGet)
+	r.HandleFunc("/notifications", jwtAuthMiddleware(requireCurated(notificationsSaveHandler))).Methods(http.MethodPut)
+	r.HandleFunc("/notifications/test", jwtAuthMiddleware(requireCurated(notificationsTestHandler))).Methods(http.MethodPost)
+	r.HandleFunc("/notifications/logs", jwtAuthMiddleware(requireCurated(notificationsLogsHandler))).Methods(http.MethodGet)
+	r.HandleFunc("/notifications/logs/resend", jwtAuthMiddleware(requireCurated(notificationsResendHandler))).Methods(http.MethodPost)
 	r.HandleFunc("/server/info", jwtAuthMiddleware(serverInfoHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/instances", jwtAuthMiddleware(instancesListHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/instances/{instanceId}/force-stop", jwtAuthMiddleware(instanceForceStopHandler)).Methods(http.MethodPost)
+
+	// 资产（目标唯一真源）：项目 / 扫描 / 计划任务都只引用资产，不再各自存一份目标。
+	// /assets 同样是新前端的页面路由，浏览器导航必须落到 SPA。
+	r.HandleFunc("/assets", jwtAuthMiddleware(assetsListHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
+	r.HandleFunc("/assets", jwtAuthMiddleware(assetsCreateHandler)).Methods(http.MethodPost)
+	r.HandleFunc("/assets/facets", jwtAuthMiddleware(assetsFacetsHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/assets/update", jwtAuthMiddleware(assetsUpdateHandler)).Methods(http.MethodPost)
+	r.HandleFunc("/assets/delete", jwtAuthMiddleware(assetsDeleteHandler)).Methods(http.MethodPost)
 
 	// -----------------------
 	// 静态网站（SvelteKit 打包内容）
@@ -104,6 +142,17 @@ func setupHandler() (http.Handler, error) {
 // -----------------------
 // API 注册与中间件
 // -----------------------
+
+// legacyAPIRoute 只放行「程序调用」而把「浏览器导航」留给 SPA。
+//
+// 旧版前端的接口路径与新前端的页面路径存在同名冲突（/reports、/pocs、
+// /projects、/ledger）。浏览器在地址栏访问或刷新页面时必定带
+// Accept: text/html，而 XHR / fetch / 脚本工具默认是 */*，据此可以稳定区分：
+//   - 浏览器导航 -> 本匹配器返回 false，请求继续落到 SPA，拿到页面
+//   - 旧前端 XHR -> 命中根路径别名，仍返回 JSON
+func legacyAPIRoute(r *http.Request, _ *mux.RouteMatch) bool {
+	return !strings.Contains(r.Header.Get("Accept"), "text/html")
+}
 
 // 仅用于 /api/* 的中间件：统一设置 JSON 响应头、校验 Content-Type
 func apiMiddleware(next http.Handler) http.Handler {
@@ -150,25 +199,52 @@ func registerAPIRoutes(api *mux.Router) {
 	// 新增：删除指定 POC（仅允许删除 my 源）
 	api.HandleFunc("/pocs/{id}", jwtAuthMiddleware(pocsDeleteHandler)).Methods(http.MethodDelete)
 
-	api.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsSetsListHandler)).Methods(http.MethodGet)
-	api.HandleFunc("/assets/sets", jwtAuthMiddleware(assetsCreateSetHandler)).Methods(http.MethodPost)
-	api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsGetSetHandler)).Methods(http.MethodGet)
-	api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsUpdateSetHandler)).Methods(http.MethodPut)
-	api.HandleFunc("/assets/sets/{id}", jwtAuthMiddleware(assetsDeleteSetHandler)).Methods(http.MethodDelete)
-	api.HandleFunc("/assets/sets/{id}/import", jwtAuthMiddleware(assetsImportHandler)).Methods(http.MethodPost)
-	api.HandleFunc("/assets/search", jwtAuthMiddleware(assetsSearchHandler)).Methods(http.MethodGet)
-	api.HandleFunc("/assets/export", jwtAuthMiddleware(assetsExportHandler)).Methods(http.MethodGet)
-
 	api.HandleFunc("/scans", jwtAuthMiddleware(scansCreateHandler)).Methods(http.MethodPost)
+	// 任务列表：让「不是本页面发起」的扫描（计划扫描）也能在前端可见。
+	api.HandleFunc("/scans", jwtAuthMiddleware(scansListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/events", jwtAuthMiddleware(scanEventsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/status", jwtAuthMiddleware(scanStatusHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/pause", jwtAuthMiddleware(scanPauseHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/scans/{taskId}/diff", jwtAuthMiddleware(requireCurated(scanDiffHandler))).Methods(http.MethodGet)
 
+	// 计划扫描（Curated 会员）
+	api.HandleFunc("/schedules", jwtAuthMiddleware(requireCurated(schedulesListHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/schedules", jwtAuthMiddleware(requireCurated(schedulesSaveHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/schedules/{id}", jwtAuthMiddleware(requireCurated(schedulesDeleteHandler))).Methods(http.MethodDelete)
+	api.HandleFunc("/schedules/{id}/toggle", jwtAuthMiddleware(requireCurated(schedulesToggleHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/schedules/{id}/run", jwtAuthMiddleware(requireCurated(schedulesRunHandler))).Methods(http.MethodPost)
+
+	api.HandleFunc("/exports/task/{taskId}", jwtAuthMiddleware(exportTaskHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/exports/reports", jwtAuthMiddleware(exportReportsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/exports/project/{projectId}", jwtAuthMiddleware(exportProjectHandler)).Methods(http.MethodGet)
+
+	api.HandleFunc("/me", jwtAuthMiddleware(meHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/nav/badges", jwtAuthMiddleware(navBadgesHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/curated/status", jwtAuthMiddleware(curatedStatusHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/curated/activate", jwtAuthMiddleware(curatedActivateHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/curated/update", jwtAuthMiddleware(requireCurated(curatedUpdateHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/projects", jwtAuthMiddleware(projectSaveHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/projects/{id}", jwtAuthMiddleware(projectGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/projects/{id}", jwtAuthMiddleware(projectDeleteHandler)).Methods(http.MethodDelete)
+	api.HandleFunc("/notifications", jwtAuthMiddleware(requireCurated(notificationsGetHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/notifications", jwtAuthMiddleware(requireCurated(notificationsSaveHandler))).Methods(http.MethodPut)
+	api.HandleFunc("/notifications/test", jwtAuthMiddleware(requireCurated(notificationsTestHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/notifications/logs", jwtAuthMiddleware(requireCurated(notificationsLogsHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/notifications/logs/resend", jwtAuthMiddleware(requireCurated(notificationsResendHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/server/info", jwtAuthMiddleware(serverInfoHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances", jwtAuthMiddleware(instancesListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances/{instanceId}/force-stop", jwtAuthMiddleware(instanceForceStopHandler)).Methods(http.MethodPost)
+
+	api.HandleFunc("/assets", jwtAuthMiddleware(assetsListHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/assets", jwtAuthMiddleware(assetsCreateHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/assets/facets", jwtAuthMiddleware(assetsFacetsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/assets/update", jwtAuthMiddleware(assetsUpdateHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/assets/delete", jwtAuthMiddleware(assetsDeleteHandler)).Methods(http.MethodPost)
 }
 
 // API 未匹配路由 -> JSON 404

@@ -53,6 +53,8 @@ type ReportListResponse struct {
 	TotalPages int          `json:"total_pages"`
 	Keyword    string       `json:"keyword,omitempty"`
 	Severity   []string     `json:"severity,omitempty"`
+	// TaskID 是按任务筛选时回显给前端的过滤条件（计划扫描的「查看上次结果」用它）。
+	TaskID string `json:"task_id,omitempty"`
 }
 
 // POC 列表 - 单条记录
@@ -65,32 +67,6 @@ type PocsListItem struct {
 	Source   string   `json:"source"` // builtin/curated/my/local
 	Path     string   `json:"path,omitempty"`
 	Created  string   `json:"created,omitempty"`
-}
-
-// 资产地址集合元信息
-type AssetSetInfo struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Path      string   `json:"path"`
-	Category  string   `json:"category,omitempty"`
-	Tags      []string `json:"tags,omitempty"`
-	Created   string   `json:"created,omitempty"`
-	Updated   string   `json:"updated,omitempty"`
-	LineCount int      `json:"line_count"`
-	Favorite  bool     `json:"favorite,omitempty"`
-}
-
-// 资产集合内容响应
-type AssetSetContent struct {
-	Info  AssetSetInfo `json:"info"`
-	Items []string     `json:"items"`
-}
-
-// 资产集合列表响应
-type AssetsListResponse struct {
-	Items     []AssetSetInfo `json:"items"`
-	Total     int            `json:"total"`
-	UpdatedAt string         `json:"updated_at"`
 }
 
 // POC 列表 - 响应
@@ -109,7 +85,7 @@ type PocsListResponse struct {
 
 type ScanCreateRequest struct {
 	Targets         []string `json:"targets,omitempty"`
-	AssetSetID      string   `json:"assetSetId,omitempty"`
+	ProjectID       string   `json:"project_id,omitempty"`
 	PocFile         string   `json:"poc_file,omitempty"`
 	PocSource       string   `json:"poc_source,omitempty"`
 	PocIDs          []string `json:"poc_ids,omitempty"`

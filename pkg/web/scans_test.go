@@ -1,6 +1,8 @@
 package web
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -34,7 +36,7 @@ func eventTypes(events []ScanEvent) []string {
 // 「前端零改动」，这层映射就是保证。
 func TestTranslateScanEvent_MapsEngineEventsForFrontend(t *testing.T) {
 	task := &Task{ID: "t1", status: TaskRunning, targets: []string{"a", "b", "c", "d", "e", "f", "g"}}
-	ch := addSubscriber(task)
+	ch, _ := addSubscriber(task, 0, false)
 	defer removeSubscriber(task, ch)
 
 	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeScanInfo, ScanInfo: &scanstream.ScanInfoEvent{
@@ -128,7 +130,7 @@ func TestFinalizeTask_PublishesTerminalStatus(t *testing.T) {
 	m.tasks[task.ID] = task
 	task.setProgress(&scanstream.ProgressEvent{Percent: 50, Finished: 1, Total: 2})
 
-	ch := addSubscriber(task)
+	ch, _ := addSubscriber(task, 0, false)
 	defer removeSubscriber(task, ch)
 
 	finalizeTask(m, task, TaskCancelled)
@@ -139,6 +141,88 @@ func TestFinalizeTask_PublishesTerminalStatus(t *testing.T) {
 	}
 	if got := task.Status(); got != TaskCancelled {
 		t.Fatalf("Status() = %q, want %q", got, TaskCancelled)
+	}
+}
+
+// 「补录」场景：计划扫描触发的任务由前端事后发现，必须能补看开扫以来的事件
+// （Web 探测、端口、命中），否则这些内容在前端永远是空的。
+func TestAddSubscriber_ReplaysBufferedEvents(t *testing.T) {
+	task := &Task{ID: "t1", status: TaskRunning}
+	for _, typ := range []string{"scan_info", "webprobe", "result"} {
+		publish(task, ScanEvent{Type: typ, Data: map[string]string{"k": typ}})
+	}
+
+	// 从头补发：拿到全部 3 条，且序号连续递增。
+	ch, history := addSubscriber(task, 0, true)
+	defer removeSubscriber(task, ch)
+	if got := eventTypes(history); !equalStrings(got, []string{"scan_info", "webprobe", "result"}) {
+		t.Fatalf("replay from 0 = %v, want all buffered events", got)
+	}
+	for i, ev := range history {
+		if ev.Seq != uint64(i+1) {
+			t.Fatalf("seq = %d at %d, want %d", ev.Seq, i, i+1)
+		}
+	}
+
+	// 从第 2 条之后续传：只补发其后的（浏览器重连带 Last-Event-ID 时走这条路）。
+	ch2, history2 := addSubscriber(task, 2, true)
+	defer removeSubscriber(task, ch2)
+	if got := eventTypes(history2); !equalStrings(got, []string{"result"}) {
+		t.Fatalf("replay from 2 = %v, want only the events after seq 2", got)
+	}
+
+	// 默认（不补发）：只收新事件，避免与本地已有记录重复。
+	ch3, history3 := addSubscriber(task, 0, false)
+	defer removeSubscriber(task, ch3)
+	if len(history3) != 0 {
+		t.Fatalf("no-replay subscriber got %d history events, want 0", len(history3))
+	}
+}
+
+// 缓冲窗口按 eventBufferSize 截断，只保留最近的事件，避免内存无限增长。
+func TestPublish_TrimsEventBuffer(t *testing.T) {
+	task := &Task{ID: "t1", status: TaskRunning}
+	const trimmed = 10
+	for i := 0; i < eventBufferSize+trimmed; i++ {
+		publish(task, ScanEvent{Type: "progress", Data: map[string]int{"i": i}})
+	}
+
+	ch, history := addSubscriber(task, 0, true)
+	defer removeSubscriber(task, ch)
+	if len(history) != eventBufferSize {
+		t.Fatalf("buffered = %d events, want %d", len(history), eventBufferSize)
+	}
+	if history[0].Seq != uint64(trimmed+1) {
+		t.Fatalf("oldest seq = %d, want %d", history[0].Seq, trimmed+1)
+	}
+}
+
+// 订阅起点解析：显式补发 > 浏览器 Last-Event-ID > 客户端自报 last_seq > 只订阅新事件。
+func TestSubscriptionStart(t *testing.T) {
+	cases := []struct {
+		name     string
+		target   string
+		lastID   string
+		wantSeq  uint64
+		wantRepl bool
+	}{
+		{"default subscribes from now", "/events", "", 0, false},
+		{"explicit replay", "/events?replay=1", "", 0, true},
+		{"browser reconnect", "/events", "42", 42, true},
+		{"client reported seq", "/events?last_seq=7", "", 7, true},
+		{"invalid seq falls back to now", "/events?last_seq=abc", "", 0, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, c.target, nil)
+			if c.lastID != "" {
+				req.Header.Set("Last-Event-ID", c.lastID)
+			}
+			seq, replay := subscriptionStart(req)
+			if seq != c.wantSeq || replay != c.wantRepl {
+				t.Fatalf("subscriptionStart = (%d,%v), want (%d,%v)", seq, replay, c.wantSeq, c.wantRepl)
+			}
+		})
 	}
 }
 
@@ -228,7 +312,7 @@ func TestFinalizeTask_DuplicateCallDoesNotDrainTheQueue(t *testing.T) {
 // goroutine at the same time. This test is meaningful under -race.
 func TestTask_ConcurrentFieldAccessIsRaceFree(t *testing.T) {
 	task := &Task{ID: "t1", status: TaskStarting}
-	sub := addSubscriber(task)
+	sub, _ := addSubscriber(task, 0, false)
 	go func() {
 		for range sub {
 		}

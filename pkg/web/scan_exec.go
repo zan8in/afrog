@@ -114,6 +114,8 @@ func runScanTask(m *TaskManager, t *Task) {
 	}
 
 	finalizeTask(m, t, t.terminalStatus(h.Err()))
+	// 汇总/异常提醒统一在收尾之后发；任务通知状态由 OnTaskDone 自行清理。
+	notifyTaskDone(t)
 }
 
 // failScanStart 处理子进程拉不起来的情况：记下原因并通过 status 事件告知前端。
@@ -166,6 +168,8 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 			return
 		}
 		t.addHit(strings.ToLower(ev.Result.Severity))
+		// 达到阈值的高危命中实时推送；去重与限流在通知器内完成。
+		getNotifier().OnHit(t.ID, ev.Result.Severity, ev.Result.PocID, ev.Result.PocName, ev.Result.Target)
 		publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
 			"target":   ev.Result.Target,
 			"severity": ev.Result.Severity,

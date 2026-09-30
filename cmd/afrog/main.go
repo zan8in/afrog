@@ -31,18 +31,10 @@ import (
 	"github.com/zan8in/gologger"
 )
 
+// shouldReportFingerprintHit 判断指纹命中是否上报。判定与事件流共用同一实现，
+// 保证「写进报告/台账的命中」与「前端事件流看到的命中」是同一集合。
 func shouldReportFingerprintHit(options *config.Options, severity string) bool {
-	if options == nil || strings.TrimSpace(options.Severity) == "" {
-		return true
-	}
-
-	severity = strings.ToLower(strings.TrimSpace(severity))
-	for _, item := range strings.Split(options.Severity, ",") {
-		if strings.EqualFold(severity, strings.TrimSpace(item)) {
-			return true
-		}
-	}
-	return false
+	return jsonstream.ShouldReportFingerprint(options, severity)
 }
 
 func main() {
@@ -78,6 +70,7 @@ func main() {
 		jsonStream = scanstream.NewWriter(os.Stdout, "local", taskID)
 	}
 
+	var curatedService *service.Service
 	if options.Config != nil {
 		cur := options.Config.Curated
 		enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
@@ -100,6 +93,7 @@ func main() {
 				ForceUpdate:   options.CuratedForceUpdate,
 				ClientVersion: config.Version,
 			})
+			curatedService = svc
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cur.TimeoutSec)*time.Second)
 			if cur.TimeoutSec <= 0 {
 				ctx, cancel = context.WithCancel(context.Background())
@@ -137,6 +131,7 @@ func main() {
 			return
 		}
 		defer sqlite.CloseX()
+		web.SetCuratedService(curatedService)
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())
 		}

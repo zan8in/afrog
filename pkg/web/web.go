@@ -18,7 +18,6 @@ var serverStartedAt time.Time
 var serverBaseURL string
 var serverPID int
 var serverArgv []string
-var httpSrv *http.Server
 
 func generateInstanceID() string {
 	b := make([]byte, 16)
@@ -41,9 +40,16 @@ func StartServer(addr string) error {
 	}
 	defer sqlite.CloseX()
 
+	// 一次性升级：旧版项目里独立保存的 targets 改为对资产的引用。
+	migrateProjectsToAssets()
+
 	// 初始化系统监控
 	InitMonitor()
 	defer StopMonitor() // 确保退出时停止
+
+	// 启动计划扫描调度器（Curated 会员能力；非会员时只推进时间、不执行）
+	StartScheduler()
+	defer StopScheduler()
 
 	// 构建路由与静态文件服务
 	handler, err := setupHandler()
@@ -69,7 +75,6 @@ func StartServer(addr string) error {
 	serverBaseURL = "http://" + browsableAddr(addr)
 	serverPID = os.Getpid()
 	serverArgv = os.Args
-	httpSrv = srv
 
 	gologger.Info().Msgf("Web服务器启动于: %s", serverBaseURL)
 	return srv.ListenAndServe()

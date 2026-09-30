@@ -19,6 +19,7 @@ var jwtSecret []byte
 // JWT Claims结构
 type Claims struct {
 	UserID    string `json:"user_id"`
+	Role      string `json:"role"` // curated | free
 	LoginTime int64  `json:"login_time"`
 	jwt.RegisteredClaims
 }
@@ -31,13 +32,14 @@ func initJWTSecret() {
 }
 
 // 生成JWT Token
-func generateJWTToken(userID string) (string, int64, error) {
+func generateJWTToken(userID string, role string) (string, int64, error) {
 	// 短期有效（建议10-15分钟），提升被窃取后的风险控制能力
 	expires := time.Now().Add(3600 * time.Minute)
 	jti := generateJTI()
 
 	claims := &Claims{
 		UserID:    userID,
+		Role:      role,
 		LoginTime: time.Now().Unix(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        jti,                               // jti
