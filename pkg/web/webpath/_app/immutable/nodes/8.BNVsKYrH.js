@@ -1,1 +1,0 @@
-import{p as v,f as i,q as l,d as n,e as m,r,v as s}from"../chunks/CuAps6qH.js";var p=i('<div class="flex flex-1 flex-col"><div class="markdown max-w-none"><!></div></div>');function c(d,e){v(e,!0);var a=p(),o=r(a),t=r(o);l(t,()=>String(e.data.html||"")),s(o),s(a),n(d,a),m()}export{c as component};
