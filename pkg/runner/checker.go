@@ -758,7 +758,7 @@ func (c *Checker) checkURL(target string) (string, error) {
 		} else if shouldCountHostError(err) {
 			c.Options.Targets.UpdateNum(target, 1)
 		}
-		return target, fmt.Errorf("%s check protocol falied", target)
+		return target, fmt.Errorf("%s check protocol failed", target)
 	}
 
 	// if target is url more than zero, then check protocol against
