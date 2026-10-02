@@ -55,6 +55,13 @@ func StartServer(addr string) error {
 	StartCluster()
 	defer StopCluster()
 
+	// 恢复上次运行落盘的远程派发镜像记录：发起端重启后任务列表不丢，
+	// 未完成的任务继续交给对账协程按远端任务号收敛。
+	remotePersistEnabled = true
+	if RestoreRemoteTasks() > 0 {
+		startRemoteReconciler()
+	}
+
 	// 构建路由与静态文件服务
 	handler, err := setupHandler()
 	if err != nil {

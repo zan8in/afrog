@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/config"
@@ -278,5 +280,61 @@ func TestClusterRemoteDispatchUnknownNode(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "不在集群配置中") {
 		t.Fatalf("应说明原因：%s", rec.Body.String())
+	}
+}
+
+// 影子记录落盘后能读回：发起端重启不丢远程任务列表，未完成的任务仍可继续对账。
+func TestRemoteTaskPersistAndRestore(t *testing.T) {
+	resetRemoteStore()
+	remoteTasksPathOverride = filepath.Join(t.TempDir(), "remote_tasks.json")
+	remotePersistEnabled = true
+	t.Cleanup(func() {
+		remotePersistEnabled = false
+		remoteTasksPathOverride = ""
+		resetRemoteStore()
+	})
+
+	rt := &remoteTask{
+		ID:           "20261002-00001-abcdef",
+		DispatchID:   "d-1",
+		NodeName:     "节点A",
+		NodeURL:      "http://peer-a",
+		RemoteTaskID: "remote-1",
+		Name:         "远程任务",
+		Status:       string(TaskRunning),
+		Progress:     ScanProgressData{Percent: 42, Finished: 42, Total: 100},
+		HitTotal:     1,
+		Targets:      []string{"http://a"},
+		CreatedAt:    "2026-10-02 10:00:00",
+		NodeOK:       true,
+		LastSeen:     time.Now(),
+		request:      ScanCreateRequest{Targets: []string{"http://a"}},
+	}
+	addRemoteTask(rt)
+
+	// 模拟进程重启：内存清空后从磁盘读回。
+	resetRemoteStore()
+	if n := RestoreRemoteTasks(); n != 1 {
+		t.Fatalf("恢复记录数 = %d，期望 1", n)
+	}
+
+	got := getRemoteTask("20261002-00001-abcdef")
+	if got == nil {
+		t.Fatal("影子记录未恢复")
+	}
+	if got.RemoteTaskID != "remote-1" || got.DispatchID != "d-1" {
+		t.Fatalf("关键字段未保留：%+v", got)
+	}
+	if got.Status != string(TaskRunning) || !got.NodeOK {
+		t.Fatalf("状态未保留：%+v", got)
+	}
+	if len(got.request.Targets) != 1 {
+		t.Fatalf("派发请求未保留，未拿到远端任务号时无法重试：%+v", got.request)
+	}
+
+	// 恢复出来的记录要照常并入任务列表。
+	items := remoteScanItems()
+	if len(items) != 1 || items[0].TaskID != rt.ID || items[0].Source != scanSourceRemote {
+		t.Fatalf("恢复的记录未并入列表：%+v", items)
 	}
 }

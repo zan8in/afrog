@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -100,9 +102,10 @@ var remoteStore = struct {
 
 func addRemoteTask(rt *remoteTask) {
 	remoteStore.mu.Lock()
-	defer remoteStore.mu.Unlock()
 	remoteStore.items[rt.ID] = rt
 	remoteStore.order = append(remoteStore.order, rt.ID)
+	remoteStore.mu.Unlock()
+	persistRemoteTasks()
 }
 
 func getRemoteTask(id string) *remoteTask {
@@ -113,8 +116,9 @@ func getRemoteTask(id string) *remoteTask {
 
 func removeRemoteTask(id string) {
 	remoteStore.mu.Lock()
-	defer remoteStore.mu.Unlock()
 	delete(remoteStore.items, id)
+	remoteStore.mu.Unlock()
+	persistRemoteTasks()
 }
 
 func remoteTaskSnapshot() []*remoteTask {
@@ -162,6 +166,223 @@ func remoteScanItems() []scanListItem {
 }
 
 // -----------------------
+// 影子记录持久化
+// -----------------------
+//
+// 影子记录只留在内存里的话，发起端一重启，任务列表里的远程任务就凭空消失——
+// 而任务其实还在执行节点上跑。这里把它们落盘，启动时读回来：终态任务继续展示，
+// 未完成的任务交给对账协程按远端任务号收敛。
+
+const (
+	remoteTasksFileName = "remote_tasks.json"
+	// maxRemoteTasks 限制落盘记录数，避免文件随派发次数无限增长。
+	maxRemoteTasks = 200
+)
+
+// 落盘开关与路径默认关闭，由 StartServer 显式开启：单元测试直接调处理器时
+// 不该去写用户的配置目录。
+var (
+	remotePersistEnabled    bool
+	remoteTasksPathOverride string
+	remotePersistMu         sync.Mutex
+)
+
+// remoteTaskRecord 是 remoteTask 的可序列化形态。remoteTask 带 mutex 与并发访问，
+// 不能直接落盘，单独抽一份「纯数据」结构，读写两侧都走转换函数。
+type remoteTaskRecord struct {
+	ID           string           `json:"id"`
+	DispatchID   string           `json:"dispatch_id"`
+	NodeName     string           `json:"node_name"`
+	NodeURL      string           `json:"node_url"`
+	RemoteTaskID string           `json:"remote_task_id,omitempty"`
+	Name         string           `json:"name"`
+	Status       string           `json:"status"`
+	Progress     ScanProgressData `json:"progress"`
+	Error        string           `json:"error,omitempty"`
+	Hits         map[string]int   `json:"hits,omitempty"`
+	HitTotal     int              `json:"hit_total"`
+	Targets      []string         `json:"targets,omitempty"`
+	CreatedAt    string           `json:"created_at,omitempty"`
+	StartedAt    string           `json:"started_at,omitempty"`
+	EndedAt      string           `json:"ended_at,omitempty"`
+	NodeOK       bool             `json:"node_ok"`
+	LastSeen     string           `json:"last_seen,omitempty"`
+	// Request 是原始派发请求：还没拿到远端任务号时，重启后仍要靠它幂等重试。
+	Request ScanCreateRequest `json:"request"`
+}
+
+type remoteTaskStore struct {
+	Items []remoteTaskRecord `json:"items"`
+}
+
+func remoteTasksFilePath() (string, error) {
+	if p := strings.TrimSpace(remoteTasksPathOverride); p != "" {
+		return p, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(home, ".config", "afrog")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, remoteTasksFileName), nil
+}
+
+func remoteTaskToRecord(rt *remoteTask) remoteTaskRecord {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	rec := remoteTaskRecord{
+		ID:           rt.ID,
+		DispatchID:   rt.DispatchID,
+		NodeName:     rt.NodeName,
+		NodeURL:      rt.NodeURL,
+		RemoteTaskID: rt.RemoteTaskID,
+		Name:         rt.Name,
+		Status:       rt.Status,
+		Progress:     rt.Progress,
+		Error:        rt.Error,
+		Hits:         rt.Hits,
+		HitTotal:     rt.HitTotal,
+		Targets:      append([]string(nil), rt.Targets...),
+		CreatedAt:    rt.CreatedAt,
+		StartedAt:    rt.StartedAt,
+		EndedAt:      rt.EndedAt,
+		NodeOK:       rt.NodeOK,
+		Request:      rt.request,
+	}
+	if !rt.LastSeen.IsZero() {
+		rec.LastSeen = rt.LastSeen.Format(scheduleTimeLayout)
+	}
+	return rec
+}
+
+func recordToRemoteTask(rec remoteTaskRecord) *remoteTask {
+	rt := &remoteTask{
+		ID:           rec.ID,
+		DispatchID:   rec.DispatchID,
+		NodeName:     rec.NodeName,
+		NodeURL:      rec.NodeURL,
+		RemoteTaskID: rec.RemoteTaskID,
+		Name:         rec.Name,
+		Status:       rec.Status,
+		Progress:     rec.Progress,
+		Error:        rec.Error,
+		Hits:         rec.Hits,
+		HitTotal:     rec.HitTotal,
+		Targets:      append([]string(nil), rec.Targets...),
+		CreatedAt:    rec.CreatedAt,
+		StartedAt:    rec.StartedAt,
+		EndedAt:      rec.EndedAt,
+		NodeOK:       rec.NodeOK,
+		request:      rec.Request,
+	}
+	if rec.LastSeen != "" {
+		if ts, err := time.ParseInLocation(scheduleTimeLayout, rec.LastSeen, time.Local); err == nil {
+			rt.LastSeen = ts
+		}
+	}
+	return rt
+}
+
+// pruneRemoteRecords 裁剪到上限：优先丢「最早且已终结」的记录，运行中的任务不会
+// 因为数量上限被静默抹掉；极端情况下（全都未终结）才按时间顺序丢最早的。
+func pruneRemoteRecords(recs []remoteTaskRecord) []remoteTaskRecord {
+	if len(recs) <= maxRemoteTasks {
+		return recs
+	}
+	keep := make([]remoteTaskRecord, 0, maxRemoteTasks)
+	overflow := len(recs) - maxRemoteTasks
+	for _, rec := range recs {
+		if overflow > 0 && isTerminalRemoteStatus(rec.Status) {
+			overflow--
+			continue
+		}
+		keep = append(keep, rec)
+	}
+	if len(keep) > maxRemoteTasks {
+		keep = keep[len(keep)-maxRemoteTasks:]
+	}
+	return keep
+}
+
+// persistRemoteTasks 把当前影子记录整体原子写盘。未开启落盘时静默返回。
+func persistRemoteTasks() {
+	if !remotePersistEnabled {
+		return
+	}
+	snap := remoteTaskSnapshot()
+	recs := make([]remoteTaskRecord, 0, len(snap))
+	for _, rt := range snap {
+		recs = append(recs, remoteTaskToRecord(rt))
+	}
+	recs = pruneRemoteRecords(recs)
+
+	remotePersistMu.Lock()
+	defer remotePersistMu.Unlock()
+	path, err := remoteTasksFilePath()
+	if err != nil {
+		gologger.Debug().Msgf("远程任务落盘失败: %v", err)
+		return
+	}
+	data, err := json.MarshalIndent(remoteTaskStore{Items: recs}, "", "  ")
+	if err != nil {
+		gologger.Debug().Msgf("远程任务序列化失败: %v", err)
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		gologger.Debug().Msgf("远程任务落盘失败: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		gologger.Debug().Msgf("远程任务落盘失败: %v", err)
+	}
+}
+
+// RestoreRemoteTasks 在服务启动时把落盘的影子记录读回内存，返回恢复的条数。
+// 读失败不阻断启动：最坏情况只是丢一份镜像视图，任务本身仍在执行节点上。
+func RestoreRemoteTasks() int {
+	path, err := remoteTasksFilePath()
+	if err != nil {
+		gologger.Warning().Msgf("远程任务记录路径不可用: %v", err)
+		return 0
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			gologger.Warning().Msgf("读取远程任务记录失败: %v", err)
+		}
+		return 0
+	}
+	var store remoteTaskStore
+	if err := json.Unmarshal(data, &store); err != nil {
+		gologger.Warning().Msgf("远程任务记录无法解析: %v", err)
+		return 0
+	}
+
+	remoteStore.mu.Lock()
+	defer remoteStore.mu.Unlock()
+	restored := 0
+	for _, rec := range store.Items {
+		if strings.TrimSpace(rec.ID) == "" {
+			continue
+		}
+		if _, ok := remoteStore.items[rec.ID]; ok {
+			continue
+		}
+		remoteStore.items[rec.ID] = recordToRemoteTask(rec)
+		remoteStore.order = append(remoteStore.order, rec.ID)
+		restored++
+	}
+	if restored > 0 {
+		gologger.Info().Msgf("已恢复 %d 条远程派发任务记录", restored)
+	}
+	return restored
+}
+
+// -----------------------
 // 后台对账
 // -----------------------
 
@@ -178,8 +399,19 @@ func startRemoteReconciler() {
 			ticker := time.NewTicker(remoteReconcileTick)
 			defer ticker.Stop()
 			for range ticker.C {
-				for _, rt := range remoteTaskSnapshot() {
+				snap := remoteTaskSnapshot()
+				active := false
+				for _, rt := range snap {
+					if remoteTaskTerminal(rt) {
+						continue
+					}
+					active = true
 					_ = reconcileRemoteTask(rt)
+				}
+				// 状态变化都发生在这里，顺手把镜像记录落盘一次；全是终态任务
+				// 时不再重复写盘，避免空转产生无意义的 IO。
+				if active {
+					persistRemoteTasks()
 				}
 			}
 		}()
@@ -240,6 +472,13 @@ func isTerminalRemoteStatus(s string) bool {
 		return true
 	}
 	return false
+}
+
+// remoteTaskTerminal 读取影子记录的当前状态并判断是否已终结。
+func remoteTaskTerminal(rt *remoteTask) bool {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	return isTerminalRemoteStatus(rt.Status)
 }
 
 // markRemoteUnreachable 只标记「联系不上」：保留最后一次成功对账的状态，
@@ -517,6 +756,7 @@ func clusterRemoteDispatchHandler(w http.ResponseWriter, r *http.Request) {
 			applyRemoteStatus(rt, st)
 		}
 	}
+	persistRemoteTasks()
 
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "dispatched", Data: remoteTaskItem(rt)})
@@ -603,6 +843,7 @@ func clusterRemoteTaskStopHandler(w http.ResponseWriter, r *http.Request) {
 	rt.mu.Lock()
 	rt.Status = string(TaskCancelled)
 	rt.mu.Unlock()
+	persistRemoteTasks()
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
 }
 
