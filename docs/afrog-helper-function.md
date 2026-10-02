@@ -1,3 +1,5 @@
+> **历史归档**：本文内容已并入文档站的维护版本 —— [PoC 内置函数](zh/poc/03-helper-functions.md)。此文件仅作历史留存，不再更新。
+
 ## Afrog PoC 内置函数
 
 内置函数源码位置：`v2\pkg\runner\celcompile.go`

@@ -1,0 +1,28 @@
+name: Docs Check
+
+on:
+  push:
+    paths:
+      - "docs/**"
+      - "cmd/docscheck/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "cmd/docscheck/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+jobs:
+  docscheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 1.24.1
+          cache: true
+
+      - name: Check docs (mirror parity + internal links)
+        run: go run ./cmd/docscheck

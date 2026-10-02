@@ -110,12 +110,16 @@ func NewWebSqliteDB() error {
 
 func CloseX() {
 	// 安全关闭任务通道并等待 worker 退出
-	if insertChannel != nil {
-		close(insertChannel)
-		insertChannel = nil
+	ch := insertChannel
+	if ch != nil {
+		close(ch)
 	}
 
 	wg.Wait()
+
+	// 必须等 worker 全部退出后再清空全局引用：worker 的 `range insertChannel`
+	// 会读取这个全局变量，提前置空与它们构成数据竞争。
+	insertChannel = nil
 
 	if dbx != nil {
 		dbx.Close()

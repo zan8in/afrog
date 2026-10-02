@@ -1,3 +1,5 @@
+> **Archived**: this page has been superseded by the maintained [SDK guide](en/sdk/01-quickstart.md). It is kept for historical reference only and is no longer updated.
+
 # Afrog SDK Usage Guide
 
 > ## ⚠️ Upgrade notice

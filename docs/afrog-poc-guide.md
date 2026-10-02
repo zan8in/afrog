@@ -1,3 +1,5 @@
+> **历史归档**：本文内容已拆分为文档站的维护版本 —— [PoC 编写手册](zh/poc/01-quickstart.md)（`docs/zh/poc/`、`docs/en/poc/`）。此文件仅作历史留存，不再更新。
+
 # Afrog POC 规则编写权威指南
 
 <div style="display: flex; gap: 24px; align-items: flex-start;">

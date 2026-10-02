@@ -124,7 +124,7 @@ docs/{zh,en}/
 | `docs/TCP/tcp-ssl-multi-step-session.md` | `docs/{zh,en}/poc/08-tcp.md` | 已合并，保留归档 |
 | `docs/tutorial/rumen-dao-rutu/*` | 部分内容已并入四本手册 | 保留归档 |
 | `docs/tutorial/series-params-to-principles/*` | 部分内容已并入四本手册 | 保留归档 |
-| `afrog.wiki/*` | `docs/{zh,en}/*` | 待处理（见 §9） |
+| `afrog.wiki/*` | `docs/{zh,en}/*` | 本仓库未跟踪（`.gitignore` 忽略 `/afrog.wiki`），历史入口需在 wiki 仓库改为跳转/归档说明（见 §9） |
 
 ## 8. 结构收尾（已完成）
 
@@ -160,8 +160,8 @@ docs/{zh,en}/
 
 ## 9. 待处理事项
 
-1. `afrog.wiki/*` 的历史入口改为跳转或归档说明。
-2. `docs/{zh,en}` 之外的归档文件在确认无引用后可考虑清理。
+1. **需在 wiki 仓库处理**：`afrog.wiki/*` 的历史入口改为跳转或归档说明。该目录不在本仓库版本控制内（`.gitignore` 忽略 `/afrog.wiki`），本仓库无可操作项；已确认本仓库文档不再新增指向 wiki 页面的链接（仅 `source:` 元数据保留出处文字）。
+2. **已完成（保留归档）**：完成引用审计——`docs/README_CN.md` 被根 `README.md` 引用，`docs/tutorial/rumen-dao-rutu/06-contribution.md` 被 `docs/{zh,en}/poc/10-contributors.md` 引用，两者必须保留；其余归档（`afrog-poc-guide.md`、`afrog-helper-function.md`、`requires-gating-guide.md`、两份 SDK 指南、`docs/TCP/*`）没有任何链接引用，仅出现在 `source:` 元数据的出处文字里。已在归档入口页顶部统一加「历史归档」说明并指向维护版本，正文保留、不再更新。若后续确定清理，可安全删除的就是上述无引用文件（`06-contribution.md` 除外，`README_CN.md` 必须保留）。
 3. 主仓库内容完善后，将本结构与新增页面同步到 `afrog-website`：
 
    - 在 `SECTION_LABELS` / `SECTION_ORDER` 中新增 `curated` 分组；
@@ -169,4 +169,4 @@ docs/{zh,en}/
    - 校对分节标题与顺序是否与四本手册一致；
    - 验证新增页面在站点内正常渲染。
 
-4. 建立文档 CI 校验：中英文目录一致性、站内链接有效性。
+4. **已完成** 文档 CI 校验：`cmd/docscheck` 校验中英文镜像一致性（`docs/zh` 与 `docs/en` 文件一一对应）与站内相对链接有效性，`.github/workflows/docs.yml` 在 `docs/**` 变更时自动执行（本地可用 `go run ./cmd/docscheck`）。
