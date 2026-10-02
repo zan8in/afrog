@@ -21,7 +21,7 @@ last_reviewed: 2026-09-23
 
 ## 这本手册覆盖什么
 
-《使用指南》覆盖把 `afrog` 用起来所需的全部内容：安装、第一次扫描、CLI 命令、配置文件、输出与报告，以及常用实战技巧。
+《使用指南》覆盖把 `afrog` 用起来所需的全部内容：安装、第一次扫描、CLI 命令、配置文件、输出与报告、常用实战技巧，以及内置的 Web 控制台与定时扫描。
 
 - 想写自己的 PoC，请转读 [PoC 编写指南](../poc/01-quickstart.md)
 - 想把 `afrog` 集成进程序，请转读 [SDK 使用指南](../sdk/01-quickstart.md)
@@ -34,6 +34,8 @@ last_reviewed: 2026-09-23
 4. [配置文件说明](./05-configuration.md)
 5. [输出与报告](./06-output-and-report.md)
 6. [实战技巧](./07-tips.md)
+7. [Web 扫描工作台](./08-web-console.md)
+8. [定时与计划扫描](./09-scheduled-scans.md)
 
 ## 最短起步
 

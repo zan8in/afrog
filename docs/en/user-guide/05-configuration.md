@@ -18,7 +18,7 @@ This file is mainly used for OOB / reverse providers, notifications, and other r
 
 ## Configuration dictionary
 
-`afrog-config.yaml` maps to the structs in `pkg/config/config.go`. The top-level keys currently break down into five groups:
+`afrog-config.yaml` maps to the structs in `pkg/config/config.go`. The top-level keys currently break down into seven groups:
 
 | Top-level key | Type | Purpose | Default / note |
 | --- | --- | --- | --- |
@@ -27,6 +27,8 @@ This file is mainly used for OOB / reverse providers, notifications, and other r
 | `webhook` | object | DingTalk and WeCom notification settings | generated as an empty template |
 | `cyberspace` | object | cyberspace search provider settings | currently includes `zoom_eyes` |
 | `curated` | object | curated pocs settings | default `enabled: auto` |
+| `cluster` | object | multi-instance orchestration (web console) | empty means single instance |
+| `ai` | object | model access for AI assist | empty means not configured |
 
 The sections below are meant to be directly searchable like a field dictionary.
 
@@ -163,6 +165,64 @@ If you plan to use CLI flags such as `-cs zoomeye`, `-q`, and `-qc`, this sectio
 | `timeout_sec` | int | timeout in seconds for curated mount / calls | `10` |
 | `channel` | string | curated channel | `stable` |
 | `license_key` | string | license key | empty |
+
+## `cluster` field dictionary
+
+`cluster` configures multi-instance orchestration: it lets one web console show the health of several `afrog` instances on its Overview page. Leave it empty for a single instance — the console works as usual.
+
+| Field | Type | Purpose | Default |
+| --- | --- | --- | --- |
+| `name` | string | display name of this node | empty (the UI shows "this instance") |
+| `token` | string | cluster-wide shared secret used between instances | empty (an instance without it exposes nothing) |
+| `peers` | object[] | peer instances | empty |
+| `peers[].name` | string | peer display name | empty (falls back to the URL) |
+| `peers[].url` | string | peer web console address | — |
+
+```yaml
+cluster:
+  name: "hq"
+  token: "cluster-shared-secret"
+  peers:
+    - name: "node-a"
+      url: "http://10.0.0.11:16868"
+    - name: "node-b"
+      url: "http://10.0.0.12:16868"
+```
+
+Key points:
+
+- Every node in the same cluster must share the **same token**; a URL without a scheme is treated as `http://`
+- This instance reads each peer's `/api/cluster/self` every 30 seconds and shows the reason on screen when a peer is unreachable
+- An instance without `token` never exposes its own state — that is the secure default
+- The aggregated view is read-only: this stage only reports state, it does not dispatch scans remotely
+
+## `ai` field dictionary
+
+`ai` powers **AI assist** — it lets a model review a finding together with its raw request and response (see [Web console](./08-web-console.md#ai-verdict)). Leave it empty and the UI guides you through filling it in. Only the OpenAI-compatible `POST {base_url}/chat/completions` protocol is implemented, so switching providers means changing `base_url` and `model` only.
+
+| Field | Type | Purpose | Default |
+| --- | --- | --- | --- |
+| `base_url` | string | API endpoint, usually ending in `/v1` | empty |
+| `model` | string | model name, e.g. `deepseek-chat` | empty |
+| `api_key` | string | credential | empty |
+| `timeout_sec` | int | timeout in seconds for one verdict | `60` |
+| `max_tokens` | int | output token cap per verdict | `1200` |
+
+```yaml
+ai:
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+  api_key: "sk-..."
+  timeout_sec: 60
+  max_tokens: 1200
+```
+
+Key points:
+
+- `base_url` / `model` / `api_key` must **all** be set before AI assist is considered configured; a full path (`.../v1/chat/completions`) is recognised too
+- You can also fill it in under **Settings → AI assist**, which writes this file and takes effect immediately — no restart needed
+- A verdict is only requested **when you click**, never in the background; re-opening the same finding is served from the local cache
+- Before sending, `Cookie`, `Authorization`, `Set-Cookie` and similar headers are masked and long bodies are truncated — but the request/response of that finding still goes to the model service you configure, so judge accordingly
 
 ## What `reverse` means
 

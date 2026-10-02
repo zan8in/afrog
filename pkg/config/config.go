@@ -18,6 +18,39 @@ type Config struct {
 	Webhook       Webhook    `yaml:"webhook"`
 	Cyberspace    Cyberspace `yaml:"cyberspace"`
 	Curated       Curated    `yaml:"curated"`
+	Cluster       Cluster    `yaml:"cluster"`
+	AI            AI         `yaml:"ai"`
+}
+
+// AI 是「AI 辅助」的模型接入配置。
+//
+// 只实现 OpenAI 兼容的 chat completions 协议（POST {base_url}/chat/completions），
+// 所以换供应商只需要改 base_url 与 model：OpenAI / DeepSeek / 通义 / one-api /
+// 本地 Ollama 都走这一套。三项（base_url、model、api_key）缺任意一项即视为未配置，
+// 界面会引导去补齐，而不是报一个看不懂的错。
+type AI struct {
+	BaseURL    string `yaml:"base_url"`
+	Model      string `yaml:"model"`
+	APIKey     string `yaml:"api_key"`
+	TimeoutSec int    `yaml:"timeout_sec"`
+	MaxTokens  int    `yaml:"max_tokens"`
+}
+
+// Cluster 是多实例编排（Web 控制台）的配置。
+//
+// 只在需要「一个控制台同时看多个 afrog 实例」时配置：把自己的名字写进 name，
+// 给同一批实例配同一个 token（集群内互访凭证），再把同伴的地址登记进 peers。
+// 留空即单实例，Web 控制台照常工作。
+type Cluster struct {
+	Name  string        `yaml:"name"`
+	Token string        `yaml:"token"`
+	Peers []ClusterPeer `yaml:"peers"`
+}
+
+// ClusterPeer 是一个同伴实例：name 只用于展示，url 指向它的 Web 控制台地址。
+type ClusterPeer struct {
+	Name string `yaml:"name"`
+	URL  string `yaml:"url"`
 }
 
 type Curated struct {
@@ -314,6 +347,16 @@ func getConfigFile() (string, error) {
 	return afrogConfigFile, nil
 }
 
+// DefaultConfigPath 返回默认配置文件路径：~/.config/afrog/afrog-config.yaml。
+// 未显式指定 -config 时，写回配置就落在这里。
+func DefaultConfigPath() string {
+	p, err := getConfigFile()
+	if err != nil {
+		return ""
+	}
+	return p
+}
+
 // ReadConfiguration reads the afrog configuration file from disk.
 func ReadConfiguration(configFile string) (*Config, error) {
 	var afrogConfigFile string
@@ -339,6 +382,7 @@ func ReadConfiguration(configFile string) (*Config, error) {
 	}
 	normalizeCuratedDefaults(config)
 	normalizeInteractshDefaults(config)
+	normalizeAIDefaults(config)
 	_ = ensureCuratedSection(afrogConfigFile, config.Curated)
 	_ = ensureInteractshSection(afrogConfigFile, config.Reverse.Interactsh)
 	return config, nil
@@ -379,6 +423,23 @@ func normalizeInteractshDefaults(cfg *Config) {
 		s = "oast.pro"
 	}
 	cfg.Reverse.Interactsh.Server = s
+}
+
+// normalizeAIDefaults 归一化 AI 配置：地址去掉结尾斜杠（拼 /chat/completions 时不能再多一条），
+// 兜底超时与输出上限。三项连接信息保持原样——空即「未配置」，由界面引导补齐。
+func normalizeAIDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	cfg.AI.BaseURL = strings.TrimRight(strings.TrimSpace(cfg.AI.BaseURL), "/")
+	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
+	cfg.AI.APIKey = strings.TrimSpace(cfg.AI.APIKey)
+	if cfg.AI.TimeoutSec <= 0 {
+		cfg.AI.TimeoutSec = 60
+	}
+	if cfg.AI.MaxTokens <= 0 {
+		cfg.AI.MaxTokens = 1200
+	}
 }
 
 func ensureCuratedSection(configPath string, curated Curated) error {
@@ -583,6 +644,112 @@ func interactshKeyLines(indent int, interactsh Interactsh, present map[string]bo
 		lines = append(lines, prefix+"token: "+strconv.Quote(strings.TrimSpace(interactsh.Token)))
 	}
 	return lines
+}
+
+// UpdateClusterSection 把 cluster 段整体写回配置文件，其余段落原样保留。
+//
+// configPath 为空时回退到默认的 ~/.config/afrog/afrog-config.yaml。
+func UpdateClusterSection(configPath string, cluster Cluster) error {
+	return replaceTopLevelSection(configPath, "cluster", clusterSectionLines(0, cluster))
+}
+
+// UpdateAISection 把 ai 段整体写回配置文件，其余段落原样保留。
+func UpdateAISection(configPath string, ai AI) error {
+	return replaceTopLevelSection(configPath, "ai", aiSectionLines(0, ai))
+}
+
+// replaceTopLevelSection 用 block 整体替换顶层 key 段；文件里没有该段时追加到末尾。
+//
+// 与 ensureCuratedSection 那种「缺哪个键就补哪个键」的增量写法不同：cluster 的
+// peers 是列表、ai 的字段会整体重填，逐行增量反而容易留下半截配置，所以整块替换。
+// 代价是该块内原有的注释会被新内容覆盖，块外的注释不受影响。
+func replaceTopLevelSection(configPath, key string, block []string) error {
+	if strings.TrimSpace(configPath) == "" {
+		p, err := getConfigFile()
+		if err != nil {
+			return err
+		}
+		configPath = p
+	}
+
+	b, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(b), "\n")
+
+	keyPrefix := key + ":"
+	start := -1
+	for i := 0; i < len(lines); i++ {
+		if leadingSpaces(lines[i]) != 0 {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimSpace(stripYAMLLineComment(lines[i])), keyPrefix) {
+			start = i
+			break
+		}
+	}
+
+	if start == -1 {
+		out := lines
+		if len(out) > 0 && strings.TrimSpace(out[len(out)-1]) != "" {
+			out = append(out, "")
+		}
+		out = append(out, block...)
+		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	}
+
+	baseIndent := leadingSpaces(lines[start])
+	end := len(lines)
+	for j := start + 1; j < len(lines); j++ {
+		if strings.TrimSpace(lines[j]) == "" {
+			continue
+		}
+		if leadingSpaces(lines[j]) <= baseIndent {
+			end = j
+			break
+		}
+	}
+
+	out := make([]string, 0, len(lines)+len(block))
+	out = append(out, lines[:start]...)
+	out = append(out, block...)
+	out = append(out, lines[end:]...)
+	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+}
+
+// clusterSectionLines 按 afrog-config.yaml 的手写风格生成 cluster 段。
+func clusterSectionLines(baseIndent int, cluster Cluster) []string {
+	prefix := strings.Repeat(" ", baseIndent)
+	lines := []string{
+		prefix + "cluster:",
+		prefix + "  name: " + strconv.Quote(strings.TrimSpace(cluster.Name)),
+		prefix + "  token: " + strconv.Quote(strings.TrimSpace(cluster.Token)),
+	}
+	if len(cluster.Peers) == 0 {
+		return append(lines, prefix+"  peers: []")
+	}
+	lines = append(lines, prefix+"  peers:")
+	for _, p := range cluster.Peers {
+		lines = append(lines,
+			prefix+"    - name: "+strconv.Quote(strings.TrimSpace(p.Name)),
+			prefix+"      url: "+strconv.Quote(strings.TrimSpace(p.URL)),
+		)
+	}
+	return lines
+}
+
+// aiSectionLines 生成 ai 段。
+func aiSectionLines(baseIndent int, ai AI) []string {
+	prefix := strings.Repeat(" ", baseIndent)
+	return []string{
+		prefix + "ai:",
+		prefix + "  base_url: " + strconv.Quote(strings.TrimRight(strings.TrimSpace(ai.BaseURL), "/")),
+		prefix + "  model: " + strconv.Quote(strings.TrimSpace(ai.Model)),
+		prefix + "  api_key: " + strconv.Quote(strings.TrimSpace(ai.APIKey)),
+		prefix + "  timeout_sec: " + strconv.Itoa(ai.TimeoutSec),
+		prefix + "  max_tokens: " + strconv.Itoa(ai.MaxTokens),
+	}
 }
 
 func curatedSectionLines(baseIndent int, curated Curated) []string {

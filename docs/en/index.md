@@ -16,7 +16,7 @@ Welcome to the official `afrog` documentation.
 
 ### 1. User Guide
 
-What `afrog` is, how to install it, the CLI, configuration and output, plus practical tips.
+What `afrog` is, how to install it, the CLI, configuration and output, practical tips, plus the built-in web console and scheduled scans.
 
 [Go to the User Guide →](./user-guide/01-overview.md)
 

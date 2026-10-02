@@ -97,6 +97,14 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating asset table: %v", err)
 	}
 
+	if _, err = dbx.Exec(scanTaskDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating scan task table: %v", err)
+	}
+
+	if _, err = dbx.Exec(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating ai tables: %v", err)
+	}
+
 	return dbx.Ping()
 }
 

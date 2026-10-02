@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
@@ -460,6 +461,9 @@ func finalizeTask(m *TaskManager, t *Task, status TaskStatus) {
 	}
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(status)}})
 
+	// 终态快照落库：这是命中分布 / 目标数 / 用时的最终版本，重启后靠它展示。
+	persistScanTask(t)
+
 	m.mu.Lock()
 	if m.running > 0 {
 		m.running--
@@ -628,7 +632,50 @@ func (t *Task) listItem() scanListItem {
 	return item
 }
 
+// persistScanTask 把任务快照落库。任务的实时状态属进程内存态，服务一停就没了；
+// 落一份快照，重启后计划扫描的「上次执行」仍能在扫描列表里打开查看。
+// 写入失败只记日志：持久化是附加能力，不该让扫描本身报错。
+func persistScanTask(t *Task) {
+	if t == nil {
+		return
+	}
+	item := t.listItem()
+
+	rec := db2.ScanTaskRow{
+		TaskID:     item.TaskID,
+		Name:       item.Name,
+		Status:     item.Status,
+		Source:     item.Source,
+		ScheduleID: item.ScheduleID,
+		ProjectID:  item.ProjectID,
+		Targets:    item.Targets,
+		Hits:       item.Hits,
+		HitTotal:   item.HitTotal,
+		Percent:    item.Progress.Percent,
+		Finished:   item.Progress.Finished,
+		Total:      item.Progress.Total,
+		ElapsedMs:  item.Progress.ElapsedMs,
+		Error:      item.Error,
+		CreatedAt:  item.CreatedAt,
+		StartedAt:  item.StartedAt,
+		EndedAt:    item.EndedAt,
+	}
+	if item.ScanInfo != nil {
+		rec.TotalTargets = item.ScanInfo.TotalTargets
+		rec.TotalPocs = item.ScanInfo.TotalPocs
+		rec.TotalScans = item.ScanInfo.TotalScans
+		rec.OOBEnabled = item.ScanInfo.OOBEnabled
+		rec.OOBStatus = item.ScanInfo.OOBStatus
+	}
+	if err := sqlite.UpsertScanTask(rec); err != nil {
+		gologger.Debug().Msgf("持久化扫描任务失败: taskId=%s err=%v", t.ID, err)
+	}
+}
+
 // listScans 按创建时间倒序返回任务列表项（新的在前）。
+//
+// 数据来自两处：本进程内存中的任务（权威，含运行态），以及 sqlite 里的历史快照
+// （本次启动之前跑过的任务）。同一个任务两边都有时以内存为准。
 func (m *TaskManager) listScans() []scanListItem {
 	m.mu.Lock()
 	tasks := make([]*Task, 0, len(m.tasks))
@@ -637,13 +684,89 @@ func (m *TaskManager) listScans() []scanListItem {
 	}
 	m.mu.Unlock()
 
-	sort.Slice(tasks, func(i, j int) bool { return tasks[i].CreatedAt.After(tasks[j].CreatedAt) })
-
 	out := make([]scanListItem, 0, len(tasks))
+	inMemory := make(map[string]struct{}, len(tasks))
 	for _, t := range tasks {
 		out = append(out, t.listItem())
+		inMemory[t.ID] = struct{}{}
+	}
+	out = append(out, historicalScanItems(inMemory)...)
+
+	// 两侧时间都已是 "2006-01-02 15:04:05" 的本地时间字符串，字典序即时间序。
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
+	return out
+}
+
+// historicalScanItems 读取历史任务快照，跳过内存里已有的任务（以内存为准）。
+func historicalScanItems(skip map[string]struct{}) []scanListItem {
+	rows, err := sqlite.SelectScanTasks(0)
+	if err != nil {
+		gologger.Debug().Msgf("读取历史扫描任务失败: %v", err)
+		return nil
+	}
+	out := make([]scanListItem, 0, len(rows))
+	for _, row := range rows {
+		if _, ok := skip[row.TaskID]; ok {
+			continue
+		}
+		out = append(out, scanItemFromRow(row))
 	}
 	return out
+}
+
+// scanItemFromRow 把历史快照转成列表项。
+//
+// 快照里仍是 starting/running/paused，说明进程在扫描中途退出过（正常收尾会写成终态）：
+// 这种任务已经没有可控制的进程，统一按「失败」呈现，与前端对僵尸任务的收敛口径一致。
+func scanItemFromRow(row db2.ScanTaskRow) scanListItem {
+	status := row.Status
+	if isActive(TaskStatus(status)) {
+		status = string(TaskFailed)
+	}
+	source := row.Source
+	if source == "" {
+		source = scanSourceManual
+	}
+	targets := row.Targets
+	if targets == nil {
+		targets = []string{}
+	}
+	hits := row.Hits
+	if hits == nil {
+		hits = map[string]int{}
+	}
+
+	item := scanListItem{
+		TaskID:     row.TaskID,
+		Name:       row.Name,
+		Status:     status,
+		Source:     source,
+		ScheduleID: row.ScheduleID,
+		ProjectID:  row.ProjectID,
+		Targets:    targets,
+		CreatedAt:  row.CreatedAt,
+		StartedAt:  row.StartedAt,
+		EndedAt:    row.EndedAt,
+		Progress: ScanProgressData{
+			Percent:   row.Percent,
+			Finished:  row.Finished,
+			Total:     row.Total,
+			ElapsedMs: row.ElapsedMs,
+		},
+		Hits:     hits,
+		HitTotal: row.HitTotal,
+		Error:    row.Error,
+	}
+	if row.TotalTargets > 0 || row.TotalPocs > 0 || row.TotalScans > 0 || row.OOBStatus != "" {
+		item.ScanInfo = &scanInfoItem{
+			TotalTargets: row.TotalTargets,
+			TotalPocs:    row.TotalPocs,
+			TotalScans:   row.TotalScans,
+			OOBEnabled:   row.OOBEnabled,
+			OOBStatus:    row.OOBStatus,
+		}
+	}
+	return item
 }
 
 // launchScan 是「提交一次扫描」的核心路径：解析目标与 PoC 范围、登记任务、
@@ -692,6 +815,8 @@ func launchScan(req ScanCreateRequest, origin scanOrigin) (string, ScanInitInfo,
 	getNotifier().OnTaskStart(id, t.Name)
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": "starting"}})
 	startTask(m, t)
+	// 起扫即落一条快照：扫描中途服务被重启时，这条记录仍能作为历史任务被看到。
+	persistScanTask(t)
 
 	// 引擎的真实汇总（total_pocs/total_scans/oob_status）要等子进程跑起来才知道，
 	// 由 scan_info 事件补发；这里先返回本地已知的目标信息，让前端立刻可渲染。
@@ -1069,6 +1194,7 @@ func scanPauseHandler(w http.ResponseWriter, r *http.Request) {
 	t.setStatus(TaskPaused)
 	gologger.Debug().Str("taskId", taskID).Msg("pause succeeded: process suspended")
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskPaused)}})
+	persistScanTask(t)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "paused", Data: map[string]bool{"paused": true}})
 }
 
@@ -1114,6 +1240,7 @@ func scanResumeHandler(w http.ResponseWriter, r *http.Request) {
 	t.setStatus(TaskRunning)
 	gologger.Debug().Str("taskId", taskID).Msg("resume succeeded: process resumed")
 	publish(t, ScanEvent{Type: "status", Data: map[string]string{"status": string(TaskRunning)}})
+	persistScanTask(t)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "resumed", Data: map[string]bool{"resumed": true}})
 }
 

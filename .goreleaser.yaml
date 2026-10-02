@@ -11,8 +11,10 @@ builds:
     id: afrog
     env:
       - CGO_ENABLED=0
-    goos: [windows, linux, darwin]
-    goarch: [amd64, arm64]
+    # goos: [windows, linux, darwin]
+    # goarch: [amd64, arm64]
+    goos: [linux]
+    goarch: [amd64]
 
     flags:
       - -trimpath

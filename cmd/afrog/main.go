@@ -132,6 +132,12 @@ func main() {
 		}
 		defer sqlite.CloseX()
 		web.SetCuratedService(curatedService)
+		// 多实例编排与 AI 辅助的配置都来自 afrog-config.yaml（cluster / ai 段）；
+		// 一并把配置文件路径交给 Web 层：界面保存时要写回这个文件。
+		if cfg != nil {
+			web.SetClusterConfig(cfg.Cluster, options.ConfigFile)
+			web.SetAIConfig(cfg.AI, options.ConfigFile)
+		}
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())
 		}

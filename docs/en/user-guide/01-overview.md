@@ -21,7 +21,7 @@ last_reviewed: 2026-09-23
 
 ## What this handbook covers
 
-The User Guide covers everything you need to put `afrog` to work: install, first scan, CLI, configuration, output, and practical tips.
+The User Guide covers everything you need to put `afrog` to work: install, first scan, CLI, configuration, output, practical tips, and the built-in web console with scheduled scans.
 
 - Writing your own PoCs? Continue with the [PoC Authoring Guide](../poc/01-quickstart.md).
 - Embedding `afrog` in a program? Continue with the [SDK Usage Guide](../sdk/01-quickstart.md).
@@ -34,6 +34,8 @@ The User Guide covers everything you need to put `afrog` to work: install, first
 4. [Configuration](./05-configuration.md)
 5. [Output and Reports](./06-output-and-report.md)
 6. [Practical Tips](./07-tips.md)
+7. [Web Scan Workspace](./08-web-console.md)
+8. [Scheduled Scans](./09-scheduled-scans.md)
 
 ## Shortest path
 

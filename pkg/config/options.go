@@ -24,7 +24,6 @@ import (
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
 	fileutil "github.com/zan8in/pins/file"
-	sliceutil "github.com/zan8in/pins/slice"
 	"gopkg.in/yaml.v2"
 )
 
@@ -37,7 +36,10 @@ type Options struct {
 	// Pocs Directory
 	PocsDirectory utils.StringSlice
 
-	Targets sliceutil.SafeSlice
+	// Targets 是扫描目标及其状态计数（协议校验通过 / 错误次数）。
+	// 用 TargetSet 而不是有序线性表：扫描热路径会按「目标 × PoC」频繁查询它，
+	// 详见 targetset.go 的说明。
+	Targets TargetSet
 
 	// target URLs/hosts to scan
 	Target goflags.StringSlice

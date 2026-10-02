@@ -51,6 +51,10 @@ func StartServer(addr string) error {
 	StartScheduler()
 	defer StopScheduler()
 
+	// 启动多实例编排的同伴心跳（未配置 cluster.peers 时只保留本机视图）
+	StartCluster()
+	defer StopCluster()
+
 	// 构建路由与静态文件服务
 	handler, err := setupHandler()
 	if err != nil {

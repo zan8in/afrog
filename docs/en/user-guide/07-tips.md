@@ -119,4 +119,4 @@ afrog -wecom       # start the WeCom webhook service
 
 Notification thresholds and tokens are configured in the `webhook` section of your [configuration](./05-configuration.md).
 
-> **← Previous:** [Output and Reports](./06-output-and-report.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Docs home →:** [afrog Docs](../index.md)
+> **← Previous:** [Output and Reports](./06-output-and-report.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Next →:** [Web Scan Workspace](./08-web-console.md)

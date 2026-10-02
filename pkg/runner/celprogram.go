@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -21,8 +22,73 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter/functions"
+	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 )
+
+// regexp2 是 .NET 语义的回溯引擎：编译和匹配都远贵于标准库 regexp，遇到带 (?s)
+// 前缀、非锚定的病态模式还会灾难性回溯。而 rmatches/bmatches/rcount/bcount 的求值
+// 粒度是「每个目标 × 每条规则」，因此这里做两件事，避免单个 PoC 把整个扫描的 CPU 吃满：
+//  1. 按 (pattern, flags) 缓存已编译实例，不再每次求值都重新 Compile；
+//  2. 给每次匹配设上限 MatchTimeout，超时按「未命中」处理。
+const regexp2MatchTimeout = time.Second
+
+type regexp2CacheKey struct {
+	pattern string
+	flags   regexp2.RegexOptions
+}
+
+// regexp2Compiled 缓存编译结果：成功存 *regexp2.Regexp，失败存 error。
+// 失败也要缓存，否则一个坏 pattern 会在每条规则上重复编译。
+var regexp2Compiled sync.Map // regexp2CacheKey -> *regexp2.Regexp | error
+
+// compileRegexp2 返回缓存过的正则实例。regexp2 的 Regexp 可被多个 goroutine 并发使用。
+func compileRegexp2(pattern string, flags regexp2.RegexOptions) (*regexp2.Regexp, error) {
+	key := regexp2CacheKey{pattern: pattern, flags: flags}
+	if v, ok := regexp2Compiled.Load(key); ok {
+		switch cached := v.(type) {
+		case *regexp2.Regexp:
+			return cached, nil
+		case error:
+			return nil, cached
+		}
+	}
+	re, err := regexp2.Compile(pattern, flags)
+	if err != nil {
+		regexp2Compiled.Store(key, err)
+		return nil, err
+	}
+	// 默认是「永不超时」，会让灾难性回溯无限吃 CPU。
+	re.MatchTimeout = regexp2MatchTimeout
+	regexp2Compiled.Store(key, re)
+	return re, nil
+}
+
+// regexp2Warned 保证同一个 pattern 只提示一次，避免按目标刷屏。
+var regexp2Warned sync.Map // pattern -> struct{}
+
+// warnRegexp2Once 提示某条正则被跳过。刻意不打印 regexp2 的原始错误：它的超时错误
+// 信息里带上了整段输入（响应体），直接落日志会把几 MB 的 body 写进去。
+func warnRegexp2Once(pattern string, reason string) {
+	if _, loaded := regexp2Warned.LoadOrStore(pattern, struct{}{}); !loaded {
+		log.Log().Warn(fmt.Sprintf("regexp rule skipped (%s): %s", reason, pattern))
+	}
+}
+
+// regexpMatchString 执行一次非锚定匹配；编译失败或匹配超时都按未命中处理。
+func regexpMatchString(pattern string, target string) bool {
+	re, err := compileRegexp2(pattern, 0)
+	if err != nil {
+		warnRegexp2Once(pattern, "compile failed")
+		return false
+	}
+	matched, err := re.MatchString(target)
+	if err != nil {
+		warnRegexp2Once(pattern, "match timeout")
+		return false
+	}
+	return matched
+}
 
 func escapeJSPString(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
@@ -42,7 +108,11 @@ func escapeVBString(s string) string {
 
 func regexNamedSubmatchFirst(expr string, raw string) map[string]string {
 	result := make(map[string]string)
-	re := regexp2.MustCompile(expr, regexp2.RE2)
+	re, err := compileRegexp2(expr, regexp2.RE2)
+	if err != nil {
+		warnRegexp2Once(expr, "compile failed")
+		return result
+	}
 	m, _ := re.FindStringMatch(raw)
 	if m == nil {
 		return result
@@ -58,7 +128,11 @@ func regexNamedSubmatchFirst(expr string, raw string) map[string]string {
 
 func regexNamedSubmatchAll(expr string, raw string) map[string][]string {
 	result := make(map[string][]string)
-	re := regexp2.MustCompile(expr, regexp2.RE2)
+	re, err := compileRegexp2(expr, regexp2.RE2)
+	if err != nil {
+		warnRegexp2Once(expr, "compile failed")
+		return result
+	}
 	m, _ := re.FindStringMatch(raw)
 	for m != nil {
 		for n, gp := range m.Groups() {
@@ -666,9 +740,6 @@ var (
 			&functions.Overload{
 				Operator: "string_bmatches_bytes",
 				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					var isMatch = false
-					var err error
-
 					v1, ok := lhs.(types.String)
 					if !ok {
 						return types.ValOrErr(lhs, "unexpected type '%v' passed to bmatches", lhs.Type())
@@ -677,15 +748,7 @@ var (
 					if !ok {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to bmatches", rhs.Type())
 					}
-					re := regexp2.MustCompile(string(v1), 0)
-					raw := string([]byte(v2))
-					if isMatch, err = re.MatchString(raw); err != nil {
-						return types.NewErr("%v", err)
-					}
-					if err != nil {
-						return types.NewErr("%v", err)
-					}
-					return types.Bool(isMatch)
+					return types.Bool(regexpMatchString(string(v1), string([]byte(v2))))
 				},
 			},
 			&functions.Overload{
@@ -700,7 +763,11 @@ var (
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to bcount", rhs.Type())
 					}
 
-					re := regexp2.MustCompile(string(v1), 0)
+					re, err := compileRegexp2(string(v1), 0)
+					if err != nil {
+						warnRegexp2Once(string(v1), "compile failed")
+						return types.Int(0)
+					}
 					raw := string([]byte(v2))
 					rawRunes := []rune(raw)
 					rawLen := len(rawRunes)
@@ -712,7 +779,9 @@ var (
 					for startAt <= rawLen {
 						m, err := re.FindRunesMatchStartingAt(rawRunes, startAt)
 						if err != nil {
-							return types.NewErr("%v", err)
+							// 超时/异常时按已统计到的数量收场，且不把输入体写进日志。
+							warnRegexp2Once(string(v1), "match aborted")
+							break
 						}
 						if m == nil {
 							break
@@ -735,9 +804,6 @@ var (
 			&functions.Overload{
 				Operator: "string_rmatches_string",
 				Binary: func(lhs ref.Val, rhs ref.Val) ref.Val {
-					var isMatch = false
-					var err error
-
 					v1, ok := lhs.(types.String)
 					if !ok {
 						return types.ValOrErr(lhs, "unexpected type '%v' passed to rmatches", lhs.Type())
@@ -746,14 +812,7 @@ var (
 					if !ok {
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to rmatches", rhs.Type())
 					}
-					re := regexp2.MustCompile(string(v1), 0)
-					if isMatch, err = re.MatchString(string(v2)); err != nil {
-						return types.NewErr("%v", err)
-					}
-					if err != nil {
-						return types.NewErr("%v", err)
-					}
-					return types.Bool(isMatch)
+					return types.Bool(regexpMatchString(string(v1), string(v2)))
 				},
 			},
 			&functions.Overload{
@@ -768,7 +827,11 @@ var (
 						return types.ValOrErr(rhs, "unexpected type '%v' passed to rcount", rhs.Type())
 					}
 
-					re := regexp2.MustCompile(string(v1), 0)
+					re, err := compileRegexp2(string(v1), 0)
+					if err != nil {
+						warnRegexp2Once(string(v1), "compile failed")
+						return types.Int(0)
+					}
 					raw := string(v2)
 					rawRunes := []rune(raw)
 					rawLen := len(rawRunes)
@@ -780,7 +843,9 @@ var (
 					for startAt <= rawLen {
 						m, err := re.FindRunesMatchStartingAt(rawRunes, startAt)
 						if err != nil {
-							return types.NewErr("%v", err)
+							// 超时/异常时按已统计到的数量收场，且不把输入体写进日志。
+							warnRegexp2Once(string(v1), "match aborted")
+							break
 						}
 						if m == nil {
 							break

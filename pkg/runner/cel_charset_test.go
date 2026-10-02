@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -443,5 +444,72 @@ func TestCELResponseHeadersInCaseInsensitive(t *testing.T) {
 	ok, _ := out.Value().(bool)
 	if !ok {
 		t.Fatalf("expected true, got %T(%v)", out.Value(), out.Value())
+	}
+}
+
+// regexp2 是回溯引擎：(a+)+b 对一长串 a 是经典灾难性回溯，没有 MatchTimeout 会挂住。
+// 这道保险必须保证它快速以「未命中」收场。
+func TestCELRegexp2MatchTimeoutIsBounded(t *testing.T) {
+	re, err := compileRegexp2("(a+)+b", 0)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	if re.MatchTimeout != regexp2MatchTimeout {
+		t.Fatalf("MatchTimeout = %v, want %v", re.MatchTimeout, regexp2MatchTimeout)
+	}
+
+	done := make(chan bool, 1)
+	go func() { done <- regexpMatchString("(a+)+b", strings.Repeat("a", 40000)) }()
+
+	select {
+	case matched := <-done:
+		if matched {
+			t.Fatalf("expected catastrophic pattern to be treated as no-match")
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatalf("match did not return within 15s: timeout guard not effective")
+	}
+}
+
+// 编译结果必须复用，否则 rmatches/bmatches 会在「每个目标 × 每条规则」上重复 Compile。
+func TestCELRegexp2CompileIsCached(t *testing.T) {
+	first, err := compileRegexp2("cached-(a|b)", 0)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	second, err := compileRegexp2("cached-(a|b)", 0)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+	if first != second {
+		t.Fatalf("expected the compiled regexp to be reused from cache")
+	}
+}
+
+// 回归：加缓存/超时不能改变正常匹配语义（含 minyoocms-detect 用的这条 pattern）。
+func TestCELRmatchesSemanticsUnchanged(t *testing.T) {
+	lib := NewCustomLib()
+	lib.UpdateCompileOption("text", decls.String)
+
+	pattern := `(?is)<title>.*?minyoocms.*?</title>`
+
+	hit, err := lib.RunEval(`"`+pattern+`".rmatches(text)`, map[string]any{
+		"text": "<html>\n<title>MinyooCMS 登录</title>\n</html>",
+	})
+	if err != nil {
+		t.Fatalf("eval rmatches error: %v", err)
+	}
+	if matched, _ := hit.Value().(bool); !matched {
+		t.Fatalf("expected rmatches=true for minyoocms title")
+	}
+
+	miss, err := lib.RunEval(`"`+pattern+`".rmatches(text)`, map[string]any{
+		"text": "<html>\n<title>Some Other CMS</title>\n</html>",
+	})
+	if err != nil {
+		t.Fatalf("eval rmatches error: %v", err)
+	}
+	if matched, _ := miss.Value().(bool); matched {
+		t.Fatalf("expected rmatches=false for unrelated title")
 	}
 }

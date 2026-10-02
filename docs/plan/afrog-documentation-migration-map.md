@@ -32,6 +32,8 @@ docs/{zh,en}/
     05-configuration.md
     06-output-and-report.md
     07-tips.md
+    08-web-console.md
+    09-scheduled-scans.md
   poc/                      # ② PoC 编写指南
     01-quickstart.md
     02-syntax.md
@@ -96,6 +98,8 @@ docs/{zh,en}/
 | `curated/01-overview.md` | curated PoC（星球精选）的定位、与内置 PoC 的区别、接入前置条件 |
 | `curated/02-usage.md` | 配置并启用 curated PoC，以及日常使用、强制更新与临时关闭 |
 | `poc/09-category-guide.md` | 按漏洞类型的编写指南（文件读取 / XXE / SSRF / 未授权访问 / RCE / SQL 注入 / 文件上传 / 弱口令爆破 / XSS） |
+| `user-guide/08-web-console.md` | Web 控制台：启动与登录、数据位置、发起扫描、任务列表与实时事件流、任务详情五个页签、资产/项目/台账、与命令行的关系 |
+| `user-guide/09-scheduled-scans.md` | 定时与计划扫描：创建计划、频率预设、触发时机（保存不执行）、停用/删除、停机补跑、结果去处、会员到期行为、配置存储 |
 
 ## 6. 仓库门面迁移（已完成）
 
@@ -145,7 +149,7 @@ docs/{zh,en}/
 
 ### 8.3 校验结果
 
-- `docs/zh` 28 个、`docs/en` 28 个 Markdown 文件，两侧相对路径一一对应。
+- `docs/zh` 29 个、`docs/en` 29 个 Markdown 文件，两侧相对路径一一对应。
 - `docs/{zh,en}` 内的站内相对链接全部有效，0 失效。
 - 所有页面的元数据块首尾标记完整（`<!--` / `-->`），正文中的 `---` 水平线未被误改。
 - 每本手册页面末尾均存在导航页脚，引用块中的相对链接全部有效；PoC 手册的页脚链已随章节调整同步更新（`08-tcp` → `09-category-guide` → `10-contributors`）。

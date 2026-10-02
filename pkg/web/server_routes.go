@@ -236,6 +236,23 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/notifications/test", jwtAuthMiddleware(requireCurated(notificationsTestHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/notifications/logs", jwtAuthMiddleware(requireCurated(notificationsLogsHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/notifications/logs/resend", jwtAuthMiddleware(requireCurated(notificationsResendHandler))).Methods(http.MethodPost)
+	// 多实例编排：/cluster/self 供同伴实例互访（走集群共享密钥，不走 JWT），
+	// /cluster/instances 是控制台自己的聚合视图，/cluster/config 用来在运行时
+	// 增删节点（会员能力，保存后写回 afrog-config.yaml 并立即生效）。
+	api.HandleFunc("/cluster/self", clusterSelfHandler).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/instances", jwtAuthMiddleware(clusterInstancesHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigGetHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigPutHandler))).Methods(http.MethodPut)
+
+	// AI 辅助（v1：命中研判）：/ai/status 告诉界面能不能用、本月还剩几次试用；
+	// /ai/config 读写模型接入配置（写回 afrog-config.yaml，保存即生效）；
+	// /ai/verdict 用 SSE 流式返回单条命中的研判结果（额度在服务端校验）。
+	api.HandleFunc("/ai/status", jwtAuthMiddleware(aiStatusHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/ai/config", jwtAuthMiddleware(aiConfigGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/ai/config", jwtAuthMiddleware(aiConfigPutHandler)).Methods(http.MethodPut)
+	api.HandleFunc("/ai/verdict", jwtAuthMiddleware(aiVerdictHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/ai/summary", jwtAuthMiddleware(aiSummaryHandler)).Methods(http.MethodGet)
+
 	api.HandleFunc("/server/info", jwtAuthMiddleware(serverInfoHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances", jwtAuthMiddleware(instancesListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances/{instanceId}/force-stop", jwtAuthMiddleware(instanceForceStopHandler)).Methods(http.MethodPost)

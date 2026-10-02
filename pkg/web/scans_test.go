@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
 
@@ -342,6 +343,80 @@ func TestTask_ConcurrentFieldAccessIsRaceFree(t *testing.T) {
 		t.Fatal("concurrent task field access deadlocked")
 	}
 	removeSubscriber(task, sub)
+}
+
+// 历史快照（重启前跑过的任务）要能还原成列表项：字段口径必须与内存任务一致，
+// 否则从「扫描列表」打开一条旧任务时，目标数 / 命中分布会全部显示成 0。
+func TestScanItemFromRow_RestoresHistoricalTask(t *testing.T) {
+	row := db2.ScanTaskRow{
+		TaskID:       "t-1",
+		Name:         "客户A每日巡检",
+		Status:       "completed",
+		Source:       "schedule",
+		ScheduleID:   "s_1",
+		ProjectID:    "p_1",
+		Targets:      []string{"http://a.example"},
+		Hits:         map[string]int{"info": 1},
+		HitTotal:     1,
+		Percent:      100,
+		Finished:     30,
+		Total:        30,
+		ElapsedMs:    5000,
+		TotalTargets: 1,
+		TotalPocs:    300,
+		TotalScans:   300,
+		CreatedAt:    "2026-09-30 16:01:00",
+		StartedAt:    "2026-09-30 16:01:01",
+		EndedAt:      "2026-09-30 16:01:06",
+	}
+
+	item := scanItemFromRow(row)
+	if item.Status != "completed" || item.Source != "schedule" || item.ScheduleID != "s_1" {
+		t.Fatalf("identity fields mismatch: %+v", item)
+	}
+	if item.HitTotal != 1 || item.Hits["info"] != 1 {
+		t.Fatalf("hits mismatch: %+v", item)
+	}
+	if item.Progress.Percent != 100 || item.Progress.Finished != 30 || item.Progress.ElapsedMs != 5000 {
+		t.Fatalf("progress mismatch: %+v", item.Progress)
+	}
+	if item.ScanInfo == nil || item.ScanInfo.TotalPocs != 300 || item.ScanInfo.TotalTargets != 1 {
+		t.Fatalf("scan info mismatch: %+v", item.ScanInfo)
+	}
+	if item.EndedAt != "2026-09-30 16:01:06" {
+		t.Fatalf("EndedAt = %q, want the snapshot value", item.EndedAt)
+	}
+}
+
+// 快照里仍是运行态，说明进程在扫描中途退出过：这种任务已经没有可控进程，
+// 呈现为「失败」而不是一条点不动的「扫描中」。
+func TestScanItemFromRow_DowngradesInterruptedTasks(t *testing.T) {
+	for _, status := range []string{"starting", "running", "paused"} {
+		item := scanItemFromRow(db2.ScanTaskRow{TaskID: "t-1", Status: status})
+		if item.Status != string(TaskFailed) {
+			t.Fatalf("status %q => %q, want failed", status, item.Status)
+		}
+	}
+
+	item := scanItemFromRow(db2.ScanTaskRow{TaskID: "t-1", Status: "cancelled"})
+	if item.Status != "cancelled" {
+		t.Fatalf("terminal statuses must be preserved, got %q", item.Status)
+	}
+}
+
+// 快照字段缺失（早期版本写入、或 JSON 损坏）时给出可直接渲染的空值，
+// 不能让前端拿到 null 数组。
+func TestScanItemFromRow_FillsEmptyCollections(t *testing.T) {
+	item := scanItemFromRow(db2.ScanTaskRow{TaskID: "t-1", Status: "completed"})
+	if item.Targets == nil || item.Hits == nil {
+		t.Fatalf("targets/hits must not be nil: %+v", item)
+	}
+	if item.Source != scanSourceManual {
+		t.Fatalf("Source = %q, want the manual default", item.Source)
+	}
+	if item.ScanInfo != nil {
+		t.Fatalf("ScanInfo should stay nil when nothing was recorded: %+v", item.ScanInfo)
+	}
 }
 
 func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {

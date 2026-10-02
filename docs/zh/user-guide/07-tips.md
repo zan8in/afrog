@@ -119,4 +119,4 @@ afrog -wecom       # 启动企业微信 webhook 服务
 
 通知的触发级别与 token 在 [配置文件](./05-configuration.md) 的 `webhook` 段配置。
 
-> **← 上一篇：** [输出与报告](./06-output-and-report.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **文档首页 →：** [afrog 文档](../index.md)
+> **← 上一篇：** [输出与报告](./06-output-and-report.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **下一篇 →：** [Web 扫描工作台](./08-web-console.md)

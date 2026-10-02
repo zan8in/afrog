@@ -56,6 +56,64 @@ type ResultData struct {
 	PocInfo     poc.Poc
 }
 
+// HitEvidence 是「AI 研判」要喂给模型的证据：一条命中的 PoC 元信息 + 原始请求/响应。
+//
+// 只有真实证据才能让模型判断「这次命中为什么成立、有没有可能是误报」；
+// 请求/响应在发送前会在 web 层做脱敏与截断。
+type HitEvidence struct {
+	TaskID     string
+	VulID      string
+	VulName    string
+	Severity   string
+	Target     string
+	FullTarget string
+	Created    string
+	// Poc 是 result 表的 poc 字段原文（含 description / reference 等 PoC 元信息）。
+	Poc      string
+	Request  string
+	Response string
+}
+
+// SummaryFinding 是报告摘要里的一条命中（按「PoC + 目标」聚合后的粒度）。
+type SummaryFinding struct {
+	VulID      string
+	VulName    string
+	Target     string
+	FullTarget string
+	Severity   string
+	HitCount   int64
+	// Status 是台账里的人工状态（pending / confirmed / false_positive / fixed）：
+	// 摘要要能区分「已确认的漏洞」和「用户已标为误报的条目」。
+	Status    string
+	ProjectID string
+}
+
+// SummaryData 是生成报告摘要所需的全部聚合信息。
+type SummaryData struct {
+	// 任务元信息（按任务出摘要时才有；跨任务的筛选场景为空）
+	TaskID       string
+	TaskName     string
+	TaskSource   string
+	TaskStatus   string
+	CreatedAt    string
+	StartedAt    string
+	EndedAt      string
+	TotalTargets int
+	TotalPocs    int
+	TotalScans   int
+
+	// 统计口径：Findings 是聚合后的条目，HitRows 是未聚合的命中条数
+	Findings     []SummaryFinding
+	SeverityDist map[string]int64
+	HitRows      int64
+	Truncated    bool
+
+	// 本次摘要覆盖的范围（task / filter），用于在提示词里说明「扫的是哪一片数据」
+	Scope    string
+	Severity string
+	Keyword  string
+}
+
 // LedgerRow 是漏洞台账的一行：由 result 表按「PoC + 目标」聚合，再叠加人工状态与备注。
 type LedgerRow struct {
 	VulID      string `db:"vulid" json:"vulid"`
@@ -89,6 +147,42 @@ type TaskFinding struct {
 	FullTarget string `db:"fulltarget" json:"fulltarget"`
 	Severity   string `db:"severity" json:"severity"`
 	HitCount   int64  `db:"hit_count" json:"hit_count"`
+}
+
+// ScanTaskRow 是一次扫描的任务元数据快照。
+//
+// 任务的实时状态活在服务进程内存里（pkg/web 的 TaskManager），进程一停就没了；
+// 但计划扫描是长期存在的，重启后用户仍要能看到「上次跑了什么、结果如何」，
+// 因此把元数据落库。命中明细不在这里——它只以 result 表为准（按 taskid 关联），
+// 本表只保留任务列表与详情页需要的展示字段。
+type ScanTaskRow struct {
+	TaskID     string `db:"taskid" json:"taskid"`
+	Name       string `db:"name" json:"name"`
+	Status     string `db:"status" json:"status"`
+	Source     string `db:"source" json:"source"`
+	ScheduleID string `db:"schedule_id" json:"schedule_id"`
+	ProjectID  string `db:"project_id" json:"project_id"`
+	// TargetsRaw / HitsRaw 是存储格式，对外走 Targets / Hits。
+	TargetsRaw string         `db:"targets" json:"-"`
+	Targets    []string       `db:"-" json:"targets"`
+	HitsRaw    string         `db:"hits" json:"-"`
+	Hits       map[string]int `db:"-" json:"hits"`
+	HitTotal   int            `db:"hit_total" json:"hit_total"`
+	Percent    int            `db:"percent" json:"percent"`
+	Finished   int            `db:"finished" json:"finished"`
+	Total      int            `db:"total" json:"total"`
+	ElapsedMs  int64          `db:"elapsed_ms" json:"elapsed_ms"`
+	// 引擎开扫前的前置汇总，对应 scan_info 事件。
+	TotalTargets int    `db:"total_targets" json:"total_targets"`
+	TotalPocs    int    `db:"total_pocs" json:"total_pocs"`
+	TotalScans   int    `db:"total_scans" json:"total_scans"`
+	OOBEnabled   bool   `db:"oob_enabled" json:"oob_enabled"`
+	OOBStatus    string `db:"oob_status" json:"oob_status"`
+	Error        string `db:"error" json:"error"`
+	CreatedAt    string `db:"created_at" json:"created_at"`
+	StartedAt    string `db:"started_at" json:"started_at"`
+	EndedAt      string `db:"ended_at" json:"ended_at"`
+	UpdatedAt    string `db:"updated_at" json:"updated_at"`
 }
 
 // AssetRow 是一条资产。address（归一化后）是唯一键，也是 id。

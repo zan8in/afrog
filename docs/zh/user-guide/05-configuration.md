@@ -18,7 +18,7 @@ $HOME/.config/afrog/afrog-config.yaml
 
 ## 配置文件字段字典
 
-`afrog-config.yaml` 对应源码里的 `pkg/config/config.go`。顶层字段目前有 5 组：
+`afrog-config.yaml` 对应源码里的 `pkg/config/config.go`。顶层字段目前有 7 组：
 
 | 顶层键 | 类型 | 作用 | 默认值 / 说明 |
 | --- | --- | --- | --- |
@@ -27,6 +27,8 @@ $HOME/.config/afrog/afrog-config.yaml
 | `webhook` | object | 钉钉、企业微信通知 | 默认只创建空模板 |
 | `cyberspace` | object | 空间测绘平台配置 | 当前内置 `zoom_eyes` |
 | `curated` | object | curated pocs 相关配置 | 默认 `enabled: auto` |
+| `cluster` | object | 多实例编排（Web 控制台） | 留空即单实例 |
+| `ai` | object | AI 辅助的模型接入 | 留空即未接入 |
 
 下面这部分可以当字段字典直接查。
 
@@ -163,6 +165,64 @@ reverse:
 | `timeout_sec` | int | curated mount / 调用超时秒数 | `10` |
 | `channel` | string | curated 渠道 | `stable` |
 | `license_key` | string | 授权 key | 空 |
+
+## `cluster` 字段字典
+
+`cluster` 用于多实例编排：让一个 Web 控制台的「概览」页同时看到多个 `afrog` 实例的运行状态。留空即单实例，控制台照常工作。
+
+| 字段 | 类型 | 作用 | 默认值 |
+| --- | --- | --- | --- |
+| `name` | string | 本节点的显示名 | 空（界面显示为「本机」） |
+| `token` | string | 集群共享密钥：实例之间互访的凭证 | 空（为空时不对外提供实例信息） |
+| `peers` | object[] | 同伴实例列表 | 空 |
+| `peers[].name` | string | 同伴显示名 | 空（回退为地址） |
+| `peers[].url` | string | 同伴的 Web 控制台地址 | — |
+
+```yaml
+cluster:
+  name: "总部"
+  token: "集群共享密钥"
+  peers:
+    - name: "节点A"
+      url: "http://10.0.0.11:16868"
+    - name: "节点B"
+      url: "http://10.0.0.12:16868"
+```
+
+要点：
+
+- 同一集群的节点要配置**相同的 token**；地址不写协议时按 `http://` 处理
+- 本实例每 30 秒读取一次同伴的 `/api/cluster/self`，同伴不可达时界面上如实显示原因
+- 未配置 `token` 的实例不会对外暴露自身状态，这是默认关闭的安全设计
+- 聚合视图是只读的：这一阶段只做状态汇总，不远程派发扫描
+
+## `ai` 字段字典
+
+`ai` 用于「AI 辅助」——让模型结合原始请求与响应复核命中结果（详见 [Web 控制台](./08-web-console.md#ai-研判)）。留空即未接入，界面上会引导你去补齐。只实现 OpenAI 兼容的 `POST {base_url}/chat/completions`，所以换供应商只需改 `base_url` 与 `model`。
+
+| 字段 | 类型 | 作用 | 默认值 |
+| --- | --- | --- | --- |
+| `base_url` | string | 接口地址，通常以 `/v1` 结尾 | 空 |
+| `model` | string | 模型名，例如 `deepseek-chat` | 空 |
+| `api_key` | string | 调用凭证 | 空 |
+| `timeout_sec` | int | 单次研判的超时秒数 | `60` |
+| `max_tokens` | int | 单次输出的 token 上限 | `1200` |
+
+```yaml
+ai:
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+  api_key: "sk-..."
+  timeout_sec: 60
+  max_tokens: 1200
+```
+
+要点：
+
+- `base_url` / `model` / `api_key` **三项都填齐才算接入**；填完整路径（`.../v1/chat/completions`）也能识别
+- 也可以直接在 Web 控制台的「设置 → AI 辅助」里填写，保存后写回本文件并立即生效，无需重启
+- 研判是**按次点击才调用**，不会后台自动跑；同一条命中重复查看走本地缓存，不再重复请求
+- 发送前会隐藏 `Cookie`、`Authorization`、`Set-Cookie` 等敏感头并截断超长内容，但仍会把这条命中的请求/响应发给你配置的模型服务，请自行评估
 
 ## reverse 是什么
 
