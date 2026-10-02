@@ -129,7 +129,15 @@ The **Multi-instance** card on the Overview page aggregates the health of this i
 
 The heartbeat itself stays on a fixed 30-second rhythm and the config file is read once at startup, so a config file edited by hand still needs a restart. Validation on save: addresses must be http/https (the scheme may be omitted), duplicates are dropped, at most 64 peers, and a token is required as soon as peers exist.
 
-This stage is read-only aggregation — dispatching scans to a specific node is a later capability.
+### Cross-node dispatch (members)
+
+The Scan workbench now has an **Execution node** selector (online peers plus this instance, defaulting to this instance). Pick a node and hit **Start scan** and that node runs the scan.
+
+- **The task belongs to the executor**: the task, its event stream and its findings all stay on the executing node (single source of truth); the initiator only keeps a mirrored record showing node name, status, progress and hit count
+- **Read-only findings proxy**: opening a remote task on the initiator shows that node's findings read-only — no separate login to the other node required; local reports and the ledger do not include remote findings
+- **Disconnection consistency**: every dispatch carries an idempotency key so retries or network flapping never start the scan twice; when the executor cannot be reached the task is flagged **node unreachable** and keeps the last reconciled status (never a false *failed*), then resumes reconciling automatically
+- **Requirements**: both sides must share the same `cluster.token` (an instance without a token accepts no dispatches), and only Curated members can dispatch
+- **Not supported yet**: dispatching by project (enter targets directly on the initiator); mirrored remote tasks are not kept across an initiator restart (the scan itself keeps running on the executor)
 
 ## Assets, projects, and the ledger
 

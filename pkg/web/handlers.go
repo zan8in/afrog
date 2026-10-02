@@ -573,23 +573,33 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 查询数据（分页），按需展开
+	data, err := queryReportList(taskID, severityParam, keyword, severityList, page, pageSize, expandPoc, expandResult, expandExtractor)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "ok",
+		Data:    data,
+	})
+}
+
+// queryReportList 是报告列表查询的唯一实现：既服务于本机 /reports（JWT），
+// 也服务于集群只读代理（集群令牌），两边返回完全一致的结构。
+func queryReportList(taskID, severityParam, keyword string, severityList []string, page, pageSize int, expandPoc, expandResult, expandExtractor bool) (ReportListResponse, error) {
 	itemsRaw, err := sqlite.SelectPageScoped(taskID, severityParam, keyword, page, pageSize, expandPoc, expandResult)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "查询失败: " + err.Error()})
-		return
+		return ReportListResponse{}, fmt.Errorf("查询失败: %w", err)
 	}
 
-	// 统计筛选后的总数
 	total, err := sqlite.CountScoped(taskID, severityParam, keyword)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "统计失败: " + err.Error()})
-		return
+		return ReportListResponse{}, fmt.Errorf("统计失败: %w", err)
 	}
 
-	// 组装响应 items
 	respItems := make([]ReportItem, 0, len(itemsRaw))
 	for _, it := range itemsRaw {
 		item := ReportItem{
@@ -618,7 +628,7 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
-	data := ReportListResponse{
+	return ReportListResponse{
 		Items:      respItems,
 		Page:       page,
 		PageSize:   pageSize,
@@ -627,13 +637,7 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 		Keyword:    keyword,
 		Severity:   severityList,
 		TaskID:     taskID,
-	}
-
-	json.NewEncoder(w).Encode(APIResponse{
-		Success: true,
-		Message: "ok",
-		Data:    data,
-	})
+	}, nil
 }
 
 func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {

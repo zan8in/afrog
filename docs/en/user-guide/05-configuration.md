@@ -194,7 +194,7 @@ Key points:
 - Every node in the same cluster must share the **same token**; a URL without a scheme is treated as `http://`
 - This instance reads each peer's `/api/cluster/self` every 30 seconds and shows the reason on screen when a peer is unreachable
 - An instance without `token` never exposes its own state — that is the secure default
-- The aggregated view is read-only: this stage only reports state, it does not dispatch scans remotely
+- The same `token` also authorises **cross-node dispatch**: an instance without a `token` neither exposes its state nor accepts dispatches (see [Web console](./08-web-console.md))
 
 ## `ai` field dictionary
 

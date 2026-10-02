@@ -73,6 +73,11 @@ type Task struct {
 	source     string
 	scheduleID string
 	projectID  string
+	// 远程派发来源（仅 source=remote 时有值）：dispatchID 是幂等键，
+	// origin* 标明是哪个控制台派发的，用于列表/详情展示与去重。
+	dispatchID       string
+	originInstanceID string
+	originName       string
 
 	// spec 是本次扫描的规格快照，排队到真正执行时由 runScanTask 使用。
 	spec *executor.Spec
@@ -321,6 +326,35 @@ func getTaskManager() *TaskManager {
 	return tm
 }
 
+// findTask 按任务号取本机内存中的任务，未找到返回 nil。
+func findTask(taskID string) *Task {
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil
+	}
+	m := getTaskManager()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.tasks[taskID]
+}
+
+// stopTaskByID 结束一个本机任务：先终止子进程（SIGTERM → 宽限期 → SIGKILL），再收尾。
+// 返回是否找到任务；找不到时给出可直接展示的原因。Web 停止与集群远程停止共用。
+func stopTaskByID(taskID string) (bool, string) {
+	t := findTask(taskID)
+	if t == nil {
+		return false, "任务不存在"
+	}
+	if h := t.getHandle(); h != nil {
+		if err := h.Cancel(); err != nil && !errors.Is(err, executor.ErrAlreadyDone) {
+			gologger.Debug().Str("taskId", taskID).Str("error", err.Error()).Msg("stop: cancel process failed")
+		}
+	}
+	t.setStatus(TaskCancelled)
+	finalizeTask(getTaskManager(), t, TaskCancelled)
+	return true, ""
+}
+
 func getMaxRunning() int {
 	v := strings.TrimSpace(os.Getenv("AFROG_MAX_RUNNING_TASKS"))
 	if v == "" {
@@ -521,17 +555,23 @@ func scansCreateHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// 任务发起入口。计划扫描的任务与手动扫描共用同一条执行路径，
-// 只在列表里用 source 区分，方便前端标出「计划」来源。
+// 任务发起入口。计划扫描、远程派发与手动扫描共用同一条执行路径，
+// 只在列表里用 source 区分，方便前端标出来源。
 const (
 	scanSourceManual   = "manual"
 	scanSourceSchedule = "schedule"
+	// scanSourceRemote 表示这次扫描由别的控制台派发（本机是执行节点）。
+	scanSourceRemote = "remote"
 )
 
 // scanOrigin 描述任务的发起入口。
 type scanOrigin struct {
 	Source     string
 	ScheduleID string
+	// DispatchID 是远程派发的幂等键：同一个 dispatch_id 重复到达只起一次扫描。
+	DispatchID       string
+	OriginInstanceID string
+	OriginName       string
 }
 
 // scansListHandler 返回本实例内存中的任务列表（运行中 + 已完成，新的在前）。
@@ -555,16 +595,22 @@ func scansListHandler(w http.ResponseWriter, r *http.Request) {
 
 // scanListItem 是任务列表项，字段刻意保持扁平，便于前端直接渲染。
 type scanListItem struct {
-	TaskID     string   `json:"task_id"`
-	Name       string   `json:"name"`
-	Status     string   `json:"status"`
-	Source     string   `json:"source"` // manual | schedule
-	ScheduleID string   `json:"schedule_id,omitempty"`
-	ProjectID  string   `json:"project_id,omitempty"`
-	Targets    []string `json:"targets"`
-	CreatedAt  string   `json:"created_at,omitempty"`
-	StartedAt  string   `json:"started_at,omitempty"`
-	EndedAt    string   `json:"ended_at,omitempty"`
+	TaskID     string `json:"task_id"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Source     string `json:"source"` // manual | schedule | remote
+	ScheduleID string `json:"schedule_id,omitempty"`
+	ProjectID  string `json:"project_id,omitempty"`
+	// NodeName 在远程场景里标明「对端」：发起端看到的是执行节点，
+	// 执行节点看到的是发起方。具体语义由 source 决定。
+	NodeName string `json:"node_name,omitempty"`
+	// NodeOK 仅对发起端的远程任务有意义：false 表示暂时联系不上执行节点，
+	// 此时状态是最后一次成功对账的结果，不应当当作失败。
+	NodeOK    bool     `json:"node_ok,omitempty"`
+	Targets   []string `json:"targets"`
+	CreatedAt string   `json:"created_at,omitempty"`
+	StartedAt string   `json:"started_at,omitempty"`
+	EndedAt   string   `json:"ended_at,omitempty"`
 
 	Progress ScanProgressData `json:"progress"`
 	Hits     map[string]int   `json:"hits"`
@@ -607,6 +653,7 @@ func (t *Task) listItem() scanListItem {
 		Source:     source,
 		ScheduleID: t.scheduleID,
 		ProjectID:  t.projectID,
+		NodeName:   t.originName,
 		Targets:    append([]string(nil), t.targets...),
 		CreatedAt:  formatScanTime(t.CreatedAt),
 		StartedAt:  formatScanTime(t.startTime),
@@ -691,6 +738,9 @@ func (m *TaskManager) listScans() []scanListItem {
 		inMemory[t.ID] = struct{}{}
 	}
 	out = append(out, historicalScanItems(inMemory)...)
+	// 远程派发任务：本机只是发起端，任务与命中都在执行节点上。
+	// 这里并入同一条列表，前端用 source=remote + node_name 标出来。
+	out = append(out, remoteScanItems()...)
 
 	// 两侧时间都已是 "2006-01-02 15:04:05" 的本地时间字符串，字典序即时间序。
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
@@ -790,15 +840,18 @@ func launchScan(req ScanCreateRequest, origin scanOrigin) (string, ScanInitInfo,
 	id := nextTaskID(getTaskManager())
 	m := getTaskManager()
 	t := &Task{
-		ID:         id,
-		Name:       strings.TrimSpace(req.TaskName),
-		status:     TaskStarting,
-		CreatedAt:  time.Now(),
-		spec:       buildScanSpec(req, targets, pocPath, appendPocs, useIDs),
-		targets:    targets,
-		source:     source,
-		scheduleID: strings.TrimSpace(origin.ScheduleID),
-		projectID:  strings.TrimSpace(req.ProjectID),
+		ID:               id,
+		Name:             strings.TrimSpace(req.TaskName),
+		status:           TaskStarting,
+		CreatedAt:        time.Now(),
+		spec:             buildScanSpec(req, targets, pocPath, appendPocs, useIDs),
+		targets:          targets,
+		source:           source,
+		scheduleID:       strings.TrimSpace(origin.ScheduleID),
+		projectID:        strings.TrimSpace(req.ProjectID),
+		dispatchID:       strings.TrimSpace(origin.DispatchID),
+		originInstanceID: strings.TrimSpace(origin.OriginInstanceID),
+		originName:       strings.TrimSpace(origin.OriginName),
 	}
 	m.mu.Lock()
 	m.tasks[id] = t
@@ -1271,26 +1324,12 @@ func scanStopHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少任务ID"})
 		return
 	}
-	m := getTaskManager()
-	m.mu.Lock()
-	t := m.tasks[taskID]
-	m.mu.Unlock()
-	if t == nil {
+	if ok, msg := stopTaskByID(taskID); !ok {
 		w.WriteHeader(http.StatusNotFound)
 		gologger.Debug().Str("taskId", taskID).Msg("stop failed: task not found")
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: msg})
 		return
 	}
-	// 先结束子进程（SIGTERM → 宽限期 → SIGKILL），再收尾任务。
-	if h := t.getHandle(); h != nil {
-		if err := h.Cancel(); err != nil && !errors.Is(err, executor.ErrAlreadyDone) {
-			gologger.Debug().Str("taskId", taskID).Str("error", err.Error()).Msg("stop: cancel process failed")
-		} else {
-			gologger.Debug().Str("taskId", taskID).Msg("stop succeeded: process terminated")
-		}
-	}
-	t.setStatus(TaskCancelled)
-	finalizeTask(m, t, TaskCancelled)
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
 }
 

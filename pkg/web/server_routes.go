@@ -240,9 +240,21 @@ func registerAPIRoutes(api *mux.Router) {
 	// /cluster/instances 是控制台自己的聚合视图，/cluster/config 用来在运行时
 	// 增删节点（会员能力，保存后写回 afrog-config.yaml 并立即生效）。
 	api.HandleFunc("/cluster/self", clusterSelfHandler).Methods(http.MethodGet)
+	// 远程派发（执行节点一侧）：同样只认集群共享密钥，不认 Web 登录态。
+	// dispatch 幂等；tasks/{id} 供发起端对账；findings 供发起端只读代理。
+	api.HandleFunc("/cluster/inbound/dispatch", clusterInboundDispatchHandler).Methods(http.MethodPost)
+	api.HandleFunc("/cluster/inbound/tasks/{taskId}", clusterInboundTaskStatusHandler).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/inbound/tasks/{taskId}/stop", clusterInboundTaskStopHandler).Methods(http.MethodPost)
+	api.HandleFunc("/cluster/inbound/tasks/{taskId}/findings", clusterInboundTaskFindingsHandler).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/instances", jwtAuthMiddleware(clusterInstancesHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigGetHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigPutHandler))).Methods(http.MethodPut)
+	// 远程派发（发起端一侧）：会员能力，派发/查看/停止/只读代理命中。
+	api.HandleFunc("/cluster/dispatch", jwtAuthMiddleware(requireCurated(clusterRemoteDispatchHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/cluster/remote-tasks", jwtAuthMiddleware(requireCurated(clusterRemoteTaskListHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/remote-tasks/{taskId}", jwtAuthMiddleware(requireCurated(clusterRemoteTaskHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/remote-tasks/{taskId}/stop", jwtAuthMiddleware(requireCurated(clusterRemoteTaskStopHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/cluster/remote-tasks/{taskId}/findings", jwtAuthMiddleware(requireCurated(clusterRemoteTaskFindingsHandler))).Methods(http.MethodGet)
 
 	// AI 辅助（v1：命中研判）：/ai/status 告诉界面能不能用、本月还剩几次试用；
 	// /ai/config 读写模型接入配置（写回 afrog-config.yaml，保存即生效）；
