@@ -237,3 +237,66 @@ func TestSelectProjectTaskIDsIsOrdered(t *testing.T) {
 		t.Fatalf("empty project id should return nil,nil; got %v,%v", empty, err)
 	}
 }
+
+// 老库的 result 表没有 node 列：启动时要能自动补上。
+// 补不上会让所有 SELECT * 的查询因为结果集多出一列而对不上结构体，报告页会直接报错。
+func TestEnsureResultNodeColumnMigratesLegacyTable(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3",
+		"file:"+filepath.Join(t.TempDir(), "legacy.db")+"?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000")
+	if err != nil {
+		t.Fatalf("connect legacy db: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	// 加 node 列之前的建表语句（历史形态）。
+	const legacyDDL = `CREATE TABLE IF NOT EXISTS "result" (
+		"id" INTEGER NOT NULL DEFAULT '',
+		"taskid" text NOT NULL DEFAULT '',
+		"vulid" text NOT NULL DEFAULT '',
+		"vulname" text NOT NULL DEFAULT '',
+		"target" TEXT NOT NULL DEFAULT '',
+		"fulltarget" TEXT NOT NULL DEFAULT '',
+		"severity" TEXT NOT NULL DEFAULT '',
+		"poc" TEXT NOT NULL DEFAULT '',
+		"result" TEXT NOT NULL DEFAULT '',
+		"created" TEXT NOT NULL DEFAULT '',
+		"fingerprint" TEXT NOT NULL DEFAULT '',
+		"extractor" TEXT NOT NULL DEFAULT '',
+		PRIMARY KEY ("id")
+	  );`
+	if _, err := db.Exec(legacyDDL); err != nil {
+		t.Fatalf("create legacy schema: %v", err)
+	}
+	insertResult(t, db, 1, "t-legacy", "poc-legacy", "http://a.example", "http://a.example/x", "high", "2026-09-01 10:00:00")
+
+	prev := dbx
+	dbx = db
+	t.Cleanup(func() { dbx = prev })
+
+	if err := ensureResultNodeColumn(); err != nil {
+		t.Fatalf("补 node 列失败：%v", err)
+	}
+	// 幂等：已经补过之后再来一次不应报错，否则每次启动都会失败。
+	if err := ensureResultNodeColumn(); err != nil {
+		t.Fatalf("重复补列应无害：%v", err)
+	}
+
+	rows, err := SelectRawResultsByTask("t-legacy", 0)
+	if err != nil {
+		t.Fatalf("读取老数据失败：%v", err)
+	}
+	if len(rows) != 1 || rows[0].Node != "" {
+		t.Fatalf("老数据补列后 node 应为空串：%+v", rows)
+	}
+
+	if _, err := InsertRawResults("t-new", "节点A", rows); err != nil {
+		t.Fatalf("写入带节点的命中失败：%v", err)
+	}
+	backfilled, err := SelectRawResultsByTask("t-new", 0)
+	if err != nil {
+		t.Fatalf("读取回填数据失败：%v", err)
+	}
+	if len(backfilled) != 1 || backfilled[0].Node != "节点A" || backfilled[0].VulID != "poc-legacy" {
+		t.Fatalf("回填应原样搬运字段并标出节点：%+v", backfilled)
+	}
+}

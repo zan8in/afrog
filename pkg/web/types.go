@@ -30,14 +30,16 @@ type ReportListRequest struct {
 
 // 报告列表 - 单条记录
 type ReportItem struct {
-	ID          string      `json:"id"`
-	TaskID      string      `json:"taskId"`
-	VulID       string      `json:"vulId"`
-	VulName     string      `json:"vulName"`
-	Target      string      `json:"target"`
-	FullTarget  string      `json:"fullTarget,omitempty"`
-	Severity    string      `json:"severity"`
-	Created     string      `json:"created"`
+	ID         string `json:"id"`
+	TaskID     string `json:"taskId"`
+	VulID      string `json:"vulId"`
+	VulName    string `json:"vulName"`
+	Target     string `json:"target"`
+	FullTarget string `json:"fullTarget,omitempty"`
+	Severity   string `json:"severity"`
+	Created    string `json:"created"`
+	// Node 是命中产生地：本机扫描为空，远程派发回填的是执行节点展示名。
+	Node        string      `json:"node,omitempty"`
 	Fingerprint interface{} `json:"fingerprint,omitempty"`
 	PocInfo     interface{} `json:"pocInfo,omitempty"`    // 展开后的 POC 信息（与前端展示一致）
 	ResultList  interface{} `json:"resultList,omitempty"` // 解析后的请求响应列表

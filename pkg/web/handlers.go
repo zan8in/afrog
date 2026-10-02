@@ -611,6 +611,7 @@ func queryReportList(taskID, severityParam, keyword string, severityList []strin
 			FullTarget: it.FullTarget,
 			Severity:   it.Severity, // 已在底层转大写
 			Created:    it.Created,
+			Node:       it.Node,
 		}
 		if expandPoc {
 			item.PocInfo = it.PocInfo
@@ -697,6 +698,7 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		FullTarget: row.FullTarget,
 		Severity:   row.Severity,
 		Created:    row.Created,
+		Node:       row.Node,
 	}
 	if expandFingerprint {
 		raw := strings.TrimSpace(row.FingerPrint)

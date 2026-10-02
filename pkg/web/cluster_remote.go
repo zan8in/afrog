@@ -15,6 +15,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/config"
+	db2 "github.com/zan8in/afrog/v3/pkg/db"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
 )
@@ -74,6 +76,9 @@ type remoteTask struct {
 	NodeURL    string
 	// ScheduleID 非空表示这次派发由计划扫描触发，用于列表追溯与排查。
 	ScheduleID string
+	// ProjectID 只在发起端有意义：按项目派发时，命中回填到本地这个项目名下。
+	// 执行节点不需要（也不该）拥有该项目，所以派发请求里不会带它。
+	ProjectID string
 	// RemoteTaskID 是执行节点上的任务号；拿到之前只能靠重试派发收敛。
 	RemoteTaskID string
 	Name         string
@@ -89,6 +94,10 @@ type remoteTask struct {
 	// NodeOK 是最近一次能否联系上执行节点。false 时 Status 仍是最后一次成功对账的结果。
 	NodeOK   bool
 	LastSeen time.Time
+	// Backfilled 表示已经把执行节点上的命中回填进本地 result 表；置位后不再重放。
+	Backfilled bool
+	// lastBackfillErr 记录上一次回填失败的原因，用来抑制重复日志（仅内存态）。
+	lastBackfillErr string
 
 	// request 保留原始派发请求，供「还没拿到远端任务号」时幂等重试。
 	request ScanCreateRequest
@@ -198,6 +207,7 @@ type remoteTaskRecord struct {
 	NodeName     string           `json:"node_name"`
 	NodeURL      string           `json:"node_url"`
 	ScheduleID   string           `json:"schedule_id,omitempty"`
+	ProjectID    string           `json:"project_id,omitempty"`
 	RemoteTaskID string           `json:"remote_task_id,omitempty"`
 	Name         string           `json:"name"`
 	Status       string           `json:"status"`
@@ -211,6 +221,8 @@ type remoteTaskRecord struct {
 	EndedAt      string           `json:"ended_at,omitempty"`
 	NodeOK       bool             `json:"node_ok"`
 	LastSeen     string           `json:"last_seen,omitempty"`
+	// Backfilled 记录命中是否已回填本地，重启后不必再来一遍。
+	Backfilled bool `json:"backfilled,omitempty"`
 	// Request 是原始派发请求：还没拿到远端任务号时，重启后仍要靠它幂等重试。
 	Request ScanCreateRequest `json:"request"`
 }
@@ -243,6 +255,7 @@ func remoteTaskToRecord(rt *remoteTask) remoteTaskRecord {
 		NodeName:     rt.NodeName,
 		NodeURL:      rt.NodeURL,
 		ScheduleID:   rt.ScheduleID,
+		ProjectID:    rt.ProjectID,
 		RemoteTaskID: rt.RemoteTaskID,
 		Name:         rt.Name,
 		Status:       rt.Status,
@@ -255,6 +268,7 @@ func remoteTaskToRecord(rt *remoteTask) remoteTaskRecord {
 		StartedAt:    rt.StartedAt,
 		EndedAt:      rt.EndedAt,
 		NodeOK:       rt.NodeOK,
+		Backfilled:   rt.Backfilled,
 		Request:      rt.request,
 	}
 	if !rt.LastSeen.IsZero() {
@@ -270,6 +284,7 @@ func recordToRemoteTask(rec remoteTaskRecord) *remoteTask {
 		NodeName:     rec.NodeName,
 		NodeURL:      rec.NodeURL,
 		ScheduleID:   rec.ScheduleID,
+		ProjectID:    rec.ProjectID,
 		RemoteTaskID: rec.RemoteTaskID,
 		Name:         rec.Name,
 		Status:       rec.Status,
@@ -282,6 +297,7 @@ func recordToRemoteTask(rec remoteTaskRecord) *remoteTask {
 		StartedAt:    rec.StartedAt,
 		EndedAt:      rec.EndedAt,
 		NodeOK:       rec.NodeOK,
+		Backfilled:   rec.Backfilled,
 		request:      rec.Request,
 	}
 	if rec.LastSeen != "" {
@@ -408,11 +424,17 @@ func startRemoteReconciler() {
 				snap := remoteTaskSnapshot()
 				active := false
 				for _, rt := range snap {
-					if remoteTaskTerminal(rt) {
-						continue
+					if !remoteTaskTerminal(rt) {
+						active = true
+						_ = reconcileRemoteTask(rt)
 					}
-					active = true
-					_ = reconcileRemoteTask(rt)
+					// 任务终结后把执行节点上的命中回填到本地：台账、报告与导出
+					// 都只认本地 result 表。回填是「先清后写」的幂等重放，
+					// 没成功就留给下一轮继续重试。
+					if remoteTaskNeedsBackfill(rt) {
+						active = true
+						backfillRemoteFindings(rt)
+					}
 				}
 				// 状态变化都发生在这里，顺手把镜像记录落盘一次；全是终态任务
 				// 时不再重复写盘，避免空转产生无意义的 IO。
@@ -485,6 +507,16 @@ func remoteTaskTerminal(rt *remoteTask) bool {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	return isTerminalRemoteStatus(rt.Status)
+}
+
+// remoteTaskNeedsBackfill 判断这条影子记录是否还欠一次命中回填。
+//
+// 终态且拿到过远端任务号才需要回填：派发被拒这类记录根本没有远端任务，
+// 也不能永久占着「欠回填」状态，否则每轮空转并触发一次无意义的落盘。
+func remoteTaskNeedsBackfill(rt *remoteTask) bool {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	return isTerminalRemoteStatus(rt.Status) && !rt.Backfilled && strings.TrimSpace(rt.RemoteTaskID) != ""
 }
 
 // markRemoteUnreachable 只标记「联系不上」：保留最后一次成功对账的状态，
@@ -661,6 +693,104 @@ func firstNonEmpty(v, fallback string) string {
 	return fallback
 }
 
+// fetchRemoteResults 原样拉取执行节点上某个任务的全部命中，供回填使用。
+//
+// 走的是结果快照接口（不是报告页那个做了展示层归一化的接口）：回填要的是能原样
+// 落库的完整数据，否则本地报告会缺请求响应证据，AI 研判也拿不到原文。
+func fetchRemoteResults(peer config.ClusterPeer, token, remoteTaskID string) ([]db2.ResultData, error) {
+	target := peer.URL + "/api/cluster/inbound/tasks/" + url.PathEscape(remoteTaskID) + "/results"
+	resp, err := doClusterGet(target, token)
+	if err != nil {
+		return nil, fmt.Errorf("无法连接执行节点：%s", err.Error())
+	}
+	defer resp.Body.Close()
+
+	var out struct {
+		Success bool             `json:"success"`
+		Message string           `json:"message"`
+		Data    []db2.ResultData `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<20)).Decode(&out); err != nil {
+		return nil, fmt.Errorf("执行节点返回内容无法解析")
+	}
+	if resp.StatusCode != http.StatusOK || !out.Success {
+		return nil, fmt.Errorf("执行节点返回：%s", firstNonEmpty(strings.TrimSpace(out.Message), fmt.Sprintf("HTTP %d", resp.StatusCode)))
+	}
+	return out.Data, nil
+}
+
+// backfillRemoteFindings 把执行节点上的命中回填到本地 result 表。
+//
+// 落库用的是发起端的影子任务号：发起端的报告、台账、导出都按它组织，前端不需要
+// 为远程命中再走一套查询；node 列记下来源节点，多节点命中才不会混成一团。按项目
+// 派发的任务同时把归属登记进 task_project，项目台账与项目导出才看得到这些命中。
+//
+// 幂等：先按影子任务号清空再整批写入。影子任务号只由回填写入（本机扫描不会拿到
+// 已被占用的号），所以重放不会和本机数据撞车，中途失败重来也不会写出重复命中。
+func backfillRemoteFindings(rt *remoteTask) {
+	rt.mu.Lock()
+	id, nodeName, nodeURL, remoteID, projectID := rt.ID, rt.NodeName, rt.NodeURL, rt.RemoteTaskID, rt.ProjectID
+	rt.mu.Unlock()
+
+	if strings.TrimSpace(remoteID) == "" {
+		return
+	}
+
+	if err := runRemoteBackfill(id, nodeName, nodeURL, remoteID, projectID); err != nil {
+		noteBackfillFailure(rt, err.Error())
+		return
+	}
+
+	rt.mu.Lock()
+	rt.Backfilled = true
+	rt.lastBackfillErr = ""
+	rt.mu.Unlock()
+	persistRemoteTasks()
+}
+
+// runRemoteBackfill 执行一次「拉取 + 落库 + 归属登记」；任一步失败都直接返回错误，
+// 是否重试交给调用方（下一轮对账会再来一次）。
+func runRemoteBackfill(id, nodeName, nodeURL, remoteID, projectID string) error {
+	peer, ok := findClusterPeer(nodeURL)
+	if !ok {
+		return fmt.Errorf("执行节点已不在集群配置中（%s）", nodeURL)
+	}
+
+	rows, err := fetchRemoteResults(peer, clusterToken(), remoteID)
+	if err != nil {
+		return err
+	}
+	// 先清后写：影子任务号只由回填写入（本机扫描不会拿到已被占用的号），
+	// 所以重放不会和本机数据撞车，中途失败重来也不会写出重复命中。
+	if _, err := sqlite.DeleteResultsByTask(id); err != nil {
+		return fmt.Errorf("清理旧命中失败: %w", err)
+	}
+	if len(rows) > 0 {
+		if _, err := sqlite.InsertRawResults(id, nodeName, rows); err != nil {
+			return fmt.Errorf("写入命中失败: %w", err)
+		}
+	}
+	if pid := strings.TrimSpace(projectID); pid != "" {
+		if err := sqlite.LinkTaskProject(id, pid); err != nil {
+			return fmt.Errorf("项目归属登记失败: %w", err)
+		}
+	}
+	gologger.Info().Msgf("远程命中已回填: task=%s node=%s hits=%d project=%s", id, nodeName, len(rows), strings.TrimSpace(projectID))
+	return nil
+}
+
+// noteBackfillFailure 只在失败原因变化时记一条告警：执行节点长期不可达时，
+// 每 10s 刷一条一模一样的日志没有意义——界面上的「节点失联」已经说明了情况。
+func noteBackfillFailure(rt *remoteTask, msg string) {
+	rt.mu.Lock()
+	changed := rt.lastBackfillErr != msg
+	rt.lastBackfillErr = msg
+	rt.mu.Unlock()
+	if changed {
+		gologger.Warning().Msgf("远程命中回填失败: task=%s err=%s", rt.ID, msg)
+	}
+}
+
 func newRemoteTask(peer config.ClusterPeer, scanReq ScanCreateRequest) *remoteTask {
 	name := strings.TrimSpace(scanReq.TaskName)
 	if name == "" {
@@ -722,12 +852,16 @@ func dispatchRemoteScan(peer config.ClusterPeer, scanReq ScanCreateRequest, orig
 	if token == "" {
 		return scanListItem{}, fmt.Errorf("本实例未配置 cluster.token，无法派发")
 	}
+	// 派发请求里不该带项目（执行节点不需要也不该知道），但发起端要记住它：
+	// 命中回填时才能把这些命中归到本地项目名下。
+	originProjectID := strings.TrimSpace(scanReq.ProjectID)
 	scanReq, err := resolveDispatchRequest(scanReq)
 	if err != nil {
 		return scanListItem{}, err
 	}
 
 	rt := newRemoteTask(peer, scanReq)
+	rt.ProjectID = originProjectID
 	rt.ScheduleID = strings.TrimSpace(origin.ScheduleID)
 	addRemoteTask(rt)
 	startRemoteReconciler()

@@ -246,6 +246,7 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/cluster/inbound/tasks/{taskId}", clusterInboundTaskStatusHandler).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/inbound/tasks/{taskId}/stop", clusterInboundTaskStopHandler).Methods(http.MethodPost)
 	api.HandleFunc("/cluster/inbound/tasks/{taskId}/findings", clusterInboundTaskFindingsHandler).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/inbound/tasks/{taskId}/results", clusterInboundTaskResultsHandler).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/instances", jwtAuthMiddleware(clusterInstancesHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigGetHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/config", jwtAuthMiddleware(requireCurated(clusterConfigPutHandler))).Methods(http.MethodPut)

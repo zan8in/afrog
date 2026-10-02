@@ -105,7 +105,42 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
 
+	if err = ensureResultNodeColumn(); err != nil {
+		return fmt.Errorf("error migrating result table: %v", err)
+	}
+
 	return dbx.Ping()
+}
+
+// ensureResultNodeColumn 给已有库补上 result.node 列。
+//
+// 建表用的是 CREATE TABLE IF NOT EXISTS，老库不会因为改了这个常量就长出新列；
+// 本项目也没有版本号式的迁移机制，所以这里做一次显式检查：缺列才 ALTER。
+func ensureResultNodeColumn() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	rows, err := dbx.Queryx("PRAGMA table_info(" + db2.TableName + ")")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		col := map[string]interface{}{}
+		if err := rows.MapScan(col); err != nil {
+			return err
+		}
+		if name, ok := col["name"]; ok && fmt.Sprintf("%v", name) == "node" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = dbx.Exec("ALTER TABLE " + db2.TableName + " ADD COLUMN \"node\" TEXT NOT NULL DEFAULT ''")
+	return err
 }
 
 func CloseX() {
@@ -656,6 +691,99 @@ func runResultQuery(query string, args []interface{}, expandPoc, expandResult bo
 	return data, nil
 }
 
+// SelectRawResultsByTask 原样返回某个任务的全部命中（含 result / poc / fingerprint /
+// extractor 原文），供集群把执行节点上的命中回填到发起端。
+//
+// 与报表查询的区别：这里不做任何展示层归一化，也不清空大字段——回填要的是可原样
+// 落库的完整数据，否则本地报告会缺证据、AI 研判也拿不到请求响应。
+func SelectRawResultsByTask(taskID string, limit int) ([]db2.ResultData, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return nil, fmt.Errorf("task id is required")
+	}
+	if limit <= 0 || limit > ExportRowLimit {
+		limit = ExportRowLimit
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	out := []db2.ResultData{}
+	query := "SELECT * FROM " + db2.TableName + " WHERE taskid = ? ORDER BY id ASC LIMIT ?"
+	if err := dbx.SelectContext(ctx, &out, query, taskID, limit); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DeleteResultsByTask 删除某个任务在本地 result 表里的命中，供回填重放前清场。
+func DeleteResultsByTask(taskID string) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return 0, fmt.Errorf("task id is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	res, err := dbx.ExecContext(ctx, "DELETE FROM "+db2.TableName+" WHERE taskid = ?", taskID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// InsertRawResults 把一批「在别处生成」的命中写进本地 result 表。
+//
+// 用于远程命中回填：taskid 用发起端的影子任务号（发起端的一切报告/台账都按它组织），
+// node 记录来源执行节点名，其余字段原样搬运。主键一律由本机 SnowFlake 重新分配，
+// 避免与本地既有行撞主键。
+func InsertRawResults(taskID, node string, rows []db2.ResultData) (int, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return 0, fmt.Errorf("task id is required")
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+
+	insertSQL := "INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor, node) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+	tx, err := dbx.Beginx()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	fallbackCreated := time.Now().Format("2006-01-02 15:04:05")
+	n := 0
+	for _, r := range rows {
+		created := strings.TrimSpace(r.Created)
+		if created == "" {
+			created = fallbackCreated
+		}
+		if _, err := tx.Exec(insertSQL, db2.SnowFlake.NextID(), taskID, r.VulID, r.VulName,
+			r.Target, r.FullTarget, r.Severity, r.Poc, r.Result, created,
+			r.FingerPrint, r.Extractor, strings.TrimSpace(node)); err != nil {
+			return n, err
+		}
+		n++
+	}
+	if err := tx.Commit(); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
 // 新增：统计筛选后的总数（保持不变）
 // func CountFiltered(...) 已存在
 
@@ -783,7 +911,8 @@ var ledgerGroupedSelect = `SELECT
 	COALESCE(l.status, 'pending') AS status,
 	COALESCE(l.note, '') AS note,
 	MAX(COALESCE(tp.project_id, '')) AS project_id,
-	COALESCE(l.updated_at, '') AS updated_at
+	COALESCE(l.updated_at, '') AS updated_at,
+	MAX(r.node) AS node
   FROM ` + db2.TableName + ` r
   LEFT JOIN vuln_ledger l
 	ON l.vulid = r.vulid AND l.target = r.target AND l.fulltarget = r.fulltarget

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 )
 
 // 多实例编排（v2：远程派发 —— 执行节点一侧）。
@@ -212,6 +213,30 @@ func clusterInboundTaskFindingsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: data})
+}
+
+// clusterInboundTaskResultsHandler 原样返回某个任务的命中快照，供发起端回填到本地。
+//
+// 与 findings 的分工：findings 是给前端渲染用的展示结构（分页、默认不展开大字段），
+// 这里是能原样落库的完整行，含请求响应原文，一次全量返回；两者都不做鉴权之外的加工。
+func clusterInboundTaskResultsHandler(w http.ResponseWriter, r *http.Request) {
+	if !requireClusterToken(w, r) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	taskID := strings.TrimSpace(mux.Vars(r)["taskId"])
+	rows, err := sqlite.SelectRawResultsByTask(taskID, sqlite.ExportRowLimit)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: rows})
 }
 
 // normalizeSeverityParam 把 "High, critical" 归一化成 "high,critical"。

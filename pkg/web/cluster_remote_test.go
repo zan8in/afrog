@@ -13,6 +13,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 )
 
 // resetRemoteStore 清掉影子任务，避免用例之间互相看到对方的记录。
@@ -73,6 +74,9 @@ func newFakePeer(t *testing.T, token string) *fakePeer {
 			_, _ = w.Write([]byte(`{"success":true,"message":"stopped","data":{"stopped":true}}`))
 		case strings.HasSuffix(r.URL.Path, "/findings"):
 			_, _ = w.Write([]byte(`{"success":true,"message":"ok","data":{"items":[{"id":"1","taskId":"remote-1","vulId":"poc-x","vulName":"X","target":"http://a","severity":"HIGH","created":"2026-10-02 10:00:00"}],"page":1,"page_size":50,"total":1,"total_pages":1}}`))
+		case strings.HasSuffix(r.URL.Path, "/results"):
+			// 回填用的原样快照：字段名与本地 result 表列一一对应。
+			_, _ = w.Write([]byte(`{"success":true,"message":"ok","data":[{"TaskID":"remote-1","VulID":"poc-x","VulName":"X","Target":"http://a","FullTarget":"http://a/x","Severity":"high","Poc":"{\"id\":\"poc-x\"}","Result":"[{\"fulltarget\":\"http://a/x\",\"request\":\"GET /x HTTP/1.1\",\"response\":\"HTTP/1.1 200 OK\"}]","Created":"2026-10-02 10:00:00","FingerPrint":"","Extractor":""}]}`))
 		case strings.HasPrefix(r.URL.Path, "/api/cluster/inbound/tasks/"):
 			body, _ := json.Marshal(APIResponse{Success: true, Message: "ok", Data: clusterTaskStatus{
 				TaskID:   "remote-1",
@@ -417,5 +421,100 @@ func TestClusterRemoteDispatchByUnknownProject(t *testing.T) {
 	}
 	if sent := fp.lastDispatch(); sent.DispatchID != "" || sent.Request.Targets != nil {
 		t.Fatalf("未知项目不该真的发起派发：%+v", sent)
+	}
+}
+
+// 任务终结后把执行节点上的命中回填到本地：落在影子任务号上、标出来源节点，
+// 并且「先清后写」保证重放不会写出第二份。
+func TestRemoteFindingsBackfill(t *testing.T) {
+	withProjectFixture(t) // 顺带准备好临时 HOME 与 sqlite
+	resetRemoteStore()
+
+	fp := newFakePeer(t, "shared-token")
+	fp.status = string(TaskCompleted)
+	useCluster(t, []config.ClusterPeer{{Name: "节点A", URL: fp.srv.URL}})
+
+	rec := dispatchRequest(t, fp.srv.URL)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("派发应成功：%d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Data scanListItem `json:"data"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+	id := out.Data.TaskID
+
+	rt := getRemoteTask(id)
+	if !remoteTaskNeedsBackfill(rt) {
+		t.Fatalf("终态任务应处于待回填状态：%+v", remoteTaskItem(rt))
+	}
+
+	backfillRemoteFindings(rt)
+	if remoteTaskNeedsBackfill(rt) {
+		t.Fatal("回填成功后不应再判为待回填")
+	}
+
+	rows, err := sqlite.SelectRawResultsByTask(id, 0)
+	if err != nil {
+		t.Fatalf("读取回填结果失败：%v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("回填命中数 = %d，期望 1", len(rows))
+	}
+	if rows[0].TaskID != id {
+		t.Fatalf("回填应落在影子任务号上，实际 %q", rows[0].TaskID)
+	}
+	if rows[0].Node != "节点A" {
+		t.Fatalf("回填应标出来源节点，实际 %q", rows[0].Node)
+	}
+	if !strings.Contains(rows[0].Result, "GET /x") {
+		t.Fatalf("回填应保留请求报文原文，实际 %q", rows[0].Result)
+	}
+
+	backfillRemoteFindings(rt)
+	if rows, _ = sqlite.SelectRawResultsByTask(id, 0); len(rows) != 1 {
+		t.Fatalf("重放后命中数 = %d，期望仍为 1", len(rows))
+	}
+}
+
+// 按项目派发的远程任务：命中回填后要登记到项目名下，
+// 否则项目报告与台账的项目筛选都看不到这些远程命中。
+func TestRemoteFindingsBackfillKeepsProjectAttribution(t *testing.T) {
+	withProjectFixture(t)
+	resetRemoteStore()
+
+	if rec := postProject(t, `{"name":"客户A","targets_text":"https://a.example"}`); rec.Code != http.StatusOK {
+		t.Fatalf("准备项目失败：%d %s", rec.Code, rec.Body.String())
+	}
+	p := onlyProject(t)
+
+	fp := newFakePeer(t, "shared-token")
+	fp.status = string(TaskCompleted)
+	useCluster(t, []config.ClusterPeer{{Name: "节点A", URL: fp.srv.URL}})
+
+	rec := dispatchBody(t, fp.srv.URL, map[string]any{"project_id": p.ID})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("按项目派发应成功：%d %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Data scanListItem `json:"data"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &out)
+
+	backfillRemoteFindings(getRemoteTask(out.Data.TaskID))
+
+	pid, err := sqlite.SelectTaskProject(out.Data.TaskID)
+	if err != nil {
+		t.Fatalf("查询任务归属失败：%v", err)
+	}
+	if pid != p.ID {
+		t.Fatalf("远程任务的项目归属 = %q，期望 %q", pid, p.ID)
+	}
+	rows, err := sqlite.SelectAllByProject(p.ID, "", false, false)
+	if err != nil {
+		t.Fatalf("按项目查询失败：%v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("项目下命中数 = %d，期望 1", len(rows))
 	}
 }

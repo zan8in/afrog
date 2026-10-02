@@ -52,8 +52,10 @@ type ResultData struct {
 	Created     string
 	FingerPrint string
 	Extractor   string
-	ResultList  []PocResult
-	PocInfo     poc.Poc
+	// Node 是命中的产生地：本机扫描为空，远程派发回填的是执行节点展示名。
+	Node       string
+	ResultList []PocResult
+	PocInfo    poc.Poc
 }
 
 // HitEvidence 是「AI 研判」要喂给模型的证据：一条命中的 PoC 元信息 + 原始请求/响应。
@@ -128,6 +130,8 @@ type LedgerRow struct {
 	Note       string `db:"note" json:"note"`
 	ProjectID  string `db:"project_id" json:"project_id"`
 	UpdatedAt  string `db:"updated_at" json:"updated_at"`
+	// Node 是命中来源节点（远程派发回填的命中才有值，本机命中为空）。
+	Node string `db:"node" json:"node,omitempty"`
 }
 
 // LedgerStats 是各状态的数量分布。
@@ -222,6 +226,7 @@ var (
 		"created" TEXT NOT NULL DEFAULT '',
 		"fingerprint" TEXT NOT NULL DEFAULT '',
   		"extractor" TEXT NOT NULL DEFAULT '',
+		"node" TEXT NOT NULL DEFAULT '',
 		PRIMARY KEY ("id")
 	  );
 
