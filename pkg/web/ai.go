@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -281,11 +282,15 @@ func newAIStream(w http.ResponseWriter) *aiStream {
 	}
 }
 
-// aiStreamFlow 是研判与摘要共用的流程：校验配置 → 组装证据 → 查缓存 → 校验额度 → 调模型 → 写缓存。
+// aiStreamFlow 是研判、摘要与参数推荐共用的流程：校验配置 → 组装证据 → 查缓存 → 校验额度 → 调模型 → 写缓存。
 //
 // seed 是缓存键的原始材料（各接口拼自己的业务标识）；prepare 负责各自的数据读取与提示词组装，
 // 返回的 errMsg 非空表示「不必调用模型，直接把原因告诉用户」。
-func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force bool, prepare func(cfg config.AI) (system, user, errMsg string)) {
+//
+// extra 可选：拿到完整文本后再补发一个事件。参数推荐用它把模型输出里那段 JSON 解析成
+// 结构化的 params 事件，让界面不必去解析 Markdown。缓存回放时同样会补发，保证「重新打开
+// 能看到同一份可应用的结果」。
+func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force bool, prepare func(cfg config.AI) (system, user, errMsg string), extra func(text string) (event string, data any, ok bool)) {
 	stream := newAIStream(w)
 
 	cfg, _ := currentAIConfig()
@@ -306,6 +311,7 @@ func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force
 		if cached, ok, err := sqlite.GetAICache(cacheKey); err == nil && ok {
 			stream.send("meta", map[string]any{"cached": true, "model": cfg.Model})
 			stream.send("delta", map[string]string{"t": cached})
+			emitAIExtra(stream, extra, cached)
 			stream.send("done", map[string]any{"cached": true})
 			return
 		} else if err != nil {
@@ -340,7 +346,18 @@ func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force
 	if err := sqlite.PutAICache(cacheKey, text, cfg.Model); err != nil {
 		gologger.Debug().Msgf("写入 AI 缓存失败: %v", err)
 	}
+	emitAIExtra(stream, extra, text)
 	stream.send("done", map[string]any{"cached": false})
+}
+
+// emitAIExtra 在流结束前补发一个由调用方决定的事件；extra 为 nil 或判定无需补发时什么都不做。
+func emitAIExtra(stream *aiStream, extra func(text string) (event string, data any, ok bool), text string) {
+	if extra == nil {
+		return
+	}
+	if event, data, ok := extra(text); ok && event != "" {
+		stream.send(event, data)
+	}
 }
 
 // -----------------------
@@ -379,7 +396,7 @@ func aiVerdictHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		system, user := aiVerdictPrompt(evidence)
 		return system, user, ""
-	})
+	}, nil)
 }
 
 // -----------------------
@@ -412,7 +429,323 @@ func aiSummaryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		system, user := aiSummaryPrompt(data)
 		return system, user, ""
+	}, nil)
+}
+
+// -----------------------
+// 目标 → 扫描参数推荐
+// -----------------------
+
+// aiRecommendInput 是推荐所需的「目标画像」。
+//
+// 刻意只带摘要（规模、类型分布、少量样例主机），而不是完整目标清单：决定参数的是资产的
+// 性质与规模，完整清单既可能很长，也没有必要整份送出去。
+type aiRecommendInput struct {
+	Sample      string // 样例目标（换行分隔，已截断）
+	Count       int    // 目标条目数
+	Hosts       int    // 估算主机数（CIDR 展开后）
+	Kinds       string // 类型分布，如 "url:12,ip:3,cidr:1,domain:4"
+	Intent      string // verify / standard / retest
+	Project     string // 项目名（可选）
+	ProjectSize int    // 项目目标数（可选）
+	Pocs        int    // 当前范围内的 PoC 数量（可选）
+}
+
+const (
+	aiRecommendSampleLimit = 20  // 最多带多少个样例目标
+	aiRecommendSampleLen   = 120 // 单个样例目标的最大长度
+)
+
+// aiRecommendHandler 根据目标画像推荐扫描参数（SSE 流式）。
+//
+// 与研判/摘要一致：GET + 查询参数（EventSource 只能用 GET），失败通过 failed 事件返回。
+// 模型输出「简短理由 + 一个 JSON 参数块」，这里把 JSON 解析成结构化的 params 事件；
+// 理由部分照常以 delta 流式展示，用户既能读懂「为什么」，也能一键应用。
+func aiRecommendHandler(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	in := aiRecommendInput{
+		Sample:      sanitizeRecommendSample(q.Get("sample")),
+		Count:       atoiClamp(q.Get("count"), 0, 10_000_000),
+		Hosts:       atoiClamp(q.Get("hosts"), 0, 1_000_000_000),
+		Kinds:       sanitizeRecommendKinds(q.Get("kinds")),
+		Intent:      normalizeRecommendIntent(q.Get("intent")),
+		Project:     trimToLen(q.Get("project"), 60),
+		ProjectSize: atoiClamp(q.Get("project_size"), 0, 1_000_000_000),
+		Pocs:        atoiClamp(q.Get("pocs"), 0, 10_000_000),
+	}
+	force := strings.TrimSpace(q.Get("force")) == "1"
+
+	seed := aiCacheSeed("recommend", in.Sample, in.Kinds, in.Intent, in.Project,
+		strconv.Itoa(in.Count), strconv.Itoa(in.Hosts), strconv.Itoa(in.ProjectSize), strconv.Itoa(in.Pocs))
+
+	aiStreamFlow(w, r.Context(), seed, force, func(cfg config.AI) (string, string, string) {
+		if in.Count <= 0 && in.ProjectSize <= 0 && in.Sample == "" {
+			return "", "", "先填写扫描目标（或选择一个项目），AI 才能据此推荐参数。"
+		}
+		system, user := aiRecommendPrompt(in)
+		return system, user, ""
+	}, func(text string) (string, any, bool) {
+		params, ok := parseRecommendParams(text)
+		if !ok {
+			return "", nil, false
+		}
+		return "params", params, true
 	})
+}
+
+const aiRecommendSystemPrompt = `你是资深红队/渗透测试工程师，负责为 afrog（漏洞扫描器）的一次扫描选择「最合适的运行参数」。
+
+必须遵守：
+1. 只依据用户给出的目标画像（规模、类型分布、样例）与扫描意图推断，不得编造目标的业务归属或漏洞信息。
+2. 先给 2~4 条简短理由（每条一句话，说明为什么这样配），然后给出一个 JSON 参数块。每条理由都要能对应到具体参数。
+3. 严格按下面的格式输出，不要开场白、不要总结、不要在 JSON 之外再写别的代码块：
+
+- 理由要点一
+- 理由要点二
+
+` + "```json" + `
+{"concurrency":25,"rate_limit":150,"timeout":50,"smart":false,"portscan":false,"ports":"","skip_host_discovery":false,"web_fingerprint":true,"severity":["high","critical"]}
+` + "```" + `
+
+字段与取值范围（只能给这些字段，且数值必须落在范围内）：
+- concurrency：并发数，1~500。目标少或单主机取小值；大规模资产且网络可靠时取大值。
+- rate_limit：每秒请求上限，1~5000。单目标或生产系统取保守值，避免打挂业务。
+- timeout：单请求超时（秒），1~600。公网目标 30~60；内网目标可更小。
+- smart：布尔，是否让引擎随资产规模自动调节并发。目标数量大且类型混杂时建议 true。
+- portscan：布尔，是否先做端口扫描。目标是单台内网主机或需发现非标准端口时建议 true；纯 URL 列表可 false。
+- ports：端口范围字符串（仅 portscan=true 时有意义，如 "80,443,8000-9000"），否则给空串。
+- skip_host_discovery：布尔，端口扫描时是否跳过主机存活探测（内网可用，跨网段慎用）。
+- web_fingerprint：布尔，是否做 Web 指纹识别。目标以 URL/域名为主时建议 true。
+- severity：数组，取值只能是 critical/high/medium/low/info 的子集，代表优先扫描的漏洞级别。快速验证给 high/critical；全量巡检给空数组表示全部。`
+
+// aiRecommendPrompt 组装 system / user 两条消息。
+func aiRecommendPrompt(in aiRecommendInput) (string, string) {
+	var b strings.Builder
+	b.WriteString("请为下面这次扫描推荐参数。\n\n### 目标画像\n")
+	if in.Project != "" {
+		b.WriteString("- 来源：项目「" + in.Project + "」")
+		if in.ProjectSize > 0 {
+			b.WriteString(fmt.Sprintf("（%d 个目标）", in.ProjectSize))
+		}
+		b.WriteString("\n")
+	} else {
+		b.WriteString("- 来源：手动输入的目标\n")
+	}
+	if in.Count > 0 {
+		b.WriteString(fmt.Sprintf("- 目标条目数：%d\n", in.Count))
+	}
+	if in.Hosts > 0 && in.Hosts != in.Count {
+		b.WriteString(fmt.Sprintf("- 估算主机数：%d（CIDR 展开后）\n", in.Hosts))
+	}
+	if in.Kinds != "" {
+		b.WriteString("- 类型分布：" + in.Kinds + "\n")
+	}
+	if in.Pocs > 0 {
+		b.WriteString(fmt.Sprintf("- 当前范围内可用的 PoC 数量：约 %d 个\n", in.Pocs))
+	}
+	b.WriteString("- 扫描意图：" + recommendIntentLabel(in.Intent) + "\n")
+
+	if in.Sample != "" {
+		b.WriteString("\n### 目标样例（最多前 20 条）\n```\n")
+		b.WriteString(in.Sample + "\n```\n")
+	}
+	return aiRecommendSystemPrompt, b.String()
+}
+
+func recommendIntentLabel(intent string) string {
+	switch intent {
+	case "verify":
+		return "快速验证（单目标、只关注高危、追求速度）"
+	case "retest":
+		return "复测对比（与历史结果比对差异）"
+	default:
+		return "标准漏扫（全量、可后台运行）"
+	}
+}
+
+// recommendRanges 是各数值参数的允许范围，与前端表单一致。模型给出的越界值会被夹到边界，
+// 而不是整份拒绝——用户宁可拿到一份已修正的参数，也不想为了一个数字重新生成一次。
+var recommendRanges = map[string][2]int{
+	"concurrency": {1, 500},
+	"rate_limit":  {1, 5000},
+	"timeout":     {1, 600},
+}
+
+var recommendSeverities = map[string]bool{
+	"critical": true, "high": true, "medium": true, "low": true, "info": true,
+}
+
+// parseRecommendParams 从模型输出里取出参数。返回的 map 只包含模型确实给出的字段，
+// 让前端只覆盖这些项，其余参数保持用户当前的设置。
+func parseRecommendParams(text string) (map[string]any, bool) {
+	raw := extractRecommendJSON(text)
+	if raw == "" {
+		return nil, false
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+		return nil, false
+	}
+
+	out := map[string]any{}
+	for name, rng := range recommendRanges {
+		if v, ok := decodeRecommendInt(fields[name]); ok {
+			out[name] = clampIntRange(v, rng[0], rng[1])
+		}
+	}
+	for _, name := range []string{"smart", "portscan", "skip_host_discovery", "web_fingerprint"} {
+		if v, ok := decodeRecommendBool(fields[name]); ok {
+			out[name] = v
+		}
+	}
+	if v, ok := fields["ports"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil {
+			out["ports"] = trimToLen(s, 200)
+		}
+	}
+	if v, ok := fields["severity"]; ok {
+		var list []string
+		if err := json.Unmarshal(v, &list); err == nil {
+			clean := make([]string, 0, len(list))
+			seen := map[string]bool{}
+			for _, s := range list {
+				s = strings.ToLower(strings.TrimSpace(s))
+				if recommendSeverities[s] && !seen[s] {
+					seen[s] = true
+					clean = append(clean, s)
+				}
+			}
+			out["severity"] = clean
+		}
+	}
+
+	if len(out) == 0 {
+		return nil, false
+	}
+	return out, true
+}
+
+// extractRecommendJSON 从模型输出里截取参数 JSON：优先取围栏代码块，其次退回
+// 「第一个 { 到最后一个 }」。模型偶尔会漏掉围栏或加解释文字，容错比严格更重要。
+func extractRecommendJSON(text string) string {
+	if i := strings.Index(text, "```"); i >= 0 {
+		rest := text[i+3:]
+		rest = strings.TrimPrefix(strings.TrimPrefix(rest, "json"), "JSON")
+		if j := strings.Index(rest, "```"); j >= 0 {
+			if block := strings.TrimSpace(rest[:j]); strings.HasPrefix(block, "{") {
+				return block
+			}
+		}
+	}
+	if i := strings.Index(text, "{"); i >= 0 {
+		if j := strings.LastIndex(text, "}"); j > i {
+			return strings.TrimSpace(text[i : j+1])
+		}
+	}
+	return ""
+}
+
+func decodeRecommendInt(v json.RawMessage) (int, bool) {
+	if len(v) == 0 {
+		return 0, false
+	}
+	var n float64
+	if err := json.Unmarshal(v, &n); err != nil {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func decodeRecommendBool(v json.RawMessage) (bool, bool) {
+	if len(v) == 0 {
+		return false, false
+	}
+	var b bool
+	if err := json.Unmarshal(v, &b); err != nil {
+		return false, false
+	}
+	return b, true
+}
+
+func clampIntRange(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+// atoiClamp 把查询参数解析成整数并夹进范围；缺失或非法一律返回 0（调用方以 0 表示未提供）。
+func atoiClamp(raw string, min, max int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return 0
+	}
+	return clampIntRange(n, min, max)
+}
+
+func trimToLen(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= n {
+		return s
+	}
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut]
+}
+
+func sanitizeRecommendSample(raw string) string {
+	lines := strings.Split(raw, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out = append(out, trimToLen(line, aiRecommendSampleLen))
+		if len(out) >= aiRecommendSampleLimit {
+			break
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// sanitizeRecommendKinds 只保留形如 "url:12,ip:3" 的计数摘要，丢弃其余字符。
+func sanitizeRecommendKinds(raw string) string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		name, num, found := strings.Cut(strings.TrimSpace(p), ":")
+		name = strings.ToLower(strings.TrimSpace(name))
+		if !found || name == "" {
+			continue
+		}
+		n, err := strconv.Atoi(strings.TrimSpace(num))
+		if err != nil || n < 0 {
+			continue
+		}
+		out = append(out, trimToLen(name, 16)+":"+strconv.Itoa(n))
+		if len(out) >= 8 {
+			break
+		}
+	}
+	return strings.Join(out, ",")
+}
+
+func normalizeRecommendIntent(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "verify":
+		return "verify"
+	case "retest":
+		return "retest"
+	default:
+		return "standard"
+	}
 }
 
 // aiCacheSeed 把若干业务标识拼成一个稳定的缓存原料。

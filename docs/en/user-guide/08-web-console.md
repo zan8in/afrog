@@ -171,6 +171,15 @@ The Reports page also has an **AI summary** button that produces an executive su
 
 Only statistics and the finding list are sent for a summary (no raw request/response), which is why it is good at the big picture and prioritisation; use **Verdict** above when you need to judge whether one specific finding is real.
 
+### Recommended scan parameters
+
+After pasting targets into the **Scan** workbench, click **AI recommended parameters**. Based on the scale and mix of your targets (URL / IP / CIDR / domain) and the current intent (quick check / standard scan), the model returns two to four reasons and a ready-to-use set of parameters — concurrency, rate, timeout, smart concurrency, port scan, web fingerprint, severity and so on. Click **Apply recommended parameters** at the bottom of the drawer to write them into the form (you can still tweak them afterwards); use **Regenerate** if you disagree.
+
+- **Only a target profile is uploaded**: target count, type mix, and at most 20 samples — never the full list
+- **Values stay in range**: out-of-range numbers are clamped to the form's limits and invalid severities dropped, so the form is never left unusable
+- **Only recommended fields are applied**: anything the model did not return keeps your current setting
+- **Re-opening the same targets is served from cache**, so the model is not called again; when no model is configured you are pointed to **Settings → AI assist**
+
 ## Relation to the CLI
 
 The web console does not replace the CLI; both share the same engine and PoCs:

@@ -252,6 +252,9 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/ai/config", jwtAuthMiddleware(aiConfigPutHandler)).Methods(http.MethodPut)
 	api.HandleFunc("/ai/verdict", jwtAuthMiddleware(aiVerdictHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/ai/summary", jwtAuthMiddleware(aiSummaryHandler)).Methods(http.MethodGet)
+	// /ai/recommend 依据「目标画像」（规模、类型分布、样例）推荐扫描参数，
+	// 流式返回理由，并额外下发一个 params 事件供界面一键应用。
+	api.HandleFunc("/ai/recommend", jwtAuthMiddleware(aiRecommendHandler)).Methods(http.MethodGet)
 
 	api.HandleFunc("/server/info", jwtAuthMiddleware(serverInfoHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances", jwtAuthMiddleware(instancesListHandler)).Methods(http.MethodGet)
