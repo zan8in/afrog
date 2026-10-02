@@ -72,6 +72,8 @@ type remoteTask struct {
 	DispatchID string // 幂等键
 	NodeName   string
 	NodeURL    string
+	// ScheduleID 非空表示这次派发由计划扫描触发，用于列表追溯与排查。
+	ScheduleID string
 	// RemoteTaskID 是执行节点上的任务号；拿到之前只能靠重试派发收敛。
 	RemoteTaskID string
 	Name         string
@@ -138,20 +140,21 @@ func remoteTaskItem(rt *remoteTask) scanListItem {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	return scanListItem{
-		TaskID:    rt.ID,
-		Name:      rt.Name,
-		Status:    rt.Status,
-		Source:    scanSourceRemote,
-		NodeName:  rt.NodeName,
-		NodeOK:    rt.NodeOK,
-		Targets:   append([]string(nil), rt.Targets...),
-		CreatedAt: rt.CreatedAt,
-		StartedAt: rt.StartedAt,
-		EndedAt:   rt.EndedAt,
-		Progress:  rt.Progress,
-		Hits:      rt.Hits,
-		HitTotal:  rt.HitTotal,
-		Error:     rt.Error,
+		TaskID:     rt.ID,
+		Name:       rt.Name,
+		Status:     rt.Status,
+		Source:     scanSourceRemote,
+		ScheduleID: rt.ScheduleID,
+		NodeName:   rt.NodeName,
+		NodeOK:     rt.NodeOK,
+		Targets:    append([]string(nil), rt.Targets...),
+		CreatedAt:  rt.CreatedAt,
+		StartedAt:  rt.StartedAt,
+		EndedAt:    rt.EndedAt,
+		Progress:   rt.Progress,
+		Hits:       rt.Hits,
+		HitTotal:   rt.HitTotal,
+		Error:      rt.Error,
 	}
 }
 
@@ -194,6 +197,7 @@ type remoteTaskRecord struct {
 	DispatchID   string           `json:"dispatch_id"`
 	NodeName     string           `json:"node_name"`
 	NodeURL      string           `json:"node_url"`
+	ScheduleID   string           `json:"schedule_id,omitempty"`
 	RemoteTaskID string           `json:"remote_task_id,omitempty"`
 	Name         string           `json:"name"`
 	Status       string           `json:"status"`
@@ -238,6 +242,7 @@ func remoteTaskToRecord(rt *remoteTask) remoteTaskRecord {
 		DispatchID:   rt.DispatchID,
 		NodeName:     rt.NodeName,
 		NodeURL:      rt.NodeURL,
+		ScheduleID:   rt.ScheduleID,
 		RemoteTaskID: rt.RemoteTaskID,
 		Name:         rt.Name,
 		Status:       rt.Status,
@@ -264,6 +269,7 @@ func recordToRemoteTask(rec remoteTaskRecord) *remoteTask {
 		DispatchID:   rec.DispatchID,
 		NodeName:     rec.NodeName,
 		NodeURL:      rec.NodeURL,
+		ScheduleID:   rec.ScheduleID,
 		RemoteTaskID: rec.RemoteTaskID,
 		Name:         rec.Name,
 		Status:       rec.Status,
@@ -682,6 +688,79 @@ func newRemoteTask(peer config.ClusterPeer, scanReq ScanCreateRequest) *remoteTa
 	}
 }
 
+// resolveDispatchRequest 把「按项目派发」在本地解析成具体目标：项目与资产库只
+// 存在于发起端，执行节点不需要（也不该）拥有该项目。
+func resolveDispatchRequest(scanReq ScanCreateRequest) (ScanCreateRequest, error) {
+	pid := strings.TrimSpace(scanReq.ProjectID)
+	if pid == "" {
+		return scanReq, nil
+	}
+	project, ok := findProject(pid)
+	if !ok {
+		return scanReq, errProjectNotFound
+	}
+	targets, err := resolveScanTargets(scanReq)
+	if err != nil {
+		return scanReq, err
+	}
+	scanReq.Targets = targets
+	scanReq.ProjectID = ""
+	if strings.TrimSpace(scanReq.TaskName) == "" {
+		scanReq.TaskName = "远程任务 · 项目 " + strings.TrimSpace(project.Name)
+	}
+	return scanReq, nil
+}
+
+// dispatchRemoteScan 把一次扫描派发给指定同伴：先在本地解析项目，再落一条影子
+// 记录并立即尝试首次派发。「手动派发」与「计划扫描派发」共用这一条路径。
+//
+// 返回的 error 表示这次派发在本地就被判定不可能成功（未配令牌、项目无效、对方
+// 明确拒绝）；执行节点暂时连不上不算失败——影子记录会保留，交给后台对账继续重试，
+// 此时返回的 item 上 NodeOK=false、Error 写明原因。
+func dispatchRemoteScan(peer config.ClusterPeer, scanReq ScanCreateRequest, origin scanOrigin) (scanListItem, error) {
+	token := clusterToken()
+	if token == "" {
+		return scanListItem{}, fmt.Errorf("本实例未配置 cluster.token，无法派发")
+	}
+	scanReq, err := resolveDispatchRequest(scanReq)
+	if err != nil {
+		return scanListItem{}, err
+	}
+
+	rt := newRemoteTask(peer, scanReq)
+	rt.ScheduleID = strings.TrimSpace(origin.ScheduleID)
+	addRemoteTask(rt)
+	startRemoteReconciler()
+
+	taskID, name, hardMsg, softMsg := postRemoteDispatch(peer, token, rt.DispatchID, scanReq)
+	if hardMsg != "" {
+		removeRemoteTask(rt.ID)
+		return scanListItem{}, fmt.Errorf("%s", hardMsg)
+	}
+
+	rt.mu.Lock()
+	if taskID != "" {
+		rt.RemoteTaskID = taskID
+		if name != "" {
+			rt.Name = name
+		}
+		rt.NodeOK = true
+	} else {
+		rt.NodeOK = false
+		rt.Error = softMsg
+	}
+	rt.mu.Unlock()
+
+	// 立即拉一次状态，界面不用等下一轮对账。
+	if taskID != "" {
+		if st, err := fetchRemoteStatus(peer, token, taskID); err == nil {
+			applyRemoteStatus(rt, st)
+		}
+	}
+	persistRemoteTasks()
+	return remoteTaskItem(rt), nil
+}
+
 // -----------------------
 // HTTP API（发起端，JWT + Curated）
 // -----------------------
@@ -718,71 +797,16 @@ func clusterRemoteDispatchHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "该节点不在集群配置中，请先在「编辑节点」里登记"})
 		return
 	}
-	token := clusterToken()
-	if token == "" {
+
+	item, err := dispatchRemoteScan(peer, req.Request, scanOrigin{})
+	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "本实例未配置 cluster.token，无法派发"})
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
 		return
 	}
-
-	// 按项目派发：项目与资产库只存在于发起端。派发前先在本地把项目解析成具体
-	// 目标，只把目标清单交给执行节点——执行节点不需要（也不该）拥有该项目。
-	scanReq := req.Request
-	if pid := strings.TrimSpace(scanReq.ProjectID); pid != "" {
-		project, ok := findProject(pid)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: errProjectNotFound.Error()})
-			return
-		}
-		targets, err := resolveScanTargets(scanReq)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
-			return
-		}
-		scanReq.Targets = targets
-		scanReq.ProjectID = ""
-		if strings.TrimSpace(scanReq.TaskName) == "" {
-			scanReq.TaskName = "远程任务 · 项目 " + strings.TrimSpace(project.Name)
-		}
-	}
-
-	rt := newRemoteTask(peer, scanReq)
-	addRemoteTask(rt)
-	startRemoteReconciler()
-
-	taskID, name, hardMsg, softMsg := postRemoteDispatch(peer, token, rt.DispatchID, scanReq)
-	if hardMsg != "" {
-		removeRemoteTask(rt.ID)
-		w.WriteHeader(http.StatusBadRequest)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: hardMsg})
-		return
-	}
-
-	rt.mu.Lock()
-	if taskID != "" {
-		rt.RemoteTaskID = taskID
-		if name != "" {
-			rt.Name = name
-		}
-		rt.NodeOK = true
-	} else {
-		rt.NodeOK = false
-		rt.Error = softMsg
-	}
-	rt.mu.Unlock()
-
-	// 立即拉一次状态，界面不用等下一轮对账。
-	if taskID != "" {
-		if st, err := fetchRemoteStatus(peer, token, taskID); err == nil {
-			applyRemoteStatus(rt, st)
-		}
-	}
-	persistRemoteTasks()
 
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "dispatched", Data: remoteTaskItem(rt)})
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "dispatched", Data: item})
 }
 
 // clusterRemoteTaskListHandler 返回本机作为发起端的全部远程任务。

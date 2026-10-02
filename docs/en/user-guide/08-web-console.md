@@ -138,6 +138,7 @@ The Scan workbench now has an **Execution node** selector (online peers plus thi
 - **Disconnection consistency**: every dispatch carries an idempotency key so retries or network flapping never start the scan twice; when the executor cannot be reached the task is flagged **node unreachable** and keeps the last reconciled status (never a false *failed*), then resumes reconciling automatically
 - **Survives restarts**: mirrored records are persisted to `~/.config/afrog/remote_tasks.json`, so the task list is intact after an initiator restart and unfinished tasks resume reconciling automatically (the scan itself always runs on the executor)
 - **Dispatch by project**: pick a project on the initiator and dispatch. The initiator resolves it to a concrete target list locally before sending, so the executor needs no copy of that project; the remote task scans only those targets and is not filed under any project or ledger entry on the executor
+- **Schedules can dispatch too**: the schedule form offers the same **Execution node** field, so a recurring scan is handed to that node automatically when it fires (see [Scheduled scans](./09-scheduled-scans.md))
 - **Requirements**: both sides must share the same `cluster.token` (an instance without a token accepts no dispatches), and only Curated members can dispatch
 
 ## Assets, projects, and the ledger

@@ -22,7 +22,7 @@ Scheduled scans are a **Curated member feature**. Regular users can open the pag
 
 ## Creating a schedule
 
-On the **Schedules** page, four things define a schedule:
+On the **Schedules** page, these fields define a schedule:
 
 | Field | Notes |
 | --- | --- |
@@ -30,6 +30,7 @@ On the **Schedules** page, four things define a schedule:
 | Targets | Pick a **project** (recommended — asset changes follow automatically) or enter a set of ad-hoc targets |
 | Scan configuration | Identical to a manual scan: intent, PoC scope, concurrency/rate/timeout, port scan, web probe (`-w`), OOB, etc. |
 | Frequency | See below |
+| Execution node | Optional: let an online peer run the scan (see below); leave empty to run on this instance |
 
 ### Frequency presets
 
@@ -45,13 +46,22 @@ Targets are validated at save time: a missing project, a project with no valid a
 
 A single instance holds up to 100 schedules.
 
+### Running on another node (members)
+
+A schedule does not have to run locally: pick an **Execution node** in the form and the scan is dispatched to that peer when it fires.
+
+- Only **online** peers appear in the selector; on save the node must still be registered and this instance must have a `cluster.token`, so a bad configuration is reported at save time instead of silently failing on every tick
+- **Project targets are resolved locally** into a concrete target list before dispatch, so the executor needs no copy of that project
+- The task and its findings stay on the executor (single source of truth); the initiator keeps only a mirrored record — marked as remote in the task list, showing the node name and the schedule ID, with read-only access to the findings. Local reports and the ledger do **not** include these remote findings
+- When the executor is unreachable the task is flagged **node unreachable** and keeps the last reconciled status (never a false *failed*), then resumes reconciling automatically; retries never start the scan twice (each dispatch carries an idempotency key)
+
 ## When a scan actually starts
 
 **Saving (creating or editing) does not run anything** — it stores the schedule and computes the next run time. The server-side scheduler fires it when that time arrives:
 
 - The scheduler checks the schedule table every 30 seconds and starts anything that is due
 - To verify a configuration right away, use **Run now** in the list: it runs once and does not disturb the existing rhythm
-- Every triggered task takes the same path as a manual scan: same asset sink, same project attribution, same notifications, same ledger entries
+- Every triggered task takes the same path as a manual scan: same asset sink, same project attribution, same notifications, same ledger entries (except schedules with an execution node, whose task and findings stay on that node — see above)
 
 Each row in the list shows the frequency, where the targets come from, the last run outcome, and the next run time:
 

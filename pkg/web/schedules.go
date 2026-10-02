@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -55,6 +56,10 @@ type Schedule struct {
 
 	Scan ScanCreateRequest `json:"scan"`
 
+	// NodeURL 是本次计划的执行节点；为空表示本机执行。非空时由发起端把扫描派发
+	// 给该同伴（项目在派发前于本地解析成具体目标），属会员能力。
+	NodeURL string `json:"node_url,omitempty"`
+
 	// NextRunAt 是下一次计划执行时间（本地时间，scheduleTimeLayout）。
 	NextRunAt  string `json:"next_run_at"`
 	LastRunAt  string `json:"last_run_at,omitempty"`
@@ -70,7 +75,9 @@ type Schedule struct {
 // scheduleView 是返回给前端的计划视图：附带目标来源的展示信息。
 type scheduleView struct {
 	Schedule
-	ProjectName string   `json:"project_name,omitempty"`
+	ProjectName string `json:"project_name,omitempty"`
+	// NodeName 是执行节点的展示名（NodeURL 为空时也为空，界面显示「本机」）。
+	NodeName    string   `json:"node_name,omitempty"`
 	TargetCount int      `json:"target_count"`
 	Preview     []string `json:"preview"`
 }
@@ -149,6 +156,7 @@ func findScheduleIndex(store *scheduleStore, id string) int {
 // 频率后残留（例如从每周切到每小时，weekday 不该继续参与计算）。
 func normalizeSchedule(s *Schedule) {
 	s.Name = strings.TrimSpace(s.Name)
+	s.NodeURL = normalizePeerURL(s.NodeURL)
 	s.Freq = strings.ToLower(strings.TrimSpace(s.Freq))
 	switch s.Freq {
 	case freqHourly:
@@ -249,6 +257,12 @@ func computeNextRun(s Schedule, from time.Time) time.Time {
 // toScheduleView 组装计划视图：项目计划带项目名与资产数，临时目标计划带目标预览。
 func toScheduleView(s Schedule) scheduleView {
 	view := scheduleView{Schedule: s, Preview: []string{}}
+	if nodeURL := strings.TrimSpace(s.NodeURL); nodeURL != "" {
+		view.NodeName = nodeURL
+		if p, ok := findClusterPeer(nodeURL); ok {
+			view.NodeName = p.Name
+		}
+	}
 	if pid := strings.TrimSpace(s.Scan.ProjectID); pid != "" {
 		if p, ok := findProject(pid); ok {
 			view.ProjectName = p.Name
@@ -331,9 +345,10 @@ func (s *scheduleScheduler) tick() {
 	}
 
 	type dueItem struct {
-		id   string
-		name string
-		scan ScanCreateRequest
+		id      string
+		name    string
+		nodeURL string
+		scan    ScanCreateRequest
 	}
 	dueCount := 0
 	changed := false
@@ -393,7 +408,7 @@ func (s *scheduleScheduler) tick() {
 		}
 		sc.LastStatus = "started"
 		sc.LastError = ""
-		launch = append(launch, dueItem{id: sc.ID, name: sc.Name, scan: sc.Scan})
+		launch = append(launch, dueItem{id: sc.ID, name: sc.Name, nodeURL: sc.NodeURL, scan: sc.Scan})
 	}
 
 	if changed {
@@ -404,7 +419,7 @@ func (s *scheduleScheduler) tick() {
 	scheduleMu.Unlock()
 
 	for _, item := range launch {
-		taskID, _, err := launchScheduledScan(item.id, item.name, item.scan)
+		taskID, _, err := launchScheduledScan(item.id, item.name, item.nodeURL, item.scan)
 		recordScheduleRun(item.id, taskID, err)
 		if err != nil {
 			gologger.Warning().Msgf("计划起扫失败: plan=%s name=%s err=%v", item.id, item.name, err)
@@ -416,9 +431,23 @@ func (s *scheduleScheduler) tick() {
 
 // launchScheduledScan 以「计划」来源起扫：任务名缺失时用计划名兜底，
 // 这样任务列表里能直接看出是哪条计划触发的。
-func launchScheduledScan(id, name string, scan ScanCreateRequest) (string, ScanInitInfo, error) {
+//
+// nodeURL 非空表示这条计划配置了执行节点：扫描交给该同伴执行，本机只留一条镜像
+// 记录（来源为 remote，带 schedule_id 便于追溯）。
+func launchScheduledScan(id, name, nodeURL string, scan ScanCreateRequest) (string, ScanInitInfo, error) {
 	if strings.TrimSpace(scan.TaskName) == "" {
 		scan.TaskName = name
+	}
+	if nodeURL = normalizePeerURL(nodeURL); nodeURL != "" {
+		peer, ok := findClusterPeer(nodeURL)
+		if !ok {
+			return "", ScanInitInfo{}, fmt.Errorf("执行节点不在集群配置中，请先在概览页「编辑节点」里登记")
+		}
+		item, err := dispatchRemoteScan(peer, scan, scanOrigin{ScheduleID: id})
+		if err != nil {
+			return "", ScanInitInfo{}, err
+		}
+		return item.TaskID, ScanInitInfo{TotalTargets: len(item.Targets), Targets: item.Targets}, nil
 	}
 	return launchScan(scan, scanOrigin{Source: scanSourceSchedule, ScheduleID: id})
 }
@@ -508,7 +537,26 @@ type scheduleSaveRequest struct {
 	AtTime        string `json:"at_time,omitempty"`
 	Weekday       int    `json:"weekday,omitempty"`
 
+	// NodeURL 为空表示本机执行；非空时必须是已登记的同伴（见 validateScheduleNode）。
+	NodeURL string `json:"node_url,omitempty"`
+
 	Scan ScanCreateRequest `json:"scan"`
+}
+
+// validateScheduleNode 校验计划的执行节点。计划是无人值守执行的，配置错误不该
+// 等到点才在日志里静默失败，保存时就拦下来。
+func validateScheduleNode(nodeURL string) error {
+	nodeURL = normalizePeerURL(nodeURL)
+	if nodeURL == "" {
+		return nil
+	}
+	if _, ok := findClusterPeer(nodeURL); !ok {
+		return fmt.Errorf("执行节点不在集群配置中，请先在概览页「编辑节点」里登记")
+	}
+	if clusterToken() == "" {
+		return fmt.Errorf("本实例未配置 cluster.token，无法把计划派发到其他节点")
+	}
+	return nil
 }
 
 // schedulesSaveHandler 新建或更新一条计划。
@@ -543,6 +591,10 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		writeScheduleJSON(w, http.StatusBadRequest, APIResponse{Success: false, Message: err.Error()})
 		return
 	}
+	if err := validateScheduleNode(req.NodeURL); err != nil {
+		writeScheduleJSON(w, http.StatusBadRequest, APIResponse{Success: false, Message: err.Error()})
+		return
+	}
 
 	scheduleMu.Lock()
 	defer scheduleMu.Unlock()
@@ -567,6 +619,7 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		cur.IntervalHours = req.IntervalHours
 		cur.AtTime = req.AtTime
 		cur.Weekday = req.Weekday
+		cur.NodeURL = req.NodeURL
 		cur.Scan = req.Scan
 		if req.Enabled != nil {
 			cur.Enabled = *req.Enabled
@@ -594,6 +647,7 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		IntervalHours: req.IntervalHours,
 		AtTime:        req.AtTime,
 		Weekday:       req.Weekday,
+		NodeURL:       req.NodeURL,
 		Scan:          req.Scan,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -699,9 +753,10 @@ func schedulesRunHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	scan := store.Items[idx].Scan
 	name := store.Items[idx].Name
+	nodeURL := store.Items[idx].NodeURL
 	scheduleMu.Unlock()
 
-	taskID, _, runErr := launchScheduledScan(id, name, scan)
+	taskID, _, runErr := launchScheduledScan(id, name, nodeURL, scan)
 	recordScheduleRun(id, taskID, runErr)
 	if runErr != nil {
 		writeScheduleJSON(w, http.StatusBadRequest, APIResponse{Success: false, Message: runErr.Error()})
