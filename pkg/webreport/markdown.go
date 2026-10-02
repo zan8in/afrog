@@ -51,15 +51,29 @@ func RenderMarkdown(doc Document) []byte {
 		return []byte(b.String())
 	}
 
-	b.WriteString("| # | 严重级别 | PoC ID | PoC 名称 | 目标 | 命中次数 | 首次发现 |\n")
-	b.WriteString("| ---: | --- | --- | --- | --- | ---: | --- |\n")
+	// 「来源节点」只在这份报告确实含远程命中时出现，纯本机扫描保持原来的列。
+	withNodes := doc.HasNodes()
+	b.WriteString("| # | 严重级别 | PoC ID | PoC 名称 | 目标 |")
+	if withNodes {
+		b.WriteString(" 来源节点 |")
+	}
+	b.WriteString(" 命中次数 | 首次发现 |\n")
+	b.WriteString("| ---: | --- | --- | --- | --- |")
+	if withNodes {
+		b.WriteString(" --- |")
+	}
+	b.WriteString(" ---: | --- |\n")
 	for i, fd := range doc.Findings {
-		target := fd.FullTarget
-		if strings.TrimSpace(target) == "" {
+		target := strings.TrimSpace(fd.FullTarget)
+		if target == "" {
 			target = fd.Target
 		}
-		fmt.Fprintf(&b, "| %d | %s | `%s` | %s | %s | %d | %s |\n",
-			i+1, fd.Severity, fd.VulID, escapeMD(fd.VulName), escapeMD(target), fd.HitCount, fd.FirstSeen)
+		cells := []string{fmt.Sprintf("%d", i+1), fd.Severity, "`" + fd.VulID + "`", escapeMD(fd.VulName), escapeMD(target)}
+		if withNodes {
+			cells = append(cells, escapeMD(fd.NodeLabel()))
+		}
+		cells = append(cells, fmt.Sprintf("%d", fd.HitCount), fd.FirstSeen)
+		fmt.Fprintf(&b, "| %s |\n", strings.Join(cells, " | "))
 	}
 
 	b.WriteString("\n## 漏洞明细\n")
@@ -76,6 +90,9 @@ func RenderMarkdown(doc Document) []byte {
 		}
 		fmt.Fprintf(&b, "- 目标：%s\n", target)
 		fmt.Fprintf(&b, "- 命中次数：%d\n", fd.HitCount)
+		if label := fd.NodeLabel(); label != "" {
+			fmt.Fprintf(&b, "- 来源节点：%s\n", label)
+		}
 		if fd.FirstSeen != "" {
 			fmt.Fprintf(&b, "- 首次发现：%s\n", fd.FirstSeen)
 		}

@@ -202,3 +202,96 @@ func TestFileNameSanitizesSubject(t *testing.T) {
 		t.Fatalf("file name lost subject: %q", got)
 	}
 }
+
+// 远程派发回填的命中要带出来源节点：同一条命中重复命中同一节点时节点去重，
+// 本机命中（未回填）不带节点。
+func TestBuildCollectsSourceNodes(t *testing.T) {
+	rows := sampleRows()
+	// 同一条聚合命中（directory-listing）的两行都来自同一节点：应只列一次。
+	rows[1].Node = "阿里云"
+	rows[2].Node = "阿里云"
+	rows = append(rows, db.ResultData{
+		ID: 4, TaskID: "20260928-00002-ab12cd", VulID: "nacos-detect", VulName: "nacos",
+		Target: "http://a.example", FullTarget: "http://a.example/", Severity: "HIGH",
+		Created: "2026-09-28 14:00:00", Node: "节点2",
+	})
+
+	doc := Build(Meta{Title: "扫描报告"}, Brand{}, rows, false)
+	if !doc.HasNodes() {
+		t.Fatal("含远程命中的报告应判定为 HasNodes")
+	}
+
+	byVulID := make(map[string]Finding, len(doc.Findings))
+	for _, f := range doc.Findings {
+		byVulID[f.VulID] = f
+	}
+	if got := byVulID["directory-listing"].NodeLabel(); got != "阿里云" {
+		t.Fatalf("directory-listing 的来源节点 = %q, want 阿里云", got)
+	}
+	if got := byVulID["nacos-detect"].NodeLabel(); got != "节点2" {
+		t.Fatalf("nacos-detect 的来源节点 = %q, want 节点2", got)
+	}
+	if got := byVulID["webprobe"].NodeLabel(); got != "" {
+		t.Fatalf("本机命中不该有来源节点，实际 %q", got)
+	}
+}
+
+// 纯本机扫描的报告不该多出「来源节点」这一列。
+func TestRenderersSkipNodeColumnWhenAllLocal(t *testing.T) {
+	doc := Build(Meta{Title: "扫描报告"}, Brand{}, sampleRows(), false)
+	if doc.HasNodes() {
+		t.Fatal("纯本机报告不该判定为 HasNodes")
+	}
+	if md := string(RenderMarkdown(doc)); strings.Contains(md, "来源节点") {
+		t.Fatal("纯本机报告的 Markdown 不该出现来源节点")
+	}
+	out, err := RenderHTML(doc, HTMLOptions{})
+	if err != nil {
+		t.Fatalf("RenderHTML: %v", err)
+	}
+	if strings.Contains(string(out), "来源节点") {
+		t.Fatal("纯本机报告的 HTML 不该出现来源节点")
+	}
+}
+
+// 含远程命中的报告：Markdown / HTML / XLSX 三种产物都要标出来源节点。
+func TestRenderersIncludeSourceNode(t *testing.T) {
+	rows := sampleRows()
+	rows[0].Node = "阿里云" // webprobe 那条
+
+	doc := Build(Meta{Title: "扫描报告"}, Brand{}, rows, false)
+
+	md := string(RenderMarkdown(doc))
+	if !strings.Contains(md, "来源节点") || !strings.Contains(md, "来源节点：阿里云") {
+		t.Fatalf("Markdown 缺少来源节点：\n%s", md)
+	}
+
+	out, err := RenderHTML(doc, HTMLOptions{})
+	if err != nil {
+		t.Fatalf("RenderHTML: %v", err)
+	}
+	if !strings.Contains(string(out), "来源节点：阿里云") {
+		t.Fatal("HTML 缺少来源节点")
+	}
+
+	xls, err := RenderXLSX(doc)
+	if err != nil {
+		t.Fatalf("RenderXLSX: %v", err)
+	}
+	book, err := excelize.OpenReader(bytes.NewReader(xls))
+	if err != nil {
+		t.Fatalf("reopen xlsx: %v", err)
+	}
+	defer book.Close()
+
+	// 插在「完整目标」之后：F=完整目标，G=来源节点，H=命中次数，I=首次发现。
+	if got, _ := book.GetCellValue(sheetFindings, "G1"); got != "来源节点" {
+		t.Fatalf("G1 = %q, want 来源节点", got)
+	}
+	if got, _ := book.GetCellValue(sheetFindings, "H1"); got != "命中次数" {
+		t.Fatalf("H1 = %q, want 命中次数", got)
+	}
+	if got, _ := book.GetCellValue(sheetFindings, "I1"); got != "首次发现" {
+		t.Fatalf("I1 = %q, want 首次发现", got)
+	}
+}

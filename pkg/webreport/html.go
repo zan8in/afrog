@@ -308,6 +308,7 @@ ul.refs li { word-break: break-all; }
           <th>严重级别</th>
           <th>PoC</th>
           <th>目标</th>
+          {{ if .Doc.HasNodes }}<th>来源节点</th>{{ end }}
           <th class="num">命中次数</th>
           <th class="nowrap">首次发现</th>
         </tr>
@@ -325,6 +326,7 @@ ul.refs li { word-break: break-all; }
             {{ $f.Target }}
             {{ if and $f.FullTarget (ne $f.FullTarget $f.Target) }}<div class="mono" style="color:var(--fg-muted);font-size:11px">{{ $f.FullTarget }}</div>{{ end }}
           </td>
+          {{ if $.Doc.HasNodes }}<td class="nowrap">{{ $f.NodeLabel }}</td>{{ end }}
           <td class="num">{{ $f.HitCount }}</td>
           <td class="nowrap">{{ $f.FirstSeen }}</td>
         </tr>
@@ -348,6 +350,7 @@ ul.refs li { word-break: break-all; }
         <span class="mono">{{ $f.VulID }}</span>
         <span>目标：{{ $f.FullTarget }}{{ if not $f.FullTarget }}{{ $f.Target }}{{ end }}</span>
         <span>命中 {{ $f.HitCount }} 次</span>
+        {{ if $f.NodeLabel }}<span>来源节点：{{ $f.NodeLabel }}</span>{{ end }}
         {{ if $f.FirstSeen }}<span>首次发现：{{ $f.FirstSeen }}</span>{{ end }}
       </div>
 

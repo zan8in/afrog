@@ -228,7 +228,13 @@ func writeFindingsSheet(f *excelize.File, doc Document, st xlsxStyles) error {
 		return err
 	}
 
-	headers := []string{"#", "严重级别", "PoC ID", "PoC 名称", "目标", "完整目标", "命中次数", "首次发现"}
+	// 「来源节点」只在这份报告确实含远程命中时出现：纯本机扫描多一列空白没有意义。
+	withNodes := doc.HasNodes()
+	headers := []string{"#", "严重级别", "PoC ID", "PoC 名称", "目标", "完整目标"}
+	if withNodes {
+		headers = append(headers, "来源节点")
+	}
+	headers = append(headers, "命中次数", "首次发现")
 	if err := setHeaderRow(f, sheet, headers, st.header); err != nil {
 		return err
 	}
@@ -242,9 +248,11 @@ func writeFindingsSheet(f *excelize.File, doc Document, st xlsxStyles) error {
 			fd.VulName,
 			fd.Target,
 			fd.FullTarget,
-			fd.HitCount,
-			fd.FirstSeen,
 		}
+		if withNodes {
+			values = append(values, fd.NodeLabel())
+		}
+		values = append(values, fd.HitCount, fd.FirstSeen)
 		if err := setRowValues(f, sheet, row, values, st.cell, st.cellNum); err != nil {
 			return err
 		}
@@ -257,7 +265,15 @@ func writeFindingsSheet(f *excelize.File, doc Document, st xlsxStyles) error {
 		}
 	}
 
-	widths := map[string]float64{"A": 5, "B": 10, "C": 30, "D": 26, "E": 34, "F": 40, "G": 10, "H": 19}
+	widths := map[string]float64{"A": 5, "B": 10, "C": 30, "D": 26, "E": 34, "F": 40}
+	if withNodes {
+		widths["G"] = 14
+		widths["H"] = 10
+		widths["I"] = 19
+	} else {
+		widths["G"] = 10
+		widths["H"] = 19
+	}
 	if err := applyWidths(f, sheet, widths); err != nil {
 		return err
 	}

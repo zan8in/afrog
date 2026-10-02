@@ -53,7 +53,7 @@ A schedule does not have to run locally: pick an **Execution node** in the form 
 - Only **online** peers appear in the selector; on save the node must still be registered and this instance must have a `cluster.token`, so a bad configuration is reported at save time instead of silently failing on every tick
 - **Project targets are resolved locally** into a concrete target list before dispatch, so the executor needs no copy of that project
 - The task and its findings stay on the executor (single source of truth); the initiator keeps only a mirrored record — marked as remote in the task list, showing the node name and the schedule ID, with read-only access to the findings
-- Once the task settles the initiator **backfills** its findings into the local results database: reports, the ledger and exports all include them, and the report and ledger lists tag each row with its source node. The backfill is idempotent (clear-then-write) and keeps retrying while the node stays unreachable — that is exactly what the **node unreachable** flag on the task reflects
+- Once the task settles the initiator **backfills** its findings into the local results database: reports, the ledger and exports all include them, tagged with their source node (exported reports included). The backfill is idempotent (clear-then-write) and keeps retrying while the node stays unreachable — that is exactly what the **node unreachable** flag on the task reflects
 - When the executor is unreachable the task is flagged **node unreachable** and keeps the last reconciled status (never a false *failed*), then resumes reconciling automatically; retries never start the scan twice (each dispatch carries an idempotency key)
 
 ## When a scan actually starts

@@ -8,6 +8,7 @@ package webreport
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -89,9 +90,15 @@ type Finding struct {
 	Solutions   string
 	References  []string
 	// HitCount 是该聚合单元在 result 表里的原始命中行数。
-	HitCount  int
+	HitCount int
+	// Nodes 是这条命中的来源执行节点（去重，按出现顺序）。
+	// 纯本机扫描为空；同一命中在多台节点上都出现时会有多个。
+	Nodes     []string
 	Evidences []Evidence
 }
+
+// NodeLabel 把来源节点拼成展示串；本机命中为空串。
+func (f Finding) NodeLabel() string { return strings.Join(f.Nodes, "、") }
 
 // Document 是待渲染的完整报告。
 type Document struct {
@@ -108,6 +115,17 @@ type Document struct {
 
 // Counts 求和，便于模板里直接展示总数。
 func (d Document) Total() int { return len(d.Findings) }
+
+// HasNodes 表示报告里至少有一条命中来自远程执行节点。
+// 渲染层用它决定要不要输出「来源节点」这一列：纯本机扫描的报告不该多一列空白。
+func (d Document) HasNodes() bool {
+	for _, f := range d.Findings {
+		if len(f.Nodes) > 0 {
+			return true
+		}
+	}
+	return false
+}
 
 // Build 把数据库行聚合为报告文档。
 func Build(meta Meta, brand Brand, rows []db.ResultData, truncated bool) Document {
@@ -156,6 +174,9 @@ func Build(meta Meta, brand Brand, rows []db.ResultData, truncated bool) Documen
 		// result 按 id DESC 返回，逐行取更早的时间即为「首次发现」。
 		if row.Created != "" && (f.FirstSeen == "" || row.Created < f.FirstSeen) {
 			f.FirstSeen = row.Created
+		}
+		if node := strings.TrimSpace(row.Node); node != "" && !slices.Contains(f.Nodes, node) {
+			f.Nodes = append(f.Nodes, node)
 		}
 		applyPocInfo(f, row)
 		if len(f.Evidences) < maxEvidencesPerFinding {
