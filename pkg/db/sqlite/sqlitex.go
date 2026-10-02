@@ -1090,6 +1090,28 @@ func LinkTaskProject(taskID, projectID string) error {
 	return err
 }
 
+// UnlinkProjectTasks 解除某个项目下所有任务的归属，返回解除的条数。
+//
+// 删除项目时必须一起做：task_project 没有裁剪逻辑，留着的话台账里这些命中会
+// 一直指向一个已不存在的 project_id（界面只能显示裸 ID），按项目筛选也仍会命中。
+func UnlinkProjectTasks(projectID string) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return 0, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	res, err := dbx.ExecContext(ctx, `DELETE FROM task_project WHERE project_id = ?`, projectID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // CountTasksByProject 返回项目下的扫描任务数。
 func CountTasksByProject(projectID string) (int64, error) {
 	if dbx == nil {

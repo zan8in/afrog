@@ -157,6 +157,37 @@ func TestDeleteAssetsCascadesProjectMembership(t *testing.T) {
 	}
 }
 
+// 删除项目要连任务归属一起解除：留着的话，台账里这些命中会继续挂着一个已删除的
+// project_id（界面只能显示裸 ID），按项目筛选也仍会命中它们。
+func TestProjectDeleteUnlinksTasks(t *testing.T) {
+	withProjectFixture(t)
+
+	postProject(t, `{"name":"客户Z","targets_text":"https://z.example"}`)
+	p := onlyProject(t)
+
+	if err := sqlite.LinkTaskProject("t-linked", p.ID); err != nil {
+		t.Fatalf("登记任务归属失败：%v", err)
+	}
+	if got, err := sqlite.SelectTaskProject("t-linked"); err != nil || got != p.ID {
+		t.Fatalf("登记后的归属 = %q, %v；期望 %q", got, err, p.ID)
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/projects/"+p.ID, nil)
+	rec := httptest.NewRecorder()
+	projectDeleteHandler(rec, mux.SetURLVars(req, map[string]string{"id": p.ID}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("删除项目应成功：%d %s", rec.Code, rec.Body.String())
+	}
+
+	got, err := sqlite.SelectTaskProject("t-linked")
+	if err != nil {
+		t.Fatalf("查询归属失败：%v", err)
+	}
+	if got != "" {
+		t.Fatalf("删除项目后任务归属应被解除，实际 %q", got)
+	}
+}
+
 // TestProjectSaveReportsIgnoredLines 无效行要被忽略并如实回报，不能悄悄吞掉。
 func TestProjectSaveReportsIgnoredLines(t *testing.T) {
 	withProjectFixture(t)

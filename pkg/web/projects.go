@@ -531,5 +531,10 @@ func projectDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if err := sqlite.DeleteProjectAssets(id); err != nil {
 		gologger.Warning().Msgf("delete project %s assets failed: %v", id, err)
 	}
+	// 任务归属同理：留着的话，台账里这些命中会继续挂着一个已删除的 project_id，
+	// 界面只能显示裸 ID，按项目筛选也仍会命中它们。
+	if _, err := sqlite.UnlinkProjectTasks(id); err != nil {
+		gologger.Warning().Msgf("delete project %s task links failed: %v", id, err)
+	}
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "已删除"})
 }
