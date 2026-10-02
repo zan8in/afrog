@@ -725,11 +725,34 @@ func clusterRemoteDispatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rt := newRemoteTask(peer, req.Request)
+	// 按项目派发：项目与资产库只存在于发起端。派发前先在本地把项目解析成具体
+	// 目标，只把目标清单交给执行节点——执行节点不需要（也不该）拥有该项目。
+	scanReq := req.Request
+	if pid := strings.TrimSpace(scanReq.ProjectID); pid != "" {
+		project, ok := findProject(pid)
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: errProjectNotFound.Error()})
+			return
+		}
+		targets, err := resolveScanTargets(scanReq)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+			return
+		}
+		scanReq.Targets = targets
+		scanReq.ProjectID = ""
+		if strings.TrimSpace(scanReq.TaskName) == "" {
+			scanReq.TaskName = "远程任务 · 项目 " + strings.TrimSpace(project.Name)
+		}
+	}
+
+	rt := newRemoteTask(peer, scanReq)
 	addRemoteTask(rt)
 	startRemoteReconciler()
 
-	taskID, name, hardMsg, softMsg := postRemoteDispatch(peer, token, rt.DispatchID, req.Request)
+	taskID, name, hardMsg, softMsg := postRemoteDispatch(peer, token, rt.DispatchID, scanReq)
 	if hardMsg != "" {
 		removeRemoteTask(rt.ID)
 		w.WriteHeader(http.StatusBadRequest)

@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +32,16 @@ type fakePeer struct {
 	stopCalls int
 	status    string
 	progress  ScanProgressData
+
+	mu       sync.Mutex
+	dispatch inboundDispatchRequest
+}
+
+// lastDispatch 返回执行节点最近一次收到的派发请求（用于断言发起端到底发了什么）。
+func (fp *fakePeer) lastDispatch() inboundDispatchRequest {
+	fp.mu.Lock()
+	defer fp.mu.Unlock()
+	return fp.dispatch
 }
 
 func newFakePeer(t *testing.T, token string) *fakePeer {
@@ -50,6 +62,11 @@ func newFakePeer(t *testing.T, token string) *fakePeer {
 		}
 		switch {
 		case r.URL.Path == "/api/cluster/inbound/dispatch":
+			var in inboundDispatchRequest
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			fp.mu.Lock()
+			fp.dispatch = in
+			fp.mu.Unlock()
 			_, _ = w.Write([]byte(`{"success":true,"message":"started","data":{"task_id":"remote-1","name":"远程任务","node":"peerA"}}`))
 		case strings.HasSuffix(r.URL.Path, "/stop"):
 			fp.stopCalls++
@@ -336,5 +353,69 @@ func TestRemoteTaskPersistAndRestore(t *testing.T) {
 	items := remoteScanItems()
 	if len(items) != 1 || items[0].TaskID != rt.ID || items[0].Source != scanSourceRemote {
 		t.Fatalf("恢复的记录未并入列表：%+v", items)
+	}
+}
+
+// dispatchBody 用给定的 request 字段发起一次派发。
+func dispatchBody(t *testing.T, nodeURL string, reqBody map[string]any) *httptest.ResponseRecorder {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"node_url": nodeURL, "request": reqBody})
+	rec := httptest.NewRecorder()
+	clusterRemoteDispatchHandler(rec, httptest.NewRequest(http.MethodPost, "/api/cluster/dispatch", strings.NewReader(string(body))))
+	return rec
+}
+
+// 按项目派发：发起端把项目解析成具体目标，执行节点只收到目标清单、不收到 project_id。
+func TestClusterRemoteDispatchByProject(t *testing.T) {
+	resetRemoteStore()
+	withProjectFixture(t)
+	if rec := postProject(t, `{"name":"客户A","targets_text":"https://a.example\nhttps://b.example"}`); rec.Code != http.StatusOK {
+		t.Fatalf("准备项目失败：%d %s", rec.Code, rec.Body.String())
+	}
+	p := onlyProject(t)
+
+	fp := newFakePeer(t, "shared-token")
+	useCluster(t, []config.ClusterPeer{{Name: "节点A", URL: fp.srv.URL}})
+
+	rec := dispatchBody(t, fp.srv.URL, map[string]any{"project_id": p.ID})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("按项目派发应成功：%d %s", rec.Code, rec.Body.String())
+	}
+
+	sent := fp.lastDispatch()
+	if sent.Request.ProjectID != "" {
+		t.Fatalf("执行节点不应收到 project_id，实际 %q", sent.Request.ProjectID)
+	}
+	want, err := resolveScanTargets(ScanCreateRequest{ProjectID: p.ID})
+	if err != nil {
+		t.Fatalf("本地解析项目目标失败：%v", err)
+	}
+	if !reflect.DeepEqual(sent.Request.Targets, want) {
+		t.Fatalf("执行节点收到的目标 = %v，期望 %v", sent.Request.Targets, want)
+	}
+	if !strings.Contains(sent.Request.TaskName, "客户A") {
+		t.Fatalf("任务名应带上项目名兜底，实际 %q", sent.Request.TaskName)
+	}
+}
+
+// 项目不存在：派发前就拦住，不产生任何影子记录，也不真的发起派发。
+func TestClusterRemoteDispatchByUnknownProject(t *testing.T) {
+	resetRemoteStore()
+	withProjectFixture(t)
+	fp := newFakePeer(t, "shared-token")
+	useCluster(t, []config.ClusterPeer{{Name: "节点A", URL: fp.srv.URL}})
+
+	rec := dispatchBody(t, fp.srv.URL, map[string]any{"project_id": "p-does-not-exist"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("未知项目应 400，实际 %d %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "项目不存在") {
+		t.Fatalf("应说明原因：%s", rec.Body.String())
+	}
+	if items := remoteScanItems(); len(items) != 0 {
+		t.Fatalf("失败派发不应留下影子记录：%+v", items)
+	}
+	if sent := fp.lastDispatch(); sent.DispatchID != "" || sent.Request.Targets != nil {
+		t.Fatalf("未知项目不该真的发起派发：%+v", sent)
 	}
 }
