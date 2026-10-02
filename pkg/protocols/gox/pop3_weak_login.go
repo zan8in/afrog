@@ -98,7 +98,7 @@ func pop3AuthAttempt(host, username, password string) bool {
 
 	// Send USER
 	fmt.Fprintf(conn, "USER %s\r\n", username)
-	
+
 	// Read USER response
 	// +OK User name accepted, password please
 	line, err = reader.ReadString('\n')

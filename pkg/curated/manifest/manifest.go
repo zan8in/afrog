@@ -82,4 +82,3 @@ func (m *Manifest) SelectBestArtifact(currentManifestID string) (Artifact, bool)
 	}
 	return m.Artifacts[0], true
 }
-

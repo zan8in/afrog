@@ -34,8 +34,8 @@ type scriptHandle struct {
 	done     chan struct{}
 	pauseErr error
 
-	once sync.Once
-	mu   sync.Mutex
+	once   sync.Once
+	mu     sync.Mutex
 	paused bool
 	ended  bool
 }
@@ -81,10 +81,10 @@ func (h *scriptHandle) Cancel() error {
 }
 
 type scriptExecutor struct {
-	mu      sync.Mutex
-	handles map[string]*scriptHandle
-	specs   map[string]*executor.Spec
-	started chan string
+	mu       sync.Mutex
+	handles  map[string]*scriptHandle
+	specs    map[string]*executor.Spec
+	started  chan string
 	startErr error
 	pauseErr error
 }

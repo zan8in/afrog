@@ -208,4 +208,3 @@ func resolveVNCAddress(target string) (string, error) {
 	}
 	return host, nil
 }
-

@@ -70,6 +70,9 @@ func newTestScanner(t *testing.T, extra ...Option) (*Scanner, *httptest.Server) 
 		WithPocPathsOnly(),
 		WithFingerprintDisabled(),
 		WithTimeout(10),
+		// Tests must not reach the network: the curated source would otherwise
+		// perform real API calls to the endpoint in the caller's config.
+		WithCurated(CuratedOptions{Enabled: "off"}),
 	}, extra...)
 
 	scanner, err := New(context.Background(), options...)
@@ -603,6 +606,7 @@ func TestScanner_DoesNotLeakGoroutines(t *testing.T) {
 			WithPocPaths(dir),
 			WithPocPathsOnly(),
 			WithFingerprintDisabled(),
+			WithCurated(CuratedOptions{Enabled: "off"}),
 		)
 		if err != nil {
 			t.Fatalf("New: %v", err)

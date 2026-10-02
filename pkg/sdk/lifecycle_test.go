@@ -118,6 +118,8 @@ func TestNew_ReleasesResourcesWhenConstructionFails(t *testing.T) {
 			WithPocPaths(dir),
 			WithPocPathsOnly(),
 			WithFingerprintDisabled(),
+			// Keep the test hermetic: no curated API calls to the network.
+			WithCurated(CuratedOptions{Enabled: "off"}),
 			// The PoC is "info", so nothing survives the filter and
 			// construction fails only after the runner exists.
 			WithSeverity("critical"),
@@ -127,14 +129,14 @@ func TestNew_ReleasesResourcesWhenConstructionFails(t *testing.T) {
 	if err := failedNew(); !errors.Is(err, ErrNoPocs) {
 		t.Fatalf("New error = %v, want ErrNoPocs", err)
 	}
-        srv.CloseClientConnections()
+	srv.CloseClientConnections()
 
 	before := waitGoroutines(t, 0)
 	for i := 0; i < 3; i++ {
 		if err := failedNew(); !errors.Is(err, ErrNoPocs) {
 			t.Fatalf("New error = %v, want ErrNoPocs", err)
 		}
-                srv.CloseClientConnections()
+		srv.CloseClientConnections()
 	}
 	if after := waitGoroutines(t, before); after > before+5 {
 		t.Fatalf("goroutine count grew from %d to %d across 3 failed constructions", before, after)

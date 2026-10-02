@@ -113,7 +113,7 @@ func ApplyHeaderLines(req *retryablehttp.Request, headerLines []string, overwrit
 }
 
 func Init(opt *Options) (err error) {
-        CloseIdleConnections()
+	CloseIdleConnections()
 
 	po := &retryablehttp.DefaultPoolOptions
 	// 避免上游 SDK 在处理代理列表时触发并发通道错误，先不让池初始化解析代理

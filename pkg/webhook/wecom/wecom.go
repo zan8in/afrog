@@ -72,6 +72,7 @@ func (w *Wecom) SendVulMessage(result *result.Result, markdown bool) error {
 	}
 	return w.sendMessage(content, markdown, mentionedMobiles)
 }
+
 // SendMarkdown 发送一条通用 markdown 消息，供 Web 端通知复用。
 // 与 SendVulMessage 的区别是不依赖扫描结果，只吃标题与正文行。
 func (w *Wecom) SendMarkdown(title string, lines []string) error {

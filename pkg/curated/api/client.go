@@ -87,6 +87,12 @@ func NewClient(base string, opts ClientOptions) *Client {
 			Timeout: 10 * time.Second,
 		}).DialContext,
 		TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+		// A client is built per control-plane call and then discarded. With
+		// keep-alives enabled the pooled connections (and their read/write
+		// goroutines) would outlive the client forever, because IdleConnTimeout
+		// defaults to 0 (no expiry). Long-running embedders that mount curated
+		// once per scanner would then accumulate leaked connections.
+		DisableKeepAlives: true,
 	}
 	if strings.TrimSpace(opts.Proxy) != "" {
 		if pu, err := url.Parse(opts.Proxy); err == nil {
