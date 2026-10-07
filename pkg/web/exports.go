@@ -16,7 +16,10 @@ import (
 )
 
 // exportBrandSite 是报告水印里的站点标识。
-const exportBrandSite = "afrog.zan8in.com"
+//
+// 留空：此前写死的域名并不正确，打在报告水印里会误导阅读者。水印只保留产品名，
+// 见 webreport.brandLine：Site 为空时只输出产品名（不带 " · " 分隔）。
+const exportBrandSite = ""
 
 // exportFormat 是报告导出格式。
 type exportFormat string
@@ -217,22 +220,28 @@ func exportTaskHandler(w http.ResponseWriter, r *http.Request) {
 	renderExport(w, r, meta, rows)
 }
 
-// exportReportsHandler 导出漏洞报告页当前筛选结果（跨任务聚合）。
-// GET /exports/reports?format=...&severity=high&keyword=ftp
+// exportReportsHandler 导出漏洞报告页当前筛选结果。
+// GET /exports/reports?format=...&severity=high&keyword=ftp&task_id=<id>
+// task_id 非空时只导出该任务，与页面上「按任务筛选」的范围保持一致。
 func exportReportsHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	severity := strings.TrimSpace(q.Get("severity"))
 	keyword := strings.TrimSpace(q.Get("keyword"))
+	taskID := strings.TrimSpace(q.Get("task_id"))
 
-	rows, err := sqlite.SelectAllFiltered(severity, keyword, true, true)
+	rows, err := sqlite.SelectAllFiltered(taskID, severity, keyword, true, true)
 	if err != nil {
 		writeExportError(w, http.StatusInternalServerError, "读取报告数据失败")
 		return
 	}
 
+	subject := "筛选结果"
+	if taskID != "" {
+		subject = taskDisplayName(taskID)
+	}
 	meta := webreport.Meta{
 		Title:       "漏洞报告",
-		Subject:     "筛选结果",
+		Subject:     subject,
 		Targets:     distinctTargets(rows),
 		Severities:  splitCSVParam(severity),
 		Keyword:     keyword,
