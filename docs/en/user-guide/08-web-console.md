@@ -190,6 +190,17 @@ After pasting targets into the **Scan** workbench, click **AI recommended parame
 - **Only recommended fields are applied**: anything the model did not return keeps your current setting
 - **Re-opening the same targets is served from cache**, so the model is not called again; when no model is configured you are pointed to **Settings → AI assist**
 
+## Curated member centre
+
+The **Curated** page turns the `curated` section of `afrog-config.yaml` into a form: the member switch, service endpoint, update channel, license, auto-update and mount timeout. Click **Save and apply** to write the file back.
+
+- **Effective immediately, no restart**: saving re-assembles the licensed capability and also signs in and pulls the PoCs once — so this step *is* activation. Fill in the endpoint and license, then save (the pull can take tens of seconds)
+- **A failed pull is not a failed activation**: the config is already written and in effect; the reason shows up both in the toast and in the member status card, and you can retry with **Check for PoC updates**
+- **An empty endpoint means the licensed capability is off**; `auto` and `on` behave the same for the member switch
+- While not activated the page also shows the locked preview and the Knowledge Planet entry point: purchase and license issuing happen off-site, there is no in-app payment
+- The status card shows remaining days, expiry, licensed PoC count, last update and manifest version
+- Note: saving **rewrites the whole `curated` section**, so comments inside that section are lost (other sections are untouched)
+
 ## Relation to the CLI
 
 The web console does not replace the CLI; both share the same engine and PoCs:

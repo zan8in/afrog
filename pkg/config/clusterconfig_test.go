@@ -193,3 +193,56 @@ cluster:
 		t.Fatalf("cluster 段解析结果不对: %+v", cfg.Cluster)
 	}
 }
+
+// curated 段同样整块替换：写会员配置不能动同文件里的其它段。
+func TestUpdateCuratedSection_ReplacesOnlyCuratedBlock(t *testing.T) {
+	path := writeTempConfig(t, `server: :16868
+curated:
+  enabled: "auto"
+  endpoint: "http://old.example:8787/"
+  timeout_sec: 10
+
+cluster:
+  name: "总部"
+  token: "shared"
+`)
+
+	autoUpdate := false
+	err := UpdateCuratedSection(path, Curated{
+		Enabled:    "on",
+		AutoUpdate: &autoUpdate,
+		Endpoint:   "http://afrogx.com:8787/",
+		TimeoutSec: 60,
+		Channel:    "stable",
+		LicenseKey: "LIC_12bee5652f92c526a9abcacc_63e4e54ffb18",
+	})
+	if err != nil {
+		t.Fatalf("UpdateCuratedSection: %v", err)
+	}
+
+	got := readFile(t, path)
+	if strings.Contains(got, "old.example") {
+		t.Fatalf("旧配置未被替换：\n%s", got)
+	}
+	if !strings.Contains(got, `license_key: "LIC_12bee5652f92c526a9abcacc_63e4e54ffb18"`) {
+		t.Fatalf("license 未写入：\n%s", got)
+	}
+	if !strings.Contains(got, "auto_update: false") || !strings.Contains(got, "timeout_sec: 60") {
+		t.Fatalf("开关 / 超时未写入：\n%s", got)
+	}
+	if !strings.Contains(got, "cluster:") || !strings.Contains(got, "shared") {
+		t.Fatalf("cluster 段被破坏：\n%s", got)
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal([]byte(got), &cfg); err != nil {
+		t.Fatalf("写回的内容不是合法 yaml: %v\n%s", err, got)
+	}
+	if cfg.Curated.Enabled != "on" || cfg.Curated.TimeoutSec != 60 ||
+		cfg.Curated.LicenseKey != "LIC_12bee5652f92c526a9abcacc_63e4e54ffb18" {
+		t.Fatalf("curated 段解析结果不对: %+v", cfg.Curated)
+	}
+	if cfg.Curated.AutoUpdate == nil || *cfg.Curated.AutoUpdate {
+		t.Fatalf("auto_update 应为 false: %+v", cfg.Curated.AutoUpdate)
+	}
+}

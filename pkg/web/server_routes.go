@@ -85,6 +85,10 @@ func setupHandler() (http.Handler, error) {
 	r.HandleFunc("/curated/status", jwtAuthMiddleware(curatedStatusHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/curated/activate", jwtAuthMiddleware(curatedActivateHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/curated/update", jwtAuthMiddleware(requireCurated(curatedUpdateHandler))).Methods(http.MethodPost)
+	// curated/config 刻意不加 requireCurated：未激活（甚至未启用）时也必须能编辑这一段，
+	// 否则"要填 endpoint 才能启用、没启用就不能编辑"会形成死锁。
+	r.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigGetHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigPutHandler)).Methods(http.MethodPut)
 	r.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
 	r.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
 	r.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).MatcherFunc(legacyAPIRoute).Methods(http.MethodGet)
@@ -231,6 +235,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/curated/status", jwtAuthMiddleware(curatedStatusHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/curated/activate", jwtAuthMiddleware(curatedActivateHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/curated/update", jwtAuthMiddleware(requireCurated(curatedUpdateHandler))).Methods(http.MethodPost)
+	api.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigPutHandler)).Methods(http.MethodPut)
 	api.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).Methods(http.MethodGet)

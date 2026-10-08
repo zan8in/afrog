@@ -646,6 +646,14 @@ func interactshKeyLines(indent int, interactsh Interactsh, present map[string]bo
 	return lines
 }
 
+// UpdateCuratedSection 把 curated（会员）段整体写回配置文件，其余段落原样保留。
+//
+// configPath 为空时回退到默认的 ~/.config/afrog/afrog-config.yaml。
+// 该段内的原有注释会被新内容覆盖（与 cluster/ai/reverse 同），段外注释不受影响。
+func UpdateCuratedSection(configPath string, curated Curated) error {
+	return replaceTopLevelSection(configPath, "curated", curatedSectionLines(0, curated))
+}
+
 // UpdateClusterSection 把 cluster 段整体写回配置文件，其余段落原样保留。
 //
 // configPath 为空时回退到默认的 ~/.config/afrog/afrog-config.yaml。

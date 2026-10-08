@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,7 +14,6 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
-	"github.com/zan8in/afrog/v3/pkg/curated/service"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/jsonstream"
@@ -70,41 +68,11 @@ func main() {
 		jsonStream = scanstream.NewWriter(os.Stdout, "local", taskID)
 	}
 
-	var curatedService *service.Service
 	if options.Config != nil {
-		cur := options.Config.Curated
-		enabled := strings.ToLower(strings.TrimSpace(cur.Enabled))
-		endpoint := strings.TrimSpace(cur.Endpoint)
-		if enabled == "off" || enabled == "false" || enabled == "0" || endpoint == "" {
-			_ = os.Setenv("AFROG_CURATED_DISABLED", "1")
-			_ = os.Unsetenv("AFROG_POCS_CURATED_DIR")
-			home, err := os.UserHomeDir()
-			if err == nil && strings.TrimSpace(home) != "" {
-				_ = os.RemoveAll(filepath.Join(home, ".config", "afrog", "pocs-curated"))
-			}
-		} else {
-			_ = os.Unsetenv("AFROG_CURATED_DISABLED")
-			svc := service.New(service.Config{
-				Endpoint:      endpoint,
-				Channel:       strings.TrimSpace(cur.Channel),
-				CuratedPocDir: "",
-				LicenseKey:    strings.TrimSpace(cur.LicenseKey),
-				NoUpdate:      cur.AutoUpdate != nil && !*cur.AutoUpdate && !options.CuratedForceUpdate,
-				ForceUpdate:   options.CuratedForceUpdate,
-				ClientVersion: config.Version,
-			})
-			curatedService = svc
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cur.TimeoutSec)*time.Second)
-			if cur.TimeoutSec <= 0 {
-				ctx, cancel = context.WithCancel(context.Background())
-			}
-			defer cancel()
-			dir, err := svc.Mount(ctx)
-			if err != nil {
-				gologger.Warning().Msgf("curated mount failed: %s", strings.TrimSpace(err.Error()))
-			} else if strings.TrimSpace(dir) != "" {
-				_ = os.Setenv("AFROG_POCS_CURATED_DIR", dir)
-			}
+		// 会员（curated）能力的装配与 Web 端「会员中心」保存配置共用同一实现，
+		// 避免"启动会清理残留、保存却不会"这类口径漂移。拉不到 PoC 不等于未激活。
+		if err := web.AssembleCurated(options.Config.Curated, options.ConfigFile, options.CuratedForceUpdate); err != nil {
+			gologger.Warning().Msgf("curated mount failed: %s", strings.TrimSpace(err.Error()))
 		}
 	}
 
@@ -131,9 +99,9 @@ func main() {
 			return
 		}
 		defer sqlite.CloseX()
-		web.SetCuratedService(curatedService)
-		// 多实例编排、AI 辅助与 OOB 凭据的配置都来自 afrog-config.yaml
-		// （cluster / ai / reverse 段）；一并把配置文件路径交给 Web 层：界面保存时要写回这个文件。
+		// 多实例编排、AI 辅助、OOB 凭据与会员配置都来自 afrog-config.yaml
+		// （cluster / ai / reverse / curated 段）；一并把配置文件路径交给 Web 层：
+		// 界面保存时要写回这个文件。
 		if cfg != nil {
 			web.SetClusterConfig(cfg.Cluster, options.ConfigFile)
 			web.SetAIConfig(cfg.AI, options.ConfigFile)
