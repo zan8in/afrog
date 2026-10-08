@@ -1,12 +1,16 @@
 package web
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gorilla/mux"
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
@@ -416,6 +420,152 @@ func TestScanItemFromRow_FillsEmptyCollections(t *testing.T) {
 	}
 	if item.ScanInfo != nil {
 		t.Fatalf("ScanInfo should stay nil when nothing was recorded: %+v", item.ScanInfo)
+	}
+}
+
+// 列表项刻意不带完整目标清单：一个任务上千目标时，每 10s 一次的轮询响应会涨到 MB 级
+// （线上实测 62 条任务 ≈ 1.8MB，其中 99% 是目标清单）。这里把「只回摘要」钉住，
+// 避免以后顺手把 targets 加回列表 JSON。
+func TestScanListItemJSON_CarriesTargetSummaryNotFullList(t *testing.T) {
+	targets := make([]string, 0, 2000)
+	for i := 0; i < 2000; i++ {
+		targets = append(targets, fmt.Sprintf("https://host-%d.example", i))
+	}
+	raw, err := json.Marshal(scanListItem{
+		TaskID:      "t-1",
+		Status:      string(TaskRunning),
+		Targets:     targets,
+		Target:      targets[0],
+		TargetTotal: len(targets),
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(raw), `"targets"`) {
+		t.Fatalf("列表项不应回传完整目标清单，实际 JSON = %s", string(raw[:min(len(raw), 200)]))
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got["target"] != targets[0] {
+		t.Fatalf("target = %v, want %q", got["target"], targets[0])
+	}
+	if got["target_total"] != float64(len(targets)) {
+		t.Fatalf("target_total = %v, want %d", got["target_total"], len(targets))
+	}
+	if len(raw) > 512 {
+		t.Fatalf("列表项 JSON 有 %d 字节，目标清单疑似又回到了响应里", len(raw))
+	}
+}
+
+// 轻量轮询（scope=active）只回内存里「活跃或刚结束」的任务：
+// 历史任务不会变化，每 10s 重拉一遍没有意义。
+func TestListScansActive_OnlyReturnsLiveOrJustEndedTasks(t *testing.T) {
+	now := time.Now()
+	m := newTaskManager()
+	m.tasks["running-1"] = &Task{
+		ID: "running-1", status: TaskRunning,
+		CreatedAt: now.Add(-time.Minute),
+		targets:   []string{"https://a.example", "https://b.example"},
+	}
+	m.tasks["just-ended"] = &Task{
+		ID: "just-ended", status: TaskCompleted,
+		CreatedAt: now.Add(-2 * time.Minute),
+		endedAt:   now.Add(-time.Minute),
+	}
+	m.tasks["stale"] = &Task{
+		ID: "stale", status: TaskCompleted,
+		CreatedAt: now.Add(-48 * time.Hour),
+		endedAt:   now.Add(-47 * time.Hour),
+	}
+
+	items := m.listScansActive()
+	byID := make(map[string]scanListItem, len(items))
+	for _, it := range items {
+		byID[it.TaskID] = it
+	}
+	if _, ok := byID["stale"]; ok {
+		t.Fatalf("已结束很久的任务不该出现在轻量轮询里：%+v", items)
+	}
+	live, ok := byID["running-1"]
+	if !ok {
+		t.Fatalf("运行中的任务必须在轻量轮询里：%+v", items)
+	}
+	if live.Target != "https://a.example" || live.TargetTotal != 2 {
+		t.Fatalf("目标摘要不对：target=%q target_total=%d", live.Target, live.TargetTotal)
+	}
+	if _, ok := byID["just-ended"]; !ok {
+		t.Fatalf("刚结束的任务要靠这个窗口回带给前端：%+v", items)
+	}
+	// 排序与全量口径一致：新的在前
+	if len(items) >= 2 && items[0].CreatedAt < items[1].CreatedAt {
+		t.Fatalf("列表未按创建时间倒序：%+v", items)
+	}
+}
+
+// 列表只给摘要后，「重跑」需要的一份全量清单由这个接口按需提供。
+func TestScanTargetsHandler_ServesFullListOnDemand(t *testing.T) {
+	m := getTaskManager()
+	task := &Task{
+		ID: "t-targets-on-demand", status: TaskRunning,
+		targets: []string{"https://a.example", "https://b.example"},
+	}
+	m.mu.Lock()
+	m.tasks[task.ID] = task
+	m.mu.Unlock()
+	t.Cleanup(func() {
+		m.mu.Lock()
+		delete(m.tasks, task.ID)
+		m.mu.Unlock()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/scans/"+task.ID+"/targets", nil)
+	req = mux.SetURLVars(req, map[string]string{"taskId": task.ID})
+	rec := httptest.NewRecorder()
+	scanTargetsHandler(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Targets     []string `json:"targets"`
+			TargetTotal int      `json:"target_total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v body=%s", err, rec.Body.String())
+	}
+	if !resp.Success || len(resp.Data.Targets) != 2 || resp.Data.TargetTotal != 2 {
+		t.Fatalf("目标清单不对：%+v", resp)
+	}
+
+	// 三处都找不到的任务：如实 404，前端据此提示「没有可复用的目标」
+	missing := httptest.NewRequest(http.MethodGet, "/api/scans/no-such-task/targets", nil)
+	missing = mux.SetURLVars(missing, map[string]string{"taskId": "no-such-task"})
+	recMissing := httptest.NewRecorder()
+	scanTargetsHandler(recMissing, missing)
+	if recMissing.Code != http.StatusNotFound {
+		t.Fatalf("不存在的任务 status = %d, want 404", recMissing.Code)
+	}
+}
+
+// 历史快照也要能给出目标摘要：按项目派发的任务没有清单，
+// 数量只能取引擎上报的 total_targets，否则列表会显示成 0。
+func TestScanItemFromRow_TargetSummaryCoversProjectDispatch(t *testing.T) {
+	item := scanItemFromRow(db2.ScanTaskRow{
+		TaskID: "t-1", Status: "completed",
+		Targets: []string{"https://a.example", "https://b.example"},
+	})
+	if item.Target != "https://a.example" || item.TargetTotal != 2 {
+		t.Fatalf("target=%q target_total=%d, want https://a.example / 2", item.Target, item.TargetTotal)
+	}
+
+	projectItem := scanItemFromRow(db2.ScanTaskRow{TaskID: "t-2", Status: "completed", TotalTargets: 7})
+	if projectItem.Target != "" || projectItem.TargetTotal != 7 {
+		t.Fatalf("按项目派发应回落到 total_targets：target=%q target_total=%d", projectItem.Target, projectItem.TargetTotal)
 	}
 }
 

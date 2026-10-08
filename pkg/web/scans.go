@@ -139,6 +139,13 @@ func (t *Task) setEnded(at time.Time) {
 	t.mu.Unlock()
 }
 
+// ended 返回任务收尾时刻，零值表示还没结束。
+func (t *Task) ended() time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.endedAt
+}
+
 func (t *Task) setHandle(h executor.Handle) {
 	t.mu.Lock()
 	t.handle = h
@@ -578,6 +585,9 @@ type scanOrigin struct {
 //
 // 任务状态是进程内存态：重启后不复存在，历史命中仍可从报告/台账查询。
 // 这个接口的作用是让「不是本页面发起」的扫描（典型是计划扫描）也能在前端可见。
+//
+// scope=active 是给轮询用的轻量口径：只回内存里活跃或刚结束的任务，不读 sqlite 历史。
+// 历史任务不会变化，前端首次加载拿一次全量就够了，每 10s 重读一遍纯属浪费。
 func scansListHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodGet {
@@ -586,7 +596,11 @@ func scansListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := getTaskManager().listScans()
+	m := getTaskManager()
+	items := m.listScans()
+	if strings.TrimSpace(r.URL.Query().Get("scope")) == "active" {
+		items = m.listScansActive()
+	}
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]interface{}{
 		"items": items,
 		"total": len(items),
@@ -606,11 +620,20 @@ type scanListItem struct {
 	NodeName string `json:"node_name,omitempty"`
 	// NodeOK 仅对发起端的远程任务有意义：false 表示暂时联系不上执行节点，
 	// 此时状态是最后一次成功对账的结果，不应当当作失败。
-	NodeOK    bool     `json:"node_ok,omitempty"`
-	Targets   []string `json:"targets"`
-	CreatedAt string   `json:"created_at,omitempty"`
-	StartedAt string   `json:"started_at,omitempty"`
-	EndedAt   string   `json:"ended_at,omitempty"`
+	NodeOK bool `json:"node_ok,omitempty"`
+	// Targets 是完整目标清单，刻意不进 JSON：一个任务上千目标时，把清单塞进列表
+	// 会让每 10s 一次的轮询响应涨到 MB 级（实测 62 条任务 ≈ 1.8MB，其中 99% 是它）。
+	// 只需要摘要（Target / TargetTotal）；真要全量时走 GET /scans/{taskId}/targets。
+	// 服务端内部仍需要它（任务快照落库），所以是 json:"-" 而不是删字段。
+	Targets []string `json:"-"`
+	// Target 是首个目标，列表摘要用。
+	Target string `json:"target,omitempty"`
+	// TargetTotal 是目标总数。前端据此区分「确实没有目标」与「清单未随列表下发」，
+	// 并决定「重跑」时是否需要按需拉一次全量清单。
+	TargetTotal int    `json:"target_total"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	StartedAt   string `json:"started_at,omitempty"`
+	EndedAt     string `json:"ended_at,omitempty"`
 
 	Progress ScanProgressData `json:"progress"`
 	Hits     map[string]int   `json:"hits"`
@@ -639,6 +662,14 @@ func formatScanTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }
 
+// firstTarget 取首个目标做列表摘要；没有目标时返回空串。
+func firstTarget(targets []string) string {
+	if len(targets) == 0 {
+		return ""
+	}
+	return targets[0]
+}
+
 // listItem 组装任务列表项。
 func (t *Task) listItem() scanListItem {
 	t.mu.Lock()
@@ -646,19 +677,22 @@ func (t *Task) listItem() scanListItem {
 	if source == "" {
 		source = scanSourceManual
 	}
+	targets := append([]string(nil), t.targets...)
 	item := scanListItem{
-		TaskID:     t.ID,
-		Name:       t.Name,
-		Status:     string(t.status),
-		Source:     source,
-		ScheduleID: t.scheduleID,
-		ProjectID:  t.projectID,
-		NodeName:   t.originName,
-		Targets:    append([]string(nil), t.targets...),
-		CreatedAt:  formatScanTime(t.CreatedAt),
-		StartedAt:  formatScanTime(t.startTime),
-		EndedAt:    formatScanTime(t.endedAt),
-		Error:      t.errText,
+		TaskID:      t.ID,
+		Name:        t.Name,
+		Status:      string(t.status),
+		Source:      source,
+		ScheduleID:  t.scheduleID,
+		ProjectID:   t.projectID,
+		NodeName:    t.originName,
+		Targets:     targets,
+		Target:      firstTarget(targets),
+		TargetTotal: len(targets),
+		CreatedAt:   formatScanTime(t.CreatedAt),
+		StartedAt:   formatScanTime(t.startTime),
+		EndedAt:     formatScanTime(t.endedAt),
+		Error:       t.errText,
 	}
 	t.mu.Unlock()
 
@@ -747,6 +781,53 @@ func (m *TaskManager) listScans() []scanListItem {
 	return out
 }
 
+// recentEndedWindow 是轻量轮询回看的「刚结束」窗口。
+//
+// 轮询间隔 10s，两次轮询之间起停的短任务（计划扫描里的常见情况）只能靠这个窗口
+// 带给前端；没有它，这类任务要等下一次全量刷新才会出现在列表里。
+const recentEndedWindow = 5 * time.Minute
+
+// listScansActive 是轮询用的轻量口径：只返回内存中「活跃或刚结束」的任务，
+// 外加同口径的远程任务。刻意不读 sqlite 历史——历史任务不会变化，
+// 前端首次加载时取一次全量即可，每 10s 重读一遍（上限 200 条）纯属浪费。
+func (m *TaskManager) listScansActive() []scanListItem {
+	m.mu.Lock()
+	tasks := make([]*Task, 0, len(m.tasks))
+	for _, t := range m.tasks {
+		tasks = append(tasks, t)
+	}
+	m.mu.Unlock()
+
+	now := time.Now()
+	out := make([]scanListItem, 0, len(tasks))
+	for _, t := range tasks {
+		if !isActive(t.Status()) && !endedRecently(t.ended(), now) {
+			continue
+		}
+		out = append(out, t.listItem())
+	}
+	// 远程任务由对账协程维护，终态收敛不依赖这里的轮询；只带上仍在跑的，
+	// 避免轻量轮询把 200 条已结束的远程记录一起重发。
+	for _, rt := range remoteTaskSnapshot() {
+		if !isActive(TaskStatus(rt.Status)) {
+			continue
+		}
+		out = append(out, remoteTaskItem(rt))
+	}
+
+	// 与 listScans 保持同一排序口径：时间已是 "2006-01-02 15:04:05"，字典序即时间序。
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt > out[j].CreatedAt })
+	return out
+}
+
+// endedRecently 判断任务是否在给定窗口内收尾；未结束（零值）不算。
+func endedRecently(endedAt, now time.Time) bool {
+	if endedAt.IsZero() {
+		return false
+	}
+	return now.Sub(endedAt) <= recentEndedWindow
+}
+
 // historicalScanItems 读取历史任务快照，跳过内存里已有的任务（以内存为准）。
 func historicalScanItems(skip map[string]struct{}) []scanListItem {
 	rows, err := sqlite.SelectScanTasks(0)
@@ -785,18 +866,26 @@ func scanItemFromRow(row db2.ScanTaskRow) scanListItem {
 	if hits == nil {
 		hits = map[string]int{}
 	}
+	// 按项目派发的任务没有目标清单（目标由服务端按项目成员决定），
+	// 数量只能取引擎上报的 total_targets，否则列表会显示成 0。
+	targetTotal := len(targets)
+	if targetTotal == 0 {
+		targetTotal = row.TotalTargets
+	}
 
 	item := scanListItem{
-		TaskID:     row.TaskID,
-		Name:       row.Name,
-		Status:     status,
-		Source:     source,
-		ScheduleID: row.ScheduleID,
-		ProjectID:  row.ProjectID,
-		Targets:    targets,
-		CreatedAt:  row.CreatedAt,
-		StartedAt:  row.StartedAt,
-		EndedAt:    row.EndedAt,
+		TaskID:      row.TaskID,
+		Name:        row.Name,
+		Status:      status,
+		Source:      source,
+		ScheduleID:  row.ScheduleID,
+		ProjectID:   row.ProjectID,
+		Targets:     targets,
+		Target:      firstTarget(targets),
+		TargetTotal: targetTotal,
+		CreatedAt:   row.CreatedAt,
+		StartedAt:   row.StartedAt,
+		EndedAt:     row.EndedAt,
 		Progress: ScanProgressData{
 			Percent:   row.Percent,
 			Finished:  row.Finished,
@@ -1201,6 +1290,61 @@ func scanStatusHandler(w http.ResponseWriter, r *http.Request) {
 	resp.Stats.FoundVulns = t.hitCount()
 	resp.Error = t.errMessage()
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: resp})
+}
+
+// scanTargetsHandler 按需下发单个任务的完整目标清单。
+//
+// 列表接口刻意不带全量目标（见 scanListItem.Targets），只有「重跑」这类确实要
+// 复用目标的动作才来取一次，避免每 10s 一次的轮询把上千个目标重发一遍。
+func scanTargetsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+	taskID := strings.TrimSpace(mux.Vars(r)["taskId"])
+	if taskID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少任务ID"})
+		return
+	}
+	targets, ok := lookupScanTargets(taskID)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务不存在"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]interface{}{
+		"targets":      targets,
+		"target_total": len(targets),
+	}})
+}
+
+// lookupScanTargets 依次从内存任务、远程影子记录、sqlite 历史快照里取目标清单。
+// ok=false 表示三处都没有这个任务。
+func lookupScanTargets(taskID string) ([]string, bool) {
+	m := getTaskManager()
+	m.mu.Lock()
+	t := m.tasks[taskID]
+	m.mu.Unlock()
+	if t != nil {
+		return append([]string{}, t.getTargets()...), true
+	}
+	if rt := getRemoteTask(taskID); rt != nil {
+		rt.mu.Lock()
+		defer rt.mu.Unlock()
+		return append([]string{}, rt.Targets...), true
+	}
+	row, err := sqlite.SelectScanTask(taskID)
+	if err != nil {
+		gologger.Debug().Msgf("读取任务目标失败: taskID=%s err=%v", taskID, err)
+		return nil, false
+	}
+	if row == nil {
+		return nil, false
+	}
+	return append([]string{}, row.Targets...), true
 }
 
 // 暂停任务

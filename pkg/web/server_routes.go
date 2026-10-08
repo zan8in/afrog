@@ -60,6 +60,9 @@ func setupHandler() (http.Handler, error) {
 	r.HandleFunc("/scans", jwtAuthMiddleware(scansCreateHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/events", jwtAuthMiddleware(scanEventsHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/scans/{taskId}/status", jwtAuthMiddleware(scanStatusHandler)).Methods(http.MethodGet)
+	// 目标清单按需下发：列表接口不带全量目标（否则轮询响应会到 MB 级），
+	// 只有「重跑」这类要复用目标的动作才来取一次。
+	r.HandleFunc("/scans/{taskId}/targets", jwtAuthMiddleware(scanTargetsHandler)).Methods(http.MethodGet)
 	r.HandleFunc("/scans/{taskId}/pause", jwtAuthMiddleware(scanPauseHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
@@ -211,6 +214,9 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/scans", jwtAuthMiddleware(scansListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/events", jwtAuthMiddleware(scanEventsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/status", jwtAuthMiddleware(scanStatusHandler)).Methods(http.MethodGet)
+	// 目标清单按需下发：列表接口不带全量目标（否则轮询响应会到 MB 级），
+	// 只有「重跑」这类要复用目标的动作才来取一次。
+	api.HandleFunc("/scans/{taskId}/targets", jwtAuthMiddleware(scanTargetsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/scans/{taskId}/pause", jwtAuthMiddleware(scanPauseHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)

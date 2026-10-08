@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -357,6 +358,68 @@ func TestRemoteTaskPersistAndRestore(t *testing.T) {
 	items := remoteScanItems()
 	if len(items) != 1 || items[0].TaskID != rt.ID || items[0].Source != scanSourceRemote {
 		t.Fatalf("恢复的记录未并入列表：%+v", items)
+	}
+}
+
+// 跨节点对账每 10s 一次：状态快照不该带完整目标清单（发起端派发时就已持有同一份），
+// 否则这份开销会随「目标数 × 在跑的远程任务数」线性放大。
+func TestRemoteStatusOf_OmitsFullTargetList(t *testing.T) {
+	targets := make([]string, 0, 2000)
+	for i := 0; i < 2000; i++ {
+		targets = append(targets, fmt.Sprintf("https://host-%d.example", i))
+	}
+	raw, err := json.Marshal(remoteStatusOf(&Task{
+		ID: "t-cluster", status: TaskRunning, targets: targets, Name: "远程任务 · t-cluster",
+		SeverityStats: map[string]int{"high": 2},
+	}))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(raw), `"targets"`) {
+		t.Fatalf("对账快照不应回传目标清单，实际 JSON = %s", string(raw[:min(len(raw), 200)]))
+	}
+	var got map[string]any
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// 对账真正需要的字段必须还在，否则发起端镜像不出状态。
+	for _, key := range []string{"task_id", "status", "progress", "hits", "hit_total"} {
+		if _, ok := got[key]; !ok {
+			t.Fatalf("对账快照缺少字段 %q：%s", key, string(raw))
+		}
+	}
+	if len(raw) > 1024 {
+		t.Fatalf("对账快照有 %d 字节，疑似又带上了目标清单", len(raw))
+	}
+}
+
+// 对端不回传目标时，镜像记录要沿用派发时那份，而不是被清空。
+func TestApplyRemoteStatus_KeepsMirroredTargetsWhenPeerOmitsThem(t *testing.T) {
+	rt := &remoteTask{
+		ID:      "rt-1",
+		Status:  string(TaskStarting),
+		Targets: []string{"https://a.example", "https://b.example"},
+	}
+	applyRemoteStatus(rt, clusterTaskStatus{Status: string(TaskRunning), HitTotal: 3})
+
+	rt.mu.Lock()
+	kept := append([]string(nil), rt.Targets...)
+	status, hitTotal := rt.Status, rt.HitTotal
+	rt.mu.Unlock()
+	if len(kept) != 2 {
+		t.Fatalf("镜像目标被清空了：%+v", kept)
+	}
+	if status != string(TaskRunning) || hitTotal != 3 {
+		t.Fatalf("其余字段未镜像过来：status=%s hit_total=%d", status, hitTotal)
+	}
+
+	// 旧版本对端仍会回传：以对端为准，混跑集群行为与改动前一致。
+	applyRemoteStatus(rt, clusterTaskStatus{Targets: []string{"https://c.example"}})
+	rt.mu.Lock()
+	replaced := append([]string(nil), rt.Targets...)
+	rt.mu.Unlock()
+	if len(replaced) != 1 || replaced[0] != "https://c.example" {
+		t.Fatalf("旧版本对端回传的清单未被采纳：%+v", replaced)
 	}
 }
 

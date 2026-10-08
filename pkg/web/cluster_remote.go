@@ -53,6 +53,11 @@ type clusterTaskStatus struct {
 }
 
 // remoteStatusOf 组装本机任务的跨节点状态快照，供发起端对账。
+//
+// 刻意不回传完整目标清单：这份快照每 10s 拉一次，而发起端在派发时就已持有同一份清单
+// （resolveDispatchRequest 先在本地把项目解析成具体目标再派发，清单也随影子记录落盘）。
+// 回传一份上千 / 上万条的目标纯属重复，开销还会随「目标数 × 在跑的远程任务数」线性放大。
+// 字段本身保留：对端是旧版本时仍会回传，见 applyRemoteStatus 的兜底。
 func remoteStatusOf(t *Task) clusterTaskStatus {
 	item := t.listItem()
 	return clusterTaskStatus{
@@ -65,7 +70,6 @@ func remoteStatusOf(t *Task) clusterTaskStatus {
 		Error:    item.Error,
 		Hits:     item.Hits,
 		HitTotal: item.HitTotal,
-		Targets:  item.Targets,
 		Created:  item.CreatedAt,
 		Started:  item.StartedAt,
 		Ended:    item.EndedAt,
@@ -152,22 +156,25 @@ func remoteTaskSnapshot() []*remoteTask {
 func remoteTaskItem(rt *remoteTask) scanListItem {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
+	targets := append([]string(nil), rt.Targets...)
 	return scanListItem{
-		TaskID:     rt.ID,
-		Name:       rt.Name,
-		Status:     rt.Status,
-		Source:     scanSourceRemote,
-		ScheduleID: rt.ScheduleID,
-		NodeName:   rt.NodeName,
-		NodeOK:     rt.NodeOK,
-		Targets:    append([]string(nil), rt.Targets...),
-		CreatedAt:  rt.CreatedAt,
-		StartedAt:  rt.StartedAt,
-		EndedAt:    rt.EndedAt,
-		Progress:   rt.Progress,
-		Hits:       rt.Hits,
-		HitTotal:   rt.HitTotal,
-		Error:      rt.Error,
+		TaskID:      rt.ID,
+		Name:        rt.Name,
+		Status:      rt.Status,
+		Source:      scanSourceRemote,
+		ScheduleID:  rt.ScheduleID,
+		NodeName:    rt.NodeName,
+		NodeOK:      rt.NodeOK,
+		Targets:     targets,
+		Target:      firstTarget(targets),
+		TargetTotal: len(targets),
+		CreatedAt:   rt.CreatedAt,
+		StartedAt:   rt.StartedAt,
+		EndedAt:     rt.EndedAt,
+		Progress:    rt.Progress,
+		Hits:        rt.Hits,
+		HitTotal:    rt.HitTotal,
+		Error:       rt.Error,
 	}
 }
 
@@ -557,6 +564,8 @@ func applyRemoteStatus(rt *remoteTask, st clusterTaskStatus) {
 	rt.Error = strings.TrimSpace(st.Error)
 	rt.Hits = st.Hits
 	rt.HitTotal = st.HitTotal
+	// 新版本执行节点不再回传目标清单（见 remoteStatusOf），镜像记录沿用派发时那份。
+	// 这里保留兜底：对端仍是旧版本时会回传，以对端为准，混跑集群的行为与改动前一致。
 	if len(st.Targets) > 0 {
 		rt.Targets = append([]string(nil), st.Targets...)
 	}
