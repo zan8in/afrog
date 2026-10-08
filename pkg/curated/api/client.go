@@ -40,6 +40,9 @@ type LoginResponse struct {
 	RefreshToken        string `json:"refresh_token"`
 	AccessExpiresInSec  int64  `json:"access_expires_in_sec"`
 	RefreshExpiresInSec int64  `json:"refresh_expires_in_sec"`
+	// LicenseExpiresAt 是 license 的真实到期时间（unix 秒，0 表示不限期）。
+	// 用指针是为了区分「服务端没返回该字段（老版本）」与「不限期（0）」。
+	LicenseExpiresAt *int64 `json:"license_expires_at"`
 }
 
 type RefreshRequest struct {
@@ -52,6 +55,8 @@ type RefreshResponse struct {
 	RefreshToken        string `json:"refresh_token"`
 	AccessExpiresInSec  int64  `json:"access_expires_in_sec"`
 	RefreshExpiresInSec int64  `json:"refresh_expires_in_sec"`
+	// LicenseExpiresAt 同 LoginResponse。
+	LicenseExpiresAt *int64 `json:"license_expires_at"`
 }
 
 type ManifestRequest struct {

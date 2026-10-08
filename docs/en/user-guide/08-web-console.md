@@ -198,7 +198,7 @@ The **Curated** page turns the `curated` section of `afrog-config.yaml` into a f
 - **A failed pull is not a failed activation**: the config is already written and in effect; the reason shows up both in the toast and in the member status card, and you can retry with **Check for PoC updates**
 - **An empty endpoint means the licensed capability is off**; `auto` and `on` behave the same for the member switch
 - While not activated the page also shows the locked preview and the Knowledge Planet entry point: purchase and license issuing happen off-site, there is no in-app payment
-- The status card shows remaining days, expiry, licensed PoC count, last update and manifest version
+- The status card shows remaining days, expiry, licensed PoC count, last update and manifest version. The expiry is the licence's real expiry date (the server's `licenses.expires_at`): perpetual licences show "Perpetual", and when the server does not report it the field shows "—"
 - Note: saving **rewrites the whole `curated` section**, so comments inside that section are lost (other sections are untouched)
 
 ## Relation to the CLI

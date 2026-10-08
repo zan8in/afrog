@@ -50,8 +50,11 @@ type authState struct {
 	RefreshToken      string    `json:"refresh_token"`
 	AccessExpiresAt   time.Time `json:"access_expires_at"`
 	RefreshExpiresAt  time.Time `json:"refresh_expires_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	Checksum          string    `json:"checksum"`
+	// LicenseExpiresAt 是 license 的真实到期时间（unix 秒，服务端下发），0 表示不限期。
+	// nil 表示服务端尚未告知（老版本服务端 / 升级前的旧授权文件），此时不要臆测到期日。
+	LicenseExpiresAt *int64    `json:"license_expires_at,omitempty"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	Checksum         string    `json:"checksum"`
 }
 
 type runtimeState struct {
@@ -123,6 +126,10 @@ func (s *Service) Login(ctx context.Context, license string) error {
 		if resp.RefreshExpiresInSec > 0 {
 			as.RefreshExpiresAt = time.Now().Add(time.Duration(resp.RefreshExpiresInSec) * time.Second)
 		}
+		// 到期日只认服务端下发的 license 真实到期时间。换 license 时必须整体覆盖：
+		// 留着上一条的到期日会让界面显示错误的授权期限；老服务端不返回该字段则置 nil
+		// （界面显示"未知"，而不是拿 refresh TTL 冒充）。
+		as.LicenseExpiresAt = cloneInt64Ptr(resp.LicenseExpiresAt)
 	}
 	return writeAuth(filepath.Join(dir, "curated-auth.json"), as)
 }
@@ -799,6 +806,10 @@ func (s *Service) checkRemoteAccess(ctx context.Context, curatedDir string, mani
 				as.RefreshExpiresAt = time.Time{}
 			}
 		}
+		// 同一 license 的到期日不会变：服务端没返回（老版本）时保留原值，别把已知的抹掉。
+		if ref.LicenseExpiresAt != nil {
+			as.LicenseExpiresAt = cloneInt64Ptr(ref.LicenseExpiresAt)
+		}
 		if err := writeAuth(authPath, as); err != nil {
 			return err
 		}
@@ -851,6 +862,20 @@ func loadOrCreateDeviceFingerprint(path string) string {
 	return fp
 }
 
+// cloneInt64Ptr 复制一个 *int64；nil 原样返回。
+func cloneInt64Ptr(v *int64) *int64 {
+	if v == nil {
+		return nil
+	}
+	out := *v
+	return &out
+}
+
+// computeAuthChecksum 汇总凭据字段做完整性校验。
+//
+// LicenseExpiresAt 刻意不参与：一是纳入后所有存量授权文件的校验和立刻失配，
+// 升级即表现为"掉登录"；二是它只影响界面展示，真正的授权边界由服务端
+// （manifest / authorize-download / refresh）强制，本地改它并不提权。
 func computeAuthChecksum(as *authState) string {
 	if as == nil {
 		return ""

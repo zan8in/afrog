@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,9 +26,12 @@ type CuratedStatus struct {
 	Expired bool `json:"expired"`
 	// License 是脱敏后的 license。
 	License string `json:"license,omitempty"`
-	// ExpiresAt 与 RemainingDays 描述到期时间。
+	// ExpiresAt 与 RemainingDays 描述授权到期时间，取自 license 的真实到期日。
+	// 不限期或服务端尚未告知时 ExpiresAt 为空。
 	ExpiresAt     string `json:"expires_at,omitempty"`
 	RemainingDays int    `json:"remaining_days"`
+	// LicensePermanent 表示该授权不限期（服务端 expires_at <= 0）。
+	LicensePermanent bool `json:"license_permanent"`
 	// Channel / ManifestID / LastUpdateAt / LastError 来自 curated 运行时状态。
 	Channel      string `json:"channel,omitempty"`
 	ManifestID   string `json:"manifest_id,omitempty"`
@@ -80,18 +84,18 @@ func currentCuratedStatus() CuratedStatus {
 		license := strings.TrimSpace(st.Auth.LicenseKey)
 		out.License = maskLicense(license)
 
-		exp := st.Auth.RefreshExpiresAt
-		if exp.IsZero() {
-			exp = st.Auth.AccessExpiresAt
-		}
-		if !exp.IsZero() {
-			out.ExpiresAt = exp.Format(time.RFC3339)
-			remain := int(time.Until(exp).Hours() / 24)
-			if remain < 0 {
-				remain = 0
+		// 到期时间只认服务端下发的 license 真实到期日（licenses.expires_at）。
+		// 绝不拿 refresh/access token 的 TTL 冒充：那是"token 还能用多久"，
+		// 与"授权到哪天"无关，用它会让界面显示一个凭空的期限。
+		// LicenseExpiresAt 为 nil 表示服务端尚未告知（老版本服务端 / 升级前的旧文件）。
+		if exp := st.Auth.LicenseExpiresAt; exp != nil {
+			out.LicensePermanent = *exp <= 0
+			if !out.LicensePermanent {
+				expires := time.Unix(*exp, 0)
+				out.ExpiresAt = expires.Format(time.RFC3339)
+				out.RemainingDays = remainingDays(expires, time.Now())
+				out.Expired = expires.Before(time.Now())
 			}
-			out.RemainingDays = remain
-			out.Expired = exp.Before(time.Now())
 		}
 		// 未启用 curated 时，即使本地残留授权文件也不视为会员。
 		out.Active = out.Enabled && license != "" && !out.Expired
@@ -116,6 +120,18 @@ func curatedRole() string {
 		return "curated"
 	}
 	return "free"
+}
+
+// remainingDays 把到期时间换算成「还剩几天」，**向上取整**。
+//
+// 向下截断会让"刚激活 30 天"显示成 29 天（还剩 29 天 23 小时），用户会以为授权少了 1 天；
+// 向上取整后不足一天也算 1 天，与"还剩 N 天"的直觉一致。
+func remainingDays(exp, now time.Time) int {
+	days := int(math.Ceil(exp.Sub(now).Hours() / 24))
+	if days < 0 {
+		return 0
+	}
+	return days
 }
 
 // maskLicense 只保留 license 首尾各 4 位，避免接口把完整凭据吐给前端。
