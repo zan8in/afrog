@@ -130,7 +130,7 @@ func TestSelectSummaryData(t *testing.T) {
 	// 另一个任务的命中不能混进来
 	insertResult(t, dbx, 15, "t-other", "poc-d", "http://c.example", "http://c.example", "critical", "2026-10-01 11:00:00")
 
-	if err := UpsertLedgerStatus("poc-b", "http://a.example", "http://a.example/2", "false_positive", ""); err != nil {
+	if err := UpsertLedgerStatus("poc-b", "http://a.example", "http://a.example/2", "false_positive", strPtr("")); err != nil {
 		t.Fatalf("写入台账状态失败: %v", err)
 	}
 	if err := UpsertScanTask(sampleScanTask("t-sum", "2026-10-01 10:00:00")); err != nil {

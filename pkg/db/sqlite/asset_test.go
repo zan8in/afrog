@@ -73,6 +73,56 @@ func TestSinkAssetsBatchCountsAndTrajectory(t *testing.T) {
 	}
 }
 
+// TestArchivedViewSeesOnlyArchived 锁定「已归档」视图：默认视图看不到归档项，
+// view=archived 只看得到归档项。否则用户归档后便无从找回（等于变相删除）。
+func TestArchivedViewSeesOnlyArchived(t *testing.T) {
+	withAssetFixture(t)
+
+	if _, err := SinkAssets("t-1", "scan", "", []AssetInput{
+		{Address: "https://keep.example", Type: "url"},
+		{Address: "https://gone.example", Type: "url"},
+	}); err != nil {
+		t.Fatalf("SinkAssets: %v", err)
+	}
+
+	archived := true
+	if _, err := UpdateAssets([]string{"https://gone.example"}, nil, nil, nil, &archived, nil); err != nil {
+		t.Fatalf("UpdateAssets(archive): %v", err)
+	}
+
+	all, err := ListAssets(AssetFilter{View: "all", PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListAssets(all): %v", err)
+	}
+	if all.Total != 1 || all.Items[0].Address != "https://keep.example" {
+		t.Fatalf("默认视图应看不到归档项，got total=%d", all.Total)
+	}
+	if all.Stats.Archived != 1 {
+		t.Fatalf("stats.archived = %d, want 1（前端「已归档」角标用它）", all.Stats.Archived)
+	}
+
+	arch, err := ListAssets(AssetFilter{View: "archived", PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListAssets(archived): %v", err)
+	}
+	if arch.Total != 1 || arch.Items[0].Address != "https://gone.example" {
+		t.Fatalf("已归档视图应只见归档项，got total=%d", arch.Total)
+	}
+
+	// 连同 id 取消归档后，已归档视图应为空
+	keep := false
+	if _, err := UpdateAssets([]string{"https://gone.example"}, nil, nil, nil, &keep, nil); err != nil {
+		t.Fatalf("UpdateAssets(unarchive): %v", err)
+	}
+	back, err := ListAssets(AssetFilter{View: "archived", PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListAssets(archived after unarchive): %v", err)
+	}
+	if back.Total != 0 {
+		t.Fatalf("取消归档后已归档视图应为空，got %d", back.Total)
+	}
+}
+
 // TestSinkAssetsLargeBatchKeepsCountsExact 大批量走的是分块多行插入，
 // 计数必须仍然精确（1000 条会跨多个 chunk）。
 func TestSinkAssetsLargeBatchKeepsCountsExact(t *testing.T) {

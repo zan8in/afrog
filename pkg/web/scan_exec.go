@@ -47,6 +47,10 @@ func getExecutor() (executor.Executor, error) {
 // 明确指向某个来源时为「独占」（-P），未指定来源时把 curated/my 目录追加到内置
 // PoC 之上（-ap）。
 func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appendPocs []string, useIDs bool) *executor.Spec {
+	// 请求节流五者互斥：即便前端/旧客户端同时下发多个，也只保留优先级最高的一个，
+	// 否则子进程的 VerifyOptions 会直接报错拒绝启动。
+	rlt, autoLimit, polite, balanced, aggressive := normalizeReqLimit(req)
+
 	spec := &executor.Spec{
 		Targets:           targets,
 		AppendPocs:        appendPocs,
@@ -56,15 +60,36 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		Retries:           req.Retries,
 		MaxHostError:      req.MaxHostError,
 		Proxy:             strings.TrimSpace(req.Proxy),
+		Headers:           req.Headers,
+		Sort:              strings.TrimSpace(req.Sort),
+		ReqLimitPerTarget: rlt,
+		AutoReqLimit:      autoLimit,
+		Polite:            polite,
+		Balanced:          balanced,
+		Aggressive:        aggressive,
 		Smart:             req.Smart,
+		TaskSmartTimeout:  req.TaskSmartTimeout,
+		NoFingerprint:     req.NoFingerprint,
+		BreakpointOnVuln:  req.BreakpointOnVuln,
+		MonitorTargets:    req.MonitorTargets,
+		BruteMaxRequests:  req.BruteMaxRequests,
+		MaxRespBodySize:   req.MaxRespBodySize,
 		PortScan:          req.PortScan || req.PortScanCompat,
 		Ports:             strings.TrimSpace(req.Ports),
 		SkipHostDiscovery: req.SkipHostDisc,
 		WebFingerprint:    req.WebProbe || req.WebFingerprint,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOB),
+		OOBRateLimit:      req.OobRateLimit,
+		OOBConcurrency:    req.OobConcurrency,
+		OOBPollInterval:   req.OobPollInterval,
+		OOBHitRetention:   req.OobHitRetention,
 		TaskName:          strings.TrimSpace(req.TaskName),
 		Labels:            req.Labels,
+	}
+	if req.OobFinalizeTimeout != nil {
+		v := *req.OobFinalizeTimeout
+		spec.OOBFinalizeTimeout = &v
 	}
 
 	exclusive := useIDs || strings.TrimSpace(pocPath) != ""
@@ -91,6 +116,25 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 	}
 
 	return spec
+}
+
+// normalizeReqLimit 把请求节流的五种写法收敛为互斥的一组：
+// 自定义 -rlt 优先，其次按 polite > balanced > aggressive > auto 取一个。
+func normalizeReqLimit(req ScanCreateRequest) (rlt int, auto, polite, balanced, aggressive bool) {
+	if req.ReqLimitPerTarget > 0 {
+		return req.ReqLimitPerTarget, false, false, false, false
+	}
+	switch {
+	case req.Polite:
+		return 0, false, true, false, false
+	case req.Balanced:
+		return 0, false, false, true, false
+	case req.Aggressive:
+		return 0, false, false, false, true
+	case req.AutoReqLimit:
+		return 0, true, false, false, false
+	}
+	return 0, false, false, false, false
 }
 
 // runScanTask 拉起子进程、把 NDJSON 事件流翻译成前端既有的事件类型，最后收尾。
@@ -170,7 +214,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 		t.addHit(strings.ToLower(ev.Result.Severity))
 		// 达到阈值的高危命中实时推送；去重与限流在通知器内完成。
 		getNotifier().OnHit(t.ID, ev.Result.Severity, ev.Result.PocID, ev.Result.PocName, ev.Result.Target)
-		publish(t, ScanEvent{Type: "result", Data: map[string]interface{}{
+		resultData := map[string]interface{}{
 			"target":   ev.Result.Target,
 			"severity": ev.Result.Severity,
 			"poc": map[string]string{
@@ -179,17 +223,25 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 			},
 			"message": fmt.Sprintf("命中 %s", ev.Result.Severity),
 			"ts":      ts,
-		}})
+		}
+		// 抽取结果（如 ssh="OpenSSH_7.4"）：控制台命中行会附在末尾，前端同样展示。
+		if ev.Result.Evidence != nil && len(ev.Result.Evidence.Extractors) > 0 {
+			resultData["extractor"] = ev.Result.Evidence.Extractors
+		}
+		publish(t, ScanEvent{Type: "result", Data: resultData})
 
 	case scanstream.TypePort:
 		if ev.Port == nil {
 			return
 		}
-		publish(t, ScanEvent{Type: "port", Data: map[string]interface{}{
+		portData := map[string]interface{}{
 			"host": ev.Port.Host,
 			"port": ev.Port.Port,
 			"ts":   ts,
-		}})
+		}
+		publish(t, ScanEvent{Type: "port", Data: portData})
+		// 落库，让历史任务的「资产发现」也能回看
+		recordProbe(t.ID, "port", ts, ev.Port.Host, ev.Port.Port, 0, "", portData)
 
 	case scanstream.TypeHost:
 		if ev.Host == nil {
@@ -204,13 +256,16 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 		if ev.WebProbe == nil {
 			return
 		}
-		publish(t, ScanEvent{Type: "webprobe", Data: map[string]interface{}{
+		webData := map[string]interface{}{
 			"url":         ev.WebProbe.URL,
 			"status":      ev.WebProbe.Status,
 			"title":       ev.WebProbe.Title,
 			"fingerprint": ev.WebProbe.Fingerprint,
 			"ts":          ts,
-		}})
+		}
+		publish(t, ScanEvent{Type: "webprobe", Data: webData})
+		// 落库，让历史任务的「资产发现」也能回看
+		recordProbe(t.ID, "webprobe", ts, ev.WebProbe.URL, 0, ev.WebProbe.Status, ev.WebProbe.Title, webData)
 
 	case scanstream.TypeLog:
 		// 诊断日志只进服务端日志，前端不消费该事件类型。

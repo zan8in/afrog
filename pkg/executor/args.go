@@ -76,6 +76,42 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		args = append(args, "-smart")
 	}
 
+	// 请求节流：五者互斥，正常由上层保证只设一个；这里按固定优先级兜底。
+	switch {
+	case spec.ReqLimitPerTarget > 0:
+		args = append(args, "-rlt", strconv.Itoa(spec.ReqLimitPerTarget))
+	case spec.Polite:
+		args = append(args, "-polite")
+	case spec.Balanced:
+		args = append(args, "-balanced")
+	case spec.Aggressive:
+		args = append(args, "-aggressive")
+	case spec.AutoReqLimit:
+		args = append(args, "-auto-req-limit")
+	}
+
+	if spec.TaskSmartTimeout {
+		args = append(args, "-task-smart-timeout")
+	}
+	if spec.NoFingerprint {
+		args = append(args, "-nf")
+	}
+	if spec.BreakpointOnVuln {
+		args = append(args, "-vsb")
+	}
+	if spec.MonitorTargets {
+		args = append(args, "-mt")
+	}
+	if v := strings.TrimSpace(spec.Sort); v != "" {
+		args = append(args, "-sort", v)
+	}
+	if spec.BruteMaxRequests > 0 {
+		args = append(args, "-brute-max-requests", strconv.Itoa(spec.BruteMaxRequests))
+	}
+	if spec.MaxRespBodySize > 0 {
+		args = append(args, "-mrbs", strconv.Itoa(spec.MaxRespBodySize))
+	}
+
 	if v := strings.TrimSpace(spec.Proxy); v != "" {
 		args = append(args, "-proxy", v)
 	}
@@ -105,6 +141,21 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	if spec.EnableOOB {
 		if v := strings.TrimSpace(spec.OOBAdapter); v != "" {
 			args = append(args, "-oob", v)
+		}
+		if spec.OOBRateLimit > 0 {
+			args = append(args, "-orl", strconv.Itoa(spec.OOBRateLimit))
+		}
+		if spec.OOBConcurrency > 0 {
+			args = append(args, "-oc", strconv.Itoa(spec.OOBConcurrency))
+		}
+		if spec.OOBPollInterval > 0 {
+			args = append(args, "-oob-poll-interval", strconv.Itoa(spec.OOBPollInterval))
+		}
+		if spec.OOBHitRetention > 0 {
+			args = append(args, "-oob-hit-retention", strconv.Itoa(spec.OOBHitRetention))
+		}
+		if spec.OOBFinalizeTimeout != nil {
+			args = append(args, "-oob-finalize-timeout", strconv.Itoa(*spec.OOBFinalizeTimeout))
 		}
 	}
 

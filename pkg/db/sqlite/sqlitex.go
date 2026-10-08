@@ -101,6 +101,10 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating scan task table: %v", err)
 	}
 
+	if _, err = dbx.Exec(probeDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating scan probe table: %v", err)
+	}
+
 	if _, err = dbx.Exec(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
@@ -564,9 +568,14 @@ func SelectAllByTask(taskID, severity string, expandPoc, expandResult bool) ([]d
 	return runExportQuery(db2.TableName+".* FROM "+db2.TableName, where, args, expandPoc, expandResult)
 }
 
-// SelectAllFiltered 返回按「严重级别 + 关键字」筛选后的全部命中（跨任务）。
-func SelectAllFiltered(severity, keyword string, expandPoc, expandResult bool) ([]db2.ResultData, error) {
+// SelectAllFiltered 返回按「任务 + 严重级别 + 关键字」筛选后的全部命中。
+// taskID 为空表示跨任务；非空时只导出该任务的命中，与报告页的筛选范围一致。
+func SelectAllFiltered(taskID, severity, keyword string, expandPoc, expandResult bool) ([]db2.ResultData, error) {
 	where, args := severityKeywordFilters(severity, keyword)
+	if tid := strings.TrimSpace(taskID); tid != "" {
+		where = append([]string{"taskid = ?"}, where...)
+		args = append([]interface{}{tid}, args...)
+	}
 	return runExportQuery(db2.TableName+".* FROM "+db2.TableName, where, args, expandPoc, expandResult)
 }
 
@@ -797,7 +806,11 @@ func GetByID(id string, expandPoc, expandResult bool) (db2.ResultData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	q := "SELECT * FROM " + db2.TableName + " WHERE id = ?"
+	q := `SELECT r.*, COALESCE(l.status, '') AS ledger_status, COALESCE(l.note, '') AS ledger_note
+		FROM ` + db2.TableName + ` r
+		LEFT JOIN vuln_ledger l
+		  ON l.vulid = r.vulid AND l.target = r.target AND l.fulltarget = r.fulltarget
+		WHERE r.id = ?`
 
 	if err := dbx.GetContext(ctx, &row, q, id); err != nil {
 		return row, err
@@ -1058,7 +1071,11 @@ func SelectLedgerPage(f LedgerFilter) (*LedgerPage, error) {
 }
 
 // UpsertLedgerStatus 写入/更新一条台账的人工状态与备注。
-func UpsertLedgerStatus(vulid, target, fulltarget, status, note string) error {
+//
+// note 为 nil 时只更新 status 与 updated_at，保留原有备注（不存在则写空串）：
+// 报告侧「只改状态」不应清空已维护的备注。
+// note 非 nil 时用给定值覆盖备注，与原先 INSERT OR REPLACE 语义等价。
+func UpsertLedgerStatus(vulid, target, fulltarget, status string, note *string) error {
 	if dbx == nil {
 		return fmt.Errorf("sqlite not initialized")
 	}
@@ -1066,10 +1083,20 @@ func UpsertLedgerStatus(vulid, target, fulltarget, status, note string) error {
 	defer cancel()
 
 	now := time.Now().Format("2006-01-02 15:04:05")
+	if note == nil {
+		_, err := dbx.ExecContext(ctx,
+			`INSERT INTO vuln_ledger(vulid, target, fulltarget, status, note, updated_at)
+			 VALUES(?, ?, ?, ?, '', ?)
+			 ON CONFLICT(vulid, target, fulltarget) DO UPDATE SET
+			   status = excluded.status,
+			   updated_at = excluded.updated_at`,
+			vulid, target, fulltarget, status, now)
+		return err
+	}
 	_, err := dbx.ExecContext(ctx,
 		`INSERT OR REPLACE INTO vuln_ledger(vulid, target, fulltarget, status, note, updated_at)
 		 VALUES(?, ?, ?, ?, ?, ?)`,
-		vulid, target, fulltarget, status, note, now)
+		vulid, target, fulltarget, status, *note, now)
 	return err
 }
 

@@ -19,21 +19,21 @@ import (
 // freeProjectLimit 是免费版可创建的项目数量上限，Curated 不限。
 const freeProjectLimit = 1
 
-// ProjectDefaults 是项目的默认扫描配置，选中项目时一键带入扫描表单。
-type ProjectDefaults struct {
-	Severity       string `json:"severity,omitempty"`
-	Concurrency    int    `json:"concurrency,omitempty"`
-	RateLimit      int    `json:"rate_limit,omitempty"`
-	Timeout        int    `json:"timeout,omitempty"`
-	Proxy          string `json:"proxy,omitempty"`
-	PortScan       bool   `json:"portscan,omitempty"`
-	WebProbe       bool   `json:"webprobe,omitempty"`
-	WebFingerprint bool   `json:"web_fingerprint,omitempty"`
-	Smart          bool   `json:"smart,omitempty"`
-	EnableOOB      bool   `json:"enable_oob,omitempty"`
-	OOB            string `json:"oob,omitempty"`
-	PocSource      string `json:"poc_source,omitempty"`
-	Search         string `json:"search,omitempty"`
+// ProjectDefaults 是项目的默认扫描参数，选中项目时一键带入扫描表单。
+//
+// 采用稀疏的「请求字段名 → 值」对象：只包含被显式覆盖的项，缺省的键表示沿用内置默认。
+// 后端只做透传（存 + 回显），不解释内容——前端用 toProjectDefaults / scanParamsFromProject
+// 读写，因此这里保持不透明，避免在 Go 侧再维护一张与前端字段表平行的结构。
+type ProjectDefaults map[string]any
+
+// MarshalJSON 让空值也输出 {}，避免前端在 defaults 上拿到 null。
+func (d ProjectDefaults) MarshalJSON() ([]byte, error) {
+	if d == nil {
+		return []byte("{}"), nil
+	}
+	// 借用别名类型，避免递归调用本方法
+	type plain ProjectDefaults
+	return json.Marshal(plain(d))
 }
 
 // Project 是一个资产空间：引用一组资产 + 默认配置 +（后续）扫描历史与台账。

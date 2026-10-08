@@ -1000,36 +1000,95 @@ func clusterRemoteTaskStopHandler(w http.ResponseWriter, r *http.Request) {
 	rt.mu.Lock()
 	nodeURL, remoteID := rt.NodeURL, rt.RemoteTaskID
 	rt.mu.Unlock()
-	if remoteID == "" {
-		w.WriteHeader(http.StatusConflict)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务尚未在执行节点上启动（或节点失联），请稍后重试"})
+
+	// 先尽力把停止请求转发给执行节点。是否成功决定后面是「确认停止」还是「只结束本机镜像」。
+	confirmed, failStatus, failMsg := requestRemoteStop(nodeURL, remoteID)
+	if confirmed {
+		rt.mu.Lock()
+		rt.Status = string(TaskCancelled)
+		rt.NodeOK = true
+		rt.Error = ""
+		rt.EndedAt = time.Now().Format("2006-01-02 15:04:05")
+		rt.mu.Unlock()
+		persistRemoteTasks()
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
 		return
+	}
+
+	if !wantsForceStop(r) {
+		// 非强制：保持严格语义，如实回报为何停不下来；界面据此提示可改用「强制结束」。
+		w.WriteHeader(failStatus)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: failMsg})
+		return
+	}
+
+	// 强制结束：执行节点不可达 / 尚未在其上启动时，允许只把本机这份镜像收敛为终态，
+	// 否则这条记录会永远卡在「启动中/扫描中」，既停不掉也删不掉。Error 里明确标注
+	// 远端状态未经确认，避免用户误以为远端一定已停。
+	rt.mu.Lock()
+	rt.Status = string(TaskCancelled)
+	rt.NodeOK = false
+	rt.Error = "已强制结束本机镜像（执行节点状态未确认）：" + failMsg
+	rt.EndedAt = time.Now().Format("2006-01-02 15:04:05")
+	rt.mu.Unlock()
+	persistRemoteTasks()
+	_ = json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "forced",
+		Data:    map[string]bool{"stopped": true, "forced": true},
+	})
+}
+
+// requestRemoteStop 尽力请求执行节点停止远端任务。
+//
+// 返回是否已确认停止；未确认时同时给出建议的 HTTP 状态与原因，供非强制路径如实回报。
+func requestRemoteStop(nodeURL, remoteID string) (confirmed bool, status int, msg string) {
+	if strings.TrimSpace(remoteID) == "" {
+		return false, http.StatusConflict, "任务尚未在执行节点上启动（或节点失联），请稍后重试"
 	}
 	peer, ok := findClusterPeer(nodeURL)
 	if !ok {
-		w.WriteHeader(http.StatusConflict)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "执行节点已不在集群配置中"})
-		return
+		return false, http.StatusConflict, "执行节点已不在集群配置中"
 	}
-
 	resp, err := doClusterPost(peer.URL+"/api/cluster/inbound/tasks/"+url.PathEscape(remoteID)+"/stop", clusterToken(), nil)
 	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无法连接执行节点：" + err.Error()})
-		return
+		return false, http.StatusBadGateway, "无法连接执行节点：" + err.Error()
 	}
 	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		w.WriteHeader(http.StatusBadGateway)
-		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("执行节点返回 HTTP %d", resp.StatusCode)})
+		return false, http.StatusBadGateway, fmt.Sprintf("执行节点返回 HTTP %d", resp.StatusCode)
+	}
+	return true, 0, ""
+}
+
+// wantsForceStop 判断是否为「强制结束」：显式带 ?force=1 时才允许只收敛本机镜像。
+func wantsForceStop(r *http.Request) bool {
+	v := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("force")))
+	return v == "1" || v == "true" || v == "yes"
+}
+
+// clusterRemoteTaskDeleteHandler 从本机列表移除一条远程任务镜像记录。
+//
+// 只允许删除已终结的任务：运行中的任务一旦删掉镜像记录，发起端就再也拿不回它
+// 的状态与命中，等于丢了一条正在跑的任务；应先停止再删除。
+// 删除只影响本机这份镜像视图，不回删已回填到本地 result 表的命中——那些命中已经
+// 进入报告与台账，属于扫描结果，不该因为清理列表而消失。
+func clusterRemoteTaskDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	rt := getRemoteTask(mux.Vars(r)["taskId"])
+	if rt == nil {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "远程任务不存在"})
 		return
 	}
-
-	rt.mu.Lock()
-	rt.Status = string(TaskCancelled)
-	rt.mu.Unlock()
-	persistRemoteTasks()
-	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "stopped", Data: map[string]bool{"stopped": true}})
+	if !remoteTaskTerminal(rt) {
+		w.WriteHeader(http.StatusConflict)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "任务仍在执行节点上运行，请先停止再删除"})
+		return
+	}
+	removeRemoteTask(rt.ID)
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "deleted", Data: map[string]bool{"deleted": true}})
 }
 
 // clusterRemoteTaskFindingsHandler 以只读方式代理执行节点上该任务的命中明细。

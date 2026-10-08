@@ -65,8 +65,7 @@ The sidebar groups pages by purpose:
 | | Ledger | Track finding status (pending/confirmed/false positive/fixed) and notes |
 | Data | PoCs | Browse, edit, and add custom PoCs |
 | | Curated | Mount status and updates for licensed curated PoCs |
-| Other | Docs | In-app documentation |
-| | Settings | Account, notifications, service info |
+| Other | Settings | Account, notifications, service info |
 
 Pages marked as member features (Schedules, Ledger, Curated) are still reachable for regular users, but show a locked preview until the plan is upgraded.
 

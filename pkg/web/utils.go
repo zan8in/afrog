@@ -54,10 +54,12 @@ func isValidAddress(line string) bool {
 	schemeRe := regexp.MustCompile(`^(?i)[a-z][a-z0-9+.-]*://\S+$`)
 	httpRe := regexp.MustCompile(`^(?i)https?://\S+$`)
 	hostPortRe := regexp.MustCompile(`^[A-Za-z0-9.-]+:\d+$`)
+	// IPv6 主机:端口，形如 [2001:db8::1]:80（net.JoinHostPort 的产物）
+	ipv6HostPortRe := regexp.MustCompile(`^\[[0-9A-Fa-f:]+\]:\d+$`)
 	tcpRe := regexp.MustCompile(`^(?i)tcp://[A-Za-z0-9.-]+:\d+$`)
 	domainRe := regexp.MustCompile(`^[A-Za-z0-9.-]+$`)
 	hostPathRe := regexp.MustCompile(`^(?i)[A-Za-z0-9.-]+(?::\d+)?(?:/\S*)?$`)
-	if httpRe.MatchString(s) || hostPortRe.MatchString(s) || tcpRe.MatchString(s) {
+	if httpRe.MatchString(s) || hostPortRe.MatchString(s) || ipv6HostPortRe.MatchString(s) || tcpRe.MatchString(s) {
 		return true
 	}
 	if schemeRe.MatchString(s) { // 允许任意合法 scheme（如 ftp, udp 等）

@@ -20,14 +20,16 @@ import (
 // 定时/计划扫描（Curated 会员能力）：按「频率预设」周期性地对某个项目（或一组
 // 目标）重跑同一份扫描配置。
 //
-// 刻意不引入 cron：结构化字段足够表达「每 N 小时 / 每天 HH:MM / 每周几 HH:MM」，
-// 前端据此渲染成自然语言，后端只做 next_run_at 的推算，避免多一份表达式解析器。
+// 刻意不引入 cron：结构化字段足够表达「每 N 小时 / 每天 HH:MM / 每周几 HH:MM /
+// 每月第 N 天 HH:MM」，前端据此渲染成自然语言，后端只做 next_run_at 的推算，
+// 避免多一份表达式解析器。
 // 起跑复用 launchScan，与「手动起扫」共享全部行为（目标解析、资产沉淀、通知登记）。
 
 const (
-	freqHourly = "hourly"
-	freqDaily  = "daily"
-	freqWeekly = "weekly"
+	freqHourly  = "hourly"
+	freqDaily   = "daily"
+	freqWeekly  = "weekly"
+	freqMonthly = "monthly"
 
 	// scheduleTimeLayout 与 result.created 等历史字段保持一致，便于人工比对。
 	scheduleTimeLayout = "2006-01-02 15:04:05"
@@ -49,10 +51,12 @@ type Schedule struct {
 	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
 
-	Freq          string `json:"freq"`                     // hourly | daily | weekly
+	Freq          string `json:"freq"`                     // hourly | daily | weekly | monthly
 	IntervalHours int    `json:"interval_hours,omitempty"` // hourly：每 N 小时
-	AtTime        string `json:"at_time,omitempty"`        // daily / weekly：HH:MM
+	AtTime        string `json:"at_time,omitempty"`        // daily / weekly / monthly：HH:MM
 	Weekday       int    `json:"weekday,omitempty"`        // weekly：0=周日 .. 6=周六
+	// DayOfMonth 是每月执行日（monthly）；限定 1-28，避免二月等月份没有该日。
+	DayOfMonth int `json:"day_of_month,omitempty"`
 
 	Scan ScanCreateRequest `json:"scan"`
 
@@ -168,15 +172,26 @@ func normalizeSchedule(s *Schedule) {
 		}
 		s.AtTime = ""
 		s.Weekday = 0
+		s.DayOfMonth = 0
 	case freqDaily:
 		s.AtTime = normalizeClock(s.AtTime)
 		s.IntervalHours = 0
 		s.Weekday = 0
+		s.DayOfMonth = 0
 	case freqWeekly:
 		s.AtTime = normalizeClock(s.AtTime)
 		s.IntervalHours = 0
+		s.DayOfMonth = 0
 		if s.Weekday < 0 || s.Weekday > 6 {
 			s.Weekday = 0
+		}
+	case freqMonthly:
+		s.AtTime = normalizeClock(s.AtTime)
+		s.IntervalHours = 0
+		s.Weekday = 0
+		// 限定 1-28：29-31 在部分月份不存在，容易给人「没执行」的错觉。
+		if s.DayOfMonth < 1 || s.DayOfMonth > 28 {
+			s.DayOfMonth = 1
 		}
 	}
 	s.NextRunAt = computeNextRun(*s, time.Now()).Format(scheduleTimeLayout)
@@ -247,6 +262,18 @@ func computeNextRun(s Schedule, from time.Time) time.Time {
 		next = next.AddDate(0, 0, days)
 		if !next.After(from) {
 			next = next.AddDate(0, 0, 7)
+		}
+		return next
+	case freqMonthly:
+		h, m, _ := parseClock(s.AtTime)
+		day := s.DayOfMonth
+		if day < 1 || day > 28 {
+			day = 1
+		}
+		next := time.Date(from.Year(), from.Month(), day, h, m, 0, 0, from.Location())
+		if !next.After(from) {
+			// time.Date 会自动把 month=13 规整成次年 1 月。
+			next = time.Date(from.Year(), from.Month()+1, day, h, m, 0, 0, from.Location())
 		}
 		return next
 	default:
@@ -536,6 +563,8 @@ type scheduleSaveRequest struct {
 	IntervalHours int    `json:"interval_hours,omitempty"`
 	AtTime        string `json:"at_time,omitempty"`
 	Weekday       int    `json:"weekday,omitempty"`
+	// DayOfMonth 为 monthly 的每月执行日（1-28）。
+	DayOfMonth int `json:"day_of_month,omitempty"`
 
 	// NodeURL 为空表示本机执行；非空时必须是已登记的同伴（见 validateScheduleNode）。
 	NodeURL string `json:"node_url,omitempty"`
@@ -581,7 +610,7 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch strings.ToLower(strings.TrimSpace(req.Freq)) {
-	case freqHourly, freqDaily, freqWeekly:
+	case freqHourly, freqDaily, freqWeekly, freqMonthly:
 	default:
 		writeScheduleJSON(w, http.StatusBadRequest, APIResponse{Success: false, Message: "无效的执行频率"})
 		return
@@ -619,6 +648,7 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		cur.IntervalHours = req.IntervalHours
 		cur.AtTime = req.AtTime
 		cur.Weekday = req.Weekday
+		cur.DayOfMonth = req.DayOfMonth
 		cur.NodeURL = req.NodeURL
 		cur.Scan = req.Scan
 		if req.Enabled != nil {
@@ -647,6 +677,7 @@ func schedulesSaveHandler(w http.ResponseWriter, r *http.Request) {
 		IntervalHours: req.IntervalHours,
 		AtTime:        req.AtTime,
 		Weekday:       req.Weekday,
+		DayOfMonth:    req.DayOfMonth,
 		NodeURL:       req.NodeURL,
 		Scan:          req.Scan,
 		CreatedAt:     now,

@@ -100,11 +100,19 @@ func UpsertScanTask(rec db2.ScanTaskRow) error {
 }
 
 // pruneScanTasks 保留最近 maxScanTaskHistory 条快照。
+//
+// 资产发现明细（scan_probe）与快照同生命周期：快照被淘汰后，这些任务的端口/Web 探测
+// 记录也一并清理，否则查询接口再也引用不到它们，只会白占存储。
 func pruneScanTasks(ctx context.Context) error {
 	_, err := dbx.ExecContext(ctx,
 		`DELETE FROM scan_task WHERE taskid NOT IN (
 		   SELECT taskid FROM scan_task ORDER BY created_at DESC, rowid DESC LIMIT ?
 		 )`, maxScanTaskHistory)
+	if err != nil {
+		return err
+	}
+	_, err = dbx.ExecContext(ctx,
+		`DELETE FROM scan_probe WHERE taskid NOT IN (SELECT taskid FROM scan_task)`)
 	return err
 }
 

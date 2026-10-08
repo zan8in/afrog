@@ -249,7 +249,7 @@ func clampInt(v, min, max, fallback int) int {
 // aiStream 是一次 SSE 响应的写入器。
 type aiStream struct {
 	send func(event string, data any)
-	fail func(msg string)
+	fail func(code string, msg string)
 }
 
 func newAIStream(w http.ResponseWriter) *aiStream {
@@ -278,7 +278,11 @@ func newAIStream(w http.ResponseWriter) *aiStream {
 		send: send,
 		// 失败事件刻意不叫 "error"：EventSource 的 error 事件同时也是传输层错误的回调，
 		// 两者同名会让前端分不清「服务端说清了原因」和「连接断了」。
-		fail: func(msg string) { send("failed", map[string]string{"message": msg}) },
+		// code 是给前端判定用的稳定标识（如 not_configured 时提示「去设置模型」），
+		// 避免前端去猜 message 里的中文。
+		fail: func(code string, msg string) {
+			send("failed", map[string]string{"code": code, "message": msg})
+		},
 	}
 }
 
@@ -295,13 +299,13 @@ func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force
 
 	cfg, _ := currentAIConfig()
 	if !aiReady(cfg) {
-		stream.fail("还没有配置模型接口。请在「设置 → AI 辅助」里填写接口地址、模型名与 API Key。")
+		stream.fail("not_configured", "还没有配置模型接口。请在「设置 → AI 辅助」里填写接口地址、模型名与 API Key。")
 		return
 	}
 
 	system, user, errMsg := prepare(cfg)
 	if errMsg != "" {
-		stream.fail(errMsg)
+		stream.fail("prepare_failed", errMsg)
 		return
 	}
 
@@ -325,7 +329,7 @@ func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force
 		gologger.Debug().Msgf("AI 额度校验失败: %v", err)
 	}
 	if !allowed {
-		stream.fail(fmt.Sprintf("本月免费次数已用完（%d 次），升级 Curated 会员可不限次。", used))
+		stream.fail("quota_exceeded", fmt.Sprintf("本月免费次数已用完（%d 次），升级 Curated 会员可不限次。", used))
 		return
 	}
 
@@ -335,11 +339,11 @@ func aiStreamFlow(w http.ResponseWriter, ctx context.Context, seed string, force
 		stream.send("delta", map[string]string{"t": delta})
 	})
 	if err != nil {
-		stream.fail(err.Error())
+		stream.fail("model_error", err.Error())
 		return
 	}
 	if strings.TrimSpace(text) == "" {
-		stream.fail("模型没有返回内容，请稍后重试。")
+		stream.fail("empty_result", "模型没有返回内容，请稍后重试。")
 		return
 	}
 

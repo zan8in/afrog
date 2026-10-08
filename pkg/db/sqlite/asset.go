@@ -429,13 +429,17 @@ func assetConditions(f AssetFilter) ([]string, []interface{}) {
 
 // viewConditions 组装「归档 + 视图」这两个决定看哪一片的条件（无绑定参数）。
 func viewConditions(f AssetFilter) []string {
+	view := strings.TrimSpace(f.View)
 	where := make([]string, 0, 2)
-	if !f.IncludeArchived {
+	// 「已归档」视图本身就是只看归档项，因此不再叠加 archived = 0。
+	if !f.IncludeArchived && view != "archived" {
 		where = append(where, "archived = 0")
 	}
-	switch strings.TrimSpace(f.View) {
+	switch view {
 	case "all":
 		// 不加视图条件
+	case "archived":
+		where = append(where, "archived = 1")
 	case "starred":
 		where = append(where, "starred = 1")
 	case "unorganized":
@@ -714,6 +718,33 @@ func ReplaceProjectAssets(projectID string, ids []string) (int64, error) {
 		return 0, err
 	}
 	return n, tx.Commit()
+}
+
+// AppendProjectAssets 把给定 id 追加进项目成员，已存在的引用保持不变。
+//
+// 与 ReplaceProjectAssets 的区别：后者是「保存项目」时的全量替换语义，
+// 这里用于「把扫描发现批量加进项目」这类增量动作，不会动用户已有的成员。
+func AppendProjectAssets(projectID string, ids []string) (int64, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return 0, fmt.Errorf("project id is required")
+	}
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	clean := normalizeAssetIDList(ids)
+	if len(clean) == 0 {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	n, err := insertProjectAssetRows(ctx, dbx, projectID, clean, time.Now().Format(assetTimeLayout))
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 // DeleteProjectAssets 清空一个项目的全部成员（删除项目时调用）。

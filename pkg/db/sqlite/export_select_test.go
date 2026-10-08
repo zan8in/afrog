@@ -21,7 +21,7 @@ func newExportFixture(t *testing.T) *sqlx.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	for _, ddl := range []string{db2.SqliteCreate, ledgerDDL, assetDDL, scanTaskDDL, aiDDL} {
+	for _, ddl := range []string{db2.SqliteCreate, ledgerDDL, assetDDL, scanTaskDDL, aiDDL, probeDDL} {
 		if _, err := db.Exec(ddl); err != nil {
 			t.Fatalf("create schema: %v", err)
 		}
@@ -115,7 +115,7 @@ func TestSelectAllByTaskReturnsWholeTask(t *testing.T) {
 func TestSelectAllFilteredSpansTasks(t *testing.T) {
 	withFixture(t)
 
-	rows, err := SelectAllFiltered("high", "", false, false)
+	rows, err := SelectAllFiltered("", "high", "", false, false)
 	if err != nil {
 		t.Fatalf("SelectAllFiltered: %v", err)
 	}
@@ -123,12 +123,26 @@ func TestSelectAllFilteredSpansTasks(t *testing.T) {
 		t.Fatalf("high rows = %d, want 2 (t-1 and t-2)", len(rows))
 	}
 
-	rows, err = SelectAllFiltered("", "poc-c", false, false)
+	rows, err = SelectAllFiltered("", "", "poc-c", false, false)
 	if err != nil {
 		t.Fatalf("SelectAllFiltered(keyword): %v", err)
 	}
 	if len(rows) != 1 || rows[0].TaskID != "t-3" {
 		t.Fatalf("keyword filter failed: %+v", rows)
+	}
+
+	// 指定任务时只返回该任务的命中，供报告页「按任务筛选后导出」使用。
+	rows, err = SelectAllFiltered("t-1", "", "", false, false)
+	if err != nil {
+		t.Fatalf("SelectAllFiltered(task): %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("task rows = %d, want 2 (t-1)", len(rows))
+	}
+	for _, r := range rows {
+		if r.TaskID != "t-1" {
+			t.Fatalf("task filter leaked other task: %+v", rows)
+		}
 	}
 }
 

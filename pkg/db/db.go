@@ -56,6 +56,10 @@ type ResultData struct {
 	Node       string
 	ResultList []PocResult
 	PocInfo    poc.Poc
+	// LedgerStatus/LedgerNote 是 vuln_ledger 的人工状态覆盖，仅报告详情查询会 LEFT JOIN 取到；
+	// 其它查询不带这两列时为零值。
+	LedgerStatus string `db:"ledger_status"`
+	LedgerNote   string `db:"ledger_note"`
 }
 
 // HitEvidence 是「AI 研判」要喂给模型的证据：一条命中的 PoC 元信息 + 原始请求/响应。

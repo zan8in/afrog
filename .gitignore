@@ -57,6 +57,7 @@ dist
 *.afg
 
 /afrog.wiki
+pkg/web/webpath/
 
 *pocs/deleted*
 *pocs/peiqi*

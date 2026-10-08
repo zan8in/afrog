@@ -169,19 +169,43 @@ func SelectHitEvidence(taskID, vulid, target, fulltarget string) (*db2.HitEviden
 	vulid = strings.TrimSpace(vulid)
 	target = strings.TrimSpace(target)
 	fulltarget = strings.TrimSpace(fulltarget)
+	tid := strings.TrimSpace(taskID)
 	if vulid == "" || target == "" {
 		return nil, fmt.Errorf("vulid and target are required")
 	}
 
+	// 逐级放宽匹配：先最精确，再依次去掉 taskid、fulltarget。
+	// 前端从事件流拿到的 taskid 可能与落库时的任务号不一致（例如本地任务号 vs
+	// serverTaskId），精确匹配就会查不到；而 vulid+target 已足以唯一定位一条命中，
+	// 放宽后不会串到别的目标，因此值得重试而不是直接判定「记录不存在」。
+	attempts := []struct{ taskID, fulltarget string }{
+		{tid, fulltarget},
+		{"", fulltarget},
+		{"", ""},
+	}
+	for _, a := range attempts {
+		ev, err := queryHitEvidence(a.taskID, vulid, target, a.fulltarget)
+		if err != nil {
+			return nil, err
+		}
+		if ev != nil {
+			return ev, nil
+		}
+	}
+	return nil, nil
+}
+
+// queryHitEvidence 按给定条件查最近一条命中证据；查不到返回 nil, nil。
+func queryHitEvidence(taskID, vulid, target, fulltarget string) (*db2.HitEvidence, error) {
 	where := []string{"vulid = ?", "target = ?"}
 	args := []interface{}{vulid, target}
 	if fulltarget != "" {
 		where = append(where, "fulltarget = ?")
 		args = append(args, fulltarget)
 	}
-	if tid := strings.TrimSpace(taskID); tid != "" {
+	if taskID != "" {
 		where = append(where, "taskid = ?")
-		args = append(args, tid)
+		args = append(args, taskID)
 	}
 
 	query := `SELECT taskid, vulid, vulname, target, fulltarget, severity, poc, result, created

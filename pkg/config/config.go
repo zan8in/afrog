@@ -658,6 +658,13 @@ func UpdateAISection(configPath string, ai AI) error {
 	return replaceTopLevelSection(configPath, "ai", aiSectionLines(0, ai))
 }
 
+// UpdateReverseSection 把 reverse（OOB 带外检测）段整体写回配置文件，
+// 其余段落原样保留。界面只编辑常见适配器的凭据，eye/jndi 等未暴露项由调用方
+// 从当前配置原样带回，避免被覆盖。
+func UpdateReverseSection(configPath string, reverse Reverse) error {
+	return replaceTopLevelSection(configPath, "reverse", reverseSectionLines(0, reverse))
+}
+
 // replaceTopLevelSection 用 block 整体替换顶层 key 段；文件里没有该段时追加到末尾。
 //
 // 与 ensureCuratedSection 那种「缺哪个键就补哪个键」的增量写法不同：cluster 的
@@ -749,6 +756,53 @@ func aiSectionLines(baseIndent int, ai AI) []string {
 		prefix + "  api_key: " + strconv.Quote(strings.TrimSpace(ai.APIKey)),
 		prefix + "  timeout_sec: " + strconv.Itoa(ai.TimeoutSec),
 		prefix + "  max_tokens: " + strconv.Itoa(ai.MaxTokens),
+	}
+}
+
+// reverseSectionLines 按 afrog-config.yaml 的手写风格生成 reverse 段。
+//
+// 覆盖全部子段：界面可编辑的适配器（alphalog/ceye/dnslogcn/interactsh/xray/revsuit）
+// 以及不暴露但需保留的 eye/jndi。键名必须与结构体 yaml tag 一致。
+func reverseSectionLines(baseIndent int, r Reverse) []string {
+	prefix := strings.Repeat(" ", baseIndent)
+	q := strconv.Quote
+	trim := strings.TrimSpace
+
+	interactshServer := trim(r.Interactsh.Server)
+	if interactshServer == "" {
+		interactshServer = "oast.pro"
+	}
+
+	return []string{
+		prefix + "reverse:",
+		prefix + "  alphalog:",
+		prefix + "    domain: " + q(trim(r.Alphalog.Domain)),
+		prefix + "    api_url: " + q(trim(r.Alphalog.ApiUrl)),
+		prefix + "  ceye:",
+		prefix + "    api-key: " + q(trim(r.Ceye.ApiKey)),
+		prefix + "    domain: " + q(trim(r.Ceye.Domain)),
+		prefix + "  dnslogcn:",
+		prefix + "    domain: " + q(trim(r.Dnslogcn.Domain)),
+		prefix + "  eye:",
+		prefix + "    host: " + q(trim(r.Eye.Host)),
+		prefix + "    token: " + q(trim(r.Eye.Token)),
+		prefix + "    domain: " + q(trim(r.Eye.Domain)),
+		prefix + "  interactsh:",
+		prefix + "    server: " + q(interactshServer),
+		prefix + "    token: " + q(trim(r.Interactsh.Token)),
+		prefix + "  jndi:",
+		prefix + "    jndi_address: " + q(trim(r.Jndi.JndiAddress)),
+		prefix + "    ldap_port: " + q(trim(r.Jndi.LdapPort)),
+		prefix + "    api_port: " + q(trim(r.Jndi.ApiPort)),
+		prefix + "  xray:",
+		prefix + "    x_token: " + q(trim(r.Xray.XToken)),
+		prefix + "    domain: " + q(trim(r.Xray.Domain)),
+		prefix + "    api_url: " + q(trim(r.Xray.ApiUrl)),
+		prefix + "  revsuit:",
+		prefix + "    token: " + q(trim(r.Revsuit.Token)),
+		prefix + "    dns_domain: " + q(trim(r.Revsuit.DnsDomain)),
+		prefix + "    http_url: " + q(trim(r.Revsuit.HttpUrl)),
+		prefix + "    api_url: " + q(trim(r.Revsuit.ApiUrl)),
 	}
 }
 

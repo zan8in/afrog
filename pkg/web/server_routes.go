@@ -64,6 +64,9 @@ func setupHandler() (http.Handler, error) {
 	r.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
 	r.HandleFunc("/scans/{taskId}/diff", jwtAuthMiddleware(requireCurated(scanDiffHandler))).Methods(http.MethodGet)
+	// 资产发现明细（端口 / Web 探测）：历史任务回看 + 手动加入资产
+	r.HandleFunc("/scans/{taskId}/probes", jwtAuthMiddleware(scanProbesListHandler)).Methods(http.MethodGet)
+	r.HandleFunc("/scans/{taskId}/probes/promote", jwtAuthMiddleware(scanProbesPromoteHandler)).Methods(http.MethodPost)
 
 	// 计划扫描（Curated 会员）：定时/周期性地重跑同一份扫描配置。
 	// 与 /reports 等同理：/schedules 也是新前端的页面路由，浏览器导航必须落到 SPA。
@@ -208,6 +211,9 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/scans/{taskId}/resume", jwtAuthMiddleware(scanResumeHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/stop", jwtAuthMiddleware(scanStopHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/scans/{taskId}/diff", jwtAuthMiddleware(requireCurated(scanDiffHandler))).Methods(http.MethodGet)
+	// 资产发现明细（端口 / Web 探测）：历史任务回看 + 手动加入资产
+	api.HandleFunc("/scans/{taskId}/probes", jwtAuthMiddleware(scanProbesListHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/scans/{taskId}/probes/promote", jwtAuthMiddleware(scanProbesPromoteHandler)).Methods(http.MethodPost)
 
 	// 计划扫描（Curated 会员）
 	api.HandleFunc("/schedules", jwtAuthMiddleware(requireCurated(schedulesListHandler))).Methods(http.MethodGet)
@@ -254,6 +260,7 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/cluster/dispatch", jwtAuthMiddleware(requireCurated(clusterRemoteDispatchHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/cluster/remote-tasks", jwtAuthMiddleware(requireCurated(clusterRemoteTaskListHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/cluster/remote-tasks/{taskId}", jwtAuthMiddleware(requireCurated(clusterRemoteTaskHandler))).Methods(http.MethodGet)
+	api.HandleFunc("/cluster/remote-tasks/{taskId}", jwtAuthMiddleware(requireCurated(clusterRemoteTaskDeleteHandler))).Methods(http.MethodDelete)
 	api.HandleFunc("/cluster/remote-tasks/{taskId}/stop", jwtAuthMiddleware(requireCurated(clusterRemoteTaskStopHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/cluster/remote-tasks/{taskId}/findings", jwtAuthMiddleware(requireCurated(clusterRemoteTaskFindingsHandler))).Methods(http.MethodGet)
 
@@ -268,6 +275,11 @@ func registerAPIRoutes(api *mux.Router) {
 	// /ai/recommend 依据「目标画像」（规模、类型分布、样例）推荐扫描参数，
 	// 流式返回理由，并额外下发一个 params 事件供界面一键应用。
 	api.HandleFunc("/ai/recommend", jwtAuthMiddleware(aiRecommendHandler)).Methods(http.MethodGet)
+
+	// OOB（带外检测）凭据：读写 afrog-config.yaml 的 reverse 段。
+	// 保存后写回配置文件，Web 执行器下次起扫描子进程时生效。
+	api.HandleFunc("/oob/config", jwtAuthMiddleware(oobConfigGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/oob/config", jwtAuthMiddleware(oobConfigPutHandler)).Methods(http.MethodPut)
 
 	api.HandleFunc("/server/info", jwtAuthMiddleware(serverInfoHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/instances", jwtAuthMiddleware(instancesListHandler)).Methods(http.MethodGet)

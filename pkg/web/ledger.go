@@ -77,7 +77,8 @@ type ledgerUpdateRequest struct {
 	Target     string `json:"target"`
 	FullTarget string `json:"fulltarget"`
 	Status     string `json:"status"`
-	Note       string `json:"note"`
+	// Note 为 nil 表示「只改状态」，保留台账里已有的备注；显式传值（含空串）则覆盖。
+	Note *string `json:"note"`
 }
 
 // ledgerUpdateHandler 更新台账的状态 / 备注 / 所属项目。会员专属。
@@ -109,12 +110,19 @@ func ledgerUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 只有客户端显式带了 note 才覆盖备注；缺省（nil）表示只改状态，保留原备注。
+	var note *string
+	if req.Note != nil {
+		trimmed := strings.TrimSpace(*req.Note)
+		note = &trimmed
+	}
+
 	if err := sqlite.UpsertLedgerStatus(
 		vulid,
 		strings.TrimSpace(req.Target),
 		strings.TrimSpace(req.FullTarget),
 		status,
-		strings.TrimSpace(req.Note),
+		note,
 	); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "台账更新失败"})

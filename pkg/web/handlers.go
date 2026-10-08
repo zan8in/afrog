@@ -23,6 +23,39 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// extractorStrings 从 result.extractor 原文里取出「字符串值」的抽取项。
+//
+// 口径与控制台命中行的 [k="v"] 一致：只展示字符串值，其余（如嵌套 map）跳过。
+// 供报告列表在历史回看时附带抽取信息，无需拉取完整的 extractor 结构。
+func extractorStrings(raw string) map[string]string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	type mapItem struct {
+		Key   any `json:"Key"`
+		Value any `json:"Value"`
+	}
+	var items []mapItem
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil
+	}
+	out := make(map[string]string, len(items))
+	for _, it := range items {
+		k := strings.TrimSpace(fmt.Sprint(it.Key))
+		if k == "" {
+			continue
+		}
+		if v, ok := it.Value.(string); ok {
+			out[k] = v
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func normalizeExtractor(raw string) any {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -612,6 +645,8 @@ func queryReportList(taskID, severityParam, keyword string, severityList []strin
 			Severity:   it.Severity, // 已在底层转大写
 			Created:    it.Created,
 			Node:       it.Node,
+			// 抽取结果很小，列表里始终带上：历史任务的诊断视图才能还原 [k="v"]。
+			Extractors: extractorStrings(it.Extractor),
 		}
 		if expandPoc {
 			item.PocInfo = it.PocInfo
@@ -699,6 +734,9 @@ func reportsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		Severity:   row.Severity,
 		Created:    row.Created,
 		Node:       row.Node,
+		// 台账人工状态一并带回，报告详情可直接在抽屉里做状态流转。
+		LedgerStatus: row.LedgerStatus,
+		LedgerNote:   row.LedgerNote,
 	}
 	if expandFingerprint {
 		raw := strings.TrimSpace(row.FingerPrint)

@@ -102,6 +102,41 @@ func TestComputeNextRun(t *testing.T) {
 			t.Fatalf("weekly roll = %v, want %v", got, want)
 		}
 	})
+
+	t.Run("monthly later today", func(t *testing.T) {
+		// day_of_month 合法区间是 1-28，所以基准点取当月 28 日。
+		sep28 := time.Date(2026, 9, 28, 10, 0, 0, 0, loc)
+		got := computeNextRun(Schedule{Freq: freqMonthly, AtTime: "23:00", DayOfMonth: 28}, sep28)
+		want := time.Date(2026, 9, 28, 23, 0, 0, 0, loc)
+		if !got.Equal(want) {
+			t.Fatalf("monthly = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("monthly rolls to next month", func(t *testing.T) {
+		got := computeNextRun(Schedule{Freq: freqMonthly, AtTime: "09:00", DayOfMonth: 15}, base)
+		want := time.Date(2026, 10, 15, 9, 0, 0, 0, loc)
+		if !got.Equal(want) {
+			t.Fatalf("monthly next = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("monthly rolls across year boundary", func(t *testing.T) {
+		dec := time.Date(2026, 12, 20, 10, 0, 0, 0, loc)
+		got := computeNextRun(Schedule{Freq: freqMonthly, AtTime: "09:00", DayOfMonth: 5}, dec)
+		want := time.Date(2027, 1, 5, 9, 0, 0, 0, loc)
+		if !got.Equal(want) {
+			t.Fatalf("monthly year roll = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("monthly clamps illegal day to 1", func(t *testing.T) {
+		got := computeNextRun(Schedule{Freq: freqMonthly, AtTime: "09:00", DayOfMonth: 31}, base)
+		want := time.Date(2026, 10, 1, 9, 0, 0, 0, loc)
+		if !got.Equal(want) {
+			t.Fatalf("monthly clamp = %v, want %v", got, want)
+		}
+	})
 }
 
 // normalizeSchedule 会按频率清掉无关字段，避免切换频率后残留脏数据。
@@ -131,6 +166,18 @@ func TestNormalizeSchedule(t *testing.T) {
 	}
 	if h.AtTime != "" || h.Weekday != 0 {
 		t.Fatalf("hourly 应清空 at_time/weekday, got %q/%d", h.AtTime, h.Weekday)
+	}
+
+	m := Schedule{Freq: "MONTHLY", IntervalHours: 6, AtTime: "8:0", Weekday: 3, DayOfMonth: 31}
+	normalizeSchedule(&m)
+	if m.IntervalHours != 0 || m.Weekday != 0 {
+		t.Fatalf("monthly 应清空 interval_hours/weekday, got %d/%d", m.IntervalHours, m.Weekday)
+	}
+	if m.AtTime != "08:00" {
+		t.Fatalf("monthly at_time = %q, want 08:00", m.AtTime)
+	}
+	if m.DayOfMonth != 1 {
+		t.Fatalf("monthly day_of_month = %d, want 1 (31 收敛到 1)", m.DayOfMonth)
 	}
 }
 

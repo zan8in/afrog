@@ -27,6 +27,27 @@ type Spec struct {
 	MaxHostError   int
 	Smart          bool
 
+	// 请求节流：五者互斥（最多一个生效），与 CLI 的 -rlt/-auto-req-limit/-polite/-balanced/-aggressive 对应。
+	ReqLimitPerTarget int
+	AutoReqLimit      bool
+	Polite            bool
+	Balanced          bool
+	Aggressive        bool
+
+	// 任务级超时与失败保护
+	TaskSmartTimeout bool
+	NoFingerprint    bool
+	// BreakpointOnVuln 对应 -vsb：命中首个漏洞即停止。
+	BreakpointOnVuln bool
+	MonitorTargets   bool
+
+	// 进阶
+	BruteMaxRequests int
+	MaxRespBodySize  int
+
+	// Sort 对应 --sort（severity|a-z）。
+	Sort string
+
 	// 网络
 	Proxy           string
 	Headers         []string
@@ -43,6 +64,12 @@ type Spec struct {
 	OOBAdapter string
 	OOBKey     string
 	OOBDomain  string
+	// OOB 调优；OOBFinalizeTimeout 用指针区分「未设置」与显式的 0/-1。
+	OOBRateLimit       int
+	OOBConcurrency     int
+	OOBPollInterval    int
+	OOBHitRetention    int
+	OOBFinalizeTimeout *int
 
 	// 任务元信息
 	TaskName     string

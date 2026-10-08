@@ -44,6 +44,13 @@ type ReportItem struct {
 	PocInfo     interface{} `json:"pocInfo,omitempty"`    // 展开后的 POC 信息（与前端展示一致）
 	ResultList  interface{} `json:"resultList,omitempty"` // 解析后的请求响应列表
 	Extractor   interface{} `json:"extractor,omitempty"`
+	// Extractors 是抽取结果的精简形态（仅字符串值），与控制台命中行 [k="v"] 口径一致。
+	// 列表接口始终返回它，历史任务的诊断视图才能还原抽取信息。
+	Extractors map[string]string `json:"extractors,omitempty"`
+	// LedgerStatus/LedgerNote 是台账里该命中的最新人工状态与备注（无记录时省略），
+	// 供报告详情「处置」区块回填初值。
+	LedgerStatus string `json:"ledger_status,omitempty"`
+	LedgerNote   string `json:"ledger_note,omitempty"`
 }
 
 // 报告列表 - 响应
@@ -112,10 +119,34 @@ type ScanCreateRequest struct {
 	Ports           string   `json:"ports,omitempty"`
 	WebProbe        bool     `json:"webprobe,omitempty"`
 	WebFingerprint  bool     `json:"web_fingerprint,omitempty"`
-	TaskName        string   `json:"task_name,omitempty"`
-	Labels          []string `json:"labels,omitempty"`
-	EnableStream    bool     `json:"enable_stream"`
-	Smart           bool     `json:"smart,omitempty"`
+	Headers         []string `json:"headers,omitempty"`
+	Sort            string   `json:"sort,omitempty"`
+	// 请求节流：-rlt 与 auto/polite/balanced/aggressive 互斥，最多只有一个为真。
+	ReqLimitPerTarget int  `json:"req_limit_per_target,omitempty"`
+	AutoReqLimit      bool `json:"auto_req_limit,omitempty"`
+	Polite            bool `json:"polite,omitempty"`
+	Balanced          bool `json:"balanced,omitempty"`
+	Aggressive        bool `json:"aggressive,omitempty"`
+	// 任务级超时与失败保护
+	TaskSmartTimeout bool `json:"task_smart_timeout,omitempty"`
+	NoFingerprint    bool `json:"no_fingerprint,omitempty"`
+	// BreakpointOnVuln 对应 -vsb：命中首个漏洞后立即停止扫描。
+	BreakpointOnVuln bool `json:"breakpoint_on_vuln,omitempty"`
+	MonitorTargets   bool `json:"monitor_targets,omitempty"`
+	// OOB 调优：轮询/保留/收尾等待（FinalizeTimeout 允许 0 与 -1，故用指针区分未设置）
+	OobRateLimit       int  `json:"oob_rate_limit,omitempty"`
+	OobConcurrency     int  `json:"oob_concurrency,omitempty"`
+	OobPollInterval    int  `json:"oob_poll_interval,omitempty"`
+	OobHitRetention    int  `json:"oob_hit_retention,omitempty"`
+	OobFinalizeTimeout *int `json:"oob_finalize_timeout,omitempty"`
+	// 进阶：爆破上限与响应体上限（MB）
+	BruteMaxRequests int `json:"brute_max_requests,omitempty"`
+	MaxRespBodySize  int `json:"max_resp_body_size,omitempty"`
+
+	TaskName     string   `json:"task_name,omitempty"`
+	Labels       []string `json:"labels,omitempty"`
+	EnableStream bool     `json:"enable_stream"`
+	Smart        bool     `json:"smart,omitempty"`
 }
 
 type ScanProgressData struct {
