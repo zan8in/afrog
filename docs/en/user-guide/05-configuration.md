@@ -220,7 +220,7 @@ ai:
 Key points:
 
 - `base_url` / `model` / `api_key` must **all** be set before AI assist is considered configured; a full path (`.../v1/chat/completions`) is recognised too
-- You can also fill it in under **Settings → AI assist**, which writes this file and takes effect immediately — no restart needed
+- You can also fill it in under **Settings → AI assist**, which writes this file and takes effect immediately — no restart needed; **saving only writes the config and never calls the model**, so use **Test connection** on the same page (one tiny request) to confirm it actually works
 - A verdict is only requested **when you click**, never in the background; re-opening the same finding is served from the local cache
 - Before sending, `Cookie`, `Authorization`, `Set-Cookie` and similar headers are masked and long bodies are truncated — but the request/response of that finding still goes to the model service you configure, so judge accordingly
 

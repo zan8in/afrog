@@ -371,3 +371,55 @@ func TestAISummaryHandler_StreamsAndCaches(t *testing.T) {
 		t.Fatalf("换筛选条件后模型调用次数 = %d，期望 2", got)
 	}
 }
+
+// 「测试连接」：成功时回传模型片段；上游拒绝时把原因翻译成用户能照做的提示。
+func TestAITestHandler_SuccessThenUpstreamError(t *testing.T) {
+	// 保证「未配置」用例不受其它用例残留的内存配置影响。
+	SetAIConfig(config.AI{}, "")
+	t.Cleanup(func() { SetAIConfig(config.AI{}, "") })
+
+	okSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Errorf("请求路径 = %q，期望 /v1/chat/completions", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer sk-test" {
+			t.Errorf("鉴权头 = %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]string{"content": "正常"}}},
+		})
+	}))
+	defer okSrv.Close()
+
+	rec := runAITest(t, aiTestPayload{BaseURL: okSrv.URL + "/v1", Model: "m", APIKey: "sk-test"})
+	if body := rec.Body.String(); !strings.Contains(body, `"success":true`) || !strings.Contains(body, "正常") {
+		t.Fatalf("测试连接应成功：%s", body)
+	}
+
+	// 401 应翻译成「检查 api_key」，而不是把裸 JSON 甩给用户。
+	denySrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"error":{"message":"invalid api key"}}`)
+	}))
+	defer denySrv.Close()
+
+	rec = runAITest(t, aiTestPayload{BaseURL: denySrv.URL + "/v1", Model: "m", APIKey: "bad"})
+	if body := rec.Body.String(); !strings.Contains(body, `"success":false`) || !strings.Contains(body, "api_key") {
+		t.Fatalf("401 应给出可照做的提示：%s", body)
+	}
+
+	// 三项不全：直接给出配置提示（此用例下内存配置为空）。
+	rec = runAITest(t, aiTestPayload{})
+	if body := rec.Body.String(); !strings.Contains(body, `"success":false`) {
+		t.Fatalf("缺配置应失败：%s", body)
+	}
+}
+
+func runAITest(t *testing.T, payload aiTestPayload) *httptest.ResponseRecorder {
+	t.Helper()
+	b, _ := json.Marshal(payload)
+	rec := httptest.NewRecorder()
+	aiTestHandler(rec, httptest.NewRequest(http.MethodPost, "/api/ai/test", strings.NewReader(string(b))))
+	return rec
+}

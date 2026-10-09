@@ -22,8 +22,8 @@
 						document.documentElement.classList.add(`theme-${userConfig.activeTheme}`);
 						document.documentElement.setAttribute('data-theme', userConfig.activeTheme);
 					}
-					if (userConfig.layout) {
-						document.documentElement.classList.add(`layout-${userConfig.layout}`);
+					if (userConfig.density) {
+						document.documentElement.classList.add(`density-${userConfig.density}`);
 					}
 				} catch (e) {
 					console.error('Error parsing user config cookie:', e);
@@ -33,10 +33,10 @@
 		
 		<link href="/_app/immutable/assets/vendor.Cwm1T27Q.css" rel="stylesheet">
 		<link href="/_app/immutable/assets/monaco-editor.BWv8anIR.css" rel="stylesheet">
-		<link rel="modulepreload" href="/_app/immutable/entry/start.CBLZ2bIS.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/D3SyBmp_.js">
-		<link rel="modulepreload" href="/_app/immutable/entry/app.DMkZ3T9h.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/DH9Pb9bt.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/start.DlfAz4ez.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/6oHhpIlf.js">
+		<link rel="modulepreload" href="/_app/immutable/entry/app.C8e1fhRy.js">
+		<link rel="modulepreload" href="/_app/immutable/chunks/Qyb1qCRk.js">
 	</head>
 
 	<body
@@ -46,15 +46,15 @@
 		<div style="display: contents">
 			<script>
 				{
-					__sveltekit_e2ba7u = {
+					__sveltekit_1cr3b01 = {
 						base: ""
 					};
 
 					const element = document.currentScript.parentElement;
 
 					Promise.all([
-						import("/_app/immutable/entry/start.CBLZ2bIS.js"),
-						import("/_app/immutable/entry/app.DMkZ3T9h.js")
+						import("/_app/immutable/entry/start.DlfAz4ez.js"),
+						import("/_app/immutable/entry/app.C8e1fhRy.js")
 					]).then(([kit, app]) => {
 						kit.start(app, element);
 					});

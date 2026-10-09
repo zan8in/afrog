@@ -238,6 +238,153 @@ func clampInt(v, min, max, fallback int) int {
 	return v
 }
 
+// aiTestPayload 是「测试连接」的入参：允许用表单里尚未保存的值直接试连，
+// 缺省字段回落到已保存的配置，这样「只改模型名」也能直接测。
+type aiTestPayload struct {
+	BaseURL string `json:"base_url"`
+	Model   string `json:"model"`
+	APIKey  string `json:"api_key"`
+}
+
+func pickNonEmpty(v, fallback string) string {
+	if s := strings.TrimSpace(v); s != "" {
+		return s
+	}
+	return strings.TrimSpace(fallback)
+}
+
+// aiTestHandler 用一次极小的 chat 请求验证「连通性 / 鉴权 / 模型名」是否可用。
+//
+// 为什么不放在保存里静默做：AI 模块的取向是「只在用户点击时调用模型」，
+// 保存时偷偷打一次会产生用户没点的计费调用。所以把它做成一个显式的、由用户触发的动作。
+// 它不写缓存、不扣当月试用额度（这是配置自检，不是一次内容生成），
+// 并允许使用尚未保存的表单值，用户可以先确认能用再保存。
+func aiTestHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
+	var req aiTestPayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+
+	saved, _ := currentAIConfig()
+	baseURL, err := normalizeAIBaseURL(pickNonEmpty(req.BaseURL, saved.BaseURL))
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+		return
+	}
+
+	cfg := config.AI{
+		BaseURL:    baseURL,
+		Model:      pickNonEmpty(req.Model, saved.Model),
+		APIKey:     pickNonEmpty(req.APIKey, saved.APIKey),
+		TimeoutSec: 20,
+		MaxTokens:  16,
+	}
+	if !aiReady(cfg) {
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "接口地址、模型名、API Key 三项都要填写后才能测试"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	sample, err := aiChatOnce(ctx, cfg, "你是连通性测试助手。", "只回复两个字：正常")
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "连接正常", Data: map[string]any{
+		"model":      cfg.Model,
+		"base_url":   cfg.BaseURL,
+		"latency_ms": latency,
+		"sample":     trimToLen(sample, 80),
+	}})
+}
+
+// aiChatOnce 发一次非流式的 chat 请求，供「测试连接」使用。
+// 流式只服务于研判的逐字展示；自检要的是「通不通、耗时多少」，不需要增量。
+func aiChatOnce(ctx context.Context, cfg config.AI, system, user string) (string, error) {
+	body, err := json.Marshal(aiChatRequest{
+		Model: cfg.Model,
+		Messages: []aiChatMessage{
+			{Role: "system", Content: system},
+			{Role: "user", Content: user},
+		},
+		Stream:      false,
+		Temperature: 0,
+		MaxTokens:   cfg.MaxTokens,
+	})
+	if err != nil {
+		return "", fmt.Errorf("构造请求失败：%s", err.Error())
+	}
+
+	timeout := time.Duration(cfg.TimeoutSec) * time.Second
+	if timeout <= 0 {
+		timeout = 20 * time.Second
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	endpoint := aiChatEndpoint(cfg.BaseURL)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, endpoint, strings.NewReader(string(body)))
+	if err != nil {
+		return "", fmt.Errorf("模型地址无效：%s", err.Error())
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("测试已取消")
+		}
+		if reqCtx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("连接超时（超过 %d 秒）：%s", cfg.TimeoutSec, endpoint)
+		}
+		return "", fmt.Errorf("无法连接模型服务：%s", err.Error())
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("%s", aiUpstreamError(resp.StatusCode, endpoint, string(raw)))
+	}
+
+	var out struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return "", fmt.Errorf("模型返回了无法解析的内容（可能不是 OpenAI 兼容接口）")
+	}
+	if out.Error != nil && strings.TrimSpace(out.Error.Message) != "" {
+		return "", fmt.Errorf("模型返回错误：%s", trimToLen(out.Error.Message, 200))
+	}
+	if len(out.Choices) == 0 {
+		return "", fmt.Errorf("模型没有返回内容，请确认模型名是否正确")
+	}
+	return strings.TrimSpace(out.Choices[0].Message.Content), nil
+}
+
 // -----------------------
 // 研判：证据 -> 模型 -> 流式回传
 // -----------------------

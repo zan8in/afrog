@@ -166,7 +166,7 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 		checkErr = s.checkRemoteAccess(ctx, dir, st.ManifestID)
 		if checkErr != nil && isCuratedAuthErrorMessage(checkErr.Error()) {
 			_ = s.purgeCuratedLocal(dir)
-			_ = s.updateRuntimeCheck("", st.ManifestID, normalizeRuntimeError(checkErr))
+			_ = s.updateRuntimeFailed("", st.ManifestID, normalizeRuntimeError(checkErr))
 			return "", checkErr
 		}
 	}
@@ -175,8 +175,13 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 		st = &runtimeState{}
 	}
 
+	// 本地没有精选 PoC 时不再受「6 小时内不重复检查」的限制：
+	// 上一次鉴权错误会清空本地目录，如果仍走时间门槛，就要等到 6 小时后才重试，
+	// 表现为「banner 一直红着显示 0/pocs，必须手动 -curated-force-update 才能恢复」。
+	needPull := s.cfg.ForceUpdate || shouldCheck || !dirHasCuratedPocs(dir)
+
 	var updateErr error
-	if endpoint != "" && (s.cfg.ForceUpdate || shouldCheck) && !s.cfg.NoUpdate {
+	if endpoint != "" && needPull && !s.cfg.NoUpdate {
 		uopts := UpdateOptions{}
 		if s.cfg.ForceUpdate {
 			uopts.Force = true
@@ -184,7 +189,7 @@ func (s *Service) Mount(ctx context.Context) (string, error) {
 		updateErr = s.Update(ctx, uopts)
 		if updateErr != nil && isCuratedAuthErrorMessage(updateErr.Error()) {
 			_ = s.purgeCuratedLocal(dir)
-			_ = s.updateRuntimeCheck("", st.ManifestID, normalizeRuntimeError(updateErr))
+			_ = s.updateRuntimeFailed("", st.ManifestID, normalizeRuntimeError(updateErr))
 			return "", updateErr
 		}
 	}
@@ -321,6 +326,33 @@ func (s *Service) updateRuntimeCheck(dir string, manifestID string, msg string) 
 	now := time.Now()
 	rs.CurrentDir = dir
 	rs.LastCheckAt = now
+	rs.LastError = strings.TrimSpace(msg)
+	if strings.TrimSpace(manifestID) != "" {
+		rs.ManifestID = strings.TrimSpace(manifestID)
+	}
+	rs.CuratedChannel = strings.TrimSpace(s.cfg.Channel)
+	data, err := json.MarshalIndent(rs, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// updateRuntimeFailed 记录一次失败的检查：写入 last_error，但**不推进 last_check_at**。
+//
+// 推进时间会把「下次是否重试」交给 6 小时门槛，而这次其实什么都没拿到；
+// 保持旧值（或零值）才能让下一次运行继续尝试，避免「目录已清空却要等到 6 小时后才重试」。
+func (s *Service) updateRuntimeFailed(dir string, manifestID string, msg string) error {
+	cfgDir, err := configDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(cfgDir, "curated-state.json")
+	rs, _ := readRuntime(path)
+	if rs == nil {
+		rs = &runtimeState{}
+	}
+	rs.CurrentDir = strings.TrimSpace(dir)
 	rs.LastError = strings.TrimSpace(msg)
 	if strings.TrimSpace(manifestID) != "" {
 		rs.ManifestID = strings.TrimSpace(manifestID)
@@ -533,7 +565,7 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 				DeviceFingerprint: as.DeviceFingerprint,
 			})
 			if err != nil {
-				if attempt == 0 && license != "" && isInvalidRefreshTokenMessage(err.Error()) {
+				if attempt == 0 && license != "" && shouldReloginAfterRefreshError(err.Error()) {
 					if loginErr := s.Login(ctx, license); loginErr != nil {
 						_ = s.updateRuntimeCheck(curatedDir, opts.ManifestID, normalizeRuntimeError(loginErr))
 						return loginErr
@@ -568,6 +600,21 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 			AfrogVersion: "",
 		})
 		if err != nil {
+			// access token 在本地看还没过期、却被服务端判为无效（换密钥、风控、时钟偏差等）时，
+			// 用 license 完整登录一次再重试。只做一次，且只在失败路径上发生，不会变成重试风暴。
+			if attempt == 0 && license != "" && isCuratedAuthErrorMessage(err.Error()) {
+				if loginErr := s.Login(ctx, license); loginErr != nil {
+					_ = s.updateRuntimeCheck(curatedDir, opts.ManifestID, normalizeRuntimeError(loginErr))
+					return loginErr
+				}
+				as, err = readAuth(authPath)
+				if err != nil || as == nil {
+					errOut := errors.New("not logged in")
+					_ = s.updateRuntimeCheck(curatedDir, opts.ManifestID, normalizeRuntimeError(errOut))
+					return errOut
+				}
+				continue
+			}
 			_ = s.updateRuntimeCheck(curatedDir, opts.ManifestID, normalizeRuntimeError(err))
 			return err
 		}
@@ -682,6 +729,22 @@ func isInvalidRefreshTokenMessage(msg string) bool {
 	return false
 }
 
+// shouldReloginAfterRefreshError 判断 refresh 失败后是否值得回退到「拿 license 完整登录一次」。
+//
+// 只比对 refresh token 更原始：服务端在不同版本/不同原因下文案不一
+// （invalid refresh token / invalid license / unauthorized / invalid token…），
+// 只要客户端手里有 license，就值得重登一次；重登若也失败，会把真正的错误返回给上层。
+func shouldReloginAfterRefreshError(msg string) bool {
+	if isInvalidRefreshTokenMessage(msg) {
+		return true
+	}
+	m := strings.ToLower(strings.TrimSpace(msg))
+	return strings.Contains(m, "unauthorized") ||
+		strings.Contains(m, "invalid license") ||
+		strings.Contains(m, "invalid token") ||
+		strings.Contains(m, "forbidden")
+}
+
 func isCuratedAuthErrorMessage(msg string) bool {
 	m := strings.ToLower(strings.TrimSpace(msg))
 	if m == "" {
@@ -775,7 +838,7 @@ func (s *Service) checkRemoteAccess(ctx context.Context, curatedDir string, mani
 			DeviceFingerprint: as.DeviceFingerprint,
 		})
 		if err != nil {
-			if license != "" && isInvalidRefreshTokenMessage(err.Error()) {
+			if license != "" && shouldReloginAfterRefreshError(err.Error()) {
 				if loginErr := s.Login(ctx, license); loginErr != nil {
 					return loginErr
 				}

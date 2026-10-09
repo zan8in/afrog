@@ -169,7 +169,7 @@ Constraints worth knowing before you use it:
 - **Masked before sending**: `Cookie`, `Authorization`, `Set-Cookie` and similar headers are hidden and long bodies truncated — but the request and response of that finding still go to the model service you configure
 - **No dead ends when unconfigured**: the button stays visible and points you to **Settings → AI assist**; the free tier allows 20 verdicts per month, Curated members are unlimited
 
-See the `ai` field dictionary in [Configuration](./05-configuration.md), or fill it in under **Settings → AI assist** (takes effect immediately, no restart).
+See the `ai` field dictionary in [Configuration](./05-configuration.md), or fill it in under **Settings → AI assist** (takes effect immediately, no restart). Saving never calls the model; click **Test connection** on the same page to send one tiny request and confirm the URL, key and model name actually work.
 
 ### Report executive summary
 

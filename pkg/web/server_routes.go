@@ -286,6 +286,9 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/ai/status", jwtAuthMiddleware(aiStatusHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/ai/config", jwtAuthMiddleware(aiConfigGetHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/ai/config", jwtAuthMiddleware(aiConfigPutHandler)).Methods(http.MethodPut)
+	// /ai/test 用一次极小请求自检「地址/Key/模型名」是否可用（不扣试用额度，不写缓存），
+	// 因为保存本身只做写入、不会静默调用模型，可用性需要一个显式入口来确认。
+	api.HandleFunc("/ai/test", jwtAuthMiddleware(aiTestHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/ai/verdict", jwtAuthMiddleware(aiVerdictHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/ai/summary", jwtAuthMiddleware(aiSummaryHandler)).Methods(http.MethodGet)
 	// /ai/recommend 依据「目标画像」（规模、类型分布、样例）推荐扫描参数，
