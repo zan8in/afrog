@@ -36,6 +36,61 @@ type Item struct {
 	Source   Source
 	Path     string // builtin: "embedded:<path>", 其他为本地路径（~ 开头）
 	Created  string
+
+	// 以下为 info 段落里「漏洞介绍」相关字段，供漏洞库详情页直接展示，
+	// 避免前端再取一次 YAML 才能渲染。
+	Description string
+	Reference   []string
+	Affected    string // 影响版本
+	Solutions   string // 修复建议
+	Verified    bool
+	Requires    []string
+	CvssMetrics string
+	CvssScore   float64
+	CveId       string
+	CweId       string
+}
+
+// itemFromMeta 用元信息填充统一的 Item，集中字段映射，避免各来源分支重复。
+func itemFromMeta(pm poc.PocMeta, src Source, path string) Item {
+	return Item{
+		ID:          pm.Id,
+		Name:        pm.Info.Name,
+		Severity:    normalizeSeverity(pm.Info.Severity),
+		Author:      SplitAuthors(pm.Info.Author),
+		Tags:        SplitTags(pm.Info.Tags),
+		Source:      src,
+		Path:        path,
+		Created:     pm.Info.Created,
+		Description: strings.TrimSpace(pm.Info.Description),
+		Reference:   pm.Info.Reference,
+		Affected:    strings.TrimSpace(pm.Info.Affected),
+		Solutions:   strings.TrimSpace(pm.Info.Solutions),
+		Verified:    pm.Info.Verified,
+		Requires:    pm.Info.Requires,
+		CvssMetrics: pm.Info.Classification.CvssMetrics,
+		CvssScore:   pm.Info.Classification.CvssScore,
+		CveId:       pm.Info.Classification.CveId,
+		CweId:       pm.Info.Classification.CweId,
+	}
+}
+
+// GetMetaByID 从全部来源按 id 查找单个 POC 元信息（含漏洞介绍字段）。
+func GetMetaByID(pocId string) (Item, bool) {
+	pocId = strings.TrimSpace(pocId)
+	if pocId == "" {
+		return Item{}, false
+	}
+	items, err := ListMeta(ListOptions{Source: "all"})
+	if err != nil {
+		return Item{}, false
+	}
+	for _, it := range items {
+		if it.ID == pocId {
+			return it, true
+		}
+	}
+	return Item{}, false
 }
 
 // 统一的路径项（扫描与 -pl 用）
@@ -93,16 +148,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				if err != nil {
 					continue
 				}
-				it := Item{
-					ID:       pm.Id,
-					Name:     pm.Info.Name,
-					Severity: normalizeSeverity(pm.Info.Severity),
-					Author:   SplitAuthors(pm.Info.Author),
-					Tags:     SplitTags(pm.Info.Tags),
-					Source:   SourceBuiltin,
-					Path:     "embedded:" + ep,
-					Created:  pm.Info.Created,
-				}
+				it := itemFromMeta(pm, SourceBuiltin, "embedded:"+ep)
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
 					continue
@@ -127,16 +173,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				if err != nil {
 					continue
 				}
-				it := Item{
-					ID:       pm.Id,
-					Name:     pm.Info.Name,
-					Severity: normalizeSeverity(pm.Info.Severity),
-					Author:   SplitAuthors(pm.Info.Author),
-					Tags:     SplitTags(pm.Info.Tags),
-					Source:   SourceCurated,
-					Path:     strings.Replace(lp, home, "~", 1),
-					Created:  pm.Info.Created,
-				}
+				it := itemFromMeta(pm, SourceCurated, strings.Replace(lp, home, "~", 1))
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
 					continue
@@ -154,16 +191,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				if err != nil {
 					continue
 				}
-				it := Item{
-					ID:       pm.Id,
-					Name:     pm.Info.Name,
-					Severity: normalizeSeverity(pm.Info.Severity),
-					Author:   SplitAuthors(pm.Info.Author),
-					Tags:     SplitTags(pm.Info.Tags),
-					Source:   SourceMy,
-					Path:     strings.Replace(lp, home, "~", 1),
-					Created:  pm.Info.Created,
-				}
+				it := itemFromMeta(pm, SourceMy, strings.Replace(lp, home, "~", 1))
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
 					continue
@@ -180,16 +208,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 				if err != nil {
 					continue
 				}
-				it := Item{
-					ID:       pm.Id,
-					Name:     pm.Info.Name,
-					Severity: normalizeSeverity(pm.Info.Severity),
-					Author:   SplitAuthors(pm.Info.Author),
-					Tags:     SplitTags(pm.Info.Tags),
-					Source:   SourceLocal,
-					Path:     strings.Replace(lp, home, "~", 1),
-					Created:  pm.Info.Created,
-				}
+				it := itemFromMeta(pm, SourceLocal, strings.Replace(lp, home, "~", 1))
 				key := makeKey(it)
 				if _, ok := seen[key]; ok {
 					continue
@@ -208,16 +227,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					// 非目录或遍历为空时，尝试作为单文件处理
 					pm, err := poc.LocalReadPocMetaByPath(entry)
 					if err == nil {
-						it := Item{
-							ID:       pm.Id,
-							Name:     pm.Info.Name,
-							Severity: normalizeSeverity(pm.Info.Severity),
-							Author:   SplitAuthors(pm.Info.Author),
-							Tags:     SplitTags(pm.Info.Tags),
-							Source:   SourceAppend,
-							Path:     strings.Replace(entry, home, "~", 1),
-							Created:  pm.Info.Created,
-						}
+						it := itemFromMeta(pm, SourceAppend, strings.Replace(entry, home, "~", 1))
 						key := makeKey(it)
 						if _, ok := seen[key]; ok {
 							continue
@@ -232,16 +242,7 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 					if err != nil {
 						continue
 					}
-					it := Item{
-						ID:       pm.Id,
-						Name:     pm.Info.Name,
-						Severity: normalizeSeverity(pm.Info.Severity),
-						Author:   SplitAuthors(pm.Info.Author),
-						Tags:     SplitTags(pm.Info.Tags),
-						Source:   SourceAppend,
-						Path:     strings.Replace(lp, home, "~", 1),
-						Created:  pm.Info.Created,
-					}
+					it := itemFromMeta(pm, SourceAppend, strings.Replace(lp, home, "~", 1))
 					key := makeKey(it)
 					if _, ok := seen[key]; ok {
 						continue

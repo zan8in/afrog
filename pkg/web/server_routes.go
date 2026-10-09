@@ -202,6 +202,10 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs/yaml/{pocId}", jwtAuthMiddleware(pocsYamlHandler)).Methods(http.MethodGet)
+	// 漏洞库详情：单个 PoC 的完整元信息（含 description/reference/affected/solutions/CVE 等）
+	api.HandleFunc("/pocs/detail/{pocId}", jwtAuthMiddleware(pocsDetailHandler)).Methods(http.MethodGet)
+	// 编辑器校验：校验一段 YAML 并回传解析后的 info（实时预览用），不落盘
+	api.HandleFunc("/pocs/validate", jwtAuthMiddleware(pocsValidateHandler)).Methods(http.MethodPost)
 	// 新增：创建 POC
 	api.HandleFunc("/pocs/create", jwtAuthMiddleware(pocsCreateHandler)).Methods(http.MethodPost)
 	// 新增：更新指定 POC 的 YAML 内容（当前使用 POST）

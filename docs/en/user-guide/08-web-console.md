@@ -63,7 +63,7 @@ The sidebar groups pages by purpose:
 | | Assets | Targets sink in automatically; tag and star them |
 | Results | Reports | Filter findings by task, keyword, severity |
 | | Ledger | Track finding status (pending/confirmed/false positive/fixed) and notes |
-| Data | PoCs | Browse, edit, and add custom PoCs |
+| Data | Vuln Library | Browse built-in/curated PoCs and vulnerability details (name, description, references, affected versions, solutions), write your own PoC |
 | | Curated | Mount status and updates for licensed curated PoCs |
 | Other | Settings | Account, notifications, service info |
 

@@ -106,37 +106,43 @@ func ValidatePocFiles(target string) error {
 
 // validateSinglePocFile 验证单个POC文件
 func validateSinglePocFile(filePath string) ValidationResult {
-	result := ValidationResult{
-		File:   filePath,
-		Passed: true,
-		Errors: []ValidationError{},
-	}
-
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		result.Passed = false
-		result.Errors = append(result.Errors, ValidationError{
-			File:    filePath,
-			Message: fmt.Sprintf("failed to read file: %v", err),
-		})
-		return result
+		return ValidationResult{
+			File:   filePath,
+			Passed: false,
+			Errors: []ValidationError{
+				{File: filePath, Message: fmt.Sprintf("failed to read file: %v", err)},
+			},
+		}
+	}
+	return ValidatePocContent(filePath, content)
+}
+
+// ValidatePocContent 校验一段 POC YAML 内容（不落盘），返回结构化结果。
+// name 仅用于错误信息里的文件名占位（Web 编辑器场景传 "editor" 即可）。
+func ValidatePocContent(name string, content []byte) ValidationResult {
+	result := ValidationResult{
+		File:   name,
+		Passed: true,
+		Errors: []ValidationError{},
 	}
 
 	var pocData poc.Poc
 	if err := yaml.UnmarshalStrict(content, &pocData); err != nil {
 		result.Passed = false
-		result.Errors = append(result.Errors, parseYamlStrictErrors(filePath, string(content), err)...)
+		result.Errors = append(result.Errors, parseYamlStrictErrors(name, string(content), err)...)
 		return result
 	}
 
 	// POC结构验证
-	if errs := validatePocStructure(&pocData, filePath); len(errs) > 0 {
+	if errs := validatePocStructure(&pocData, name); len(errs) > 0 {
 		result.Passed = false
 		result.Errors = append(result.Errors, errs...)
 	}
 
 	// Expression语法验证
-	if errs := validateExpressions(&pocData, filePath, string(content)); len(errs) > 0 {
+	if errs := validateExpressions(&pocData, name, string(content)); len(errs) > 0 {
 		result.Passed = false
 		result.Errors = append(result.Errors, errs...)
 	}

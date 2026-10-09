@@ -823,6 +823,30 @@ func pocDetailHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(yamlContent)
 }
 
+// toPocsListItem 把仓库层的统一元信息映射为 API 输出结构（含漏洞介绍字段）。
+func toPocsListItem(it pocsrepo.Item) PocsListItem {
+	return PocsListItem{
+		ID:          it.ID,
+		Name:        it.Name,
+		Severity:    it.Severity,
+		Author:      it.Author,
+		Tags:        it.Tags,
+		Source:      string(it.Source),
+		Path:        it.Path,
+		Created:     it.Created,
+		Description: it.Description,
+		Reference:   it.Reference,
+		Affected:    it.Affected,
+		Solutions:   it.Solutions,
+		Verified:    it.Verified,
+		Requires:    it.Requires,
+		CvssMetrics: it.CvssMetrics,
+		CvssScore:   it.CvssScore,
+		CveId:       it.CveId,
+		CweId:       it.CweId,
+	}
+}
+
 func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -944,16 +968,7 @@ func pocsListHandler(w http.ResponseWriter, r *http.Request) {
 	// 转为 API 输出结构，新增 created 字段
 	respItems := make([]PocsListItem, 0, len(pageItems))
 	for _, it := range pageItems {
-		respItems = append(respItems, PocsListItem{
-			ID:       it.ID,
-			Name:     it.Name,
-			Severity: it.Severity,
-			Author:   it.Author,
-			Tags:     it.Tags,
-			Source:   string(it.Source),
-			Path:     it.Path,
-			Created:  it.Created,
-		})
+		respItems = append(respItems, toPocsListItem(it))
 	}
 
 	// 返回
@@ -1005,9 +1020,103 @@ func pocsYamlHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(yamlContent)
 }
 
-// 更新指定 POC 的 YAML 内容
+// pocsDetailHandler 返回单个 PoC 的完整元信息（含漏洞介绍字段），供漏洞详情页直接渲染。
+func pocsDetailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持GET方法"})
+		return
+	}
+
+	pocId := strings.TrimSpace(mux.Vars(r)["pocId"])
+	if pocId == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的 POC ID"})
+		return
+	}
+
+	it, ok := pocsrepo.GetMetaByID(pocId)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "未找到指定的 POC"})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: toPocsListItem(it)})
+}
+
+// pocsValidateHandler 校验一段 POC YAML（编辑器实时校验 + 信息预览），不落盘、不写入。
+// 校验不通过时仍返回 HTTP 200，用 data.valid=false 表达，便于编辑器持续展示。
+func pocsValidateHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+
+	var req struct {
+		YamlContent string `json:"yaml_content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+
+	type issue struct {
+		Line    int    `json:"line"`
+		Column  int    `json:"column"`
+		Message string `json:"message"`
+	}
+
+	valid := true
+	issues := []issue{}
+	var metadata any
+
+	if strings.TrimSpace(req.YamlContent) == "" {
+		valid = false
+		issues = append(issues, issue{Message: "YAML 内容为空"})
+	} else {
+		result := validator.ValidatePocContent("editor", []byte(req.YamlContent))
+		valid = result.Passed
+		for _, e := range result.Errors {
+			issues = append(issues, issue{Line: e.Line, Column: e.Column, Message: e.Message})
+		}
+		// 元信息预览：即使校验未通过也尽量解析，便于编辑器右侧实时展示
+		var pm poc.PocMeta
+		if err := yaml.Unmarshal([]byte(req.YamlContent), &pm); err == nil {
+			metadata = map[string]any{
+				"id":          pm.Id,
+				"name":        pm.Info.Name,
+				"author":      pm.Info.Author,
+				"severity":    pm.Info.Severity,
+				"description": pm.Info.Description,
+				"reference":   pm.Info.Reference,
+				"affected":    pm.Info.Affected,
+				"solutions":   pm.Info.Solutions,
+				"tags":        pocsrepo.SplitTags(pm.Info.Tags),
+				"requires":    pm.Info.Requires,
+			}
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "OK",
+		Data: map[string]any{
+			"valid":    valid,
+			"errors":   issues,
+			"metadata": metadata,
+		},
+	})
+}
+
+// 新建指定 POC 的 YAML 内容
 func pocsCreateHandler(w http.ResponseWriter, r *http.Request) {
-	// 仅支持 POST（如需改为 PUT，将路由方法调整为 http.MethodPut 即可）
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "Method Not Allowed"})

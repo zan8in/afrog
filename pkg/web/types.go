@@ -76,6 +76,18 @@ type PocsListItem struct {
 	Source   string   `json:"source"` // builtin/curated/my/local
 	Path     string   `json:"path,omitempty"`
 	Created  string   `json:"created,omitempty"`
+
+	// 漏洞介绍相关字段：供漏洞库列表与详情页直接渲染，无需再取 YAML。
+	Description string   `json:"description,omitempty"`
+	Reference   []string `json:"reference,omitempty"`
+	Affected    string   `json:"affected,omitempty"`
+	Solutions   string   `json:"solutions,omitempty"`
+	Verified    bool     `json:"verified,omitempty"`
+	Requires    []string `json:"requires,omitempty"`
+	CvssMetrics string   `json:"cvss_metrics,omitempty"`
+	CvssScore   float64  `json:"cvss_score,omitempty"`
+	CveId       string   `json:"cve_id,omitempty"`
+	CweId       string   `json:"cwe_id,omitempty"`
 }
 
 // POC 列表 - 响应
