@@ -76,13 +76,20 @@ afrog -T targets.txt
 afrog -T targets.txt -S high,critical
 ```
 
+启动内置 Web 控制台（浏览器打开 `http://127.0.0.1:16868`，用终端打印的密码登录）：
+
+```bash
+afrog -web
+```
+
 ## 文档入口
 
-文档按四本手册组织：
+文档按五本手册组织：
 
 | 手册 | 从这里开始 |
 | --- | --- |
 | 使用指南 | [afrog 是什么、如何使用](./zh/user-guide/01-overview.md) |
+| Web 控制台 | [用图形界面发起扫描、查看结果、管理漏洞](./zh/web/01-overview.md) |
 | PoC 编写指南 | [写出你的第一条 PoC](./zh/poc/01-quickstart.md) |
 | SDK 使用指南 | [把 afrog 集成进 Go 程序](./zh/sdk/01-quickstart.md) |
 | Curated PoC | [启用授权 curated PoC](./zh/curated/01-overview.md) |

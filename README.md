@@ -76,13 +76,20 @@ Run only high and critical checks:
 afrog -T targets.txt -S high,critical
 ```
 
+Start the built-in web console (open `http://127.0.0.1:16868` in a browser and sign in with the password printed to the terminal):
+
+```bash
+afrog -web
+```
+
 ## Documentation
 
-The documentation is organized into four handbooks:
+The documentation is organized into five handbooks:
 
 | Handbook | Start here |
 | --- | --- |
 | User Guide | [What afrog is and how to use it](docs/en/user-guide/01-overview.md) |
+| Web Console | [Run scans and manage results in a browser](docs/en/web/01-overview.md) |
 | PoC Authoring Guide | [Write your first PoC](docs/en/poc/01-quickstart.md) |
 | SDK Usage Guide | [Embed afrog in your Go program](docs/en/sdk/01-quickstart.md) |
 | Curated PoC | [Enable licensed curated PoCs](docs/en/curated/01-overview.md) |

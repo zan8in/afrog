@@ -186,8 +186,8 @@ func stripFencedCode(content string) []string {
 	return out
 }
 
-// skipLinkTarget 判断链接目标是否属于「无需校验」的类别：外链、纯锚点、
-// 站内绝对路径（拼接规则由站点决定，本地无从解析）。
+// skipLinkTarget 判断链接目标是否属于「无需校验」的类别：外链、本地文件链接
+// （file://）、纯锚点、站内绝对路径（拼接规则由站点决定，本地无从解析）。
 func skipLinkTarget(target string) bool {
 	t := strings.TrimSpace(target)
 	t = strings.Trim(t, "<>")
@@ -195,7 +195,7 @@ func skipLinkTarget(target string) bool {
 		return true
 	}
 	lower := strings.ToLower(t)
-	for _, prefix := range []string{"http://", "https://", "mailto:", "tel:", "//"} {
+	for _, prefix := range []string{"http://", "https://", "mailto:", "tel:", "file:", "//"} {
 		if strings.HasPrefix(lower, prefix) {
 			return true
 		}
