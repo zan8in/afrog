@@ -165,6 +165,24 @@ jobs:
             exit 1
           fi
 
+      - name: Sign official PoCs
+        env:
+          AFROG_POC_SIGNING_KEY_B64: ${{ secrets.AFROG_POC_SIGNING_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AFROG_POC_SIGNING_KEY_B64:-}" ]; then
+            echo "AFROG_POC_SIGNING_KEY_B64 is not set; skipping official PoC signing." >&2
+            echo "Embedded javascript PoCs will be unsigned (official verification disabled)." >&2
+            exit 0
+          fi
+          go run ./cmd/afrog -pocsign pocs/afrog-pocs | tee _pocsign.out
+          PUBKEY="$(sed -n 's/^pubkey=//p' _pocsign.out)"
+          if [ -z "${PUBKEY}" ]; then
+            echo "failed to derive the official public key from -pocsign output" >&2
+            exit 1
+          fi
+          echo "AFROG_POC_PUBKEY_B64=${PUBKEY}" >> "${GITHUB_ENV}"
+
       - name: Smoke build (validate go:embed)
         env:
           CGO_ENABLED: 0

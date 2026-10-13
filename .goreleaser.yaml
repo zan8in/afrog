@@ -22,6 +22,9 @@ builds:
     ldflags:
       - -s
       - -w
+      # 注入官方 PoC 验签公钥（base64）。发布流水线在签名官方 PoC 后把公钥导出到
+      # 环境变量 AFROG_POC_PUBKEY_B64；未设置时注入空串，等价于开发态不启用官方验签。
+      - -X github.com/zan8in/afrog/v3/pkg/pocsign.officialPublicKeyB64={{ envOrDefault "AFROG_POC_PUBKEY_B64" "" }}
 
 archives:
   - formats:

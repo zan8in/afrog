@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -210,7 +211,14 @@ func (e JSExecutor) Execute(target string, rule poc.Rule, opt *config.Options, v
 	if opt != nil && opt.JsScriptTimeout > 0 {
 		maxTimeout = time.Duration(opt.JsScriptTimeout) * time.Second
 	}
-	return js.Execute(ctx, target, rule.Request.Code, rule.Request.PreCondition, args, vars, maxTimeout)
+	// 模块准入策略：由能力等级决定 require 能否取得模块（exec 等特权能力的运行期拦截点）
+	var policy js.ModulePolicy
+	if opt != nil {
+		policy = func(_ string, level capability.Level) bool {
+			return opt.AllowsCapability(level)
+		}
+	}
+	return js.Execute(ctx, target, rule.Request.Code, rule.Request.PreCondition, args, vars, maxTimeout, policy)
 }
 
 func getDuration(sec int) (d time.Duration) {

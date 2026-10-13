@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/cel-go/checker/decls"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -173,5 +174,61 @@ expression: r0()
 	rawResp, ok := c.VariableMap["response"].(*proto.Response)
 	if ok && !strings.Contains(string(rawResp.Body), "fixedboundary") {
 		t.Fatalf("expected echoed response to contain fixedboundary, got %q", string(rawResp.Body))
+	}
+}
+
+// TestDeclareRuntimeVars 验证运行期写入变量表的键（如 javascript 的 ExportAs 产物）
+// 能被 rule expression 直接引用，且不会覆盖已有的类型声明。
+func TestDeclareRuntimeVars(t *testing.T) {
+	c := &Checker{
+		VariableMap: map[string]any{
+			"banner":        "SSH-2.0-OpenSSH_9.6",
+			"code":          int64(220),
+			"response_text": "hello",
+			"Host":          "1.2.3.4",
+			"bad-key":       "ignored",
+		},
+		CustomLib: NewCustomLib(),
+	}
+	// 预先声明的键不应被动态类型覆盖
+	c.CustomLib.UpdateCompileOption("Host", decls.String)
+
+	c.declareRuntimeVars()
+
+	out, err := c.CustomLib.RunEval(
+		`banner.contains("OpenSSH") && code == 220 && response_text.contains("hello")`, c.VariableMap)
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if b, ok := out.Value().(bool); !ok || !b {
+		t.Fatalf("expected true, got %#v", out.Value())
+	}
+
+	if got := c.CustomLib.varTypes["Host"]; got != decls.String {
+		t.Fatalf("existing declaration overwritten: %#v", got)
+	}
+	if _, ok := c.CustomLib.varTypes["response_text"]; ok {
+		t.Fatalf("response_text should not be re-declared")
+	}
+	if _, ok := c.CustomLib.varTypes["bad-key"]; ok {
+		t.Fatalf("invalid identifier should be skipped")
+	}
+}
+
+// TestDeclareJSExportVars 验证脚本里的 ExportAs 键会被预声明并给出空串默认值，
+// 因此未执行到的分支不会导致 expression 编译失败。
+func TestDeclareJSExportVars(t *testing.T) {
+	c := &Checker{VariableMap: map[string]any{}, CustomLib: NewCustomLib()}
+	c.declareJSExportVars(`
+		if (false) { ExportAs("banner", "SSH-2.0"); }
+		ExportAs('status', 220);
+	`)
+
+	out, err := c.CustomLib.RunEval(`banner == "" && status == ""`, c.VariableMap)
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if b, ok := out.Value().(bool); !ok || !b {
+		t.Fatalf("expected true, got %#v", out.Value())
 	}
 }

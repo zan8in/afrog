@@ -5,7 +5,7 @@ lang: en
 summary: afrog PoC syntax and field reference, designed for both writing flow and precise lookup.
 status: published
 source: docs/zh/poc/02-syntax.md
-last_reviewed: 2026-09-16
+last_reviewed: 2026-10-13
 -->
 
 This page is not the zero-to-one tutorial. It is the page PoC authors come back to while they are actually writing rules.
@@ -291,15 +291,95 @@ As a rule of thumb, the top-level `expression` should describe the final conclus
 
 ## `output` and `extractors`
 
-`afrog` can extract values from responses and reuse them in later rules.
+`afrog` can extract values from responses and reuse them in later rules. The two share **the same extraction logic**; the only difference is:
 
-### When `output` is the better choice
+- `output`: writes the result to the variable table only, for later rules to reference;
+- `extractors`: writes to the variable table **and** records it in the scan result (shown in reports).
 
-If you mainly want to pass a value from one rule to the next, `output` is often the most direct style.
+> Use `extractors` for values that should appear in the final report; use `output` for intermediate variables meant only for later rules.
+
+### Typed extractors (recommended)
+
+Each `extractors` entry is a named extractor whose `type` describes the intent:
+
+| `type` | Purpose | Key fields |
+| --- | --- | --- |
+| `regex` | Regex extraction | `regex`, `group`, `all` |
+| `json` | JSON path lookup | `path` (e.g. `$.data.version`, `data.tags[0]`) |
+| `kval` | Response header / `key: value` text | `key`, `part` (defaults to `header`) |
+| `literal` | Fixed value (supports `{{variable}}`) | `value` |
+| `cel` | Any CEL expression (fallback) | `value` |
+
+Common fields:
+
+| Field | Description |
+| --- | --- |
+| `name` | Output variable name; must be a valid identifier (letter/underscore first, then letters/digits/underscores) |
+| `part` | Source: `body` (default) / `raw` / `header` / `text` / `status` / `request` / `request_body` / `request_header` |
+| `group` | `regex` only: named group or index; defaults to the whole match |
+| `all` | `regex` only: when `true`, collect every match (result is a string list) |
+
+Example:
+
+```yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /profile
+    expression: response.status == 200
+    extractors:
+      - name: web_title          # regex, named group
+        type: regex
+        part: text
+        regex: '"<title>(?P<webtitle>.+)</title>"'
+        group: webtitle
+
+      - name: server             # response header (case-insensitive)
+        type: kval
+        key: Server
+
+      - name: api_version        # JSON field
+        type: json
+        path: $.data.version
+
+      - name: ids                # all matches
+        type: regex
+        part: body
+        regex: '"id":"(?P<id>[0-9]+)"'
+        group: id
+        all: true
+
+      - name: pass               # fixed value
+        type: literal
+        value: "1qaz@3edC12345"
+```
+
+When extraction fails (no match / path missing), the variable is set to an empty value (an **empty list** when `all` is set) rather than erroring out, so `expression` can reference it directly without worrying about an undefined variable.
+
+### Legacy form (kept for compatibility)
+
+The historical form uses `extractor` as an ordered map (output name -> CEL expression / literal):
+
+```yaml
+extractors:
+  - type: regex
+    extractor:
+      ext1: '"\"version\":\"(?P<v>.*?)\"".bsubmatch(response.body)'
+      ver:  ext1["v"]
+  - type: word
+    extractor:
+      pass: "1qaz@3edC12345"
+```
+
+- `type: word`: values are treated as literal templates (with `{{variable}}` substitution);
+- any other `type` (including `regex`): values are evaluated as **CEL expressions**.
+
+It still works, but it forces you to declare a temporary variable before pulling fields out — verbose and prone to ordering pitfalls. **For new PoCs, prefer the typed extractors**; existing PoCs can migrate such two-step regex blocks automatically with `afrog -pocmigrate <file|dir>`.
 
 ### `output`
 
-One recommended style:
+`output` takes an ordered map in the same style as the legacy `extractor` (output name -> CEL expression / literal):
 
 ```yaml
 rules:
@@ -310,23 +390,6 @@ rules:
     expression: response.status == 200
     output:
       web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
-```
-
-### `extractors`
-
-An equivalent extractor style:
-
-```yaml
-rules:
-  r0:
-    request:
-      method: GET
-      path: /profile
-    expression: response.status == 200
-    extractors:
-      - type: regex
-        extractor:
-          web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
 ```
 
 ## Dynamic multi-value extraction

@@ -18,6 +18,8 @@ const (
 	PocLoadLegacyOOB   = "legacy_oob"
 	// PocLoadJSPocDisabled 表示该 PoC 包含 javascript 规则，但未启用 javascript 执行。
 	PocLoadJSPocDisabled = "js_poc_disabled"
+	// PocLoadUnsignedJSPoc 表示该 javascript PoC 未签名或签名无效，被严格模式跳过。
+	PocLoadUnsignedJSPoc = "js_poc_unsigned"
 )
 
 // ErrNoPocMatched 表示路径本身存在，但没有匹配到任何 .yaml/.yml 文件。

@@ -32,3 +32,4 @@ extractors:
       version: '"SSH-2\\.0-[^\\r\\n]+".submatch(response_text)["version"]'
 
 expression: detect()
+# digest: bwa4ciJRgtVrahRd3/o1pSjYBp/bCsHTxkMTQERqUvB986VEVzhhG57/zgDCR1Yp2eO44/iFWUUTLk2HHuLgBw==

@@ -115,9 +115,9 @@ type Options struct {
 	// StopOnFirstMatch stops the scan as soon as a vulnerability is found.
 	StopOnFirstMatch bool
 
-	// EnableJSPoc enables execution of javascript-type PoCs. Disabled by default
-	// because it runs untrusted script code embedded in PoC files.
-	EnableJSPoc bool
+	// DisableJSPoc 关闭 javascript 类型 PoC 的执行。零值即启用（默认可用），
+	// 因为它会执行 PoC 文件中的脚本代码，敏感场景可用 WithJSPoc(false) 关闭。
+	DisableJSPoc bool
 
 	// --- per-task timeout ---
 
@@ -755,9 +755,9 @@ func WithStopOnFirstMatch() Option {
 }
 
 // WithJSPoc enables or disables execution of javascript-type PoCs.
-// Disabled by default because it runs untrusted script code from PoC files.
+// Enabled by default (it runs script code from PoC files); pass false to disable.
 func WithJSPoc(enabled bool) Option {
-	return func(o *Options) error { o.EnableJSPoc = enabled; return nil }
+	return func(o *Options) error { o.DisableJSPoc = !enabled; return nil }
 }
 
 // --- per-task timeout ---

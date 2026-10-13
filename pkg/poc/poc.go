@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
@@ -509,6 +510,33 @@ func (poc *Poc) HasJSRule() bool {
 	return false
 }
 
+// jsRequireRe 匹配脚本里的 require("afrog/xxx") / require('afrog/xxx')，用于推算能力等级。
+var jsRequireRe = regexp.MustCompile(`require\s*\(\s*["'](afrog/[a-zA-Z0-9_./-]+)["']`)
+
+// Capability 返回该 PoC 的最高能力等级：含 javascript 规则即至少 network，
+// 脚本 require 到更高等级模块时取更高。
+//
+// 这是加载期的静态推算，用于跳过与提示；真正的特权拦截在 js 包的 require
+// 运行期完成（静态扫描可能被拼接或混淆绕过）。
+func (poc *Poc) Capability() capability.Level {
+	level := capability.Declarative
+	for _, rm := range poc.Rules {
+		req := rm.Value.Request
+		if !strings.EqualFold(strings.TrimSpace(req.Type), JS_Type) {
+			continue
+		}
+		level = capability.Max(level, capability.Network)
+		for _, src := range []string{req.Code, req.PreCondition} {
+			for _, m := range jsRequireRe.FindAllStringSubmatch(src, -1) {
+				if l, ok := capability.ModuleLevel(m[1]); ok {
+					level = capability.Max(level, l)
+				}
+			}
+		}
+	}
+	return level
+}
+
 func (poc *Poc) IsHTTPType() bool {
 	for _, rule := range poc.Rules {
 		reqType := rule.Value.Request.Type
@@ -536,9 +564,26 @@ func (poc *Poc) IsReverse() bool {
 	return false
 }
 
+// Extractors 支持两种写法：
+//
+//  1. 类型化（新）：每条是一个具名提取器，靠 name/part/regex/group/all 等字段描述意图；
+//  2. 有序 map（旧，兼容保留）：靠 Extractor 里的 `输出名 -> CEL 表达式/字面量` 逐条求值。
+//
+// 两者由 Extractor 是否为空区分：非空即旧写法。详见 docs/poc 提取器章节。
 type Extractors struct {
-	Type      string        `yaml:"type"`      // regex,str
-	Extractor yaml.MapSlice `yaml:"extractor"` //
+	// ---- 新写法（类型化提取器）----
+	Name  string `yaml:"name"`  // 输出变量名（必须是合法 CEL 标识符）
+	Type  string `yaml:"type"`  // regex | json | kval | literal | cel
+	Part  string `yaml:"part"`  // 取值来源：body|raw|header|text|status|request...（默认 body）
+	Regex string `yaml:"regex"` // type=regex 时的正则
+	Group string `yaml:"group"` // 取哪个捕获组：命名组或序号；缺省为整段匹配
+	All   bool   `yaml:"all"`   // true 时收集全部匹配（结果为 []string）
+	Path  string `yaml:"path"`  // type=json 时的路径，如 $.data.version
+	Key   string `yaml:"key"`   // type=kval 时要取的头/键名
+	Value string `yaml:"value"` // type=literal/cel 时的字面量或 CEL 表达式
+
+	// ---- 旧写法（有序 map: 输出名 -> CEL 表达式/字面量）----
+	Extractor yaml.MapSlice `yaml:"extractor"`
 }
 
 // FindPocYamlById 通过POC ID查找原始YAML内容
@@ -773,6 +818,12 @@ func migrateFile(path string) (changed bool, changes int, err error) {
 	if n > 0 {
 		changes += n
 		s = s2
+	}
+
+	s2b, n2 := migrateExtractorBlocks(s)
+	if n2 > 0 {
+		changes += n2
+		s = s2b
 	}
 
 	if s == orig {

@@ -11,10 +11,12 @@ import (
 	"sync"
 
 	"github.com/rs/xid"
+	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/output"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/pocsign"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/validator"
@@ -121,8 +123,18 @@ type Options struct {
 	TaskTimeoutGoCapSec         int
 	// JsScriptTimeout 是单个 javascript PoC 脚本的执行上限（秒），0 表示不设脚本级上限。
 	JsScriptTimeout int
-	// EnableJSPoc 是否启用 javascript 类型 PoC 的执行（默认关闭，因其会执行 PoC 中的脚本代码）。
+	// EnableJSPoc 是否启用 javascript 类型 PoC 的执行。
+	// 默认开启；如需关闭，使用 -enable-js-poc=false。
 	EnableJSPoc bool
+	// RequireSignedJSPoc 为 true 时，未签名或签名无效的 javascript PoC 将被跳过。
+	// 默认关闭（宽松模式：有签名则验，验不过仅告警不拦截）。
+	RequireSignedJSPoc bool
+	// PocSign 是 -pocsign 指定的 PoC 文件或目录，用于就地签名（工具模式）。
+	PocSign string
+	// jsReport 汇总本次 PoC 加载中 javascript 相关的启用/跳过情况。
+	// 加载期只填充不打印，由 PrintJSReport 在启动横幅之后统一输出，
+	// 避免这些信息插进 Core/POC/Cur/OOB 横幅中间。
+	jsReport jsLoadReport
 
 	// Single Vulnerability Stopper
 	VulnerabilityScannerBreakpoint bool
@@ -294,6 +306,7 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.PocFile, "poc-file", "P", "", "PoC file or directory to scan"),
 		flagSet.StringSliceVarP(&options.AppendPoc, "append-poc", "ap", nil, "append PoC file or directory to scan (comma separated)", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.StringVar(&options.PocMigrate, "pocmigrate", "", "migrate legacy PoCs to current syntax (file or directory)"),
+		flagSet.StringVar(&options.PocSign, "pocsign", "", "sign a PoC file or directory in place using your ed25519 key (auto-generated on first use)"),
 		flagSet.StringSliceVarP(&options.ExcludePocs, "exclude-pocs", "ep", nil, "pocs to exclude from the scan (comma-separated)", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.StringVarP(&options.ExcludePocsFile, "exclude-pocs-file", "epf", "", "list of pocs to exclude from scan (file)"),
 		flagSet.BoolVarP(&options.PocList, "poc-list", "pl", false, "show afrog-pocs list"),
@@ -376,7 +389,8 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.TaskTimeoutNetCapSec, "task-timeout-net-cap-sec", 360, "maximum smart timeout for tcp/udp/ssl PoCs"),
 		flagSet.IntVar(&options.TaskTimeoutGoCapSec, "task-timeout-go-cap-sec", 420, "maximum smart timeout for go PoCs"),
 		flagSet.IntVar(&options.JsScriptTimeout, "js-script-timeout", 60, "maximum execution time for one javascript PoC script in seconds, 0 disables"),
-		flagSet.BoolVar(&options.EnableJSPoc, "enable-js-poc", false, "enable javascript PoC execution (disabled by default; runs untrusted script code from PoC files)"),
+		flagSet.BoolVar(&options.EnableJSPoc, "enable-js-poc", true, "enable javascript PoC execution (enabled by default; set -enable-js-poc=false to disable running script code from PoC files)"),
+		flagSet.BoolVar(&options.RequireSignedJSPoc, "require-signed-js-poc", false, "skip javascript PoCs whose signature is missing or invalid (lenient by default: verify if present, warn only)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug & Tools",
@@ -435,6 +449,23 @@ func (opt *Options) VerifyOptions() error {
 			os.Exit(1)
 		}
 		fmt.Printf("seen=%d changed=%d changes=%d\n", r.FilesSeen, r.FilesChanged, r.Changes)
+		os.Exit(0)
+	}
+
+	if strings.TrimSpace(opt.PocSign) != "" {
+		priv, err := pocsign.ResolveSigningKey()
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		n, err := pocsign.SignPath(opt.PocSign, priv)
+		if err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		pub := pocsign.PublicKeyOf(priv)
+		fmt.Printf("signed=%d key=%s\n", n, pocsign.Fingerprint(pub))
+		fmt.Printf("pubkey=%s\n", pocsign.EncodePublicKeyB64(pub))
 		os.Exit(0)
 	}
 
@@ -1103,6 +1134,21 @@ func detectLegacyOOBReasons(yamlText string) []string {
 	return reasons
 }
 
+// AllowsCapability 判断当前配置是否允许执行指定能力等级的 PoC。
+//
+// 目前只区分两档：declarative 一律允许；network（javascript）跟随 -enable-js-poc；
+// exec（本机命令执行）能力尚未实现，先一律拒绝——将来接上时只需改这里。
+func (o *Options) AllowsCapability(level capability.Level) bool {
+	switch {
+	case level <= capability.Declarative:
+		return true
+	case level == capability.Network:
+		return o.EnableJSPoc
+	default:
+		return false
+	}
+}
+
 // CreatePocList 返回本次扫描要执行的 PoC 列表。
 // 加载过程中被跳过的 PoC 会被丢弃，如需诊断信息请使用 CreatePocListWithDiagnostics。
 func (o *Options) CreatePocList() []poc.Poc {
@@ -1122,7 +1168,8 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 
 	newPocSlice := make([]poc.Poc, 0, len(pathItems))
 	legacy := make([]legacyItem, 0)
-	jsDisabled := make([]legacyItem, 0)
+	jsReport := jsLoadReport{}
+	verifier := pocsign.DefaultVerifier()
 
 	for _, it := range pathItems {
 		var (
@@ -1181,15 +1228,37 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 		if pp.Id == "" {
 			pp.Id = id
 		}
-		if !o.EnableJSPoc && pp.HasJSRule() {
-			jsDisabled = append(jsDisabled, legacyItem{ID: pp.Id, Path: srcPath})
+		// 能力策略：declarative 一律放行；network（javascript）跟随 -enable-js-poc；
+		// 将来的 exec 一档由 AllowsCapability 统一决定，这里无需改动。
+		capLevel := pp.Capability()
+		if !o.AllowsCapability(capLevel) {
+			jsReport.disabled = append(jsReport.disabled, pp.Id)
 			diagnostics = append(diagnostics, PocLoadError{
 				Path:   it.Path,
 				ID:     pp.Id,
 				Reason: PocLoadJSPocDisabled,
-				Detail: "javascript PoC requires -enable-js-poc",
+				Detail: fmt.Sprintf("capability %q is not allowed (javascript: -enable-js-poc)", capLevel),
 			})
 			continue
+		}
+		if capLevel >= capability.Network {
+			// 信任轴：仅在带代码/特权能力的 PoC 上做签名校验。
+			// 宽松模式：有签名则验，验不过只告警；严格模式：未签名/签名无效一律跳过。
+			sig, content, sigErr := pocsign.ExtractSignature(raw)
+			signed := sigErr == nil && verifier.Verify(content, sig)
+			if !signed && sigErr == nil {
+				jsReport.invalid++
+			}
+			if !signed && o.RequireSignedJSPoc {
+				jsReport.unsigned = append(jsReport.unsigned, pp.Id)
+				diagnostics = append(diagnostics, PocLoadError{
+					Path:   it.Path,
+					ID:     pp.Id,
+					Reason: PocLoadUnsignedJSPoc,
+					Detail: "javascript PoC signature missing or invalid (strict mode: -require-signed-js-poc)",
+				})
+				continue
+			}
 		}
 		if o.TaskSmartTimeout {
 			estimate := poc.EstimateTaskTimeout(pp, poc.TaskTimeoutPolicy{
@@ -1221,22 +1290,9 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 		gologger.Print().Msg("建议：使用 -pocmigrate 迁移旧语法")
 	}
 
-	if len(jsDisabled) > 0 && !o.consoleQuiet() {
-		total := len(jsDisabled)
-		const limit = 20
-		gologger.Print().Msgf("检测到 javascript PoC（已跳过）：%d 个", total)
-		n := total
-		if n > limit {
-			n = limit
-		}
-		for i := 0; i < n; i++ {
-			gologger.Print().Msgf("- %s", jsDisabled[i].ID)
-		}
-		if total > n {
-			gologger.Print().Msgf("+ %d more", total-n)
-		}
-		gologger.Print().Msg("如需启用，使用 -enable-js-poc（将执行 PoC 中的脚本代码，请确保来源可信）")
-	}
+	// javascript 加载汇总只记录、不在此处打印：由 PrintJSReport 在启动横幅
+	// （Core/POC/Cur/OOB）之后统一输出，避免把这组横幅打断。
+	o.jsReport = jsReport
 
 	// 按严重级别排序但保留未设置 severity 的 POC
 	latestPocSlice := []poc.Poc{}
@@ -1275,6 +1331,53 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 // consoleQuiet 表示当前不应该向控制台输出内容（SDK 模式或显式静默）。
 func (o *Options) consoleQuiet() bool {
 	return o != nil && (o.SDKMode || o.Silent)
+}
+
+// jsLoadReport 汇总一次 PoC 加载中与 javascript 相关的统计。
+// 这些信息统一在启动横幅（Core/POC/Cur/OOB）之后由 PrintJSReport 输出，
+// 以免插入横幅中间把一组内容打断。
+type jsLoadReport struct {
+	invalid  int      // 携带无效签名、宽松模式下仍放行的数量
+	disabled []string // 因 -enable-js-poc=false 被跳过的 ID
+	unsigned []string // 因严格模式（-require-signed-js-poc）被跳过的 ID
+}
+
+// PrintJSReport 在启动横幅之后打印 javascript PoC 的加载告警。
+// 只输出"被跳过/签名无效"这类需要用户关注的情况；正常启用不打任何提示。
+// SDK/静默模式下不输出（与加载期的原有约定一致）。
+func (o *Options) PrintJSReport() {
+	if o == nil || o.consoleQuiet() {
+		return
+	}
+	r := o.jsReport
+
+	printList := func(header, hint string, ids []string) {
+		if len(ids) == 0 {
+			return
+		}
+		const limit = 20
+		gologger.Print().Msgf("%s：%d 个", header, len(ids))
+		n := len(ids)
+		if n > limit {
+			n = limit
+		}
+		for i := 0; i < n; i++ {
+			gologger.Print().Msgf("- %s", ids[i])
+		}
+		if len(ids) > n {
+			gologger.Print().Msgf("+ %d more", len(ids)-n)
+		}
+		if hint != "" {
+			gologger.Print().Msg(hint)
+		}
+	}
+
+	printList("检测到 javascript PoC（已跳过）", "如需启用，去掉 -enable-js-poc=false（将执行 PoC 中的脚本代码，请确保来源可信）", r.disabled)
+	printList("检测到未签名/签名无效的 javascript PoC（严格模式已跳过）", "如需放行，去掉 -require-signed-js-poc；为用户 PoC 签名可用 -pocsign <file>", r.unsigned)
+
+	if r.invalid > 0 {
+		gologger.Print().Msgf("警告：%d 个 javascript PoC 携带无效签名（宽松模式未拦截）", r.invalid)
+	}
 }
 
 func (o *Options) logPocDiscarded(path string, err error) {

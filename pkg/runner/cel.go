@@ -428,6 +428,37 @@ func (c *CustomLib) UpdateCompileOption(k string, t *exprpb.Type) {
 	c.varTypes[k] = t
 }
 
+// DeclareRuntimeVar 把运行期变量注册为 CEL 动态类型；已声明的键保持不变。
+// 用于让 javascript 的 ExportAs 等运行期产物能被 expression / extractors 引用。
+func (c *CustomLib) DeclareRuntimeVar(k string) {
+	if !isCelIdent(k) || k == "request" || k == "response" || k == "response_text" {
+		return
+	}
+	if c.varTypes != nil {
+		if _, ok := c.varTypes[k]; ok {
+			return
+		}
+	}
+	c.UpdateCompileOption(k, decls.Dyn)
+}
+
+// isCelIdent 判断字符串是否为合法 CEL 标识符。
+func isCelIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'):
+		case i > 0 && ch >= '0' && ch <= '9':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func (c *CustomLib) SetOOBManager(mgr *OOBManager) {
 	c.oobMgr = mgr
 }

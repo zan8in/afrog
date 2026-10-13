@@ -1024,6 +1024,9 @@ func (runner *Runner) Execute() {
 
 	runner.printOOBStatus(reversePocs)
 
+	// javascript PoC 加载汇总放在启动横幅之后打印，避免插进 Core/POC/Cur/OOB 这一组中间。
+	options.PrintJSReport()
+
 	// portscan pre-scan: run after OOB status output to ensure ordering
 	if options.PortScan {
 		origTargets := runner.options.Targets.List()

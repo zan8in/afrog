@@ -98,6 +98,17 @@ func setTarget(data string, vmap map[string]any) {
 	vmap["target"] = data
 }
 
+// hasPort 判断 host 是否已包含端口（兼容 IPv6 的 [::1]:port 形式）。
+func hasPort(host string) bool {
+	if strings.Count(host, ":") == 0 {
+		return false
+	}
+	if strings.HasPrefix(host, "[") && strings.Contains(host, "]:") {
+		return true
+	}
+	return strings.Count(host, ":") == 1
+}
+
 type HTTPSender interface {
 	Do(ctx context.Context, method string, target string, body []byte, headers map[string]string, followRedirects bool, variableMap map[string]any) (*proto.Response, error)
 }

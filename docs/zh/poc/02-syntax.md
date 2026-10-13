@@ -5,7 +5,7 @@ lang: zh
 summary: afrog PoC 语法与字段参考，先帮助你判断该写什么，再支持按字段深查。
 status: published
 source: docs/afrog-poc-guide.md
-last_reviewed: 2026-09-16
+last_reviewed: 2026-10-13
 -->
 
 这页不是“从零到一”的教程，而是 PoC 作者在真正落笔时最常回来看的一页。
@@ -293,15 +293,95 @@ expression: ping() && version()
 
 ## `output` 与 `extractors`
 
-`afrog` 支持从响应中提取变量，供后续规则继续使用。
+`afrog` 支持从响应中提取变量，供后续规则继续使用。二者**共用同一套提取逻辑**，区别只有一个：
 
-### 什么时候用 `output`
+- `output`：只把结果写进变量表，供后续规则引用；
+- `extractors`：写进变量表，**同时**记入扫描结果（报告里会展示）。
 
-如果你只是想把前一条规则里拿到的值传给下一条规则，`output` 往往是最直观的写法。
+> 需要出现在最终报告里的提取值用 `extractors`；只是给后续规则用的中间变量，用 `output` 更合适。
+
+### 类型化提取器（推荐）
+
+`extractors` 的每条是一个具名提取器，用 `type` 描述意图：
+
+| `type` | 用途 | 关键字段 |
+| --- | --- | --- |
+| `regex` | 正则提取 | `regex`、`group`、`all` |
+| `json` | JSON 路径取值 | `path`（如 `$.data.version`、`data.tags[0]`） |
+| `kval` | 取响应头 / `key: value` 文本 | `key`、`part`（缺省 `header`） |
+| `literal` | 固定值（支持 `{{变量}}`） | `value` |
+| `cel` | 任意 CEL 表达式（兜底） | `value` |
+
+通用字段：
+
+| 字段 | 说明 |
+| --- | --- |
+| `name` | 输出变量名，必须是合法标识符（字母/下划线开头，后接字母、数字、下划线） |
+| `part` | 取值来源：`body`(默认) / `raw` / `header` / `text` / `status` / `request` / `request_body` / `request_header` |
+| `group` | 仅 `regex`：命名组或序号；缺省为整段匹配 |
+| `all` | 仅 `regex`：为 `true` 时收集全部匹配（结果为字符串列表） |
+
+示例：
+
+```yaml
+rules:
+  r0:
+    request:
+      method: GET
+      path: /profile
+    expression: response.status == 200
+    extractors:
+      - name: web_title          # 正则，取命名组
+        type: regex
+        part: text
+        regex: '"<title>(?P<webtitle>.+)</title>"'
+        group: webtitle
+
+      - name: server             # 取响应头（大小写不敏感）
+        type: kval
+        key: Server
+
+      - name: api_version        # 取 JSON 字段
+        type: json
+        path: $.data.version
+
+      - name: ids                # 取全部匹配
+        type: regex
+        part: body
+        regex: '"id":"(?P<id>[0-9]+)"'
+        group: id
+        all: true
+
+      - name: pass               # 固定值
+        type: literal
+        value: "1qaz@3edC12345"
+```
+
+提取失败（未命中 / 路径不存在）时，变量会被置为空值（`all` 时为**空列表**），不会报错，`expression` 里可以直接判断，无需担心变量未定义。
+
+### 旧写法（兼容保留）
+
+历史写法用 `extractor` 作为一个有序 map（输出名 → CEL 表达式 / 字面量）：
+
+```yaml
+extractors:
+  - type: regex
+    extractor:
+      ext1: '"\"version\":\"(?P<v>.*?)\"".bsubmatch(response.body)'
+      ver:  ext1["v"]
+  - type: word
+    extractor:
+      pass: "1qaz@3edC12345"
+```
+
+- `type: word`：值按字面量模板处理（替换其中的 `{{变量}}`）；
+- 其它 `type`（含 `regex`）：值按 **CEL 表达式**逐条求值。
+
+它仍然可用，但需要先声明临时变量再取值，冗长且容易踩顺序依赖的坑。**新写 PoC 建议直接用类型化提取器**；旧 PoC 可以用 `afrog -pocmigrate <file|dir>` 把这种两步式 regex 自动迁移成上面的写法。
 
 ### `output`
 
-推荐写法之一：
+`output` 接收与旧 `extractor` 相同风格的有序 map（输出名 → CEL 表达式 / 字面量）：
 
 ```yaml
 rules:
@@ -312,23 +392,6 @@ rules:
     expression: response.status == 200
     output:
       web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
-```
-
-### `extractors`
-
-等价的提取方式也可以写成：
-
-```yaml
-rules:
-  r0:
-    request:
-      method: GET
-      path: /profile
-    expression: response.status == 200
-    extractors:
-      - type: regex
-        extractor:
-          web_title: '"<title>(?P<webtitle>.+)</title>".submatch(response_text)'
 ```
 
 ## 动态多值提取

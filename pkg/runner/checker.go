@@ -269,6 +269,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 			}
 		}
 
+		if strings.EqualFold(rule.Request.Type, poc.JS_Type) {
+			// 预声明 ExportAs 键，避免未执行到的分支导致 expression 编译失败
+			c.declareJSExportVars(rule.Request.Code)
+		}
+
 		isMatch := false
 		baseReq := cloneRuleRequest(rule.Request)
 		bruteCfg, bruteVars, bruteOrder := parseBrute(rule.Brute, c.VariableMap, c.CustomLib)
@@ -513,6 +518,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		c.UpdateVariableMapExtractor(pocItem.Extractors)
 	}
 
+	c.declareRuntimeVars()
 	isVul, err := c.CustomLib.RunEval(pocItem.Expression, c.VariableMap)
 	if err != nil {
 		c.Result.IsVul = false
@@ -711,10 +717,42 @@ func forEachBrutePayload(cfg bruteConfig, vars map[string][]string, order []stri
 	_ = walk(0)
 }
 
+// jsExportKeyRe 匹配 javascript 脚本里 ExportAs("key", ...) 的键。
+var jsExportKeyRe = regexp.MustCompile(`ExportAs\s*\(\s*["']([A-Za-z_][A-Za-z0-9_]*)["']`)
+
+// declareJSExportVars 预声明脚本中出现的 ExportAs 键，并给出空串默认值。
+// 这样即使某个分支未执行（键未产出），expression 仍能编译且求值为假，而不是报编译错误。
+func (c *Checker) declareJSExportVars(code string) {
+	if c == nil || c.CustomLib == nil || strings.TrimSpace(code) == "" {
+		return
+	}
+	for _, m := range jsExportKeyRe.FindAllStringSubmatch(code, -1) {
+		key := m[1]
+		if _, ok := c.VariableMap[key]; !ok {
+			c.VariableMap[key] = ""
+		}
+		c.CustomLib.UpdateCompileOption(key, decls.Dyn)
+	}
+}
+
+// declareRuntimeVars 把当前变量表中尚未声明的键注册为 CEL 动态类型变量，
+// 使 javascript 的 ExportAs 等运行期产物能被 expression / extractors 直接引用。
+// 只声明「已存在」的键，因此不会掩盖表达式里的拼写错误。
+func (c *Checker) declareRuntimeVars() {
+	if c == nil || c.CustomLib == nil {
+		return
+	}
+	for key := range c.VariableMap {
+		c.CustomLib.DeclareRuntimeVar(key)
+	}
+}
+
 func (c *Checker) evalRuleMatch(rule *poc.Rule, pocItem *poc.Poc) bool {
 	if rule == nil {
 		return false
 	}
+
+	c.declareRuntimeVars()
 
 	if len(rule.Expressions) > 0 {
 		for _, expression := range rule.Expressions {
@@ -967,80 +1005,16 @@ func (c *Checker) setVariableFromEval(key string, out ref.Val) {
 }
 
 func (c *Checker) UpdateVariableMap(args yaml.MapSlice) {
-	for _, item := range args {
-		key := item.Key.(string)
-
-		// 新增：根据 YAML 值的实际类型分支处理
-		switch v := item.Value.(type) {
-		case string:
-			// 原有字符串路径：走 CEL 求值
-			out, err := c.CustomLib.RunEval(v, c.VariableMap)
-			if err != nil {
-				// fixed set string failed bug
-				c.setVariableValue(key, v)
-				continue
-			}
-			c.setVariableFromEval(key, out)
-
-		case int:
-			c.setVariableValue(key, v)
-			continue
-		case int64:
-			c.setVariableValue(key, v)
-			continue
-		case float64:
-			c.setVariableValue(key, v)
-			continue
-		case bool:
-			c.setVariableValue(key, v)
-			continue
-		case []string:
-			c.setVariableValue(key, v)
-			continue
-		case map[string]string:
-			c.setVariableValue(key, v)
-			continue
-		case map[string][]string:
-			c.setVariableValue(key, v)
-			continue
-		default:
-			// 其他类型统一按字符串存（保证兼容）
-			c.setVariableValue(key, v)
-			continue
-		}
+	if len(args) == 0 {
+		return
 	}
+	// output 与 extractors 共用同一套提取核心，区别仅在于 output 不写 Result.Extractor。
+	c.applyExtractors([]poc.Extractors{{Extractor: args}}, false)
 }
 
 func (c *Checker) UpdateVariableMapExtractor(extractors []poc.Extractors) {
-	for _, v := range extractors {
-		tpe := v.Type
-		extMap := v.Extractor
-		if len(extMap) == 0 {
-			continue
-		}
-		for _, item := range extMap {
-			key := item.Key.(string)
-			value := item.Value.(string)
-
-			if tpe == "word" {
-				new := setVariableMap(value, c.VariableMap)
-				c.VariableMap[key] = new
-				c.CustomLib.UpdateCompileOption(key, decls.String)
-				c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: new})
-				continue
-			}
-
-			out, err := c.CustomLib.RunEval(value, c.VariableMap)
-			if err != nil {
-				continue
-			}
-
-			c.setVariableFromEval(key, out)
-			c.Result.Extractor = append(c.Result.Extractor, yaml.MapItem{Key: key, Value: c.VariableMap[key]})
-
-		}
-	}
-
+	// 与 output 共用提取核心（extractor.go），此处 report=true：结果额外写入 Result.Extractor。
+	c.applyExtractors(extractors, true)
 }
 
 // func (c *Checker) newRerverse() *proto.Reverse {

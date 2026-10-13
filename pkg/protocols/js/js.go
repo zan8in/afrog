@@ -16,21 +16,49 @@ import (
 	"github.com/zan8in/gologger"
 )
 
-// moduleBuilder 构造一个可供 require() 返回的模块对象。
-type moduleBuilder func(vm *goja.Runtime) (goja.Value, error)
-
-// modules 是 afrog 风格的 require 模块注册表。
-// 命名空间统一为 afrog/<name>，与 nuclei 的 nuclei/<name> 区分开。
-var modules = map[string]moduleBuilder{
-	"afrog/ssh": buildSSHModule,
-	"afrog/net": buildNetModule,
-}
-
 // execState 保存一次脚本执行的运行时状态。
 type execState struct {
 	vm       *goja.Runtime
+	ctx      context.Context
 	vars     map[string]any
 	exported bytes.Buffer
+
+	// allowModule 是模块准入策略；为 nil 表示不限制（仅测试与内部调用会出现）。
+	allowModule ModulePolicy
+
+	mu   sync.Mutex
+	open map[any]func()
+}
+
+// track 登记一个需要在脚本结束后兜底释放的资源（如未显式关闭的连接）。
+func (s *execState) track(key any, closeFn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.open == nil {
+		s.open = map[any]func(){}
+	}
+	s.open[key] = closeFn
+}
+
+// untrack 移除已由脚本显式释放的资源。
+func (s *execState) untrack(key any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.open, key)
+}
+
+// closeAll 兜底释放脚本未关闭的资源，避免连接泄漏。
+func (s *execState) closeAll() {
+	s.mu.Lock()
+	fns := make([]func(), 0, len(s.open))
+	for k, fn := range s.open {
+		fns = append(fns, fn)
+		delete(s.open, k)
+	}
+	s.mu.Unlock()
+	for _, fn := range fns {
+		fn()
+	}
 }
 
 // programCache 按脚本源码缓存编译结果。PoC 的 code 是静态的，
@@ -82,7 +110,9 @@ func watchContext(ctx context.Context, vm *goja.Runtime, maxTimeout time.Duratio
 // args:   request.args 渲染后的脚本入参，将作为同名全局变量注入
 // vars:   与 checker 共享的变量表，脚本结果通过 response / response_text 回写
 // maxTimeout: 脚本整体执行上限，<=0 时只跟随 ctx
-func Execute(ctx context.Context, target, code, preCondition string, args map[string]any, vars map[string]any, maxTimeout time.Duration) error {
+// allowModule: 可选模块准入策略；不传表示不限制。它决定 require 能否取得
+// 某个模块，是能力策略（如将来的 exec）的运行期拦截点。
+func Execute(ctx context.Context, target, code, preCondition string, args map[string]any, vars map[string]any, maxTimeout time.Duration, allowModule ...ModulePolicy) error {
 	if strings.TrimSpace(code) == "" {
 		return fmt.Errorf("javascript: empty code")
 	}
@@ -111,7 +141,12 @@ func Execute(ctx context.Context, target, code, preCondition string, args map[st
 	stop := watchContext(ctx, vm, maxTimeout)
 	defer stop()
 
-	state := &execState{vm: vm, vars: vars}
+	state := &execState{vm: vm, ctx: ctx, vars: vars}
+	if len(allowModule) > 0 {
+		state.allowModule = allowModule[0]
+	}
+	// 脚本结束（含出错/中断）时兜底释放未关闭的连接
+	defer state.closeAll()
 	if err := registerBuiltins(state); err != nil {
 		return err
 	}
@@ -169,6 +204,22 @@ func registerBuiltins(state *execState) error {
 		return err
 	}
 
+	// ExportAs(key, value): 将值写入同名变量，供规则 expression(CEL) 与
+	// extractors 直接引用。key 必须是合法标识符。
+	if err := vm.Set("ExportAs", func(call goja.FunctionCall) goja.Value {
+		if len(call.Arguments) != 2 {
+			panic(vm.ToValue("ExportAs expects 2 arguments: ExportAs(key, value)"))
+		}
+		key := strings.TrimSpace(call.Argument(0).String())
+		if !isIdent(key) {
+			panic(vm.ToValue(fmt.Sprintf("ExportAs: invalid key %q, expected identifier", key)))
+		}
+		state.vars[key] = call.Argument(1).Export()
+		return goja.Null()
+	}); err != nil {
+		return err
+	}
+
 	// log(msg): 调试输出
 	if err := vm.Set("log", func(call goja.FunctionCall) goja.Value {
 		if len(call.Arguments) == 0 {
@@ -220,7 +271,7 @@ func registerBuiltins(state *execState) error {
 				timeout = time.Duration(sec) * time.Second
 			}
 		}
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
+		conn, err := (&net.Dialer{Timeout: timeout}).DialContext(state.ctx, "tcp", net.JoinHostPort(host, port))
 		if err != nil {
 			return vm.ToValue(false)
 		}
@@ -237,11 +288,14 @@ func registerRequire(state *execState) error {
 	vm := state.vm
 	return vm.Set("require", func(call goja.FunctionCall) goja.Value {
 		name := strings.TrimSpace(call.Argument(0).String())
-		builder, ok := modules[name]
+		def, ok := lookupModule(name)
 		if !ok {
 			panic(vm.ToValue(fmt.Sprintf("require: module %q not found", name)))
 		}
-		val, err := builder(vm)
+		if state.allowModule != nil && !state.allowModule(name, def.level) {
+			panic(vm.ToValue(fmt.Sprintf("require: module %q is not allowed (capability %q)", name, def.level)))
+		}
+		val, err := def.build(state)
 		if err != nil {
 			panic(vm.ToValue(err.Error()))
 		}
@@ -289,6 +343,23 @@ func stringify(vm *goja.Runtime, val goja.Value) string {
 		}
 	}
 	return fmt.Sprintf("%v", value)
+}
+
+// isIdent 判断字符串是否为合法标识符（字母/下划线开头，后接字母、数字或下划线）。
+func isIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'):
+		case i > 0 && ch >= '0' && ch <= '9':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func toInt(v any) (int, bool) {

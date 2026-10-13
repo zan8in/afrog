@@ -1107,7 +1107,7 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		TaskTimeoutVisibleCapSec: opts.TaskTimeout.VisibleCapSec,
 		TaskTimeoutNetCapSec:     opts.TaskTimeout.NetCapSec,
 		TaskTimeoutGoCapSec:      opts.TaskTimeout.GoCapSec,
-		EnableJSPoc:              opts.EnableJSPoc,
+		EnableJSPoc:              !opts.DisableJSPoc,
 
 		Cyberspace: opts.Cyberspace.Engine,
 		Query:      opts.Cyberspace.Query,
