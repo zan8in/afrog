@@ -180,6 +180,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 	c.Result.Target = target
 	c.Result.PocInfo = pocItem
 
+	// 仅 javascript 类型的 PoC 需要 Host/Port/Hostname，避免影响既有 PoC 行为
+	if pocItem.HasJSRule() {
+		c.injectHostPortVars(target)
+	}
+
 	matchCondition := ""
 	if strings.Contains(pocItem.Expression, "&&") && !strings.Contains(pocItem.Expression, "||") {
 		matchCondition = poc.STOP_IF_FIRST_MISMATCH
@@ -824,6 +829,55 @@ func shouldCountHostError(err error) bool {
 	return false
 }
 
+// injectHostPortVars 从目标中解析出主机/端口，注入 Host、Port、Hostname 变量，
+// 供 javascript 类型的 PoC 在 args 中直接使用 {{Host}} / {{Port}}。
+func (c *Checker) injectHostPortVars(target string) {
+	host, port := splitHostPort(target)
+	if host != "" {
+		c.VariableMap["Host"] = host
+		c.CustomLib.UpdateCompileOption("Host", decls.String)
+	}
+	if port != "" {
+		c.VariableMap["Port"] = port
+		c.CustomLib.UpdateCompileOption("Port", decls.String)
+	}
+	if host != "" {
+		hostname := host
+		if port != "" {
+			hostname = net.JoinHostPort(host, port)
+		}
+		c.VariableMap["Hostname"] = hostname
+		c.CustomLib.UpdateCompileOption("Hostname", decls.String)
+	}
+}
+
+// splitHostPort 兼容 "host:port"、"scheme://host:port/path" 与纯 host 三种目标形态。
+func splitHostPort(target string) (host, port string) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", ""
+	}
+	if strings.Contains(target, "://") {
+		if u, err := url.Parse(target); err == nil && u != nil {
+			host = strings.TrimSpace(u.Hostname())
+			port = strings.TrimSpace(u.Port())
+			if port == "" {
+				switch strings.ToLower(u.Scheme) {
+				case "http":
+					port = "80"
+				case "https":
+					port = "443"
+				}
+			}
+		}
+		return host, port
+	}
+	if h, p, err := net.SplitHostPort(target); err == nil {
+		return strings.TrimSpace(h), strings.TrimSpace(p)
+	}
+	return strings.Trim(target, "[]"), ""
+}
+
 var (
 	nativeStringSliceType          = reflect.TypeOf([]string{})
 	nativeStringStringMapType      = reflect.TypeOf(map[string]string{})
@@ -1105,5 +1159,20 @@ func (c *Checker) preRenderRuleRequest(req *poc.RuleRequest) {
 			newHeaders[hk] = setVariableMap(h, c.VariableMap)
 		}
 		req.Headers = newHeaders
+	}
+
+	// javascript 专用：渲染 args 中的字符串值（支持 {{Host}} / {{Port}} 等）
+	if len(req.Args) > 0 {
+		newArgs := make(yaml.MapSlice, 0, len(req.Args))
+		for _, item := range req.Args {
+			if s, ok := item.Value.(string); ok {
+				s = c.renderCELPlaceholders(strings.TrimSpace(s))
+				s = setVariableMap(s, c.VariableMap)
+				newArgs = append(newArgs, yaml.MapItem{Key: item.Key, Value: s})
+				continue
+			}
+			newArgs = append(newArgs, item)
+		}
+		req.Args = newArgs
 	}
 }

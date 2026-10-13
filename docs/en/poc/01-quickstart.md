@@ -200,5 +200,6 @@ If the first practice target already involves async behavior, complex login flow
 - [TCP / SSL](./08-tcp.md)
 - [Writing Guide by Vulnerability Type](./09-category-guide.md)
 - [PoC Contributors](./10-contributors.md)
+- [JavaScript PoC](./11-javascript.md)
 
 > **← Docs home:** [afrog Docs](../index.md) ｜ **Next →:** [PoC Syntax](./02-syntax.md)

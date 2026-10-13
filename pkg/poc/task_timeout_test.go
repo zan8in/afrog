@@ -93,6 +93,25 @@ func TestEstimateTaskTimeout_GoPocUsesGoBonus(t *testing.T) {
 	}
 }
 
+func TestEstimateTaskTimeout_JSPocUsesNetBonus(t *testing.T) {
+	p := Poc{
+		Id: "js-demo-ssh-banner",
+		Rules: RuleMapSlice{
+			{Key: "r0", Value: Rule{Request: RuleRequest{Type: JS_Type}}},
+		},
+	}
+
+	got := EstimateTaskTimeout(p, TaskTimeoutPolicy{
+		VisibleCapSec: 300,
+		NetCapSec:     360,
+		GoCapSec:      420,
+	})
+
+	if got.TimeoutSec != 120 {
+		t.Fatalf("expected 120s, got %ds (%s)", got.TimeoutSec, got.Reason)
+	}
+}
+
 func TestTaskTimeoutDuration_UsesLargerFallback(t *testing.T) {
 	p := &Poc{EstimatedTaskTimeoutSec: 160}
 	got := TaskTimeoutDuration(p, 180)

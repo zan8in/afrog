@@ -200,5 +200,6 @@ afrog -t https://example.com -P ./mypocs -debug
 - [TCP / SSL](./08-tcp.md)
 - [按漏洞类型的编写指南](./09-category-guide.md)
 - [PoC 贡献者荣誉墙](./10-contributors.md)
+- [JavaScript PoC](./11-javascript.md)
 
 > **← 文档首页：** [afrog 文档](../index.md) ｜ **下一篇 →：** [PoC 语法参考](./02-syntax.md)

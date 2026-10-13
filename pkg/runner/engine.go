@@ -1307,7 +1307,7 @@ func (runner *Runner) Execute() {
 			switch t {
 			case "", poc.HTTP_Type, poc.HTTPS_Type:
 				hasHTTP = true
-			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
+			case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type, poc.JS_Type:
 				hasNet = true
 			case poc.GO_Type:
 				hasGo = true

@@ -199,6 +199,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/reports/detail/{id}", jwtAuthMiddleware(reportsDetailHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/reports/poc/{id}", jwtAuthMiddleware(pocDetailHandler)).Methods(http.MethodGet)
+	// 批量删除命中记录（报告页多选删除）
+	api.HandleFunc("/reports/delete", jwtAuthMiddleware(reportsDeleteHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs", jwtAuthMiddleware(pocsListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/pocs/yaml/{pocId}", jwtAuthMiddleware(pocsYamlHandler)).Methods(http.MethodGet)
@@ -249,6 +251,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigPutHandler)).Methods(http.MethodPut)
 	api.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
+	// 批量删除台账选中的命中记录（连同底层 result 一起移除）
+	api.HandleFunc("/ledger/delete", jwtAuthMiddleware(requireCurated(ledgerDeleteHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/projects", jwtAuthMiddleware(projectSaveHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/projects/{id}", jwtAuthMiddleware(projectGetHandler)).Methods(http.MethodGet)

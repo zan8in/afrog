@@ -24,4 +24,4 @@ afrog keeps contributor recognition visible in the repository root [README `PoC 
 - If the README structure changes again, either this page or the README must continue to expose a clear contributor recognition entry.
 - If a contributor record needs a correction, it should be proposed through an issue or pull request.
 
-> **← Previous:** [Writing Guide by Vulnerability Type](./09-category-guide.md) ｜ **Handbook home:** [PoC Quickstart](./01-quickstart.md) ｜ **Docs home →:** [afrog Docs](../index.md)
+> **← Previous:** [Writing Guide by Vulnerability Type](./09-category-guide.md) ｜ **Handbook home:** [PoC Quickstart](./01-quickstart.md) ｜ **Next →:** [JavaScript PoC](./11-javascript.md)

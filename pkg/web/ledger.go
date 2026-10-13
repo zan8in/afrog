@@ -131,3 +131,55 @@ func ledgerUpdateHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "已更新"})
 }
+
+// ledgerDeleteRequest 是台账批量删除的请求体：每一行用 (vulid, target, fulltarget) 定位，
+// 与台账的分组口径一致。
+type ledgerDeleteRequest struct {
+	Items []struct {
+		VulID      string `json:"vulid"`
+		Target     string `json:"target"`
+		FullTarget string `json:"fulltarget"`
+	} `json:"items"`
+}
+
+// ledgerDeleteHandler 批量删除台账选中的命中记录。
+//
+// 台账是 result 表按 (PoC, 目标) 聚合出的视图，删除即连同底层命中一起移除，
+// 并清掉对应的人工状态/备注，保证台账与漏洞报告两侧同时消失。会员专属。
+func ledgerDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+
+	var req ledgerDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	if len(req.Items) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少要删除的记录"})
+		return
+	}
+
+	keys := make([]sqlite.ResultKey, 0, len(req.Items))
+	for _, it := range req.Items {
+		keys = append(keys, sqlite.ResultKey{
+			VulID:      it.VulID,
+			Target:     it.Target,
+			FullTarget: it.FullTarget,
+		})
+	}
+
+	deleted, err := sqlite.DeleteResultsByKeys(keys)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "删除失败"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]any{"deleted": deleted}})
+}

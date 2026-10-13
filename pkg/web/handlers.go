@@ -620,6 +620,52 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// reportsDeleteHandler 批量删除命中记录（报告页多选删除）。
+// 报告行的主键就是 result.id，用户勾选多少行就删多少条，不可恢复。
+func reportsDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+
+	ids := make([]int64, 0, len(req.IDs))
+	for _, s := range req.IDs {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		// id 是 SnowFlake int64，前端以字符串承载（JS 大整数精度问题），这里解析回整数。
+		if v, err := strconv.ParseInt(s, 10, 64); err == nil && v > 0 {
+			ids = append(ids, v)
+		}
+	}
+	if len(ids) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少有效的命中ID"})
+		return
+	}
+
+	deleted, err := sqlite.DeleteResultsByIDs(ids)
+	if err != nil {
+		gologger.Warning().Msgf("delete reports failed: %v", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "删除失败"})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]any{"deleted": deleted}})
+}
+
 // queryReportList 是报告列表查询的唯一实现：既服务于本机 /reports（JWT），
 // 也服务于集群只读代理（集群令牌），两边返回完全一致的结构。
 func queryReportList(taskID, severityParam, keyword string, severityList []string, page, pageSize int, expandPoc, expandResult, expandExtractor bool) (ReportListResponse, error) {

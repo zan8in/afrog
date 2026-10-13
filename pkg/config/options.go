@@ -119,6 +119,10 @@ type Options struct {
 	TaskTimeoutVisibleCapSec    int
 	TaskTimeoutNetCapSec        int
 	TaskTimeoutGoCapSec         int
+	// JsScriptTimeout 是单个 javascript PoC 脚本的执行上限（秒），0 表示不设脚本级上限。
+	JsScriptTimeout int
+	// EnableJSPoc 是否启用 javascript 类型 PoC 的执行（默认关闭，因其会执行 PoC 中的脚本代码）。
+	EnableJSPoc bool
 
 	// Single Vulnerability Stopper
 	VulnerabilityScannerBreakpoint bool
@@ -371,6 +375,8 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.TaskTimeoutVisibleCapSec, "task-timeout-visible-cap-sec", 300, "maximum smart timeout for regular HTTP PoCs"),
 		flagSet.IntVar(&options.TaskTimeoutNetCapSec, "task-timeout-net-cap-sec", 360, "maximum smart timeout for tcp/udp/ssl PoCs"),
 		flagSet.IntVar(&options.TaskTimeoutGoCapSec, "task-timeout-go-cap-sec", 420, "maximum smart timeout for go PoCs"),
+		flagSet.IntVar(&options.JsScriptTimeout, "js-script-timeout", 60, "maximum execution time for one javascript PoC script in seconds, 0 disables"),
+		flagSet.BoolVar(&options.EnableJSPoc, "enable-js-poc", false, "enable javascript PoC execution (disabled by default; runs untrusted script code from PoC files)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug & Tools",
@@ -519,6 +525,9 @@ func (opt *Options) VerifyOptions() error {
 	}
 	if opt.TaskHardTimeoutSec < 0 {
 		return fmt.Errorf("--task-hard-timeout-sec must be >= 0")
+	}
+	if opt.JsScriptTimeout < 0 {
+		return fmt.Errorf("--js-script-timeout must be >= 0")
 	}
 	if opt.TaskTimeoutVisibleCapSec <= 0 {
 		return fmt.Errorf("--task-timeout-visible-cap-sec must be > 0")
@@ -1113,6 +1122,7 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 
 	newPocSlice := make([]poc.Poc, 0, len(pathItems))
 	legacy := make([]legacyItem, 0)
+	jsDisabled := make([]legacyItem, 0)
 
 	for _, it := range pathItems {
 		var (
@@ -1171,6 +1181,16 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 		if pp.Id == "" {
 			pp.Id = id
 		}
+		if !o.EnableJSPoc && pp.HasJSRule() {
+			jsDisabled = append(jsDisabled, legacyItem{ID: pp.Id, Path: srcPath})
+			diagnostics = append(diagnostics, PocLoadError{
+				Path:   it.Path,
+				ID:     pp.Id,
+				Reason: PocLoadJSPocDisabled,
+				Detail: "javascript PoC requires -enable-js-poc",
+			})
+			continue
+		}
 		if o.TaskSmartTimeout {
 			estimate := poc.EstimateTaskTimeout(pp, poc.TaskTimeoutPolicy{
 				VisibleCapSec: o.TaskTimeoutVisibleCapSec,
@@ -1199,6 +1219,23 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 			gologger.Print().Msgf("+ %d more", total-n)
 		}
 		gologger.Print().Msg("建议：使用 -pocmigrate 迁移旧语法")
+	}
+
+	if len(jsDisabled) > 0 && !o.consoleQuiet() {
+		total := len(jsDisabled)
+		const limit = 20
+		gologger.Print().Msgf("检测到 javascript PoC（已跳过）：%d 个", total)
+		n := total
+		if n > limit {
+			n = limit
+		}
+		for i := 0; i < n; i++ {
+			gologger.Print().Msgf("- %s", jsDisabled[i].ID)
+		}
+		if total > n {
+			gologger.Print().Msgf("+ %d more", total-n)
+		}
+		gologger.Print().Msg("如需启用，使用 -enable-js-poc（将执行 PoC 中的脚本代码，请确保来源可信）")
 	}
 
 	// 按严重级别排序但保留未设置 severity 的 POC

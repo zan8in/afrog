@@ -748,6 +748,119 @@ func DeleteResultsByTask(taskID string) (int64, error) {
 	return res.RowsAffected()
 }
 
+// DeleteResultsByIDs 按主键批量删除命中记录，返回实际删除条数。
+// 报告页「批量删除」用它：用户勾选的每一行就是一条 result。
+func DeleteResultsByIDs(ids []int64) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	clean := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id > 0 {
+			clean = append(clean, id)
+		}
+	}
+	if len(clean) == 0 {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	tx, err := dbx.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var total int64
+	// 按块执行：勾选上千条时不会因为 IN 占位符过多而失败。
+	for _, chunk := range chunkSlice(clean, idChunkSize) {
+		holders := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]interface{}, 0, len(chunk))
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+		res, err := tx.ExecContext(ctx,
+			"DELETE FROM "+db2.TableName+" WHERE id IN ("+holders+")", args...)
+		if err != nil {
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+	}
+	return total, tx.Commit()
+}
+
+// ResultKey 标识一组聚合命中：(PoC, target, fulltarget)，与台账的分组口径一致。
+type ResultKey struct {
+	VulID      string
+	Target     string
+	FullTarget string
+}
+
+// resultKeyChunkSize 是「按组合删除」的单批上限：每组 3 个绑定参数，100 组 = 300 个。
+const resultKeyChunkSize = 100
+
+// DeleteResultsByKeys 按 (vulid,target,fulltarget) 组合批量删除命中，
+// 并清掉这些组合上的人工台账状态——台账是 result 的聚合视图，两侧必须一起消失。
+// 返回删除的命中条数（result 行数，一个组合可能对应多次命中）。
+func DeleteResultsByKeys(keys []ResultKey) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	clean := make([]ResultKey, 0, len(keys))
+	for _, k := range keys {
+		vulid := strings.TrimSpace(k.VulID)
+		if vulid == "" {
+			continue
+		}
+		clean = append(clean, ResultKey{
+			VulID:      vulid,
+			Target:     strings.TrimSpace(k.Target),
+			FullTarget: strings.TrimSpace(k.FullTarget),
+		})
+	}
+	if len(clean) == 0 {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	tx, err := dbx.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var total int64
+	for _, chunk := range chunkSlice(clean, resultKeyChunkSize) {
+		// 行值 IN (VALUES(?,?,?),...)：一次匹配多组，避免逐组一条语句。
+		placeholders := make([]string, 0, len(chunk))
+		args := make([]interface{}, 0, len(chunk)*3)
+		for _, k := range chunk {
+			placeholders = append(placeholders, "(?,?,?)")
+			args = append(args, k.VulID, k.Target, k.FullTarget)
+		}
+		values := strings.Join(placeholders, ",")
+
+		res, err := tx.ExecContext(ctx,
+			"DELETE FROM "+db2.TableName+" WHERE (vulid,target,fulltarget) IN (VALUES "+values+")", args...)
+		if err != nil {
+			return 0, err
+		}
+		n, _ := res.RowsAffected()
+		total += n
+
+		if _, err := tx.ExecContext(ctx,
+			"DELETE FROM vuln_ledger WHERE (vulid,target,fulltarget) IN (VALUES "+values+")", args...); err != nil {
+			return 0, err
+		}
+	}
+	return total, tx.Commit()
+}
+
 // InsertRawResults 把一批「在别处生成」的命中写进本地 result 表。
 //
 // 用于远程命中回填：taskid 用发起端的影子任务号（发起端的一切报告/台账都按它组织），

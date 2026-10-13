@@ -16,6 +16,8 @@ const (
 	PocLoadReadFailed  = "read_failed"
 	PocLoadParseFailed = "parse_failed"
 	PocLoadLegacyOOB   = "legacy_oob"
+	// PocLoadJSPocDisabled 表示该 PoC 包含 javascript 规则，但未启用 javascript 执行。
+	PocLoadJSPocDisabled = "js_poc_disabled"
 )
 
 // ErrNoPocMatched 表示路径本身存在，但没有匹配到任何 .yaml/.yml 文件。

@@ -71,7 +71,7 @@ Pages marked as member features (Schedules, Ledger, Curated) are still reachable
 
 ## Launching a scan
 
-Enter targets on the **Scan** page. The input recognizes and normalizes these forms, one per line or comma separated:
+Enter targets on the **Scan** page. The input recognizes and normalizes these forms, one per line:
 
 - URLs: `https://example.com/login`
 - Domains: `example.com`

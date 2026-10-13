@@ -118,7 +118,7 @@ func detectTaskTimeoutCategory(p Poc) taskTimeoutCategory {
 		switch reqType {
 		case GO_Type:
 			return taskTimeoutCategoryGo
-		case TCP_Type, UDP_Type, SSL_Type:
+		case TCP_Type, UDP_Type, SSL_Type, JS_Type:
 			hasNet = true
 		}
 	}

@@ -10,7 +10,7 @@ last_reviewed: 2026-10-10
 
 ## Target input
 
-Enter targets on the **Scan** page to get going. The input box automatically recognizes and normalizes the following forms; one per line or comma separated both work:
+Enter targets on the **Scan** page to get going. The input box automatically recognizes and normalizes the following forms, one per line:
 
 - URL: `https://example.com/login`
 - Domain: `example.com`

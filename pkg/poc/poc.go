@@ -100,6 +100,10 @@ type RuleRequest struct {
 	Headers         map[string]string `yaml:"headers"`
 	Body            string            `yaml:"body"`
 	FollowRedirects bool              `yaml:"follow_redirects"`
+	// 以下是 javascript 专用字段
+	Code         string        `yaml:"code"`          // javascript 脚本内容
+	Args         yaml.MapSlice `yaml:"args"`          // javascript 脚本入参
+	PreCondition string        `yaml:"pre-condition"` // javascript 前置条件（求值为真才执行 code）
 }
 
 type NetStep struct {
@@ -127,6 +131,7 @@ const (
 	UDP_Type   = "udp"
 	SSL_Type   = "ssl"
 	GO_Type    = "go"
+	JS_Type    = "javascript"
 )
 
 // 以下开始是 信息部分
@@ -492,6 +497,16 @@ func (poc *Poc) Reset() {
 	poc.Rules = nil
 	poc.Expression = ""
 	poc.Info = Info{}
+}
+
+// HasJSRule 判断 PoC 是否包含 javascript 类型的规则。
+func (poc *Poc) HasJSRule() bool {
+	for _, rm := range poc.Rules {
+		if strings.EqualFold(strings.TrimSpace(rm.Value.Request.Type), JS_Type) {
+			return true
+		}
+	}
+	return false
 }
 
 func (poc *Poc) IsHTTPType() bool {

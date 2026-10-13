@@ -13,6 +13,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
+	"github.com/zan8in/afrog/v3/pkg/protocols/js"
 	"github.com/zan8in/afrog/v3/pkg/protocols/netxclient"
 	"github.com/zan8in/afrog/v3/pkg/protocols/raw"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -192,6 +193,26 @@ func (e GoExecutor) Execute(target string, rule poc.Rule, opt *config.Options, v
 	return gox.Request(target, rule.Request.Data, vars)
 }
 
+type JSExecutor struct{}
+
+func (e JSExecutor) Execute(target string, rule poc.Rule, opt *config.Options, vars map[string]any) error {
+	args := make(map[string]any, len(rule.Request.Args))
+	for _, item := range rule.Request.Args {
+		key, ok := item.Key.(string)
+		if !ok {
+			continue
+		}
+		args[key] = item.Value
+	}
+	ctx := retryhttpclient.ContextFromVariableMap(vars)
+	// javascript 脚本独立预算，不与全局 -timeout 耦合；0 表示不设脚本级上限。
+	var maxTimeout time.Duration
+	if opt != nil && opt.JsScriptTimeout > 0 {
+		maxTimeout = time.Duration(opt.JsScriptTimeout) * time.Second
+	}
+	return js.Execute(ctx, target, rule.Request.Code, rule.Request.PreCondition, args, vars, maxTimeout)
+}
+
 func getDuration(sec int) (d time.Duration) {
 	if sec <= 0 {
 		return 0
@@ -235,4 +256,5 @@ var executors = map[string]Executor{
 	poc.UDP_Type:   NetExecutor{},
 	poc.SSL_Type:   NetExecutor{},
 	poc.GO_Type:    GoExecutor{},
+	poc.JS_Type:    JSExecutor{},
 }

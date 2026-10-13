@@ -1,0 +1,34 @@
+id: js-demo-ssh-banner
+
+info:
+  name: SSH Banner (JavaScript PoC Demo)
+  author: afrog
+  severity: info
+  description: |
+    演示 javascript 类型 PoC：通过 afrog/ssh 模块读取 SSH banner，
+    并使用 afrog 的 CEL expression / extractors 完成判断与提取。
+  tags: js,demo,ssh
+  created: 2026/10/11
+
+rules:
+  detect:
+    request:
+      type: javascript
+      pre-condition: |
+        isPortOpen(Host, Port)
+      code: |
+        var m = require("afrog/ssh");
+        var c = m.SSHClient();
+        var info = c.ConnectSSHInfoMode(Host, Port);
+        Export(info.ServerID.Raw);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
+    expression: response_text.contains("SSH-2.0-")
+
+extractors:
+  - type: regex
+    extractor:
+      version: '"SSH-2\\.0-[^\\r\\n]+".submatch(response_text)["version"]'
+
+expression: detect()
