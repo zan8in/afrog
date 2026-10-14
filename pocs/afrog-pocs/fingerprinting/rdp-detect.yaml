@@ -1,20 +1,19 @@
 id: rdp-detect
 
 info:
-  name: RDP Service - Detect
+  name: RDP Detection
   author: zan8in
   severity: info
   verified: true
-  description: |-
-    RDP 的全称是 Remote Desktop Protocol。
-    它是微软开发的一种专有协议，允许用户远程连接并控制另一台计算机的图形化桌面，就像坐在那台电脑前一样。
-    它传输屏幕图像、键盘和鼠标操作，并支持声音重定向、打印机映射、驱动器共享等高级功能。
-    fofa: protocol="rdp"
-  tags: network,rdp,fingerprint
-  created: 2026/01/09
+  description: |
+    通过 RDP X.224 连接握手响应识别远程桌面服务，并依据 RDP 协商响应特征识别 Windows 系统版本。
+    shodan: port:3389 product:"Microsoft Remote Desktop Protocol"
+  tags: network,windows,rdp,detect,fingerprint
+  created: 2026/10/14
 
 set:
   host: request.url.host
+
 rules:
   r0:
     request:
@@ -22,10 +21,25 @@ rules:
       host: "{{host}}"
       steps:
         - write:
-            data: "030000130ee000000000000100080003000000"
+            data: "030000130ee00000000000010008000b000000"
             data-type: hex
         - read:
             read-size: 4096
             read-timeout: 3
-    expression: response.raw.bcontains(b"\x03\x00\x00") && response.raw.bcontains(b"\x0e\xd0")
+    expression: response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00") || response.raw.bstartsWith(b"\x03\x00\x00\x0b\x06\xd0\x00\x00\x12\x34\x00")
+    extractors:
+      - name: os
+        type: cel
+        value: |
+          response.raw.bstartsWith(b"\x03\x00\x00\x0b\x06\xd0\x00\x00\x12\x34\x00") ? "Windows 2000 / XP" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x03\x00\x08\x00\x02\x00\x00\x00") ? "Windows Server 2003" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x00\x08\x00\x02\x00\x00\x00") ? "Windows Server 2008" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x09\x08\x00\x02\x00\x00\x00") ? "Windows 7 / Server 2008 R2" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x01\x08\x00\x02\x00\x00\x00") ? "Windows Server 2008 R2 DC" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x1f\x08\x00\x02\x00\x00\x00") ? "Windows 10" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x0f\x08\x00\x02\x00\x00\x00") ? "Windows 8 / Server 2012" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x0f\x08\x00\x08\x00\x00\x00") ? "Windows Server 2012 R2" :
+          response.raw.bstartsWith(b"\x03\x00\x00\x13\x0e\xd0\x00\x00\x12\x34\x00\x02\x1f\x08\x00\x08\x00\x00\x00") ? "Windows Server 2016 / 2019" :
+          "Windows RDP (unknown version)"
+
 expression: r0()

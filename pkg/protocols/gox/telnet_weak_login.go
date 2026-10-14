@@ -46,8 +46,14 @@ func telnet_weak_login(target string, variableMap map[string]any) error {
 				return nil
 			}
 			tried++
-			if telnetAuthAttempt(host, u, p) {
-				setResponse(fmt.Sprintf("success;user=%s;pass=%s", u, p), variableMap)
+			ok, noAuth := telnetAuthAttempt(host, u, p)
+			if ok {
+				if noAuth {
+					// 未鉴权即进入 shell，如实标注为无认证，避免伪造用户名/口令
+					setResponse("success;reason=no_auth", variableMap)
+				} else {
+					setResponse(fmt.Sprintf("success;user=%s;pass=%s", u, p), variableMap)
+				}
 				setRequest(host, variableMap)
 				setTarget(host, variableMap)
 				setFullTarget(host, variableMap)
@@ -63,10 +69,10 @@ func telnet_weak_login(target string, variableMap map[string]any) error {
 	return nil
 }
 
-func telnetAuthAttempt(host, username, password string) bool {
+func telnetAuthAttempt(host, username, password string) (ok bool, noAuth bool) {
 	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
 	if err != nil {
-		return false
+		return false, false
 	}
 	defer conn.Close()
 
@@ -82,8 +88,9 @@ func telnetAuthAttempt(host, username, password string) bool {
 		banner += "\n" + telnetSanitizeText(moreRaw)
 	}
 
+	// 未鉴权即直接进入 shell：标注为无认证，而非弱口令
 	if telnetLooksLikeShell(banner) {
-		return true
+		return true, true
 	}
 
 	needUser := telnetHasLoginPrompt(banner) || (!telnetHasPasswordPrompt(banner) && !telnetHasLoginPrompt(banner))
@@ -104,15 +111,25 @@ func telnetAuthAttempt(host, username, password string) bool {
 	afterRaw, _ := telnetReadSome(conn, reader, 8192, 1500*time.Millisecond)
 	after := telnetSanitizeText(afterRaw)
 
-	if telnetHasFailure(after) || telnetHasLoginPrompt(after) || telnetHasPasswordPrompt(after) {
-		return false
+	// 明确的口令错误 → 失败
+	if telnetHasFailure(after) {
+		return false, false
+	}
+	// 先判成功（shell 提示符 / Last login），避免 "Last login:" 被 login: 提示误杀
+	if telnetLooksLikeShell(after) {
+		return true, false
 	}
 
 	_, _ = fmt.Fprintf(conn, "\r\n")
 	promptRaw, _ := telnetReadSome(conn, reader, 8192, 900*time.Millisecond)
 	prompt := telnetSanitizeText(promptRaw)
 
-	return telnetLooksLikeShell(after + "\n" + prompt)
+	// 补读到的内容再次出现失败或登录/口令提示 → 失败
+	if telnetHasFailure(prompt) || telnetHasLoginPrompt(prompt) || telnetHasPasswordPrompt(prompt) {
+		return false, false
+	}
+
+	return telnetLooksLikeShell(after + "\n" + prompt), false
 }
 
 func telnet_env_user_root(target string, variableMap map[string]any) error {
@@ -669,42 +686,14 @@ func telnetLooksLikeShell(s string) bool {
 		if telnetHasFailure(line) {
 			return false
 		}
-		if telnetHasLoginPrompt(line) || telnetHasPasswordPrompt(line) {
-			continue
-		}
-		if telnetLineLooksLikePrompt(line) {
-			return true
-		}
+		// "Last login: ..." 属成功证据，须先于 login:/password: 提示判断，避免被 "login:" 子串误杀
 		if strings.Contains(line, "last login") {
 			return true
-		}
-	}
-	return false
-}
-
-func telnetLooksLikeShellTail(s string) bool {
-	u := strings.ToLower(strings.TrimSpace(s))
-	if u == "" {
-		return false
-	}
-	lines := strings.Split(u, "\n")
-	checked := 0
-	for i := len(lines) - 1; i >= 0 && checked < 8; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
-		}
-		checked++
-		if telnetHasFailure(line) {
-			return false
 		}
 		if telnetHasLoginPrompt(line) || telnetHasPasswordPrompt(line) {
 			continue
 		}
 		if telnetLineLooksLikePrompt(line) {
-			return true
-		}
-		if strings.Contains(line, "last login") {
 			return true
 		}
 	}
