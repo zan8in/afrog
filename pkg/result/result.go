@@ -185,21 +185,69 @@ func (r *Result) PrintResultInfo() string {
 }
 
 func (r *Result) PrintColorResultInfoConsole(number string) {
-	extinfo := ""
-	if len(r.Extractor) > 0 {
-		for _, v := range r.Extractor {
-			switch value := v.Value.(type) {
-			case map[string]string:
-			case string:
-				extinfo += "," + log.LogColor.Extractor(v.Key.(string)) + "=\"" + log.LogColor.Extractor(utils.Str2UTF8(value)) + "\""
-			}
-		}
-		extinfo = "[" + strings.TrimLeft(extinfo, ",") + "]"
-	}
-
 	fmt.Printf("\r%v %v %v %v\r\n", log.LogColor.Time(number+" "+utils.GetNowDateTime()),
-		log.LogColor.Vulner(""+r.PocInfo.Id+"")+" "+log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)+""), r.FullTarget, extinfo)
+		log.LogColor.Vulner(""+r.PocInfo.Id+"")+" "+log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)+""), r.FullTarget, formatExtractorInline(r.Extractor))
 
+}
+
+// formatExtractorInline 把提取结果渲染成控制台内联片段：`[key=value,key=value]`。
+// 只在必要时给值加引号（空值、或含空白/逗号/引号），并支持字符串以外的常见类型，
+// 让类型化提取器（数字、布尔、字符串列表）也能正常展示。无可用值时返回空串。
+func formatExtractorInline(extractor yaml.MapSlice) string {
+	if len(extractor) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(extractor))
+	for _, v := range extractor {
+		key, ok := v.Key.(string)
+		if !ok || key == "" {
+			continue
+		}
+		val, ok := extractorValueText(v.Value)
+		if !ok {
+			continue
+		}
+		parts = append(parts, log.LogColor.Extractor(key)+"="+log.LogColor.Extractor(val))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+// extractorValueText 把提取值渲染成文本；不支持的复杂类型返回 false（跳过）。
+func extractorValueText(v any) (string, bool) {
+	switch t := v.(type) {
+	case string:
+		return quoteExtractorValue(utils.Str2UTF8(t)), true
+	case int:
+		return strconv.Itoa(t), true
+	case int64:
+		return strconv.FormatInt(t, 10), true
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(t), true
+	case []string:
+		items := make([]string, 0, len(t))
+		for _, it := range t {
+			items = append(items, quoteExtractorValue(it))
+		}
+		return strings.Join(items, ","), true
+	default:
+		return "", false
+	}
+}
+
+// quoteExtractorValue 仅在必要时加引号：空值用 "" 明确表示，含空白/逗号/引号时转义。
+func quoteExtractorValue(s string) string {
+	if s == "" {
+		return `""`
+	}
+	if strings.ContainsAny(s, " \t,\"") {
+		return strconv.Quote(s)
+	}
+	return s
 }
 
 func (r *Result) Debug() {

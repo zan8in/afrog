@@ -213,6 +213,35 @@ func TestTypedExtractorInvalidNameSkipped(t *testing.T) {
 	}
 }
 
+// 复刻 mysql-weak-login.yaml 的提取器：同一条正则、两个命名组，part=raw。
+func TestTypedExtractorSharedRegexTwoGroups(t *testing.T) {
+	pattern := `user=(?P<username>[^;]*);pass=(?P<password>.*)$`
+
+	cases := []struct {
+		raw         string
+		wantUser    string
+		wantPass    string
+	}{
+		{"success;user=root;pass=root", "root", "root"},
+		{"success;user=admin;pass=", "admin", ""},
+		{"success;user=mysql;pass=123456", "mysql", "123456"},
+	}
+	for _, tc := range cases {
+		c := newExtractorChecker()
+		c.VariableMap["response"] = &proto.Response{Raw: []byte(tc.raw)}
+		c.UpdateVariableMapExtractor([]poc.Extractors{
+			{Name: "username", Type: "regex", Part: "raw", Regex: pattern, Group: "username"},
+			{Name: "password", Type: "regex", Part: "raw", Regex: pattern, Group: "password"},
+		})
+		if got := c.VariableMap["username"]; got != tc.wantUser {
+			t.Fatalf("%s: username = %#v, want %q", tc.raw, got, tc.wantUser)
+		}
+		if got := c.VariableMap["password"]; got != tc.wantPass {
+			t.Fatalf("%s: password = %#v, want %q", tc.raw, got, tc.wantPass)
+		}
+	}
+}
+
 // 端到端：类型化提取器在真实 HTTP 规则里提取变量，并被顶层 expression 引用。
 func TestTypedExtractorEndToEndHTTP(t *testing.T) {
 	retryhttpclient.Init(&retryhttpclient.Options{Timeout: 5, Retries: 0, MaxRespBodySize: 4096})

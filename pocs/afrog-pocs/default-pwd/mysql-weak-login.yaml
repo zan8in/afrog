@@ -54,10 +54,15 @@ rules:
         Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
-      - type: regex
-        extractor:
-          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
-          username: ext["username"]
-          password: ext["password"]
+      - name: username
+        type: regex
+        part: raw
+        regex: "user=(?P<username>[^;]*);pass=(?P<password>.*)$"
+        group: username
+      - name: password
+        type: regex
+        part: raw
+        regex: "user=(?P<username>[^;]*);pass=(?P<password>.*)$"
+        group: password
 
 expression: r0()

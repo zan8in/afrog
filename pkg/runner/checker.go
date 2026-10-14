@@ -173,9 +173,19 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		}
 	}
 
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		target = "https://" + target
+	// 目标形态：
+	//   - HTTP 类型的目标由 checkURL 保证带 scheme，这里只做兜底；
+	//   - tcp / ssl / javascript / go 等原始网络 PoC 的目标就是 host:port，
+	//     刻意不补 scheme，否则控制台、报告与漏洞台账里会出现误导性的
+	//     "https://host:port"。
+	displayTarget := target
+	if pocItem.IsHTTPType() {
+		displayTarget = ensureURLScheme(target, "https://")
 	}
+	// 下方占位请求对象要求绝对 URL：非 HTTP 类型用一个不会被使用的 http:// 占位，
+	// 其 request 变量随后会被各自的执行器覆盖。
+	requestURL := ensureURLScheme(target, "http://")
+	target = displayTarget
 
 	c.Result.Target = target
 	c.Result.PocInfo = pocItem
@@ -193,7 +203,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		matchCondition = poc.STOP_IF_FIRST_MATCH
 	}
 
-	originReq, err := http.NewRequest("GET", target, nil)
+	originReq, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		c.Result.IsVul = false
 		return err
@@ -887,6 +897,14 @@ func (c *Checker) injectHostPortVars(target string) {
 		c.VariableMap["Hostname"] = hostname
 		c.CustomLib.UpdateCompileOption("Hostname", decls.String)
 	}
+}
+
+// ensureURLScheme 给不带 scheme 的目标补上默认 scheme；已带 http/https 则原样返回。
+func ensureURLScheme(target, scheme string) string {
+	if strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://") {
+		return target
+	}
+	return scheme + target
 }
 
 // splitHostPort 兼容 "host:port"、"scheme://host:port/path" 与纯 host 三种目标形态。
