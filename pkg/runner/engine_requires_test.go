@@ -30,6 +30,19 @@ func TestShouldSkipRequires_Strict_Match(t *testing.T) {
 	}
 }
 
+// requires 命中「指纹 PoC 的 id」（而非 tag）时，同样不应跳过。
+// 例：CVE-2020-1938 写 requires: ["ajp-protocol-detect"]，而 ajp-protocol-detect 是
+// 指纹 PoC 的 id，其 tags 里并无 "ajp-protocol-detect" 这个 tag。
+func TestShouldSkipRequires_Strict_MatchFingerprintPocID(t *testing.T) {
+	p := poc.Poc{Info: poc.Info{Requires: []string{"ajp-protocol-detect"}}}
+	fingerRequiresByKey := map[string]map[string]struct{}{
+		"127.0.0.1:8009": {"ajp": {}, "tomcat": {}, "ajp-protocol-detect": {}},
+	}
+	if shouldSkipRequires("127.0.0.1:8009", p, func(s string) string { return s }, fingerRequiresByKey, false) {
+		t.Fatalf("expected not skip when requires matches fingerprint poc id")
+	}
+}
+
 func TestShouldSkipRequires_Strict_Mismatch(t *testing.T) {
 	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
 	fingerTagsByKey := map[string]map[string]struct{}{

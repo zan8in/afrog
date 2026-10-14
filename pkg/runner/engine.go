@@ -373,7 +373,11 @@ func (c *openPortsCollector) Snapshot() map[string][]int {
 	return cp
 }
 
-func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerTagsByKey map[string]map[string]struct{}, testMode bool) bool {
+// shouldSkipRequires 判断目标是否因 requires 门控而跳过。
+//
+// fingerRequiresByKey 是「该目标命中的指纹标识集合」，同时包含指纹 PoC 的 tag 与 id，
+// 因此 requires: [mysql]（tag）与 requires: [ajp-protocol-detect]（指纹 PoC id）都能命中。
+func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerRequiresByKey map[string]map[string]struct{}, testMode bool) bool {
 	if testMode {
 		return false
 	}
@@ -400,7 +404,7 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 		mode = "strict"
 	}
 
-	if len(fingerTagsByKey) == 0 {
+	if len(fingerRequiresByKey) == 0 {
 		return mode == "strict"
 	}
 
@@ -412,7 +416,7 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 		return mode == "strict"
 	}
 
-	tts := fingerTagsByKey[key]
+	tts := fingerRequiresByKey[key]
 	if len(tts) == 0 {
 		return mode == "strict"
 	}
@@ -1422,7 +1426,11 @@ func (runner *Runner) Execute() {
 		return keyFromTargetWithPath(target)
 	}
 
+	// fingerTagsByKey 只放「指纹 tag」，供指纹过滤使用；
+	// fingerRequiresByKey 额外并入指纹 PoC 的 id，供 requires 匹配使用
+	// （作者既可能写 requires: [mysql]（tag），也可能写 requires: [ajp-protocol-detect]（id））。
 	fingerTagsByKey := make(map[string]map[string]struct{})
+	fingerRequiresByKey := make(map[string]map[string]struct{})
 	globalFingerTags := make(map[string]struct{})
 	{
 		runner.fingerMu.Lock()
@@ -1439,12 +1447,20 @@ func (runner *Runner) Execute() {
 
 		for k, hits := range fingerSnap {
 			tagSet := make(map[string]struct{})
+			reqSet := make(map[string]struct{})
 			for _, h := range hits {
-				hs := normalizeTags(h.Tags, true)
-				for t := range hs {
+				for t := range normalizeTags(h.Tags, true) {
 					tagSet[t] = struct{}{}
+					reqSet[t] = struct{}{}
+				}
+				if id := strings.ToLower(strings.TrimSpace(h.ID)); id != "" {
+					reqSet[id] = struct{}{}
 				}
 			}
+			if len(reqSet) == 0 {
+				continue
+			}
+			fingerRequiresByKey[k] = reqSet
 			if len(tagSet) == 0 {
 				continue
 			}
@@ -1594,7 +1610,7 @@ func (runner *Runner) Execute() {
 					continue
 				}
 
-				if shouldSkipRequires(t, pocItem, keyForTarget, fingerTagsByKey, runner.options.Test) {
+				if shouldSkipRequires(t, pocItem, keyForTarget, fingerRequiresByKey, runner.options.Test) {
 					runner.ScanProgress.IncrementTask(pocItem.Id, t)
 					runner.NotVulCallback()
 					continue

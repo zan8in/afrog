@@ -72,7 +72,7 @@ info:
 
 | Field | Commonness | Purpose | Default behavior |
 | --- | --- | --- | --- |
-| `requires` | common | declare which fingerprint tags must match first | no gating when omitted |
+| `requires` | common | declare which fingerprint identifiers must match first (fingerprint tag or fingerprint PoC id) | no gating when omitted |
 | `requires-mode` | common | define what happens when fingerprint data is missing | default `strict` |
 
 ## `requires` syntax
@@ -110,15 +110,28 @@ The code path also accepts these `requires-mode` spellings:
 The rule is simple:
 
 - no `requires`: no gating
-- with `requires`: execute only when the target's matched fingerprint tags intersect with the `requires` values
+- with `requires`: execute only when the target's matched **fingerprint identifiers** intersect with the `requires` values
 
-Those matched tags come from the fingerprint PoC `info.tags`.
+Those "fingerprint identifiers" are the **union of two sets**:
+
+1. the `info.tags` of the fingerprint PoCs that matched the target
+2. the `id` of the fingerprint PoCs that matched the target
+
+In other words, `requires` accepts either a **fingerprint tag** or the **id of a fingerprint PoC**; both match.
+
+For example, the two forms below are equivalent (assume the fingerprint PoC has `id: ajp-protocol-detect` and a tag `ajp`):
+
+```yaml
+requires: [ajp]                     # matches the fingerprint tag
+# equivalent to
+requires: [ajp-protocol-detect]     # matches the fingerprint PoC id
+```
 
 ### The simplest mental model
 
 The PoC executes only when this is true:
 
-> the current target's fingerprint tags intersect with at least one value in `requires`
+> the current target's fingerprint identifiers (tags ∪ fingerprint PoC ids) intersect with at least one value in `requires`
 
 Otherwise it is skipped.
 
@@ -249,7 +262,7 @@ This is also the most common explanation when a `requires` PoC appears not to ru
 ## Usage suggestions
 
 1. For high-cost PoCs, prefer `strict` first
-2. Keep `requires` focused on the primary product tag, not broad categories
+2. Keep `requires` focused on the primary product tag (or the matching fingerprint PoC id), not broad categories
 3. Fingerprint PoCs should usually expose one primary tag plus `fingerprint`
 4. If you run with `-nf`, remember that `strict` mode will usually skip
 5. Keep target formatting consistent instead of mixing URLs and bare hosts

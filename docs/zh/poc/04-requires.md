@@ -72,7 +72,7 @@ info:
 
 | 字段 | 是否常用 | 作用 | 默认行为 |
 | --- | --- | --- | --- |
-| `requires` | 常用 | 声明需要哪些指纹 tag 命中后才执行 | 不写则不门控 |
+| `requires` | 常用 | 声明需要哪些指纹标识命中后才执行（指纹 tag 或指纹 PoC 的 id） | 不写则不门控 |
 | `requires-mode` | 常用 | 控制没有指纹结果时是否跳过 | 默认 `strict` |
 
 ## `requires` 的写法
@@ -110,15 +110,28 @@ requires: "nacos,redis"
 规则很简单：
 
 - 没写 `requires`：不启用门控
-- 写了 `requires`：只有目标命中的指纹 tags 与 `requires` 有交集时，才允许执行
+- 写了 `requires`：只有目标命中的**指纹标识**与 `requires` 有交集时，才允许执行
 
-这里的“命中指纹 tags”来自指纹阶段命中的指纹 PoC 的 `info.tags`。
+这里的“指纹标识”是**两个集合的并集**：
+
+1. 指纹阶段命中的指纹 PoC 的 `info.tags`
+2. 指纹阶段命中的指纹 PoC 的 `id`
+
+也就是说，`requires` 既可以写「指纹 tag」，也可以直接写「指纹 PoC 的 id」，两者都能命中。
+
+例如下面两种写法等价（假设指纹 PoC 的 `id: ajp-protocol-detect`，`tags` 含 `ajp`）：
+
+```yaml
+requires: [ajp]                     # 命中指纹 tag
+# 等价于
+requires: [ajp-protocol-detect]     # 命中指纹 PoC 的 id
+```
 
 ### 你可以把它理解成一条简单规则
 
 只有当下面这件事成立时，PoC 才会执行：
 
-> 当前目标的指纹 tags 和 `requires` 里声明的 tags 至少有一个交集
+> 当前目标的指纹标识（tags ∪ 指纹 PoC id）和 `requires` 里声明的值至少有一个交集
 
 否则，就会被跳过。
 
@@ -249,7 +262,7 @@ requires-mode: strict
 ## 使用建议
 
 1. 高成本 PoC 默认优先 `strict`
-2. `requires` 里尽量只放主产品 tag，不要放过宽泛的分类词
+2. `requires` 里尽量只放主产品 tag（或对应指纹 PoC 的 id），不要放过宽泛的分类词
 3. 指纹 PoC 的 `info.tags` 建议稳定包含一个主 tag 和 `fingerprint`
 4. 如果你加了 `-nf`，就要意识到 `strict` 模式大概率会跳过
 5. target 形式尽量规范，不要一会儿 URL 一会儿裸 host

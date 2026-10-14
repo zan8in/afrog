@@ -47,13 +47,14 @@
 核心规则非常简单：
 
 - 如果 PoC 没写 `requires`：不启用门控（行为不变）
-- 如果 PoC 写了 `requires`：只有当该 target 的“指纹命中 tags”与 `requires` 有交集时，才允许执行
+- 如果 PoC 写了 `requires`：只有当该 target 的“指纹标识”与 `requires` 有交集时，才允许执行
 
-这里的“指纹命中 tags”来自指纹阶段命中的指纹 PoC 的 `info.tags`：
+这里的“指纹标识”是**两个集合的并集**：
 
-- 指纹 PoC 通常会带 `fingerprint` tag
-- 系统会忽略 `fingerprint` 这个 tag，本质上是用它来区分“这是指纹 PoC”
-- 其它 tag（例如 `ftp`、`mysql`、`nacos` 等）会作为“命中指纹 tags”参与门控匹配
+- 指纹 PoC 的 `info.tags`（通常会带 `fingerprint` tag，系统会忽略它）
+- 指纹 PoC 的 `id`
+
+也就是说，`requires` 既可以写「指纹 tag」（例如 `ftp`、`mysql`、`nacos`），也可以直接写「指纹 PoC 的 id」（例如 `ajp-protocol-detect`），两者都能命中。
 
 ### `requires` 多值语义：OR（任意命中即可）
 
