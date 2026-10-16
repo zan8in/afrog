@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"net"
 	"net/url"
 	"regexp"
@@ -112,6 +113,8 @@ func extractTitle(body []byte) string {
 	if t == "" {
 		return ""
 	}
+	// 部分站点把标题写成 HTML 实体（如 &#x4E2D;&#x7164;），浏览器会解码，这里同样解码后再归一化空白
+	t = html.UnescapeString(t)
 	t = strings.Join(strings.Fields(t), " ")
 	return t
 }
