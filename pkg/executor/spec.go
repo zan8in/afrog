@@ -59,6 +59,12 @@ type Spec struct {
 	SkipHostDiscovery bool
 	WebFingerprint    bool
 
+	// 报告输出：OutputHTML 为真时子进程写 HTML 报告（-o），否则用 -disable-output-html。
+	// OutputFile 只是文件名：子进程 CWD 是每任务独立的临时目录，实际路径由执行器固定
+	// 到报告目录下（见 buildArgs）。
+	OutputHTML bool
+	OutputFile string
+
 	// OOB
 	EnableOOB  bool
 	OOBAdapter string

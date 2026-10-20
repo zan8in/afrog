@@ -77,6 +77,8 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		PortScan:          req.PortScan || req.PortScanCompat,
 		Ports:             strings.TrimSpace(req.Ports),
 		SkipHostDiscovery: req.SkipHostDisc,
+		OutputHTML:        req.OutputHTML,
+		OutputFile:        strings.TrimSpace(req.OutputFile),
 		WebFingerprint:    req.WebProbe || req.WebFingerprint,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOB),

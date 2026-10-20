@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // buildArgs 把 Spec 映射为 afrog CLI 参数。
@@ -162,11 +164,87 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	// 始终追加：执行器通过 NDJSON 事件流消费子进程输出。
 	args = append(args, "-json-stream")
 
-	// 机器驱动的子进程不应往工作目录写 HTML 报告：
-	// 结果已进 sqlite 并通过事件流回传，落在 CWD 的报告文件是纯垃圾。
-	args = append(args, "-disable-output-html")
+	// 默认不让机器驱动的子进程写 HTML 报告：结果已进 sqlite 并通过事件流回传，
+	// 落在 CWD（每任务临时目录）的报告是纯垃圾。显式开启才写，且路径固定在报告目录下。
+	reportPath := ""
+	if spec.OutputHTML {
+		// 报告路径解析失败（如取不到 home 目录）不应拖垮扫描，静默回退到不生成。
+		reportPath, _ = reportFilePath(taskID, spec.OutputFile)
+	}
+	if reportPath != "" {
+		args = append(args, "-o", reportPath)
+	} else {
+		args = append(args, "-disable-output-html")
+	}
 
 	return args, cleanup, nil
+}
+
+// ReportsDir 返回 HTML 报告的统一落盘目录：控制面进程当前目录下的 ./reports。
+//
+// 与 afrog CLI 的口径一致（report.OutputDirectory），但不直接交给子进程一个相对路径：
+// 子进程的 CWD 是每任务独立的临时目录，相对路径的报告会随临时目录一起删除，所以这里
+// 解析成绝对路径后再通过 -o 传下去。目录固定而不由前端指定，避免写坏宿主机任意路径。
+func ReportsDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("executor: resolve working dir: %w", err)
+	}
+	dir := filepath.Join(wd, "reports")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("executor: create reports dir: %w", err)
+	}
+	return dir, nil
+}
+
+// reportFilePath 把前端给的文件名收敛成报告目录下的绝对路径。
+//
+// 只取基名并过滤不安全字符，杜绝路径穿越；留空时用任务号 + 时间戳兜底命名，保证
+// 并发任务不会互相覆盖。
+func reportFilePath(taskID, name string) (string, error) {
+	dir, err := ReportsDir()
+	if err != nil {
+		return "", err
+	}
+	base := sanitizeReportName(name)
+	if base == "" {
+		prefix := "afrog-report-"
+		if s := sanitizeTaskID(taskID); s != "" {
+			prefix += s + "-"
+		}
+		base = prefix + time.Now().Format("20060102-150405") + ".html"
+	}
+	return filepath.Join(dir, base), nil
+}
+
+// sanitizeReportName 把用户给的报告名收敛成可安全用作文件名的字符串。
+// 返回空串表示「没有可用的名字」，由调用方兜底命名。
+func sanitizeReportName(name string) string {
+	// 先取基名，避免 "../../etc/x" 这类路径穿越。
+	v := filepath.Base(strings.ReplaceAll(strings.TrimSpace(name), "\\", "/"))
+	var b strings.Builder
+	for _, r := range v {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+			r == '-', r == '_', r == '.', r == ' ':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	s := strings.Trim(b.String(), "._- ")
+	if len(s) > 80 {
+		s = s[:80]
+	}
+	if strings.Trim(s, "._- ") == "" {
+		return ""
+	}
+	// afrog 的 -o 只接受 .html/.htm，其余一律补上 .html
+	lower := strings.ToLower(s)
+	if !strings.HasSuffix(lower, ".html") && !strings.HasSuffix(lower, ".htm") {
+		s += ".html"
+	}
+	return s
 }
 
 // writeTargetsFile 把多个目标写入临时文件（每行一个），供 -T 使用。

@@ -577,7 +577,7 @@ func (s *Scanner) checkPortOpen(st *hostScanStat, host string, port int) (net.Co
 		}
 
 		// Retry logic
-		if strings.Contains(err.Error(), "refused") {
+		if isConnRefused(err) {
 			return nil, err // Connection refused usually means host is up but port closed
 		}
 
@@ -600,7 +600,6 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	if err != nil {
 		scanned := atomic.AddUint64(&st.scanned, 1)
-		errStr := err.Error()
 		isTimeout := false
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			isTimeout = true
@@ -612,7 +611,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 			// never let it be mistaken for a hard error.
 			atomic.AddUint64(&st.timeouts, 1)
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
-		case strings.Contains(errStr, "refused"):
+		case isConnRefused(err):
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
 		default:
 			atomic.AddInt32(&s.consecutiveErrors, 1)

@@ -129,10 +129,14 @@ type ScanCreateRequest struct {
 	PortScanCompat  bool     `json:"port_scan,omitempty"`
 	SkipHostDisc    bool     `json:"skip_host_discovery,omitempty"`
 	Ports           string   `json:"ports,omitempty"`
-	WebProbe        bool     `json:"webprobe,omitempty"`
-	WebFingerprint  bool     `json:"web_fingerprint,omitempty"`
-	Headers         []string `json:"headers,omitempty"`
-	Sort            string   `json:"sort,omitempty"`
+	// 报告输出：默认关闭（结果进 sqlite 并走事件流）。开启后执行器把 -o 指向固定的
+	// 报告目录，OutputFile 只是文件名，留空自动命名。
+	OutputHTML     bool     `json:"output_html,omitempty"`
+	OutputFile     string   `json:"output_file,omitempty"`
+	WebProbe       bool     `json:"webprobe,omitempty"`
+	WebFingerprint bool     `json:"web_fingerprint,omitempty"`
+	Headers        []string `json:"headers,omitempty"`
+	Sort           string   `json:"sort,omitempty"`
 	// 请求节流：-rlt 与 auto/polite/balanced/aggressive 互斥，最多只有一个为真。
 	ReqLimitPerTarget int  `json:"req_limit_per_target,omitempty"`
 	AutoReqLimit      bool `json:"auto_req_limit,omitempty"`

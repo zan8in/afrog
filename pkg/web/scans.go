@@ -1122,6 +1122,9 @@ func logScanStart(id string, req ScanCreateRequest, targets []string) {
 	if req.Ports != "" {
 		logParts = append(logParts, fmt.Sprintf("ports=%s", req.Ports))
 	}
+	if req.OutputHTML {
+		logParts = append(logParts, fmt.Sprintf("output_html=true output_file=%s", req.OutputFile))
+	}
 	if req.WebProbe || req.WebFingerprint {
 		logParts = append(logParts, fmt.Sprintf("webprobe=%t", req.WebProbe || req.WebFingerprint))
 	}
