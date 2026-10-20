@@ -72,7 +72,9 @@ func main() {
 *   **`portscan.Options`**:
     *   `Targets`: 目标列表 ([]string)
     *   `Ports`: 端口字符串 (如 "80,443,top-100")
-    *   `RateLimit`: 速率/并发限制
+    *   `RateLimit`: 全局速率/并发限制
+    *   `MaxHostConcurrency`: 单目标并发上限，避免全局并发集中打单台触发目标 SYN 保护
+    *   `AdaptiveTimeout`: RTT 自适应连接超时，按实测往返时间收紧首次超时（重试仍用完整预算）
     *   `ScanMode`: 扫描模式 (目前默认为 Auto/Connect)
 
 *   **`portscan.ScanResult`**:

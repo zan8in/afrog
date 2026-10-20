@@ -78,26 +78,16 @@ func TestS3Parts(t *testing.T) {
 	}
 }
 
-func TestNewPortIterator_CustomPortsAlsoScanTop(t *testing.T) {
+func TestNewPortIterator_CustomPortsScanOnlySpecified(t *testing.T) {
 	iter, err := NewPortIterator("12345")
 	if err != nil {
 		t.Fatalf("NewPortIterator error: %v", err)
 	}
-	if iter.Total() == 0 {
-		t.Fatalf("expected non-empty iterator")
+	if iter.Total() != 1 {
+		t.Fatalf("expected only the specified port, got total=%d", iter.Total())
 	}
 	if iter.ports[0] != 12345 {
-		t.Fatalf("expected first port to be custom port: got=%d", iter.ports[0])
-	}
-	found80 := false
-	for _, p := range iter.ports {
-		if p == 80 {
-			found80 = true
-			break
-		}
-	}
-	if !found80 {
-		t.Fatalf("expected top port 80 to be included")
+		t.Fatalf("expected only custom port 12345: got=%d", iter.ports[0])
 	}
 }
 

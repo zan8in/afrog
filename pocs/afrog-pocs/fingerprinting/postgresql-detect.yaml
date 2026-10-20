@@ -13,6 +13,8 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：明文 StartupMessage，服务端要么回认证请求帧(trust/md5/scram)，
+  #     要么回错误帧(pg_hba 拒绝、库/角色不存在、连接数满等)
   r0:
     request:
       type: tcp
@@ -24,8 +26,90 @@ rules:
         - read:
             read-size: 4096
             read-timeout: 3
+    # 认证请求帧：'R' + 报文长度 + 认证类型
+    # 8/0 信任、8/2 Kerberos、8/3 明文口令、12/5 MD5、8/6 SCM、8/7 GSS、8/9 SSPI、
+    # 23/10 SASL(SCRAM-SHA-256)、42/10 SASL(SSL 下附带 SCRAM-SHA-256-PLUS)
+    # 错误帧：'E' + 报文长度 + 字段，服务端错误文案可能被本地化，
+    # 因此以 SQLSTATE(带结尾 0x00) 与协议源码文件名为主要判据
     expression: |
-      response.raw.bstartsWith(b"R\x00\x00\x00\x08") ||
-      response.raw.bstartsWith(b"R\x00\x00\x00\x0c") ||
-      response.raw.bstartsWith(b"E\x00\x00\x00")
-expression: r0()
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x00") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x02") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x03") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x0c\x00\x00\x00\x05") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x06") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x07") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x09") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x17\x00\x00\x00\x0a") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x2a\x00\x00\x00\x0a") ||
+      (response.raw.bstartsWith(b"E\x00\x00\x00") &&
+       (response.raw.bcontains(b"C28P01\x00") ||
+        response.raw.bcontains(b"C28000\x00") ||
+        response.raw.bcontains(b"C3D000\x00") ||
+        response.raw.bcontains(b"C57P03\x00") ||
+        response.raw.bcontains(b"C53300\x00") ||
+        response.raw.bcontains(b"C0A000\x00") ||
+        response.raw.bcontains(b"pg_hba.conf") ||
+        response.raw.bcontains(b"authentication failed") ||
+        response.raw.bcontains(b"invalid startup packet") ||
+        response.raw.bcontains(b"unsupported frontend protocol") ||
+        response.raw.bcontains(b"auth.c") ||
+        response.raw.bcontains(b"miscinit.c") ||
+        response.raw.bcontains(b"postinit.c") ||
+        response.raw.bcontains(b"postmaster.c")))
+  # r1：hostssl / 强制加密场景，TLS 之上再走一遍 StartupMessage
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "00000029000300007573657200706f73746772657300646174616261736500706f7374677265730000"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
+    expression: |
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x00") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x02") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x03") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x0c\x00\x00\x00\x05") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x06") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x07") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x08\x00\x00\x00\x09") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x17\x00\x00\x00\x0a") ||
+      response.raw.bstartsWith(b"R\x00\x00\x00\x2a\x00\x00\x00\x0a") ||
+      (response.raw.bstartsWith(b"E\x00\x00\x00") &&
+       (response.raw.bcontains(b"C28P01\x00") ||
+        response.raw.bcontains(b"C28000\x00") ||
+        response.raw.bcontains(b"C3D000\x00") ||
+        response.raw.bcontains(b"C57P03\x00") ||
+        response.raw.bcontains(b"C53300\x00") ||
+        response.raw.bcontains(b"C0A000\x00") ||
+        response.raw.bcontains(b"pg_hba.conf") ||
+        response.raw.bcontains(b"authentication failed") ||
+        response.raw.bcontains(b"invalid startup packet") ||
+        response.raw.bcontains(b"unsupported frontend protocol") ||
+        response.raw.bcontains(b"auth.c") ||
+        response.raw.bcontains(b"miscinit.c") ||
+        response.raw.bcontains(b"postinit.c") ||
+        response.raw.bcontains(b"postmaster.c")))
+  # r2：与认证配置无关的判据，发送非法协议版本(4.0)，
+  #     服务端会在处理 StartupMessage 时回 "unsupported frontend protocol"
+  #     错误帧(SQLSTATE 0A000、源文件 postmaster.c)，该行为在 pg_hba 全部拒绝时同样成立
+  r2:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "0000000800040000"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
+    expression: |
+      response.raw.bstartsWith(b"E\x00\x00\x00") &&
+      (response.raw.bcontains(b"C0A000\x00") ||
+       response.raw.bcontains(b"unsupported frontend protocol") ||
+       response.raw.bcontains(b"postmaster.c"))
+expression: r0() || r1() || r2()

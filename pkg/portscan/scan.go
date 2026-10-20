@@ -31,6 +31,7 @@ type Scanner struct {
 	resultsCount      uint64
 	adaptiveDelay     int32 // Current delay in milliseconds
 	hostStats         sync.Map
+	hostSems          sync.Map // host -> chan struct{} (per-target concurrency gate)
 	scanPortTotal     uint64
 	scanStageMajor    uint32
 }
@@ -110,9 +111,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
 	hostIter := NewHostIterator(s.options.Targets)
 
-	// Pre-scan Host Discovery (for CIDR/List optimization)
-	// If we have more than 1 host, let's filter dead ones first
-	if hostIter.Total() > 1 && !s.options.SkipDiscovery {
+	// Pre-scan Host Discovery. Discovery is only worthwhile for larger target
+	// sets (CIDR blocks, big ranges). A small explicit host/IP list is treated as
+	// alive (nmap -Pn semantics) so that live hosts whose ICMP/TCP discovery
+	// probes are filtered are never dropped. -Pn forces skipping discovery even
+	// for large target sets.
+	if hostIter.Total() > discoveryMinHosts && !s.options.SkipDiscovery {
 		origHosts := hostIter.GetHosts()
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
 		discStart := time.Now()
@@ -235,6 +239,14 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			return
 		default:
 		}
+
+		// Per-target concurrency gate: bound the probes in flight against a
+		// single host so the global pool is not concentrated on one target.
+		release := s.acquireHostSlot(scanCtx, task.host)
+		if release == nil {
+			return
+		}
+		defer release()
 
 		s.scanTarget(scanCtx, task.host, task.port)
 
@@ -375,6 +387,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	return nil
 }
 
+// discoveryMinHosts is the minimum number of expanded targets before a host
+// discovery phase is performed. Smaller target sets are scanned directly so
+// that live hosts whose ICMP/TCP discovery probes are filtered are never
+// silently dropped.
+const discoveryMinHosts = 8
+
 type scanTask struct {
 	host string
 	port int
@@ -390,19 +408,24 @@ func (s *Scanner) isHostSuspicious(host string) bool {
 }
 
 type hostScanStat struct {
-	scanned   uint64
-	open      uint64
-	mode      uint32
-	verifying uint32
-	mu        sync.Mutex
-	verified  map[int]struct{}
-	pending   []int
+	scanned    uint64
+	open       uint64
+	timeouts   uint64
+	srttNs     int64 // smoothed round-trip time in nanoseconds (0 = unknown)
+	mode       uint32
+	verifying  uint32
+	warned     uint32
+	mu         sync.Mutex
+	verified   map[int]struct{}
+	discovered map[int]struct{}
+	pending    []int
 }
 
 func newHostScanStat() *hostScanStat {
 	return &hostScanStat{
-		verified: make(map[int]struct{}),
-		pending:  make([]int, 0, 256),
+		verified:   make(map[int]struct{}),
+		discovered: make(map[int]struct{}),
+		pending:    make([]int, 0, 256),
 	}
 }
 
@@ -445,11 +468,80 @@ func (s *Scanner) maybeAdaptiveDelay() {
 	}
 }
 
+// acquireHostSlot bounds how many probes are in flight against a single
+// target. Concentrating the whole global pool on one host can trip its
+// SYN-flood protection and make live ports look closed. It returns a release
+// function, or nil if the context was cancelled before a slot was free.
+func (s *Scanner) acquireHostSlot(ctx context.Context, host string) func() {
+	limit := s.options.MaxHostConcurrency
+	if limit <= 0 {
+		return func() {}
+	}
+	v, ok := s.hostSems.Load(host)
+	if !ok {
+		actual, _ := s.hostSems.LoadOrStore(host, make(chan struct{}, limit))
+		v = actual
+	}
+	sem := v.(chan struct{})
+	select {
+	case sem <- struct{}{}:
+		return func() { <-sem }
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+// attemptTimeoutFor scales the connect timeout with the round trip time
+// measured for this host. A fast host does not need a full second of patience,
+// so shortening the first attempt speeds up large scans; a slow host keeps
+// enough headroom that its open ports are not mistaken for closed. Retries
+// always use the full user budget (see checkPortOpen).
+func (s *Scanner) attemptTimeoutFor(st *hostScanStat, base time.Duration) time.Duration {
+	if !s.options.AdaptiveTimeout {
+		return base
+	}
+	srtt := atomic.LoadInt64(&st.srttNs)
+	if srtt <= 0 {
+		return base
+	}
+	t := time.Duration(srtt) * 4
+	const floor = 200 * time.Millisecond
+	if t < floor {
+		t = floor
+	}
+	if t > base {
+		t = base
+	}
+	return t
+}
+
+// observeRTT folds a measured round trip into the host's smoothed RTT
+// estimate (EWMA, alpha = 1/8). Only non-timeout outcomes are recorded so a
+// dropped probe does not inflate the estimate and slow later attempts.
+func (s *Scanner) observeRTT(st *hostScanStat, d time.Duration) {
+	if !s.options.AdaptiveTimeout || d <= 0 {
+		return
+	}
+	ns := d.Nanoseconds()
+	for {
+		cur := atomic.LoadInt64(&st.srttNs)
+		var next int64
+		if cur == 0 {
+			next = ns
+		} else {
+			next = cur - cur/8 + ns/8
+		}
+		if atomic.CompareAndSwapInt64(&st.srttNs, cur, next) {
+			return
+		}
+	}
+}
+
 // checkPortOpen attempts to establish a connection to the target
 // It handles proxy, timeout, and retries.
 // Returns the open connection (if successful) or error.
 // Caller is responsible for closing the connection.
-func (s *Scanner) checkPortOpen(host string, port int) (net.Conn, error) {
+func (s *Scanner) checkPortOpen(st *hostScanStat, host string, port int) (net.Conn, error) {
 	// net.JoinHostPort brackets IPv6 literals; fmt.Sprintf("%s:%d") does not
 	// and produces an address net.Dial cannot parse.
 	address := net.JoinHostPort(host, strconv.Itoa(port))
@@ -457,10 +549,31 @@ func (s *Scanner) checkPortOpen(host string, port int) (net.Conn, error) {
 	var err error
 
 	for i := 0; i <= s.options.Retries; i++ {
-		conn, err = net.DialTimeout("tcp", address, s.options.Timeout)
+		// First attempt uses the RTT-adaptive budget; retries use the full user
+		// budget and escalate, since a first-attempt timeout is often just
+		// congestion/loss and giving the retry more time recovers slow or
+		// rate-limited hosts instead of marking the port closed.
+		attemptTimeout := s.options.Timeout
+		if i == 0 {
+			attemptTimeout = s.attemptTimeoutFor(st, s.options.Timeout)
+		} else {
+			attemptTimeout = s.options.Timeout + time.Duration(i)*s.options.Timeout/2
+		}
+		start := time.Now()
+		conn, err = net.DialTimeout("tcp", address, attemptTimeout)
 
 		if err == nil {
+			s.observeRTT(st, time.Since(start))
 			return conn, nil
+		}
+
+		// A "refused" reply also measured a real round trip; a timeout did not.
+		isTimeout := false
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			isTimeout = true
+		}
+		if !isTimeout {
+			s.observeRTT(st, time.Since(start))
 		}
 
 		// Retry logic
@@ -483,22 +596,29 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 	}
 
 	// 1. Check if port is open using shared logic
-	conn, err := s.checkPortOpen(host, port)
+	conn, err := s.checkPortOpen(st, host, port)
 
 	if err != nil {
 		scanned := atomic.AddUint64(&st.scanned, 1)
-		// Error handling and adaptive rate limiting logic...
 		errStr := err.Error()
 		isTimeout := false
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			isTimeout = true
 		}
-		if !strings.Contains(errStr, "refused") && !isTimeout {
-			atomic.AddInt32(&s.consecutiveErrors, 1)
-		} else {
+		switch {
+		case isTimeout:
+			// A timeout usually means the port is filtered (packet dropped by a
+			// firewall) rather than closed; treat it as a distinct signal and
+			// never let it be mistaken for a hard error.
+			atomic.AddUint64(&st.timeouts, 1)
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
+		case strings.Contains(errStr, "refused"):
+			atomic.StoreInt32(&s.consecutiveErrors, 0)
+		default:
+			atomic.AddInt32(&s.consecutiveErrors, 1)
 		}
 		s.maybeDecideHost(ctx, host, st, scanned)
+		s.maybeWarnFiltered(host, st, scanned)
 		return
 	}
 
@@ -508,6 +628,10 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	scanned := atomic.AddUint64(&st.scanned, 1)
 	atomic.AddUint64(&st.open, 1)
+
+	st.mu.Lock()
+	st.discovered[port] = struct{}{}
+	st.mu.Unlock()
 
 	s.maybeDecideHost(ctx, host, st, scanned)
 	if atomic.LoadUint32(&st.mode) == hostModeSuspicious {
@@ -563,8 +687,11 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 	open := atomic.LoadUint64(&st.open)
 	openRate := float64(open) / float64(scanned)
 	if openRate >= 0.98 {
+		// Everything answers: almost certainly a security device/proxy instead of
+		// real listeners. Keep the state so ports already discovered are still
+		// verified below (verifyAndEmit also re-checks every discovered port),
+		// instead of silently dropping them.
 		st.mu.Lock()
-		st.pending = st.pending[:0]
 		atomic.StoreUint32(&st.mode, hostModeSuspicious)
 		st.mu.Unlock()
 		if !s.options.Quiet {
@@ -598,6 +725,37 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 	}
 }
 
+// maybeWarnFiltered surfaces (once per host, full-port scans only) the case
+// where a host drops almost every probe. That normally means a packet-filtering
+// firewall, and the result set for such a host may be incomplete. It never
+// discards data; it only makes the condition visible instead of silently
+// reporting every port as closed.
+func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint64) {
+	if atomic.LoadUint32(&s.scanStageMajor) != 1 {
+		return
+	}
+	if atomic.LoadUint64(&s.scanPortTotal) < 5000 {
+		return
+	}
+	if scanned < 200 {
+		return
+	}
+	if atomic.LoadUint32(&st.warned) == 1 {
+		return
+	}
+	timeouts := atomic.LoadUint64(&st.timeouts)
+	if float64(timeouts)/float64(scanned) < 0.95 {
+		return
+	}
+	if !atomic.CompareAndSwapUint32(&st.warned, 0, 1) {
+		return
+	}
+	if !s.options.Quiet {
+		gologger.Warning().Msgf("%-9s | %-9s | host=%s drop-rate=%.2f%% (%d/%d) filtered, results may be incomplete",
+			utils.StagePortScan, "filtered", host, float64(timeouts)/float64(scanned)*100, timeouts, scanned)
+	}
+}
+
 func (s *Scanner) emitOpen(host string, port int, banner string) {
 	atomic.AddUint64(&s.resultsCount, 1)
 
@@ -624,7 +782,29 @@ func (s *Scanner) emitOpen(host string, port int, banner string) {
 }
 
 func (s *Scanner) verifyAndEmit(ctx context.Context, host string, st *hostScanStat) {
-	ports := []int{80, 443, 22, 21, 25, 110, 143, 445, 3389, 135, 139, 3306, 5432, 6379, 27017, 8080, 8443, 8000, 8888, 9200}
+	// Verify the common-ports baseline plus every port already discovered as
+	// open, so a host that answers everything (proxy/firewall) does not lose the
+	// real services we already found.
+	base := []int{80, 443, 22, 21, 25, 110, 143, 445, 3389, 135, 139, 3306, 5432, 6379, 27017, 8080, 8443, 8000, 8888, 9200}
+	seen := make(map[int]struct{}, len(base)+16)
+	ports := make([]int, 0, len(base)+16)
+	for _, p := range base {
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		ports = append(ports, p)
+	}
+	st.mu.Lock()
+	for p := range st.discovered {
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		ports = append(ports, p)
+	}
+	st.mu.Unlock()
+
 	for _, port := range ports {
 		select {
 		case <-ctx.Done():

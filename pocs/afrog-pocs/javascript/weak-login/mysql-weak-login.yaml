@@ -18,7 +18,6 @@ rules:
       code: |
         var mysql = require("afrog/mysql");
 
-        // 目标未带端口时回落到 3306，与 requires: [mysql] 的指纹端口保持一致
         var port = /^[0-9]+$/.test(String(Port)) ? Port : "3306";
 
         var usernames = ["root", "admin", "mysql", "test"];

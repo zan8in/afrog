@@ -38,7 +38,7 @@ func TestCheckPortOpen_IPv6Literal(t *testing.T) {
 
 	s := &Scanner{options: &Options{Timeout: 3 * time.Second, Retries: 0}}
 
-	conn, err := s.checkPortOpen("::1", port)
+	conn, err := s.checkPortOpen(newHostScanStat(), "::1", port)
 	if err != nil {
 		t.Fatalf("checkPortOpen on an open IPv6 port failed: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestCheckPortOpen_IPv4StillWorks(t *testing.T) {
 
 	s := &Scanner{options: &Options{Timeout: 3 * time.Second, Retries: 0}}
 
-	conn, err := s.checkPortOpen("127.0.0.1", port)
+	conn, err := s.checkPortOpen(newHostScanStat(), "127.0.0.1", port)
 	if err != nil {
 		t.Fatalf("checkPortOpen on an open IPv4 port failed: %v", err)
 	}

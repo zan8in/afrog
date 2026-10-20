@@ -10,8 +10,10 @@ type Options struct {
 	Ports                  string   // Port range string (e.g., "80,443,1000-2000" or "top")
 	S4ChunkSize            int
 	RateLimit              int // Packets per second (approx) or concurrency limit
+	MaxHostConcurrency     int // Max concurrent probes per target (0 = unlimited)
 	Timeout                time.Duration
 	Retries                int
+	AdaptiveTimeout        bool // Scale the connect timeout with measured RTT
 	ScanMode               ScanMode
 	ServiceDB              string // Path to nmap-services or custom fingerprints
 	OnResult               func(*ScanResult)
@@ -38,12 +40,14 @@ func DefaultOptions() *Options {
 		Ports:                  "full",
 		S4ChunkSize:            1000,
 		RateLimit:              500,
+		MaxHostConcurrency:     200,
 		Timeout:                1000 * time.Millisecond,
 		Retries:                2,
+		AdaptiveTimeout:        true,
 		ScanMode:               ScanModeAuto,
 		Quiet:                  false,
 		DiscoveryFallback:      true,
-		DiscoveryFallbackPorts: []int{21, 25, 502, 102, 123, 135, 445, 8000, 8080},
+		DiscoveryFallbackPorts: defaultDiscoveryFallbackPorts(),
 		DiscoveryMethod:        "auto",
 		IcmpConcurrency:        1000,
 		PingConcurrency:        50,
@@ -55,12 +59,14 @@ func DefaultOptions() *Options {
 
 func ApplyQuickStrategy(o *Options) {
 	o.RateLimit = 500
+	o.MaxHostConcurrency = 200
 	o.Timeout = 800 * time.Millisecond
 	o.Retries = 2
 }
 
 func ApplyQuickestStrategy(o *Options) {
 	o.RateLimit = 1500
+	o.MaxHostConcurrency = 500
 	o.Timeout = 1500 * time.Millisecond
 	o.Retries = 2
 }

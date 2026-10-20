@@ -1,0 +1,27 @@
+id: node-red-unauth
+
+info:
+  name: Node-RED - Unauthenticated Access
+  author: 0xBassia
+  severity: high
+  verified: true
+  description: |
+    Node-RED flow editor is accessible without authentication. Node-RED is a flow-based programming tool that can execute arbitrary system commands, read/write files, and make network requests. Unauthenticated access leads to remote code execution.
+  reference:
+    - https://nodered.org/docs/user-guide/runtime/securing-node-red
+    - https://nodered.org/docs/user-guide/runtime/configuration
+  tags: node-red,unauth
+  created: 2026/10/16
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /flow
+    expression: |
+      response.status == 200 && 
+      response.content_type.contains("application/json") &&
+      response.body.bcontains(b'"id"') &&
+      response.body.bcontains(b'"type"') &&
+      response.body.bcontains(b'"wires"')
+expression: r0()

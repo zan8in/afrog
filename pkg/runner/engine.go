@@ -1098,6 +1098,12 @@ func (runner *Runner) Execute() {
 			if options.PSS4Chunk != 0 {
 				psOpts.S4ChunkSize = options.PSS4Chunk
 			}
+			if options.PSHostConcurrency > 0 {
+				psOpts.MaxHostConcurrency = options.PSHostConcurrency
+			}
+			if options.PSNoAdaptiveTimeout {
+				psOpts.AdaptiveTimeout = false
+			}
 			collector := newOpenPortsCollector()
 			psOpts.OnResult = func(r *portscan.ScanResult) {
 				if options.OnPortScanResult != nil {

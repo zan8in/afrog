@@ -205,13 +205,8 @@ func NewPortIterator(portStr string) (*PortIterator, error) {
 		}
 	}
 
-	if len(ports) > 0 {
-		s1, s2, _, _ := BuildStagePorts(nil)
-		ports = append(ports, s1...)
-		ports = append(ports, s2...)
-	}
-
-	// Remove duplicates
+	// Only the ports explicitly requested are scanned (no implicit top-port
+	// expansion), so `-p 3306` scans exactly 3306.
 	ports = removeDuplicateInt(ports)
 
 	return &PortIterator{ports: ports}, nil

@@ -253,18 +253,20 @@ type Options struct {
 	EnableOOB bool
 
 	// enable pre-scan host port scanning
-	PortScan         bool
-	PSPorts          string
-	PSRateLimit      int
-	PSTimeout        int
-	PSRetries        int
-	PSSkipDiscovery  bool
-	PSS4Chunk        int
-	OnPortScanResult func(host string, port int)
-	OnHostDiscovered func(host string)
-	OnPhaseProgress  func(phase string, status string, finished int64, total int64, percent int)
-	OnScanInfoUpdate func(info ScanInfoUpdate)
-	OnPedmLog        func(line string)
+	PortScan            bool
+	PSPorts             string
+	PSRateLimit         int
+	PSTimeout           int
+	PSRetries           int
+	PSSkipDiscovery     bool
+	PSS4Chunk           int
+	PSHostConcurrency   int
+	PSNoAdaptiveTimeout bool
+	OnPortScanResult    func(host string, port int)
+	OnHostDiscovered    func(host string)
+	OnPhaseProgress     func(phase string, status string, finished int64, total int64, percent int)
+	OnScanInfoUpdate    func(info ScanInfoUpdate)
+	OnPedmLog           func(line string)
 
 	// path to the afrog configuration file
 	ConfigFile string
@@ -352,12 +354,14 @@ func NewOptions() (*Options, error) {
 
 	flagSet.CreateGroup("stages", "Stages",
 		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
-		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (custom ports also scan 'top')"),
+		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (only the specified ports are scanned)"),
 		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
 		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
 		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
 		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
+		flagSet.IntVar(&options.PSHostConcurrency, "ps-host-concurrency", 0, "max concurrent probes against a single host in port pre-scan (0 = module default)"),
+		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
 		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),

@@ -405,17 +405,47 @@ func runPing(ctx context.Context, hosts []string, opt *Options, pp *phaseProgres
 	return alive
 }
 
+// defaultDiscoveryPrimaryPorts is the built-in TCP probe list used when the
+// caller has not specified discovery ports. Beyond the classic web/remote-admin
+// ports it covers common database and middleware ports so that hosts exposing
+// only a business port (e.g. MySQL 3306) are not treated as dead.
+func defaultDiscoveryPrimaryPorts() []int {
+	return []int{
+		80, 443, 22, 3389, 445, 135, 139, 8080, 8443, 8000,
+		3306, 5432, 6379, 1433, 1521, 27017, 9200, 11211, 5672, 2181,
+		23, 21, 25, 110, 143, 993, 995, 389, 636, 873,
+		5900, 2375, 2379, 5000, 7001, 8888, 9090, 10000, 15672, 3128,
+	}
+}
+
+// defaultDiscoveryFallbackPorts is the secondary probe list used when the
+// primary probes yield no response.
+func defaultDiscoveryFallbackPorts() []int {
+	return []int{
+		81, 102, 123, 161, 502, 2049, 3000, 4444, 5555, 8001,
+		8081, 8880, 9000, 9443, 10050, 10051, 27018, 50000, 6379, 3307,
+	}
+}
+
+// shuffledInts returns a shuffled copy of in so that discovery probes do not
+// hit the target in a fixed order.
+func shuffledInts(in []int) []int {
+	out := append([]int(nil), in...)
+	rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	return out
+}
+
 func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phaseProgress) []string {
 	var alive []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	primary := opt.DiscoveryPorts
 	if len(primary) == 0 {
-		primary = []int{443, 80, 22, 3389, 445, 135, 8080, 8443}
+		primary = shuffledInts(defaultDiscoveryPrimaryPorts())
 	}
 	fallback := opt.DiscoveryFallbackPorts
 	if len(fallback) == 0 {
-		fallback = []int{81, 21, 25, 139, 8081, 8888, 9090, 9443, 8000, 9000, 3128}
+		fallback = shuffledInts(defaultDiscoveryFallbackPorts())
 	}
 	limit := opt.RateLimit
 	if limit < 100 {
@@ -594,11 +624,12 @@ func execPing(ip string) bool {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "ping -n 1 -w 1 "+ip+" && echo true || echo false")
+		cmd = exec.Command("cmd", "/c", "ping -n 2 -w 1000 "+ip+" && echo true || echo false")
 	case "darwin":
-		cmd = exec.Command("/bin/bash", "-c", "ping -c 1 -W 1 "+ip+" && echo true || echo false")
+		// macOS -W is a per-reply wait in milliseconds.
+		cmd = exec.Command("/bin/bash", "-c", "ping -c 2 -W 1000 "+ip+" && echo true || echo false")
 	default:
-		cmd = exec.Command("/bin/bash", "-c", "ping -c 1 -w 1 "+ip+" && echo true || echo false")
+		cmd = exec.Command("/bin/bash", "-c", "ping -c 2 -W 2 -w 5 "+ip+" && echo true || echo false")
 	}
 	var out bytes.Buffer
 	cmd.Stdout = &out
