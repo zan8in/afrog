@@ -15,12 +15,14 @@ type Options struct {
 	Retries                int
 	AdaptiveTimeout        bool // Scale the connect timeout with measured RTT
 	ScanMode               ScanMode
-	ServiceDB              string // Path to nmap-services or custom fingerprints
+	ServiceProbes          bool   // Send active service probes (default: passive banner grabbing only)
+	FingerprintDir         string // Optional directory with probes.yaml / services.yaml / ports.yaml that overrides the built-in set
 	OnResult               func(*ScanResult)
 	OnProgress             func(phase string, status string, finished int, total int, percent int)
 	OnDiscoveredHost       func(host string)
 	Debug                  bool
 	LiveStats              bool
+	StageLog               bool // Print phase boundary lines (HOST-DISC/PORT-SCAN started/completed); off by default
 	Quiet                  bool
 	SkipDiscovery          bool // Skip host discovery phase
 	DiscoveryPorts         []int

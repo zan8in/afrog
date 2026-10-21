@@ -37,7 +37,7 @@ func TestEncodeParseRoundTrip(t *testing.T) {
 		},
 	}
 	w.Result(result)
-	w.Port("1.2.3.4", 8080)
+	w.Port(&PortEvent{Host: "1.2.3.4", Port: 8080})
 	w.WebProbe(&WebProbeEvent{URL: "http://x", Status: 200, Title: "t", Fingerprint: "nginx"})
 	w.Host("1.2.3.4")
 	w.Log("info", "hello")
@@ -143,7 +143,7 @@ func TestConcurrentWritesDoNotInterleave(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < perGoroutine; i++ {
 				if i%2 == 0 {
-					w.Port("127.0.0.1", 1000+id)
+					w.Port(&PortEvent{Host: "127.0.0.1", Port: 1000 + id})
 				} else {
 					w.Log("info", "concurrent")
 				}

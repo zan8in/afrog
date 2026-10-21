@@ -65,11 +65,41 @@ type Runner struct {
 	// OOB           *oobadapter.OOBAdapter
 }
 
+// WebTech 是 -w 探测识别出的一条 Web 指纹。
+type WebTech struct {
+	Name       string
+	Version    string
+	Category   string
+	CPE        string
+	Confidence string
+	// RuleID 是命中的内置/外置规则 id，只用于 requires 门控的标识词，不进入事件契约。
+	RuleID string
+}
+
+// WebMeta 是一次 Web 探测的结果，也是全链路 WebProbeEvent 的唯一来源。
 type WebMeta struct {
 	URL       string
+	Status    int
 	Title     string
 	Server    string
 	PoweredBy string
+	// Fingerprint 是一行指纹摘要：优先取 Web 指纹识别的技术栈，
+	// 没有命中时回落到 Server 与 X-Powered-By。
+	Fingerprint string
+	// Confidence 是 Web 指纹命中的最高可信度，未命中时为空。
+	Confidence   string
+	Technologies []WebTech
+}
+
+// joinNonEmpty 用逗号连接非空字段，全部为空时返回空串。
+func joinNonEmpty(values ...string) string {
+	parts := make([]string, 0, len(values))
+	for _, v := range values {
+		if s := strings.TrimSpace(v); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, ",")
 }
 
 func (r *Runner) Done() <-chan struct{} {
@@ -266,6 +296,9 @@ func NewRunner(options *config.Options) (*Runner, error) {
 }
 
 func (runner *Runner) Run() error {
+	// 协议探测的记忆缓存是包级全局状态，长驻进程（SDK / afrogweb）跨扫描复用它会让上一轮的
+	// 失败冷却污染本轮，因此每轮扫描开始前清一次。
+	retryhttpclient.ResetCheckProtocolCache()
 
 	if runner.options.MonitorTargets {
 		go runner.monitorTargets()

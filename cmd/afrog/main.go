@@ -57,7 +57,8 @@ func main() {
 	var jsonStream *scanstream.Writer
 	if jsonStreamMode {
 		jsonstream.RedirectLogs()
-		// Silent 用来压制引擎里不受 gologger 管辖的直写 stdout（如 Web 探测的 fmt.Printf）
+		// Silent 关掉引擎的人类可读输出：stdout 此时只允许出现 NDJSON，
+		// 任何「结果行」都不该额外打一份到控制台。
 		options.Silent = true
 		// 由执行器拉起时，任务 ID 由父进程通过 AFROG_TASK_ID 指定，事件信封与
 		// 写库都要用它，父进程才能把事件与结果关联到同一个任务上。
@@ -168,17 +169,47 @@ func main() {
 	var oobFinalize atomic.Value
 	oobFinalize.Store(oobFinalizeProgress{})
 
+	// 端口扫描与 Web 探测阶段的进度由 OnPhaseProgress 提供，这里存下来供进度条渲染。
+	// 三个阶段共用 progress.RenderLine，形状与字段完全一致，用户从阶段名就能看出
+	// 当前是在扫端口、探 Web 还是跑漏洞。
+	type phaseBarState struct {
+		status   string
+		finished int64
+		total    int64
+		percent  int
+		started  time.Time
+	}
+	var portBar, webBar atomic.Value
+	portBar.Store(phaseBarState{})
+	webBar.Store(phaseBarState{})
+	recordPhase := func(dst *atomic.Value, status string, finished, total int64, percent int) {
+		prev, _ := dst.Load().(phaseBarState)
+		next := phaseBarState{status: status, finished: finished, total: total, percent: percent}
+		// started 只在阶段进入 running 的那一刻取一次，后续同一个阶段的回调沿用，
+		// 否则每次刷新都会把已用时间重置成 0，速率与 ETA 会算错。
+		if status == "running" && prev.status != "running" {
+			next.started = time.Now()
+		} else {
+			next.started = prev.started
+		}
+		dst.Store(next)
+	}
+
 	progressLine := func() string {
-		total := options.Count
+		if st, ok := webBar.Load().(phaseBarState); ok && st.status == "running" {
+			return progress.RenderLine(utils.StageWebProbe, st.percent, st.finished, st.total, time.Since(st.started), "")
+		}
+		if st, ok := portBar.Load().(phaseBarState); ok && st.status == "running" {
+			return progress.RenderLine(utils.StagePortScan, st.percent, st.finished, st.total, time.Since(st.started), "")
+		}
+
+		// 漏洞扫描阶段沿用 engine 统计的任务数（当前阶段之外 Count 还是 0，进度条留空）。
+		total := int64(options.Count)
 		if total <= 0 {
 			return ""
 		}
-		current := atomic.LoadUint32(&options.CurrentCount)
-		pgress := 0
-		if total > 0 {
-			pgress = int(current) * 100 / total
-		}
-		elapsed := strings.Split(time.Since(starttime).String(), ".")[0] + "s"
+		current := int64(atomic.LoadUint32(&options.CurrentCount))
+		pgress := int(current * 100 / total)
 
 		suffix := ""
 		if options.LiveStats {
@@ -198,7 +229,8 @@ func main() {
 				suffix = fmt.Sprintf(" oobf=%d/%d %s", remain, v.Total, v.Status)
 			}
 		}
-		return fmt.Sprintf("[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(pgress, 0), pgress, current, total, elapsed, suffix)
+		tail := fmt.Sprintf(" found=%d%s", atomic.LoadUint32(&number), suffix)
+		return progress.RenderLine(utils.StageVulnScan, pgress, current, total, time.Since(starttime), tail)
 	}
 
 	renderProgress := func() {
@@ -216,7 +248,7 @@ func main() {
 		if progressEnabled && progressLine() != "" {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
-		gologger.Info().Msg(line)
+		gologger.Print().Msg(line)
 		if progressEnabled && !options.LiveStats {
 			renderProgress()
 		}
@@ -246,9 +278,6 @@ func main() {
 				prev(phase, status, finished, total, percent)
 			}
 			phase = strings.ToLower(strings.TrimSpace(phase))
-			if phase != "oob_finalize" {
-				return
-			}
 			status = strings.ToLower(strings.TrimSpace(status))
 			if percent < 0 {
 				percent = 0
@@ -256,6 +285,24 @@ func main() {
 			if percent > 100 {
 				percent = 100
 			}
+
+			// 端口扫描 / Web 探测阶段的分母不是漏洞任务数，用阶段回调的数据单独渲染进度条。
+			switch phase {
+			case "portscan", "webprobe":
+				if phase == "portscan" {
+					recordPhase(&portBar, status, finished, total, percent)
+				} else {
+					recordPhase(&webBar, status, finished, total, percent)
+				}
+				lock.Lock()
+				renderProgress()
+				lock.Unlock()
+				return
+			case "oob_finalize":
+			default:
+				return
+			}
+
 			next := oobFinalizeProgress{
 				Active:   status == "running",
 				Status:   status,
@@ -333,7 +380,7 @@ func main() {
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
-				rst.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+				rst.PrintColorResultInfoConsole()
 			}
 			if progressEnabled {
 				renderProgress()
@@ -403,7 +450,7 @@ func main() {
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
-				result.PrintColorResultInfoConsole(utils.GetNumberText(int(number)))
+				result.PrintColorResultInfoConsole()
 			}
 			if progressEnabled {
 				renderProgress()
@@ -472,7 +519,7 @@ func main() {
 			}
 
 			gologger.Print().Msg("")
-			gologger.Info().Msg("Scan termination signal received")
+			gologger.Print().Msg("Scan termination signal received")
 
 			interrupted.Store(true)
 			runner.Stop()
@@ -481,8 +528,7 @@ func main() {
 			if err := r.ScanProgress.AtomicSave(autoSaveFile, atomic.LoadUint32(&options.CurrentCount), uint32(options.Count)); err != nil {
 				gologger.Error().Msgf("Could not preserve scan state: %s", err)
 			} else {
-				gologger.Info().Msgf("Scan state archived: %s\n", autoSaveFile)
-				// gologger.Info().Msgf("Resume command: afrog -T urls.txt -resume %s\n", autoSaveFile)
+				gologger.Print().Msgf("Scan state archived: %s\n", autoSaveFile)
 			}
 		}
 	}(r)
@@ -503,22 +549,23 @@ func main() {
 		}
 	}()
 
-	if err = r.Run(); err != nil {
-		if jsonStream != nil {
-			jsonStream.Error("scan_failed", err.Error())
-		}
-		gologger.Error().Msgf("runner run err: %s\n", err)
-		return
-	}
+	runErr := r.Run()
+
+	// 中断/出错时同样要停掉进度条定时器并输出收尾汇总，
+	// 否则终端会残留一行进度条，用户也看不到本轮完成情况与断点文件提示。
 	if progressDone != nil {
 		close(progressDone)
 		progressDone = nil
 	}
 
-	if len(options.Json) > 0 || len(options.JsonAll) > 0 {
+	if runErr != nil {
+		if jsonStream != nil {
+			jsonStream.Error("scan_failed", runErr.Error())
+		}
+		gologger.Error().Msgf("runner run err: %s\n", runErr.Error())
+	} else if len(options.Json) > 0 || len(options.JsonAll) > 0 {
 		if err := r.JsonReport.AppendEndOfFile(); err != nil {
 			gologger.Error().Msgf("json or json-all output err: %s\n", err)
-			return
 		}
 	}
 
@@ -533,13 +580,13 @@ func main() {
 	lock.Unlock()
 
 	status := "completed"
-	if interrupted.Load() {
+	if interrupted.Load() || runErr != nil {
 		status = "stopped"
 	}
 	if jsonStreamFinish != nil {
 		jsonStreamFinish(status, int64(atomic.LoadUint32(&number)), int64(atomic.LoadUint32(&options.CurrentCount)))
 	}
-	gologger.Info().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
+	gologger.Print().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
 		utils.StageVulnScan,
 		status,
 		atomic.LoadUint32(&options.CurrentCount),
@@ -547,6 +594,16 @@ func main() {
 		atomic.LoadUint32(&number),
 		time.Since(starttime).Truncate(time.Second),
 	)
+
+	// 未跑完（中断/出错）时给出恢复命令，用户可以接着扫而不是从头再来。
+	if status == "stopped" && fileutil.FileExists(autoSaveFile) {
+		args := strings.Join(os.Args[1:], " ")
+		if len(options.Resume) > 0 {
+			gologger.Print().Msgf("resume: afrog %s", args)
+		} else {
+			gologger.Print().Msgf("resume: afrog %s -resume %s", args, autoSaveFile)
+		}
+	}
 
 	// 标记正常退出
 	normalExit = !interrupted.Load()

@@ -103,11 +103,11 @@ func TestVerifyPortHTTPOnRandomPort(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	ok, banner := sc.verifyPort(ctx, "127.0.0.1", port)
+	ok, info := sc.verifyPort(ctx, "127.0.0.1", port)
 	if !ok {
 		t.Fatalf("expected verify ok")
 	}
-	if banner == "" {
+	if info.Banner == "" {
 		t.Fatalf("expected banner")
 	}
 

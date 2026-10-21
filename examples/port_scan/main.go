@@ -28,6 +28,7 @@ func main() {
 	targets := flag.String("targets", "127.0.0.1", "comma separated hosts / CIDRs to scan")
 	ports := flag.String("ports", "top", "ports: top|full|all|80,443|1-1024")
 	skipDiscovery := flag.Bool("Pn", true, "skip host discovery")
+	serviceProbe := flag.Bool("probe", false, "send active service probes to identify services that do not greet first")
 	flag.Parse()
 
 	opts := portscan.DefaultOptions()
@@ -35,6 +36,7 @@ func main() {
 	opts.Ports = *ports
 	opts.DiscoveryMethod = "auto"
 	opts.SkipDiscovery = *skipDiscovery
+	opts.ServiceProbes = *serviceProbe
 
 	if len(opts.Targets) == 0 {
 		fmt.Fprintln(os.Stderr, "no targets provided / 未指定目标")
@@ -48,7 +50,21 @@ func main() {
 	opts.OnResult = func(r *portscan.ScanResult) {
 		mu.Lock()
 		defer mu.Unlock()
-		fmt.Printf("%s:%d\n", r.Host, r.Port)
+		line := fmt.Sprintf("%s:%d", r.Host, r.Port)
+		if svc := strings.Join(strings.Fields(r.Service+" "+r.Product+" "+r.Version), " "); svc != "" {
+			line += " " + svc
+		}
+		var flags []string
+		if r.TLS {
+			flags = append(flags, "tls")
+		}
+		if c := r.Confidence.String(); c != "" && c != "unknown" {
+			flags = append(flags, c)
+		}
+		if len(flags) > 0 {
+			line += " (" + strings.Join(flags, ", ") + ")"
+		}
+		fmt.Println(line)
 	}
 
 	scanner, err := portscan.NewScanner(opts)

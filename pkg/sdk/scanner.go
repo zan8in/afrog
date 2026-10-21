@@ -178,9 +178,24 @@ func (s *Scanner) abandon(cancel context.CancelFunc) {
 // installEngineHooks wires the config-level callbacks. They must be installed
 // before the runner is built because the engine captures them.
 func (s *Scanner) installEngineHooks() {
-	s.internal.OnPortScanResult = func(host string, port int) {
-		s.recordOpenPort(host, port)
-		s.portEvents.emit(s.ctx, PortEvent{Host: host, Port: port})
+	s.internal.OnPortScanResult = func(info config.PortScanInfo) {
+		s.recordOpenPort(info.Host, info.Port)
+		s.portEvents.emit(s.ctx, PortEvent{
+			Host:       info.Host,
+			Port:       info.Port,
+			Service:    info.Service,
+			Product:    info.Product,
+			Version:    info.Version,
+			Device:     info.Device,
+			Hostname:   info.Hostname,
+			OS:         info.OS,
+			CPE:        info.CPE,
+			Info:       info.Info,
+			TLS:        info.TLS,
+			Confidence: info.Confidence,
+			Banner:     info.Banner,
+			Extras:     info.Extras,
+		})
 	}
 
 	s.internal.OnHostDiscovered = func(host string) {
@@ -240,12 +255,28 @@ func (s *Scanner) installEngineHooks() {
 // installRunnerHooks wires the runner-level callbacks.
 func (s *Scanner) installRunnerHooks() {
 	s.runner.OnWebProbe = func(meta runner.WebMeta) {
-		s.webProbeEvents.emit(s.ctx, WebProbeEvent{
-			URL:       strings.TrimSpace(meta.URL),
-			Title:     strings.TrimSpace(meta.Title),
-			Server:    strings.TrimSpace(meta.Server),
-			PoweredBy: strings.TrimSpace(meta.PoweredBy),
-		})
+		ev := WebProbeEvent{
+			URL:         strings.TrimSpace(meta.URL),
+			Status:      meta.Status,
+			Title:       strings.TrimSpace(meta.Title),
+			Server:      strings.TrimSpace(meta.Server),
+			PoweredBy:   strings.TrimSpace(meta.PoweredBy),
+			Fingerprint: strings.TrimSpace(meta.Fingerprint),
+			Confidence:  strings.TrimSpace(meta.Confidence),
+		}
+		if len(meta.Technologies) > 0 {
+			ev.Technologies = make([]WebTechnology, 0, len(meta.Technologies))
+			for _, t := range meta.Technologies {
+				ev.Technologies = append(ev.Technologies, WebTechnology{
+					Name:       t.Name,
+					Version:    t.Version,
+					Category:   t.Category,
+					CPE:        t.CPE,
+					Confidence: t.Confidence,
+				})
+			}
+		}
+		s.webProbeEvents.emit(s.ctx, ev)
 	}
 
 	s.runner.OnFailure = func(target, pocID string, err error) {
@@ -1081,6 +1112,8 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		DefaultAccept:                  opts.DefaultAccept,
 		DisableFingerprint:             opts.DisableFingerprint,
 		EnableWebProbe:                 opts.EnableWebProbe,
+		WebFingerprintDir:              opts.WebFingerprintDir,
+		WebFavicon:                     opts.WebFavicon,
 		FingerprintFilterMode:          opts.FingerprintFilterMode,
 		VulnerabilityScannerBreakpoint: opts.StopOnFirstMatch,
 		Proxy:                          opts.Proxy,
@@ -1095,6 +1128,9 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		PSRetries:       opts.PortScan.Retries,
 		PSSkipDiscovery: opts.PortScan.SkipDiscovery,
 		PSS4Chunk:       opts.PortScan.ChunkSize,
+
+		PSServiceProbe:   opts.PortScan.ServiceProbe,
+		PSFingerprintDir: opts.PortScan.FingerprintDir,
 
 		OOBRateLimit:       opts.OOB.RateLimit,
 		OOBConcurrency:     opts.OOB.Concurrency,

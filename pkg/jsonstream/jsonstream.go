@@ -118,8 +118,12 @@ func ShouldReportFingerprint(options *config.Options, severity string) bool {
 	return false
 }
 
-// webProbeFingerprint 把 WebMeta 的 Server/PoweredBy 合并为协议里的 fingerprint 字段。
+// webProbeFingerprint 返回一行指纹摘要。引擎已经算好（技术栈摘要，无命中时回落到
+// Server/PoweredBy），这里只做兜底，保证直接调用 runner 的场景也有值。
 func webProbeFingerprint(meta runner.WebMeta) string {
+	if s := strings.TrimSpace(meta.Fingerprint); s != "" {
+		return s
+	}
 	parts := make([]string, 0, 2)
 	if s := strings.TrimSpace(meta.Server); s != "" {
 		parts = append(parts, s)
@@ -165,11 +169,26 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 	}
 
 	prevPort := options.OnPortScanResult
-	options.OnPortScanResult = func(host string, port int) {
+	options.OnPortScanResult = func(info config.PortScanInfo) {
 		if prevPort != nil {
-			prevPort(host, port)
+			prevPort(info)
 		}
-		w.Port(host, port)
+		w.Port(&scanstream.PortEvent{
+			Host:       info.Host,
+			Port:       info.Port,
+			Service:    info.Service,
+			Product:    info.Product,
+			Version:    info.Version,
+			Device:     info.Device,
+			Hostname:   info.Hostname,
+			OS:         info.OS,
+			CPE:        info.CPE,
+			Info:       info.Info,
+			TLS:        info.TLS,
+			Confidence: info.Confidence,
+			Banner:     info.Banner,
+			Extras:     info.Extras,
+		})
 	}
 
 	prevHost := options.OnHostDiscovered
@@ -185,11 +204,28 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 		if prevWebProbe != nil {
 			prevWebProbe(meta)
 		}
-		w.WebProbe(&scanstream.WebProbeEvent{
+		ev := &scanstream.WebProbeEvent{
 			URL:         meta.URL,
+			Status:      meta.Status,
 			Title:       meta.Title,
+			Server:      meta.Server,
+			PoweredBy:   meta.PoweredBy,
 			Fingerprint: webProbeFingerprint(meta),
-		})
+			Confidence:  meta.Confidence,
+		}
+		if len(meta.Technologies) > 0 {
+			ev.Technologies = make([]scanstream.WebTechnologyEvent, 0, len(meta.Technologies))
+			for _, t := range meta.Technologies {
+				ev.Technologies = append(ev.Technologies, scanstream.WebTechnologyEvent{
+					Name:       t.Name,
+					Version:    t.Version,
+					Category:   t.Category,
+					CPE:        t.CPE,
+					Confidence: t.Confidence,
+				})
+			}
+		}
+		w.WebProbe(ev)
 	}
 
 	prevResult := r.OnResult

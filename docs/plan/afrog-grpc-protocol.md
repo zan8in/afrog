@@ -89,8 +89,8 @@ Web 前端 ──HTTP/SSE──▶ 控制面 ◀──gRPC 双向流（agent 主
 | `ProgressEvent` | 扫描级进度（约 1s） | `percent`、`finished`、`total`、`rate`、`elapsed_ms` |
 | `PhaseEvent` | 阶段进度 | `phase`：`host_discovery`/`portscan`/`webprobe`/`vuln`；`status`、`finished`、`total`、`percent` |
 | `ResultEvent` | 命中漏洞 | `severity`、`poc_id`、`poc_name`、`target`、`evidence`（请求/响应，供落库） |
-| `PortEvent` | 开放端口 | `host`、`port` |
-| `WebProbeEvent` | Web 探测 | `url`、`status`、`title`、`fingerprint` |
+| `PortEvent` | 开放端口 | `host`、`port`；端口指纹：`service`、`product`、`version`、`device`、`hostname`、`os`、`cpe`、`info`、`tls`、`confidence`（`port`/`probable`/`certain`）、`banner`、`extras` |
+| `WebProbeEvent` | Web 探测 | `url`、`status`、`title`、`server`、`powered_by`、`fingerprint`（一行技术栈摘要，无命中时回落 `server`+`powered_by`）、`confidence`（`probable`/`certain`）、`technologies`（`name`、`version`、`category`、`cpe`、`confidence`） |
 | `HostEvent` | 资产发现（存活主机） | `host` |
 | `LogEvent` | 诊断日志 | `level`、`text` |
 | `DoneEvent` | 任务结束 | `status`、`summary`（命中分布、耗时、实际执行数） |
@@ -205,9 +205,16 @@ message PhaseEvent   { string phase = 1; string status = 2;
                        int64 finished = 3; int64 total = 4; int32 percent = 5; }
 message ResultEvent  { string severity = 1; string poc_id = 2; string poc_name = 3;
                        string target = 4; Evidence evidence = 5; }
-message PortEvent    { string host = 1; int32 port = 2; }
+message PortEvent    { string host = 1; int32 port = 2; string service = 3;
+                       string product = 4; string version = 5; string device = 6;
+                       string hostname = 7; string os = 8; string cpe = 9;
+                       string info = 10; bool tls = 11; string confidence = 12;
+                       string banner = 13; map<string, string> extras = 14; }
+message WebTechnology { string name = 1; string version = 2; string category = 3;
+                       string cpe = 4; string confidence = 5; }
 message WebProbeEvent{ string url = 1; int32 status = 2; string title = 3;
-                       string fingerprint = 4; }
+                       string fingerprint = 4; string server = 5; string powered_by = 6;
+                       string confidence = 7; repeated WebTechnology technologies = 8; }
 message HostEvent    { string host = 1; }
 message LogEvent     { string level = 1; string text = 2; }
 message DoneEvent    { string status = 1; Summary summary = 2; }

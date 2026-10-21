@@ -69,18 +69,46 @@ func ToProtoEvent(ev *scanstream.Event) *afrogv1.ScanEvent {
 	case scanstream.TypePort:
 		if ev.Port != nil {
 			out.Body = &afrogv1.ScanEvent_Port{Port: &afrogv1.PortEvent{
-				Host: ev.Port.Host,
-				Port: int32(ev.Port.Port),
+				Host:       ev.Port.Host,
+				Port:       int32(ev.Port.Port),
+				Service:    ev.Port.Service,
+				Product:    ev.Port.Product,
+				Version:    ev.Port.Version,
+				Device:     ev.Port.Device,
+				Hostname:   ev.Port.Hostname,
+				Os:         ev.Port.OS,
+				Cpe:        ev.Port.CPE,
+				Info:       ev.Port.Info,
+				Tls:        ev.Port.TLS,
+				Confidence: ev.Port.Confidence,
+				Banner:     ev.Port.Banner,
+				Extras:     ev.Port.Extras,
 			}}
 		}
 	case scanstream.TypeWebProbe:
 		if ev.WebProbe != nil {
-			out.Body = &afrogv1.ScanEvent_Webprobe{Webprobe: &afrogv1.WebProbeEvent{
+			wp := &afrogv1.WebProbeEvent{
 				Url:         ev.WebProbe.URL,
 				Status:      int32(ev.WebProbe.Status),
 				Title:       ev.WebProbe.Title,
 				Fingerprint: ev.WebProbe.Fingerprint,
-			}}
+				Server:      ev.WebProbe.Server,
+				PoweredBy:   ev.WebProbe.PoweredBy,
+				Confidence:  ev.WebProbe.Confidence,
+			}
+			if len(ev.WebProbe.Technologies) > 0 {
+				wp.Technologies = make([]*afrogv1.WebTechnology, 0, len(ev.WebProbe.Technologies))
+				for _, t := range ev.WebProbe.Technologies {
+					wp.Technologies = append(wp.Technologies, &afrogv1.WebTechnology{
+						Name:       t.Name,
+						Version:    t.Version,
+						Category:   t.Category,
+						Cpe:        t.CPE,
+						Confidence: t.Confidence,
+					})
+				}
+			}
+			out.Body = &afrogv1.ScanEvent_Webprobe{Webprobe: wp}
 		}
 	case scanstream.TypeHost:
 		if ev.Host != nil {

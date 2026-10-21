@@ -88,10 +88,24 @@ type Exchange struct {
 	BruteRequests int `json:"brute_requests,omitempty"`
 }
 
-// PortEvent reports an open port found during port pre-scanning.
+// PortEvent reports an open port found during port pre-scanning together with
+// the service fingerprint identified on it. Confidence is one of
+// "port"/"probable"/"certain" and reflects how strong the evidence is.
 type PortEvent struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Host       string            `json:"host"`
+	Port       int               `json:"port"`
+	Service    string            `json:"service,omitempty"`
+	Product    string            `json:"product,omitempty"`
+	Version    string            `json:"version,omitempty"`
+	Device     string            `json:"device,omitempty"`
+	Hostname   string            `json:"hostname,omitempty"`
+	OS         string            `json:"os,omitempty"`
+	CPE        string            `json:"cpe,omitempty"`
+	Info       string            `json:"info,omitempty"`
+	TLS        bool              `json:"tls,omitempty"`
+	Confidence string            `json:"confidence,omitempty"`
+	Banner     string            `json:"banner,omitempty"`
+	Extras     map[string]string `json:"extras,omitempty"`
 }
 
 // HostEvent reports a live host found during host discovery.
@@ -99,12 +113,30 @@ type HostEvent struct {
 	Host string `json:"host"`
 }
 
+// WebTechnology is one matched web fingerprint. Confidence is one of
+// "probable"/"certain" and uses the same scale as PortEvent.
+type WebTechnology struct {
+	Name       string `json:"name"`
+	Version    string `json:"version,omitempty"`
+	Category   string `json:"category,omitempty"`
+	CPE        string `json:"cpe,omitempty"`
+	Confidence string `json:"confidence,omitempty"`
+}
+
 // WebProbeEvent reports the metadata of a probed web service.
+//
+// Fingerprint is the human-readable one-line summary of the detected stack;
+// it falls back to Server + PoweredBy when no fingerprint rule matched.
+// Technologies carries the same data in structured form.
 type WebProbeEvent struct {
-	URL       string `json:"url"`
-	Title     string `json:"title,omitempty"`
-	Server    string `json:"server,omitempty"`
-	PoweredBy string `json:"powered_by,omitempty"`
+	URL          string          `json:"url"`
+	Status       int             `json:"status,omitempty"`
+	Title        string          `json:"title,omitempty"`
+	Server       string          `json:"server,omitempty"`
+	PoweredBy    string          `json:"powered_by,omitempty"`
+	Fingerprint  string          `json:"fingerprint,omitempty"`
+	Confidence   string          `json:"confidence,omitempty"`
+	Technologies []WebTechnology `json:"technologies,omitempty"`
 }
 
 // Phase names reported through PhaseProgress.

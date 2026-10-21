@@ -75,6 +75,23 @@ scanner.Wait(ctx)
 | `ProgressStream()` | `PhaseProgress` |
 | `ScanInfoStream()` | `ScanInfo` |
 
+### `PortEvent` 字段
+
+`PortEvent` 描述一个开放端口及其端口指纹识别结果，可用于在扫描前先建立资产画像：
+
+| 字段 | 说明 |
+| --- | --- |
+| `Host` / `Port` | 主机与端口号 |
+| `Service` | 服务名，如 `ssh`、`http` |
+| `Product` / `Version` | 产品与版本，如 `OpenSSH` / `9.6p1` |
+| `Device` / `Hostname` / `OS` | 设备类型、主机名、操作系统 |
+| `CPE` | CPE 标识 |
+| `Info` | 补充描述 |
+| `TLS` | 该端口是否按 TLS 处理 |
+| `Confidence` | 识别可信度：`port`（仅端口惯例推测）/ `probable`（弱特征命中）/ `certain`（banner 明确命中） |
+| `Banner` | 原始响应片段 |
+| `Extras` | 规则捕获的额外具名分组 |
+
 ## 使用流时最重要的一条
 
 一旦订阅，就必须消费。

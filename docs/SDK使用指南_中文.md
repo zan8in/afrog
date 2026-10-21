@@ -403,7 +403,7 @@ case err != nil:
 
 ## 端口预扫描
 
-发现的开放端口会以 `host:port` 形式追加为扫描目标：
+发现的开放端口会以 `host:port` 形式追加为扫描目标。`PortHandler` 除了主机与端口，还会拿到该端口的指纹识别结果（`Service`/`Product`/`Version`/`CPE`/`Confidence` 等），便于先建立资产画像：
 
 ```go
 scanner, _ := sdk.New(ctx,
@@ -413,9 +413,11 @@ scanner, _ := sdk.New(ctx,
 		Ports:         "top",  // top|full|all|80,443|1-1024
 		TimeoutMs:     500,
 		SkipDiscovery: true,
+		ServiceProbe:  true, // 额外发送主动探针，识别更准但更慢
 	}),
 	sdk.WithPortHandler(func(p sdk.PortEvent) {
-		fmt.Printf("open: %s:%d\n", p.Host, p.Port)
+		fmt.Printf("open: %s:%d %s %s %s (%s, %s)\n",
+			p.Host, p.Port, p.Service, p.Product, p.Version, p.Confidence, p.Banner)
 	}),
 )
 
@@ -423,6 +425,8 @@ scanner.Execute(ctx)
 
 open := scanner.OpenPorts() // map[string][]int
 ```
+
+`Confidence` 表示识别证据的强弱：`port` 仅由端口惯例推测，`probable` 为弱特征命中，`certain` 为 banner 明确命中。
 
 ## OOB（带外）检测
 

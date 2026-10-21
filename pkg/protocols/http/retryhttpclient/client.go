@@ -1031,6 +1031,19 @@ func IsCheckProtocolSuppressed(err error) bool {
 	return errors.As(err, &se)
 }
 
+// ResetCheckProtocolCache 清空协议探测的记忆缓存。
+//
+// probeMemos 是包级全局状态：结论（命中过的 URL）与失败冷却（最长 10 分钟）都会跨扫描保留。
+// 对一次性的 CLI 进程无所谓，但在 SDK / afrogweb 这类长驻进程里，上一轮扫描的网络抖动会把
+// 主机的探测压制到下一轮，造成「明明可达却报 no response」。因此每次扫描开始前调用本函数。
+//
+// 只清记忆不碰 probeCalls：正在进行的探测仍有 goroutine 在等它关闭，清掉会破坏等待方。
+func ResetCheckProtocolCache() {
+	probeMu.Lock()
+	probeMemos = make(map[string]*probeMemo)
+	probeMu.Unlock()
+}
+
 var (
 	probeMu    sync.Mutex
 	probeCalls = make(map[string]*probeCall)

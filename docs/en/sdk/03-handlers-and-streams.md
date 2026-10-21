@@ -75,6 +75,23 @@ scanner.Wait(ctx)
 | `ProgressStream()` | `PhaseProgress` |
 | `ScanInfoStream()` | `ScanInfo` |
 
+### `PortEvent` fields
+
+`PortEvent` describes a single open port together with its service fingerprint, so you can build an asset profile before the PoC scan runs:
+
+| Field | Description |
+| --- | --- |
+| `Host` / `Port` | Host and port number |
+| `Service` | Service name, e.g. `ssh`, `http` |
+| `Product` / `Version` | Product and version, e.g. `OpenSSH` / `9.6p1` |
+| `Device` / `Hostname` / `OS` | Device type, hostname, operating system |
+| `CPE` | CPE identifier |
+| `Info` | Extra description |
+| `TLS` | Whether the port is treated as TLS |
+| `Confidence` | Identification confidence: `port` (port-prior guess only) / `probable` (weak match) / `certain` (explicit banner match) |
+| `Banner` | Raw response snippet |
+| `Extras` | Additional named capture groups from the matching rule |
+
 ## The most important rule with streams
 
 Once you subscribe, you must consume.

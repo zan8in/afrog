@@ -108,9 +108,9 @@ func (w *Writer) Result(ev *ResultEvent) {
 }
 
 // Port 发送开放端口事件。
-func (w *Writer) Port(host string, port int) {
-	w.emit(TypePort, func(ev *Event) {
-		ev.Port = &PortEvent{Host: host, Port: port}
+func (w *Writer) Port(ev *PortEvent) {
+	w.emit(TypePort, func(e *Event) {
+		e.Port = ev
 	})
 }
 

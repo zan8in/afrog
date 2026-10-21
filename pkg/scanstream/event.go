@@ -92,18 +92,48 @@ type ResultEvent struct {
 	Evidence *Evidence `json:"evidence,omitempty"`
 }
 
-// PortEvent 描述一个开放端口。
+// PortEvent 描述一个开放端口及其指纹识别结果。
+// confidence 取值 port/probable/certain，表示识别证据的强弱。
 type PortEvent struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Host       string            `json:"host"`
+	Port       int               `json:"port"`
+	Service    string            `json:"service,omitempty"`
+	Product    string            `json:"product,omitempty"`
+	Version    string            `json:"version,omitempty"`
+	Device     string            `json:"device,omitempty"`
+	Hostname   string            `json:"hostname,omitempty"`
+	OS         string            `json:"os,omitempty"`
+	CPE        string            `json:"cpe,omitempty"`
+	Info       string            `json:"info,omitempty"`
+	TLS        bool              `json:"tls,omitempty"`
+	Confidence string            `json:"confidence,omitempty"`
+	Banner     string            `json:"banner,omitempty"`
+	Extras     map[string]string `json:"extras,omitempty"`
+}
+
+// WebTechnologyEvent 是 WebProbeEvent 里的一条命中指纹。
+// confidence 取值 probable/certain，与端口指纹同一标尺。
+type WebTechnologyEvent struct {
+	Name       string `json:"name"`
+	Version    string `json:"version,omitempty"`
+	Category   string `json:"category,omitempty"`
+	CPE        string `json:"cpe,omitempty"`
+	Confidence string `json:"confidence,omitempty"`
 }
 
 // WebProbeEvent 描述一次 Web 探测。
+//
+// fingerprint 是给人看的一行技术栈摘要（无命中时回落到 server + powered_by），
+// technologies 是结构化明细，两者同源，消费方按需取用。
 type WebProbeEvent struct {
-	URL         string `json:"url"`
-	Status      int    `json:"status"`
-	Title       string `json:"title"`
-	Fingerprint string `json:"fingerprint"`
+	URL          string               `json:"url"`
+	Status       int                  `json:"status"`
+	Title        string               `json:"title"`
+	Server       string               `json:"server,omitempty"`
+	PoweredBy    string               `json:"powered_by,omitempty"`
+	Fingerprint  string               `json:"fingerprint"`
+	Confidence   string               `json:"confidence,omitempty"`
+	Technologies []WebTechnologyEvent `json:"technologies,omitempty"`
 }
 
 // HostEvent 描述资产发现阶段发现的一个存活主机。

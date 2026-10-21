@@ -1055,7 +1055,7 @@ func TestWebProbePreservesTargetPath(t *testing.T) {
 		webMetaByKey: make(map[string]WebMeta),
 	}
 
-	out := r.webProbe(context.Background(), idx)
+	out := r.webProbe(context.Background(), idx, nil)
 	if len(out) != 1 || out[0] != target {
 		t.Fatalf("unexpected webprobe out: %#v, want [%q]", out, target)
 	}

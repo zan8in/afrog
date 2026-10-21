@@ -1,0 +1,536 @@
+# afrog 端口指纹规则。
+#
+# 一条规则 = 「在某个探针的响应上，用什么正则、能提取出哪些字段」。
+#
+# 顺序即优先级（specific → generic）：同一个端口上多条规则同时命中时，取可信度最高
+# 的一条；可信度相同时取文件中靠前的。因此**新增规则必须插到更通用的规则之前**，
+# 例如 elasticsearch 必须写在通用 http 之前。
+#
+# 字段：
+#   id        规则标识，唯一
+#   service   服务名（写入 ScanResult.Service）。留空表示「不改变端口先验的服务名」
+#   product   产品名默认值，可被 match 覆盖
+#   device    设备类型默认值，可被 match 覆盖
+#   cpe       默认 CPE，可被 match 覆盖；支持 $1 / ${name} 引用捕获组
+#   probes    该规则检查哪些探针的响应，缺省 ["NULL"]
+#             注意：探针 id 若与 YAML 保留字冲突（如 NULL 会被解析成空值），必须加引号
+#   ports     端口先验，仅用于补全端口信息与文档化，不参与匹配判定
+#   softmatch true 表示该规则的特征偏弱，命中记为 probable 而不是 certain
+#   encoding  text（默认）| binary。binary 时把响应按 latin-1 逐字节映射成字符，
+#             使正则里的 \xNN 能与任意二进制字节一一对应
+#   match     规则列表，按顺序取第一个命中的
+#
+# match 字段：
+#   pattern     正则（.NET 语法，支持 lookahead/lookbehind 与 (?<name>...) 具名组）
+#   confidence  覆盖本条 pattern 的可信度：certain | probable
+#   version/product/info/cpe/hostname/os/device
+#               取值模板，支持 $1..$9 与 ${name}；未引用的具名组会进 Extras
+#
+# 可用变量：$0 整个匹配，$1..$9 捕获组，${name} 具名组。
+
+# ================================ 远程登录 / Shell ================================
+
+- id: ssh
+  service: ssh
+  product: OpenSSH
+  cpe: cpe:/a:openbsd:openssh
+  probes: ["NULL"]
+  ports: [22, 2222, 8022, 22222]
+  match:
+    # SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4
+    - pattern: '(?i)^SSH-[\d.]+-OpenSSH[_/-](?<version>[\d.p]+)'
+      product: OpenSSH
+      version: $version
+      cpe: cpe:/a:openbsd:openssh:$version
+      info: "OpenSSH $version"
+    # SSH-2.0-dropbear_2022.83 / SSH-2.0-libssh_0.9.6
+    - pattern: '(?i)^SSH-[\d.]+-(?<product>dropbear|libssh|RomSShell|Bitvise|Cisco|WolfSSH|Paramiko|Sun_SSH|WeOnlyDo|F-Secure)[_/-]?(?<version>[\d.]*)'
+      product: $product
+      version: $version
+      info: "$product $version"
+    - pattern: '(?i)^SSH-[\d.]+-(?<software>[^\s\r\n]{1,64})'
+      info: "SSH banner: $software"
+
+- id: telnet
+  service: telnet
+  probes: ["NULL"]
+  ports: [23, 2323, 8023]
+  # Telnet 没有握手，只能靠「登录提示」这类特征，因此是弱匹配。
+  softmatch: true
+  match:
+    - pattern: '(?i)(?:login|password|username)\s*[:>]'
+      info: "login prompt"
+    - pattern: '(?i)\bwelcome to\b'
+      info: "welcome banner"
+
+# ================================ 图形 / 远程桌面 ================================
+
+- id: vnc
+  service: vnc
+  probes: ["NULL"]
+  ports: [5900, 5901, 5902, 5903, 5904]
+  match:
+    # RFB 003.008
+    - pattern: '^RFB (?<version>\d{3}\.\d{3})'
+      version: $version
+      product: VNC
+      info: "RFB protocol $version"
+
+# ================================ 文件传输 ================================
+
+- id: ftp
+  service: ftp
+  probes: ["NULL"]
+  ports: [21, 2121]
+  match:
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)vsftpd[ /]?(?<version>[\d.]+)'
+      product: vsftpd
+      version: $version
+      info: "vsftpd $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)ProFTPD[ /]?(?<version>[\d.p]+)'
+      product: ProFTPD
+      version: $version
+      info: "ProFTPD $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)Pure-FTPd'
+      product: Pure-FTPd
+      info: "Pure-FTPd"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)FileZilla Server[ /]?(?<version>[\d.]+)'
+      product: FileZilla
+      version: $version
+      info: "FileZilla Server $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)Serv-U FTP Server v?(?<version>[\d.]+)'
+      product: Serv-U
+      version: $version
+      info: "Serv-U $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)Microsoft FTP Service(?: \(Version (?<version>[\d.]+))?'
+      product: Microsoft FTP
+      version: $version
+      info: "Microsoft FTP Service"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,160}?)Cerberus FTP Server[ /]?(?<version>[\d.]+)'
+      product: Cerberus FTP
+      version: $version
+      info: "Cerberus $version"
+    # 兜底：必须出现 ftp 字样，否则会把 SMTP 的 220 抢过来
+    - pattern: '(?i)^220[ -](?=[^\r\n]{0,160}ftp)(?<info>[^\r\n]{1,200})'
+      info: "$info"
+
+- id: rsync
+  service: rsync
+  probes: ["NULL"]
+  ports: [873]
+  match:
+    - pattern: '^@RSYNCD: (?<version>[\d.]+)'
+      product: rsync
+      version: $version
+      info: "rsync protocol $version"
+    - pattern: '^@ERROR: (?<msg>[^\r\n]{1,120})'
+      product: rsync
+      info: "$msg"
+    - pattern: "^#list"
+      product: rsync
+      info: "rsync module list"
+
+- id: git
+  service: git
+  probes: ["NULL"]
+  ports: [9418]
+  match:
+    # \x30\x30\x31\x65# service=git-upload-pack
+    - pattern: '^(?<pkt>[0-9a-f]{4})# service=(?<svc>[\w-]+)'
+      product: git
+      info: "git protocol, service=$svc"
+
+- id: svn
+  service: svn
+  probes: ["NULL"]
+  ports: [3690]
+  match:
+    - pattern: '^\( success \( (?<version>[\d ]+)'
+      product: Subversion
+      version: $version
+      info: "Subversion protocol $version"
+    - pattern: '^\( failure'
+      product: Subversion
+      info: "Subversion failure greeting"
+
+# ================================ 邮件 ================================
+
+- id: smtp
+  service: smtp
+  probes: ["NULL"]
+  ports: [25, 465, 587, 2525, 1025, 1026]
+  match:
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)Microsoft ESMTP MAIL Service, Version: (?<version>[\d.]+)'
+      product: Microsoft Exchange
+      version: $version
+      info: "Exchange SMTP $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)Postfix'
+      product: Postfix
+      info: "Postfix"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)Exim (?<version>[\d.]+)'
+      product: Exim
+      version: $version
+      info: "Exim $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)Sendmail (?<version>[\d.]+)'
+      product: Sendmail
+      version: $version
+      info: "Sendmail $version"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)hMailServer'
+      product: hMailServer
+      info: "hMailServer"
+    - pattern: '(?i)^220[ -](?:[\s\S]{0,200}?)Haraka'
+      product: Haraka
+      info: "Haraka"
+    - pattern: '(?i)^220[ -](?=[^\r\n]{0,200}(?:smtp|esmtp|mail))(?<info>[^\r\n]{1,200})'
+      info: "$info"
+
+- id: pop3
+  service: pop3
+  probes: ["NULL"]
+  ports: [110, 995]
+  match:
+    - pattern: '(?i)^\+OK[^\r\n]{0,120}?(?<product>Dovecot|Courier|Microsoft Exchange POP3|Qpopper|MailEnable|Zimbra|Coremail)'
+      product: $product
+      info: "$product"
+    - pattern: '^\+OK'
+      info: "POP3 ready"
+
+- id: imap
+  service: imap
+  probes: ["NULL"]
+  ports: [143, 993]
+  match:
+    - pattern: '(?i)^\* OK[^\r\n]{0,160}?(?<product>Dovecot|Courier|Cyrus|Microsoft Exchange|Zimbra|MailEnable|Coremail)'
+      product: $product
+      info: "$product"
+    - pattern: '(?i)^\* (?:OK|PREAUTH|CAPABILITY)'
+      info: "IMAP greeting"
+    - pattern: '(?i)\[CAPABILITY [^\]]+\]'
+      info: "IMAP capabilities"
+
+- id: nntp
+  service: nntp
+  probes: ["NULL"]
+  ports: [119, 563]
+  match:
+    - pattern: '(?i)^(?:20[01])[ -](?=[^\r\n]{0,160}(?:nntp|news))(?<info>[^\r\n]{1,200})'
+      info: "$info"
+
+- id: irc
+  service: irc
+  probes: ["NULL"]
+  ports: [194, 6660, 6661, 6662, 6663, 6664, 6665, 6666, 6667, 6668, 6669, 6697]
+  match:
+    # :irc.example.com 001 nick :Welcome
+    - pattern: '^:(?<server>[\w.\-]{1,80}) (?:00[1-9]|NOTICE|MODE)'
+      info: "server $server"
+
+# ================================ 数据库 / 缓存 ================================
+
+- id: mysql
+  service: mysql
+  product: MySQL
+  probes: ["NULL"]
+  ports: [3306, 3307, 13306]
+  # 握手包：3 字节长度 + 1 字节序号 + 0x0a(协议版本) + 版本字符串 + 0x00
+  match:
+    - pattern: '^[\s\S]{4}\x0a(?<version>[0-9][\w.\-]{0,30}?)-MariaDB'
+      product: MariaDB
+      version: $version
+      info: "MariaDB $version"
+    - pattern: '^[\s\S]{4}\x0a(?<version>[0-9][0-9.]{2,20}[^\x00]{0,24})'
+      product: MySQL
+      version: $version
+      info: "MySQL $version"
+
+- id: postgresql
+  service: postgresql
+  product: PostgreSQL
+  probes: [PostgresStartup]
+  ports: [5432, 5433]
+  match:
+    # 错误包：'E' + int32 长度 + 'S'FATAL\0 ...
+    - pattern: '(?i)^E[\s\S]{0,300}?(?:password authentication failed|no pg_hba\.conf entry|role "[^"]{0,40}" does not exist|database "[^"]{0,40}" does not exist|unsupported frontend protocol)'
+      info: "PostgreSQL error response"
+    - pattern: '^E[\s\S]{0,64}?FATAL'
+      info: "PostgreSQL FATAL"
+    - pattern: '^R[\s\S]{0,8}'
+      confidence: probable
+      info: "PostgreSQL authentication request"
+
+- id: mongodb
+  service: mongodb
+  product: MongoDB
+  probes: [MongoIsMaster]
+  ports: [27017, 27018, 27019]
+  match:
+    - pattern: "(?i)(?:ismaster|isWritablePrimary|maxBsonObjectSize|helloOk)"
+      info: "MongoDB isMaster/hello reply"
+    - pattern: "(?i)(?:not authorized|requires authentication)"
+      info: "MongoDB auth required"
+
+- id: redis-sentinel
+  service: redis-sentinel
+  product: Redis Sentinel
+  probes: [RedisInfo]
+  ports: [26379]
+  match:
+    - pattern: "(?m)^redis_mode:sentinel"
+      info: "Sentinel mode"
+    - pattern: "(?m)^sentinel_"
+      info: "Sentinel INFO"
+
+- id: redis
+  service: redis
+  product: Redis
+  probes: [RedisInfo, RedisPing]
+  ports: [6379, 6380, 6381, 6382]
+  match:
+    - pattern: '(?m)^redis_version:(?<version>[^\r\n]+)'
+      version: $version
+      info: "Redis $version"
+    - pattern: '(?m)^redis_mode:(?<mode>[^\r\n]+)'
+      info: "Redis mode $mode"
+    - pattern: '^\+PONG'
+      info: "PING -> PONG"
+    - pattern: "(?i)^-DENIED Redis is running in protected mode"
+      info: "protected mode"
+    - pattern: "(?i)^-NOAUTH"
+      info: "authentication required"
+    - pattern: "(?i)^-ERR unknown command"
+      confidence: probable
+      info: "Redis-like error reply"
+
+- id: memcached
+  service: memcached
+  product: Memcached
+  probes: [MemcachedStats]
+  ports: [11211, 11212, 11213]
+  match:
+    - pattern: '(?m)^STAT version (?<version>[^\r\n]+)'
+      version: $version
+      info: "Memcached $version"
+    - pattern: "(?m)^STAT (?:pid|uptime|curr_items|cmd_get) "
+      confidence: probable
+      info: "Memcached stats"
+
+- id: clickhouse
+  service: clickhouse
+  product: ClickHouse
+  probes: [GetRequest, "NULL"]
+  ports: [8123, 9000]
+  match:
+    - pattern: '^Ok\.$'
+      info: "ClickHouse HTTP ping"
+    - pattern: '(?im)^X-ClickHouse-Server-Display-Name:[ ]*(?<product>[^\r\n]{1,64})'
+      info: "ClickHouse $product"
+
+# ================================ 分布式协调 / 消息队列 ================================
+
+- id: zookeeper
+  service: zookeeper
+  product: ZooKeeper
+  probes: [ZooKeeperRuok, "NULL"]
+  ports: [2181, 2182, 2183]
+  match:
+    - pattern: "^imok"
+      info: "ruok -> imok"
+    - pattern: '(?i)Zookeeper version: (?<version>[\d.\-]+)'
+      version: $version
+      info: "ZooKeeper $version"
+    - pattern: "(?i)^(?:Client port found|Environment:)"
+      info: "ZooKeeper stat"
+
+- id: amqp
+  service: amqp
+  product: RabbitMQ
+  probes: [AMQPGreeting, "NULL"]
+  ports: [5672, 5671]
+  match:
+    - pattern: '(?i)(?:PLAIN\s+AMQPLAIN|AMQPLAIN)'
+      info: "AMQP 0-9-1 Connection.Start"
+    - pattern: '(?i)\x0cRabbitMQ'
+      product: RabbitMQ
+      info: "RabbitMQ"
+    - pattern: "^AMQP"
+      info: "AMQP protocol header echoed"
+
+- id: mqtt
+  service: mqtt
+  product: MQTT
+  probes: [MQTTConnect]
+  ports: [1883, 8883]
+  encoding: binary
+  match:
+    # CONNACK: 0x20 0x02 0x00 0x00
+    - pattern: '^\x20[\s\S]\x00'
+      info: "CONNACK"
+    - pattern: '^\x20[\s\S]\x01'
+      info: "CONNACK (unacceptable protocol version)"
+
+- id: zabbix-agent
+  service: zabbix-agent
+  product: Zabbix Agent
+  probes: [ZabbixAgentVersion]
+  ports: [10050]
+  match:
+    - pattern: '^ZBXD\x01[\s\S]{8}(?<version>[\d.]+)'
+      version: $version
+      info: "Zabbix agent $version"
+
+- id: xmpp
+  service: xmpp
+  probes: [XMPPStreamOpen, "NULL"]
+  ports: [5222, 5269]
+  match:
+    - pattern: "(?i)(?:stream:features|<mechanisms|jabber:client)"
+      info: "XMPP stream"
+    - pattern: '(?i)^<\?xml[^>]{0,40}><stream:stream'
+
+# ================================ Web / 中间件 ================================
+
+- id: elasticsearch
+  service: elasticsearch
+  product: Elasticsearch
+  probes: [GetRequest, TLSGetRequest, HTTPOptions, "NULL"]
+  ports: [9200, 9201]
+  match:
+    - pattern: '(?is)"cluster_name"[\s\S]{0,400}?"number"\s*:\s*"(?<version>[0-9][\w.\-]{0,20})"'
+      version: $version
+      info: "cluster $version"
+    - pattern: '(?is)"(?:cluster_name|tagline)"\s*:'
+      info: "Elasticsearch root document"
+    - pattern: '(?im)^X-Elastic-Product:[ ]*(?<product>[^\r\n]{1,40})'
+      info: "$product"
+
+- id: etcd
+  service: etcd
+  product: etcd
+  probes: [GetRequest, TLSGetRequest, "NULL"]
+  ports: [2379, 2380]
+  match:
+    - pattern: '(?is)"etcdserver"\s*:\s*"(?<version>[0-9][\w.\-]{0,20})"'
+      version: $version
+      info: "etcd $version"
+    - pattern: '(?i)"(?:etcdserver|etcdcluster)"\s*:'
+      info: "etcd version document"
+
+- id: kubernetes
+  service: kubernetes
+  product: Kubernetes
+  probes: [GetRequest, TLSGetRequest, HTTPOptions, "NULL"]
+  ports: [6443, 6444, 10250]
+  match:
+    - pattern: '(?is)"gitVersion"\s*:\s*"(?<version>v[\d][\w.\-]{0,20})"'
+      version: $version
+      info: "apiserver $version"
+    - pattern: '(?is)"major"\s*:\s*"[^\"]{1,8}"[\s\S]{0,120}?"gitVersion"'
+
+- id: jenkins
+  service: http
+  product: Jenkins
+  probes: ["NULL", HTTPOptions, GetRequest]
+  ports: [8080]
+  match:
+    - pattern: '(?im)^X-Jenkins:[ ]*(?<version>[\d.]+)'
+      version: $version
+      info: "Jenkins $version"
+    - pattern: "(?im)^X-Jenkins-Session:"
+      info: "Jenkins session header"
+
+- id: docker
+  service: docker
+  product: Docker Engine
+  probes: [GetRequest, HTTPOptions, TLSGetRequest, "NULL"]
+  ports: [2375, 2376]
+  match:
+    - pattern: '(?is)"(?:KernelVersion|ApiVersion)"\s*:'
+      info: "Docker Engine info"
+    - pattern: '(?im)^Docker-Distribution-Api-Version:[ ]*(?<version>[^\r\n]{1,32})'
+      product: Docker Registry
+      version: $version
+      info: "registry api $version"
+
+# ================================ 通用 HTTP ================================
+
+- id: http
+  service: http
+  probes: [GetRequest, TLSGetRequest, HTTPOptions, "NULL"]
+  match:
+    # Server: nginx/1.25.3
+    - pattern: '(?im)^Server:[ ]*(?<product>[A-Za-z][\w.\-]{0,40})/(?<version>[0-9][^\s;,(]{0,24})'
+      product: $product
+      version: $version
+      info: "$product $version"
+    - pattern: '(?im)^Server:[ ]*(?<product>[^\r\n]{1,60})'
+      product: $product
+      info: "$product"
+    - pattern: '(?im)^X-Powered-By:[ ]*(?<product>[^\r\n]{1,60})'
+      product: $product
+      info: "$product"
+    - pattern: '(?m)^HTTP/1\.[01] (?<code>[1-5][0-9][0-9])'
+      info: "HTTP $code"
+    # IIS 的 Server 头只有 Microsoft-IIS/10.0 也已被上面的规则覆盖
+    - pattern: "(?im)^MicrosoftOfficeWebServer:"
+      product: Microsoft-IIS
+      info: "Microsoft IIS"
+
+# ================================ 其它主流协议 ================================
+
+- id: ident
+  service: ident
+  probes: [IdentQuery, "NULL"]
+  ports: [113]
+  match:
+    - pattern: '^[0-9]{1,5}\s*,\s*[0-9]{1,5}\s*:\s*(?:USERID|ERROR|NO-USER)'
+      info: "ident reply"
+    - pattern: '^[0-9]{1,5}\s*,\s*[0-9]{1,5}\s*:\s*(?<os>[A-Z]+)'
+      info: "ident os $os"
+
+- id: domain
+  service: domain
+  product: DNS
+  probes: [DNSVersionBind]
+  ports: [53]
+  match:
+    - pattern: '(?i)(?<product>dnsmasq)[- ]?(?<version>[\d.]+)?'
+      product: dnsmasq
+      version: $version
+      info: "dnsmasq $version"
+    - pattern: '(?i)(?<product>BIND)[- ]?(?<version>[\d.]+)?'
+      product: BIND
+      version: $version
+      info: "BIND $version"
+    - pattern: '(?i)version\.bind'
+      info: "version.bind CH TXT answered"
+
+- id: java-rmi
+  service: java-rmi
+  probes: ["NULL"]
+  ports: [1099]
+  match:
+    - pattern: "^JRMI"
+      info: "Java RMI protocol ack"
+
+- id: rtsp
+  service: rtsp
+  probes: [MediaStream, "NULL"]
+  ports: [554, 8554]
+  match:
+    - pattern: '(?i)^RTSP/1\.0 (?<code>[0-9]{3})'
+      info: "RTSP $code"
+    - pattern: '(?im)^(?:Server|Public):[ ]*(?<product>[^\r\n]{1,80})'
+      product: $product
+      info: "$product"
+
+# ================================ 设备/厂商兜底 ================================
+# 放在最后：只有在没有任何协议规则命中时，才用它补充厂商/设备信息。
+# softmatch 保证它永远不会覆盖前面识别出的服务。
+
+- id: device-banner
+  probes: ["NULL", HTTPOptions, GetRequest]
+  softmatch: true
+  match:
+    - pattern: "(?i)(?<device>Cisco|RouterOS|MikroTik|Huawei|H3C|TP-LINK|DrayTek|ZyXEL|OpenWrt|DD-WRT|NETGEAR|D-Link|Fortinet|FortiGate|SonicWall|Ubiquiti|EdgeOS|SangFor|Hillstone|TopSec|Venustech)"
+      device: $device
+      info: "device banner: $device"

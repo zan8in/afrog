@@ -1,0 +1,632 @@
+# afrog Web 指纹规则。
+#
+# 一条规则 = 「在 HTTP 响应的哪部分素材上，用什么正则、能提取出哪些字段」。
+#
+# 顺序即优先级（specific → generic）：同一个响应上多条规则同时命中时，结果按可信度
+# 排序；可信度相同时取文件中靠前的。因此新增的 specific 规则应插到更通用的规则之前。
+#
+# 字段：
+#   id        规则标识，唯一
+#   name      技术名（写入 Technology.Name），留空时取 id
+#   category  分类，如 web-server / cms / framework / language / cdn / js-library / panel
+#   cpe       默认 CPE，可被 match 覆盖；支持 $1 / ${name} 引用捕获组
+#   softmatch true 表示该规则特征偏弱，命中记为 probable 而不是 certain
+#   match     规则列表，按顺序取第一个命中的
+#
+# match 字段：
+#   source     匹配素材：header | body | title | favicon
+#   header     source 为 header 时指定具体响应头；留空表示匹配整个响应头块
+#   pattern    正则（.NET 语法，支持 lookahead/lookbehind 与 (?<name>...) 具名组）
+#   confidence 覆盖本条 pattern 的可信度：certain | probable
+#   version    版本模板，支持 $1..$9 与 ${name}
+#   cpe        本条 pattern 的 CPE 模板，留空时回落到规则级 cpe
+#
+# title 匹配的是页面 <title> 文本；favicon 匹配的是 favicon 的 mmh3 哈希
+# （有符号十进制字符串，可用公开的 favicon 指纹库查得，例如 pattern: '^-1234567890$'）。
+#
+# 命中后除用于展示，还会成为 PoC requires 门控的标识词（全部小写）：
+#   id                        如 requires: [thinkphp]
+#   name（原样小写）          如 requires: [next.js]
+#   name 的空格转连字符写法   如 requires: [apache-shiro]
+#   category                  如 requires: [cms]
+# 因此 category 不宜写得过宽（如统一写 web），否则 requires: [web] 会放行所有站点。
+
+# ================================ Web 服务器 ================================
+
+- id: tengine
+  name: Tengine
+  category: web-server
+  cpe: cpe:/a:taobao:tengine
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\btengine(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: openresty
+  name: OpenResty
+  category: web-server
+  cpe: cpe:/a:openresty:openresty
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bopenresty(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: nginx
+  name: Nginx
+  category: web-server
+  cpe: cpe:/a:igor_sysoev:nginx
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bnginx(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: apache-httpd
+  name: Apache httpd
+  category: web-server
+  cpe: cpe:/a:apache:http_server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bapache(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: iis
+  name: Microsoft IIS
+  category: web-server
+  cpe: cpe:/a:microsoft:internet_information_services
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)microsoft-iis/(?<version>[\d.]+)'
+      version: ${version}
+
+- id: litespeed
+  name: LiteSpeed
+  category: web-server
+  cpe: cpe:/a:litespeedtech:litespeed_web_server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\blitespeed\b'
+    - source: header
+      header: server
+      pattern: '(?i)\blsWS\b'
+
+- id: caddy
+  name: Caddy
+  category: web-server
+  cpe: cpe:/a:caddyserver:caddy
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bcaddy\b'
+
+- id: lighttpd
+  name: lighttpd
+  category: web-server
+  cpe: cpe:/a:lighttpd:lighttpd
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\blighttpd(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: tomcat
+  name: Apache Tomcat
+  category: web-server
+  cpe: cpe:/a:apache:tomcat
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)apache-coyote/(?<version>[\d.]+)'
+      version: ${version}
+      confidence: certain
+    - source: body
+      pattern: '(?i)<title>\s*(?:Apache Tomcat)'
+      confidence: probable
+    - source: title
+      pattern: "(?i)Apache Tomcat"
+      confidence: probable
+
+- id: jetty
+  name: Jetty
+  category: web-server
+  cpe: cpe:/a:eclipse:jetty
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bjetty\s*(?:\((?<version>[\d.]+))?'
+      version: ${version}
+
+- id: gunicorn
+  name: Gunicorn
+  category: web-server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bgunicorn(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: werkzeug
+  name: Werkzeug
+  category: web-server
+  cpe: cpe:/a:palletsprojects:werkzeug
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bwerkzeug(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: waitress
+  name: Waitress
+  category: web-server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bwaitress\b'
+
+- id: kestrel
+  name: Kestrel
+  category: web-server
+  cpe: cpe:/a:microsoft:asp.net_core
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bkestrel\b'
+
+- id: uvicorn
+  name: Uvicorn
+  category: web-server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\buvicorn\b'
+
+- id: minio
+  name: MinIO
+  category: web-server
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bminio\b'
+
+# ================================ 反向代理 / CDN ================================
+
+- id: cloudflare
+  name: Cloudflare
+  category: cdn
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bcloudflare\b'
+    - source: header
+      header: cf-ray
+      pattern: '\S'
+
+- id: akamai
+  name: Akamai
+  category: cdn
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bAkamaiGHost\b'
+
+- id: varnish
+  name: Varnish
+  category: cache
+  match:
+    - source: header
+      header: via
+      pattern: '(?i)\bvarnish\b'
+    - source: header
+      header: x-varnish
+      pattern: '\d'
+
+- id: awselb
+  name: AWS Elastic Load Balancer
+  category: load-balancer
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bawselb(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+# ================================ 语言 / 运行时 ================================
+
+- id: php
+  name: PHP
+  category: language
+  cpe: cpe:/a:php:php
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bPHP/(?<version>[\d.]+)'
+      version: ${version}
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bPHPSESSID='
+      confidence: probable
+
+- id: aspnet
+  name: ASP.NET
+  category: framework
+  cpe: cpe:/a:microsoft:asp.net
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bASP\.NET\b'
+    - source: header
+      header: x-aspnet-version
+      pattern: '(?<version>[\d.]+)'
+      version: ${version}
+
+- id: express
+  name: Express
+  category: framework
+  cpe: cpe:/a:expressjs:express
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bExpress\b'
+
+- id: nextjs
+  name: Next.js
+  category: framework
+  cpe: cpe:/a:vercel:next.js
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bNext\.js\b'
+    - source: body
+      pattern: "(?i)/_next/static/"
+      confidence: probable
+
+- id: nuxtjs
+  name: Nuxt.js
+  category: framework
+  cpe: cpe:/a:nuxt:nuxt
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bNuxt\b'
+    - source: body
+      pattern: "(?i)__NUXT__"
+      confidence: probable
+
+- id: spring-boot
+  name: Spring Boot
+  category: framework
+  cpe: cpe:/a:vmware:spring_boot
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Whitelabel Error Page'
+      confidence: probable
+
+- id: laravel
+  name: Laravel
+  category: framework
+  cpe: cpe:/a:laravel:laravel
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\blaravel_session='
+
+- id: django
+  name: Django
+  category: framework
+  cpe: cpe:/a:djangoproject:django
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bcsrftoken='
+
+- id: rails
+  name: Ruby on Rails
+  category: framework
+  cpe: cpe:/a:rubyonrails:rails
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b_rails'
+      confidence: probable
+
+# ================================ 前端库 ================================
+
+- id: angular
+  name: Angular
+  category: js-library
+  cpe: cpe:/a:angular:angular
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)ng-version="(?<version>[\d.]+)"'
+      version: ${version}
+      confidence: certain
+
+- id: react
+  name: React
+  category: js-library
+  cpe: cpe:/a:facebook:react
+  softmatch: true
+  match:
+    - source: body
+      pattern: "(?i)data-reactroot"
+    - source: body
+      pattern: '(?i)react(?:-dom)?[.@-](?<version>[\d.]+)(?:\.min)?\.js'
+      version: ${version}
+
+- id: vue
+  name: Vue.js
+  category: js-library
+  cpe: cpe:/a:vuejs:vue.js
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)vue(?:\.runtime)?(?:\.min)?\.js'
+    - source: body
+      pattern: "(?i)data-v-[0-9a-f]{8}"
+
+- id: jquery
+  name: jQuery
+  category: js-library
+  cpe: cpe:/a:jquery:jquery
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)jquery[.-](?<version>[\d.]+)(?:\.min)?\.js'
+      version: ${version}
+
+- id: bootstrap
+  name: Bootstrap
+  category: js-library
+  cpe: cpe:/a:getbootstrap:bootstrap
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)bootstrap(?:\.min)?\.(?:css|js)(?:\?v=(?<version>[\d.]+))?'
+      version: ${version}
+
+# ================================ CMS / 应用 ================================
+
+- id: wordpress
+  name: WordPress
+  category: cms
+  cpe: cpe:/a:wordpress:wordpress
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']WordPress\s*(?<version>[\d.]+)'
+      version: ${version}
+      confidence: certain
+    - source: body
+      pattern: "(?i)/wp-content/"
+      confidence: probable
+    - source: body
+      pattern: "(?i)/wp-includes/"
+      confidence: probable
+
+- id: drupal
+  name: Drupal
+  category: cms
+  cpe: cpe:/a:drupal:drupal
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']Generator["''][^>]+content=["'']Drupal\s*(?<version>[\d.]+)'
+      version: ${version}
+      confidence: certain
+    - source: header
+      header: x-generator
+      pattern: '(?i)^Drupal\s*(?<version>[\d.]+)?'
+      version: ${version}
+
+- id: joomla
+  name: Joomla
+  category: cms
+  cpe: cpe:/a:joomla:joomla
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Joomla!'
+      confidence: certain
+    - source: body
+      pattern: "(?i)/media/jui/"
+      confidence: probable
+
+- id: ghost
+  name: Ghost
+  category: cms
+  cpe: cpe:/a:ghost:ghost
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Ghost\s*(?<version>[\d.]+)'
+      version: ${version}
+      confidence: certain
+
+- id: discuz
+  name: Discuz!
+  category: forum
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Discuz!'
+      confidence: certain
+    - source: body
+      pattern: "(?i)/static/image/common/"
+      confidence: probable
+
+- id: typecho
+  name: Typecho
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Typecho'
+      confidence: certain
+
+- id: thinkphp
+  name: ThinkPHP
+  category: framework
+  cpe: cpe:/a:thinkphp:thinkphp
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: '(?i)\bThinkPHP\s*(?<version>[\d.]+)?'
+      version: ${version}
+    - source: body
+      pattern: '(?i)<title>\s*ThinkPHP'
+      confidence: probable
+
+- id: phpmyadmin
+  name: phpMyAdmin
+  category: panel
+  cpe: cpe:/a:phpmyadmin:phpmyadmin
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bphpMyAdmin='
+    - source: body
+      pattern: '(?i)<title>\s*phpMyAdmin'
+      confidence: probable
+
+- id: jenkins
+  name: Jenkins
+  category: ci
+  cpe: cpe:/a:jenkins:jenkins
+  match:
+    - source: header
+      header: x-jenkins
+      pattern: '(?<version>[\d.]+)'
+      version: ${version}
+    - source: title
+      pattern: '(?i)\[Jenkins\]'
+      confidence: probable
+
+- id: grafana
+  name: Grafana
+  category: panel
+  cpe: cpe:/a:grafana:grafana
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Grafana'
+      confidence: probable
+    - source: body
+      pattern: "(?i)grafana-app"
+      confidence: probable
+
+- id: apache-shiro
+  name: Apache Shiro
+  category: framework
+  cpe: cpe:/a:apache:shiro
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\brememberMe='
+
+- id: swagger-ui
+  name: Swagger UI
+  category: api-doc
+  softmatch: true
+  match:
+    - source: body
+      pattern: "(?i)swagger-ui"
+    - source: body
+      pattern: '(?i)"swagger"\s*:'
+
+# ============================== favicon 指纹 ==============================
+#
+# 只有把 /favicon.ico 抓下来（CLI 加 -w-favicon，或外置规则集里自己写了 favicon 规则）才会
+# 参与匹配，因此这里的规则默认不产生任何额外请求。
+#
+# 哈希取自本仓库既有 PoC 的 favicon 指纹（shodan: http.favicon.hash / icon_hash），都是
+# 产品自带图标的哈希，命中即可认定是该产品，故记为 certain。
+
+- id: n8n
+  name: n8n
+  category: automation
+  match:
+    - source: favicon
+      pattern: '^-831756631$'
+
+- id: emqx
+  name: EMQX
+  category: mq
+  match:
+    - source: favicon
+      pattern: '^-670975485$'
+
+- id: xxl-job
+  name: XXL-JOB
+  category: scheduler
+  match:
+    - source: favicon
+      pattern: '^1691956220$'
+
+- id: seeyon
+  name: 致远 OA
+  category: oa
+  match:
+    - source: favicon
+      pattern: '^-187813927$'
+
+- id: zabbix
+  name: Zabbix
+  category: monitoring
+  match:
+    - source: favicon
+      pattern: '^892542951$'
+
+- id: harbor
+  name: Harbor
+  category: registry
+  match:
+    - source: favicon
+      pattern: '^657337228$'
+
+- id: sysaid
+  name: SysAid
+  category: itsm
+  match:
+    - source: favicon
+      pattern: '^1540720428$'
+
+- id: zimbra
+  name: Zimbra
+  category: mail
+  match:
+    - source: favicon
+      pattern: '^1624375939$'
+
+- id: owa
+  name: Microsoft Exchange OWA
+  category: mail
+  match:
+    - source: favicon
+      pattern: '^1768726119$'
+
+- id: juniper-jweb
+  name: Juniper J-Web
+  category: network-device
+  match:
+    - source: favicon
+      pattern: '^2141724739$'
+
+- id: dlink-dview
+  name: D-Link D-View
+  category: network-device
+  match:
+    - source: favicon
+      pattern: '^-1317621215$'
+
+- id: superset
+  name: Apache Superset
+  category: bi
+  match:
+    - source: favicon
+      pattern: '^1582430156$'
+
+- id: mcms
+  name: MCMS
+  category: cms
+  match:
+    - source: favicon
+      pattern: '^1464851260$'

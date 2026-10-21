@@ -2,6 +2,7 @@ package result
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -184,10 +185,20 @@ func (r *Result) PrintResultInfo() string {
 	return "[" + utils.GetNowDateTime() + "] [" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 }
 
-func (r *Result) PrintColorResultInfoConsole(number string) {
-	fmt.Printf("\r%v %v %v %v\r\n", log.LogColor.Time(number+" "+utils.GetNowDateTime()),
-		log.LogColor.Vulner(""+r.PocInfo.Id+"")+" "+log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)+""), r.FullTarget, formatExtractorInline(r.Extractor))
-
+// PrintColorResultInfoConsole 输出一行漏洞命中：`<poc-id> <SEVERITY> <target> <extractor>`。
+// 不带编号与时间：并发命中时编号顺序并不稳定，时间戳对定位目标也没有帮助，
+// 去掉后与端口/Web 结果行保持同一观感。
+func (r *Result) PrintColorResultInfoConsole() {
+	parts := []string{
+		log.LogColor.Vulner(r.PocInfo.Id),
+		log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)),
+		r.FullTarget,
+	}
+	if ex := formatExtractorInline(r.Extractor); ex != "" {
+		parts = append(parts, ex)
+	}
+	// 与端口/Web 结果行一样走 stderr，避免污染 -json-stream 的 stdout。
+	fmt.Fprintln(os.Stderr, strings.Join(parts, " "))
 }
 
 // formatExtractorInline 把提取结果渲染成控制台内联片段：`[key=value,key=value]`。

@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/gookit/color"
@@ -58,6 +59,27 @@ func wrapRender(render func(a ...any) string) func(a ...any) string {
 			return fmt.Sprint(a...)
 		}
 		return render(a...)
+	}
+}
+
+// StatusCode 按 HTTP 状态码类别着色：2xx 绿、3xx 青、4xx 黄、5xx 红，
+// 让一屏结果里不同健康度的目标靠颜色即可分辨；非标准码用深灰。
+func (c *Color) StatusCode(code int) string {
+	s := strconv.Itoa(code)
+	if !EnableColor {
+		return s
+	}
+	switch code / 100 {
+	case 2:
+		return c.Green(s)
+	case 3:
+		return c.Low(s)
+	case 4:
+		return c.Midium(s)
+	case 5:
+		return c.Red(s)
+	default:
+		return c.DarkGray(s)
 	}
 }
 

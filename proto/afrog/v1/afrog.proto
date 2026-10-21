@@ -124,12 +124,40 @@ message ResultEvent {
 message PortEvent {
   string host = 1;
   int32 port = 2;
+  string service = 3;
+  string product = 4;
+  string version = 5;
+  string device = 6;
+  string hostname = 7;
+  string os = 8;
+  string cpe = 9;
+  string info = 10;
+  bool tls = 11;
+  // confidence 取值 port/probable/certain，表示识别证据的强弱。
+  string confidence = 12;
+  string banner = 13;
+  map<string, string> extras = 14;
+}
+// WebTechnology 是一条命中的 Web 指纹。
+message WebTechnology {
+  string name = 1;
+  string version = 2;
+  string category = 3;
+  string cpe = 4;
+  // confidence 取值 probable/certain，与 port.confidence 同一标尺。
+  string confidence = 5;
 }
 message WebProbeEvent {
   string url = 1;
   int32 status = 2;
   string title = 3;
+  // fingerprint 是给人看的一行技术栈摘要；无指纹命中时回落到 server + powered_by。
   string fingerprint = 4;
+  string server = 5;
+  string powered_by = 6;
+  // confidence 是所有命中里最高的可信度，未命中时为空。
+  string confidence = 7;
+  repeated WebTechnology technologies = 8;
 }
 message HostEvent {
   string host = 1;

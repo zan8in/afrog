@@ -1,0 +1,195 @@
+# afrog 端口先验（port prior）。
+#
+# 先验的作用只有一个：当被动/主动探针都没能拿到明确证据时，给出「最可能的服务」
+# 作为推测（ConfidencePortOnly），并且决定哪些端口默认值得做一次 TLS 握手。
+# 它永远不会覆盖探针识别出的结果。
+#
+# 字段：
+#   port     端口号
+#   service  该端口的惯例服务名（nmap-services 风格）
+#   tls      true 表示该端口按惯例是 TLS 端口：跳过明文被动读取，直接做 TLS 握手
+#
+# 维护约定：只收录「大面积部署 + 端口惯例稳定」的条目。某个软件偶尔占用某个端口
+# 不构成先验，那种情况应该由 services.yaml 里的探针规则来识别。
+
+- { port: 21, service: ftp }
+- { port: 22, service: ssh }
+- { port: 23, service: telnet }
+- { port: 25, service: smtp }
+- { port: 43, service: whois }
+- { port: 53, service: domain }
+- { port: 69, service: tftp }
+- { port: 79, service: finger }
+- { port: 80, service: http }
+- { port: 81, service: http }
+- { port: 82, service: http }
+- { port: 83, service: http }
+- { port: 84, service: http }
+- { port: 85, service: http }
+- { port: 88, service: kerberos-sec }
+- { port: 90, service: http }
+- { port: 110, service: pop3 }
+- { port: 111, service: rpcbind }
+- { port: 113, service: ident }
+- { port: 119, service: nntp }
+- { port: 123, service: ntp }
+- { port: 135, service: msrpc }
+- { port: 137, service: netbios-ns }
+- { port: 138, service: netbios-dgm }
+- { port: 139, service: netbios-ssn }
+- { port: 143, service: imap }
+- { port: 161, service: snmp }
+- { port: 162, service: snmptrap }
+- { port: 179, service: bgp }
+- { port: 194, service: irc }
+- { port: 389, service: ldap }
+- { port: 443, service: https, tls: true }
+- { port: 445, service: microsoft-ds }
+- { port: 465, service: smtps, tls: true }
+- { port: 500, service: isakmp }
+- { port: 512, service: exec }
+- { port: 513, service: login }
+- { port: 514, service: shell }
+- { port: 515, service: printer }
+- { port: 548, service: afp }
+- { port: 554, service: rtsp }
+- { port: 563, service: nntps, tls: true }
+- { port: 587, service: submission }
+- { port: 623, service: ipmi }
+- { port: 631, service: ipp }
+- { port: 636, service: ldaps, tls: true }
+- { port: 646, service: ldp }
+- { port: 873, service: rsync }
+- { port: 902, service: vmware-auth }
+- { port: 989, service: ftps-data, tls: true }
+- { port: 990, service: ftps, tls: true }
+- { port: 992, service: telnets, tls: true }
+- { port: 993, service: imaps, tls: true }
+- { port: 994, service: ircs, tls: true }
+- { port: 995, service: pop3s, tls: true }
+- { port: 1025, service: msrpc }
+- { port: 1080, service: socks }
+- { port: 1099, service: java-rmi }
+- { port: 1194, service: openvpn }
+- { port: 1433, service: ms-sql-s }
+- { port: 1434, service: ms-sql-m }
+- { port: 1521, service: oracle }
+- { port: 1701, service: l2tp }
+- { port: 1720, service: h323q931 }
+- { port: 1723, service: pptp }
+- { port: 1755, service: ms-streaming }
+- { port: 1812, service: radius }
+- { port: 1883, service: mqtt }
+- { port: 1900, service: upnp }
+- { port: 2049, service: nfs }
+- { port: 2082, service: infoweb }
+- { port: 2083, service: infoweb, tls: true }
+- { port: 2086, service: whm }
+- { port: 2087, service: whm, tls: true }
+- { port: 2095, service: webmail }
+- { port: 2096, service: webmail, tls: true }
+- { port: 2121, service: ftp }
+- { port: 2181, service: zookeeper }
+- { port: 2222, service: ssh }
+- { port: 2375, service: docker }
+- { port: 2376, service: docker, tls: true }
+- { port: 2379, service: etcd-client, tls: true }
+- { port: 2380, service: etcd-server, tls: true }
+- { port: 3000, service: http }
+- { port: 3128, service: squid-http }
+- { port: 3260, service: iscsi }
+- { port: 3306, service: mysql }
+- { port: 3307, service: mysql }
+- { port: 3389, service: ms-wbt-server }
+- { port: 3478, service: stun }
+- { port: 3690, service: svn }
+- { port: 4000, service: http }
+- { port: 4369, service: epmd }
+- { port: 4443, service: https-alt, tls: true }
+- { port: 5000, service: http }
+- { port: 5044, service: logstash }
+- { port: 5060, service: sip }
+- { port: 5061, service: sips, tls: true }
+- { port: 5222, service: xmpp-client }
+- { port: 5269, service: xmpp-server }
+- { port: 5353, service: mdns }
+- { port: 5432, service: postgresql }
+- { port: 5433, service: postgresql }
+- { port: 5601, service: http }
+- { port: 5671, service: amqps, tls: true }
+- { port: 5672, service: amqp }
+- { port: 5683, service: coap }
+- { port: 5900, service: vnc }
+- { port: 5901, service: vnc }
+- { port: 5902, service: vnc }
+- { port: 5903, service: vnc }
+- { port: 5984, service: couchdb }
+- { port: 5985, service: winrm }
+- { port: 5986, service: winrm, tls: true }
+- { port: 6000, service: x11 }
+- { port: 6379, service: redis }
+- { port: 6380, service: redis }
+- { port: 6381, service: redis }
+- { port: 6382, service: redis }
+- { port: 6443, service: kubernetes, tls: true }
+- { port: 6444, service: kubernetes, tls: true }
+- { port: 6667, service: irc }
+- { port: 7001, service: http }
+- { port: 7002, service: https-alt, tls: true }
+- { port: 7474, service: http }
+- { port: 7687, service: bolt }
+- { port: 8000, service: http }
+- { port: 8008, service: http }
+- { port: 8009, service: ajp13 }
+- { port: 8010, service: http }
+- { port: 8042, service: http }
+- { port: 8069, service: http }
+- { port: 8080, service: http }
+- { port: 8081, service: http }
+- { port: 8082, service: http }
+- { port: 8083, service: http }
+- { port: 8086, service: http }
+- { port: 8088, service: http }
+- { port: 8090, service: http }
+- { port: 8123, service: http }
+- { port: 8161, service: http }
+- { port: 8200, service: http }
+- { port: 8443, service: https-alt, tls: true }
+- { port: 8500, service: http }
+- { port: 8529, service: http }
+- { port: 8834, service: https-alt, tls: true }
+- { port: 8880, service: http }
+- { port: 8883, service: mqtts, tls: true }
+- { port: 8888, service: http }
+- { port: 8983, service: http }
+- { port: 9000, service: http }
+- { port: 9001, service: http }
+- { port: 9042, service: cql }
+- { port: 9060, service: http }
+- { port: 9090, service: http }
+- { port: 9092, service: kafka }
+- { port: 9093, service: kafka }
+- { port: 9100, service: jetdirect }
+- { port: 9160, service: cassandra-thrift }
+- { port: 9200, service: http }
+- { port: 9300, service: elasticsearch-transport }
+- { port: 9418, service: git }
+- { port: 9443, service: https-alt, tls: true }
+- { port: 9999, service: http }
+- { port: 10000, service: http }
+- { port: 10050, service: zabbix-agent }
+- { port: 10051, service: zabbix-trapper }
+- { port: 10250, service: kubelet, tls: true }
+- { port: 10443, service: https-alt, tls: true }
+- { port: 11211, service: memcached }
+- { port: 11212, service: memcached }
+- { port: 11213, service: memcached }
+- { port: 15672, service: http }
+- { port: 27017, service: mongodb }
+- { port: 27018, service: mongodb }
+- { port: 27019, service: mongodb }
+- { port: 28017, service: http }
+- { port: 50000, service: http }
+- { port: 50070, service: http }
+- { port: 61616, service: activemq }
+- { port: 61613, service: activemq }

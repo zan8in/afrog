@@ -28,10 +28,24 @@ type OOBAdapter interface {
 	IsVaild() bool
 }
 
-// PortScanResult is an open port found during the port pre-scan.
+// PortScanResult is an open port found during the port pre-scan, together with
+// the service fingerprint identified on it. Confidence is one of
+// port/probable/certain and reflects how strong the identifying evidence is.
 type PortScanResult struct {
-	Host string
-	Port int
+	Host       string
+	Port       int
+	Service    string
+	Product    string
+	Version    string
+	Device     string
+	Hostname   string
+	OS         string
+	CPE        string
+	Info       string
+	TLS        bool
+	Confidence string
+	Banner     string
+	Extras     map[string]string
 }
 
 // HostDiscoveryResult is a live host found during discovery.
@@ -39,12 +53,27 @@ type HostDiscoveryResult struct {
 	Host string
 }
 
+// WebTechnology is one matched web fingerprint.
+type WebTechnology struct {
+	Name       string
+	Version    string
+	Category   string
+	CPE        string
+	Confidence string
+}
+
 // WebProbeResult is the metadata of a probed web service.
 type WebProbeResult struct {
 	URL       string
+	Status    int
 	Title     string
 	Server    string
 	PoweredBy string
+	// Fingerprint is the one-line summary of the detected stack; it falls back
+	// to Server + PoweredBy when no fingerprint rule matched.
+	Fingerprint  string
+	Confidence   string
+	Technologies []WebTechnology
 }
 
 // PhaseProgress is the progress of one scan phase.
@@ -239,7 +268,7 @@ type SDKScanner struct {
 	// OnResult receives every finding, as the engine's own result type.
 	OnResult func(*result.Result)
 	// OnPort receives every open port found by the port pre-scan.
-	OnPort func(host string, port int)
+	OnPort func(r PortScanResult)
 	// OnWebProbe receives every probed web service.
 	OnWebProbe func(r WebProbeResult)
 
@@ -518,10 +547,26 @@ func (s *SDKScanner) handleRawResult(r *result.Result) {
 }
 
 func (s *SDKScanner) handlePort(e sdk.PortEvent) {
-	if fn := s.OnPort; fn != nil {
-		fn(e.Host, e.Port)
+	r := PortScanResult{
+		Host:       e.Host,
+		Port:       e.Port,
+		Service:    e.Service,
+		Product:    e.Product,
+		Version:    e.Version,
+		Device:     e.Device,
+		Hostname:   e.Hostname,
+		OS:         e.OS,
+		CPE:        e.CPE,
+		Info:       e.Info,
+		TLS:        e.TLS,
+		Confidence: e.Confidence,
+		Banner:     e.Banner,
+		Extras:     e.Extras,
 	}
-	sendOrDrop(s.ctx, s.PortChan, PortScanResult{Host: e.Host, Port: e.Port})
+	if fn := s.OnPort; fn != nil {
+		fn(r)
+	}
+	sendOrDrop(s.ctx, s.PortChan, r)
 }
 
 func (s *SDKScanner) handleHost(e sdk.HostEvent) {
@@ -529,7 +574,27 @@ func (s *SDKScanner) handleHost(e sdk.HostEvent) {
 }
 
 func (s *SDKScanner) handleWebProbe(e sdk.WebProbeEvent) {
-	r := WebProbeResult{URL: e.URL, Title: e.Title, Server: e.Server, PoweredBy: e.PoweredBy}
+	r := WebProbeResult{
+		URL:         e.URL,
+		Status:      e.Status,
+		Title:       e.Title,
+		Server:      e.Server,
+		PoweredBy:   e.PoweredBy,
+		Fingerprint: e.Fingerprint,
+		Confidence:  e.Confidence,
+	}
+	if len(e.Technologies) > 0 {
+		r.Technologies = make([]WebTechnology, 0, len(e.Technologies))
+		for _, t := range e.Technologies {
+			r.Technologies = append(r.Technologies, WebTechnology{
+				Name:       t.Name,
+				Version:    t.Version,
+				Category:   t.Category,
+				CPE:        t.CPE,
+				Confidence: t.Confidence,
+			})
+		}
+	}
 	if fn := s.OnWebProbe; fn != nil {
 		fn(r)
 	}

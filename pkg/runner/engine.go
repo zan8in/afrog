@@ -7,6 +7,7 @@ import (
 	"html"
 	"net"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/targets"
 	"github.com/zan8in/afrog/v3/pkg/utils"
+	"github.com/zan8in/afrog/v3/pkg/webscan"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/oobadapter/pkg/oobadapter"
 )
@@ -90,15 +92,147 @@ func keyFromTargetWithPath(target string) string {
 	return base + path
 }
 
+// openPortsCollector 汇总端口扫描阶段的开放端口与指纹结论。
+//
+// 开放端口用于把 host:port 追加为后续扫描目标；指纹结论（service/TLS/confidence）
+// 供 webProbe 复用：既用于过滤掉已确认的非 Web 端口，也用于直接按 TLS 事实构造 URL。
 type openPortsCollector struct {
-	mu   sync.Mutex
-	open map[string][]int
+	mu      sync.Mutex
+	open    map[string][]int
+	results map[string]*portscan.ScanResult
 }
 
 func newOpenPortsCollector() *openPortsCollector {
 	return &openPortsCollector{
-		open: make(map[string][]int),
+		open:    make(map[string][]int),
+		results: make(map[string]*portscan.ScanResult),
 	}
+}
+
+// Add 登记一个开放端口。
+func (c *openPortsCollector) Add(host string, port int) {
+	c.mu.Lock()
+	c.open[host] = append(c.open[host], port)
+	c.mu.Unlock()
+}
+
+// AddResult 登记一个端口的完整指纹结论，同时把它计入开放端口。
+func (c *openPortsCollector) AddResult(r *portscan.ScanResult) {
+	if r == nil {
+		return
+	}
+	key := net.JoinHostPort(r.Host, strconv.Itoa(r.Port))
+	c.mu.Lock()
+	c.open[r.Host] = append(c.open[r.Host], r.Port)
+	if _, ok := c.results[key]; !ok {
+		c.results[key] = r
+	}
+	c.mu.Unlock()
+}
+
+// Result 返回 host:port 的指纹结论，没有记录时返回 nil。
+func (c *openPortsCollector) Result(host string, port int) *portscan.ScanResult {
+	if c == nil {
+		return nil
+	}
+	key := net.JoinHostPort(host, strconv.Itoa(port))
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.results[key]
+}
+
+// maxFaviconBytes 是抓取 favicon 时接受的最大体积，超过则视为非 favicon 直接丢弃。
+const maxFaviconBytes = 1 << 20
+
+// applyWebFingerprint 把 Web 指纹匹配结果写入探测元数据。
+//
+// Fingerprint 是给人与前端看的一行摘要：优先用识别出的技术栈，无命中时回落到
+// Server 与 X-Powered-By 响应头，保证老行为不丢。
+func applyWebFingerprint(meta *WebMeta, res webscan.Result) {
+	if meta == nil {
+		return
+	}
+	if len(res.Technologies) > 0 {
+		meta.Technologies = make([]WebTech, 0, len(res.Technologies))
+		for _, t := range res.Technologies {
+			meta.Technologies = append(meta.Technologies, WebTech{
+				Name:       t.Name,
+				Version:    t.Version,
+				Category:   t.Category,
+				CPE:        t.CPE,
+				Confidence: t.Confidence.String(),
+				RuleID:     t.RuleID,
+			})
+		}
+		meta.Confidence = res.Confidence.String()
+	}
+	fingerprint := webscan.Summarize(res.Technologies)
+	if fingerprint == "" {
+		fingerprint = joinNonEmpty(meta.Server, meta.PoweredBy)
+	}
+	meta.Fingerprint = fingerprint
+}
+
+// webProbeScheme 依据端口指纹结论决定候选是否值得做 Web 探测，以及应采用的协议。
+//
+// 返回 ok 为 false 表示指纹已明确判定该端口不是 Web 服务，应跳过 HTTP 探测；
+// scheme 为空表示没有可用指纹，调用方需要退回协议试探。
+func webProbeScheme(fact *portscan.ScanResult) (scheme string, ok bool) {
+	if fact == nil {
+		return "", true
+	}
+	if fact.TLS {
+		return "https", true
+	}
+	if fact.Service != "" && !portscan.IsWebService(fact.Service) {
+		return "", false
+	}
+	return "http", true
+}
+
+// toPortScanInfo 把 portscan 的识别结果转换成 config 层结构，供回调与事件流使用。
+func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
+	return config.PortScanInfo{
+		Host:       r.Host,
+		Port:       r.Port,
+		Service:    r.Service,
+		Product:    r.Product,
+		Version:    r.Version,
+		Device:     r.Device,
+		Hostname:   r.Hostname,
+		OS:         r.OS,
+		CPE:        r.CPE,
+		Info:       r.Info,
+		TLS:        r.TLS,
+		Confidence: r.Confidence.String(),
+		Banner:     r.Banner,
+		Extras:     r.Extras,
+	}
+}
+
+// formatPortResult 渲染一行端口结果：host:port service product version (tls, confidence)。
+func formatPortResult(r *portscan.ScanResult) string {
+	// net.JoinHostPort 保证 IPv6 写成 [::1]:80，而不是拼接出无法解析的 ::1:80。
+	line := net.JoinHostPort(r.Host, strconv.Itoa(r.Port))
+	if svc := strings.Join(strings.Fields(r.Service+" "+r.Product+" "+r.Version), " "); svc != "" {
+		line += " " + svc
+	}
+	var flags []string
+	if r.TLS {
+		flags = append(flags, "tls")
+	}
+	// 内部可信度枚举对用户不可读：verified/likely 才有意义，
+	// 「仅端口开放未识别服务」与 unknown 属无信息状态，直接省略（避免出现 (port) 这类黑话）。
+	switch r.Confidence {
+	case portscan.ConfidenceCertain:
+		flags = append(flags, "verified")
+	case portscan.ConfidenceProbable:
+		flags = append(flags, "likely")
+	}
+	if len(flags) > 0 {
+		line += " (" + strings.Join(flags, ", ") + ")"
+	}
+	return line
 }
 
 func extractTitle(body []byte) string {
@@ -119,7 +253,17 @@ func extractTitle(body []byte) string {
 	return t
 }
 
-func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []string {
+// clearProgressLine 在输出阶段日志/结果行之前清掉进度条所在行。
+// 这些输出与进度条都写 stderr，不清行时两者会拼接在同一行上。
+func clearProgressLine() {
+	fmt.Fprint(os.Stderr, "\r\033[2K\r")
+}
+
+// webProbe 探测存活 Web 服务并返回可用的 URL 列表。
+//
+// facts 是端口扫描阶段的指纹结论（可为 nil，如未开启 -ps）：命中时用它跳过
+// 已确认的非 Web 端口，并按 TLS 事实直接构造 http(s):// URL，省去协议试探请求。
+func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, facts *openPortsCollector) []string {
 	if runner == nil || idx == nil || runner.options == nil {
 		return nil
 	}
@@ -129,29 +273,64 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		return nil
 	}
 
-	var printSeq uint64
+	// matcher 是 Web 指纹引擎，加载失败只降级为「不识别技术栈」，不影响探测本身。
+	matcher, err := webscan.LoadMatcher(runner.options.WebFingerprintDir)
+	if err != nil {
+		matcher = webscan.NewMatcher(nil)
+		if !runner.options.Silent {
+			gologger.Warning().Msgf("webprobe: load web fingerprint rules: %v", err)
+		}
+	}
+
+	// factFor 按 host:port 取端口指纹结论；没有结论（如端口由用户直接指定）时返回 nil。
+	factFor := func(hostPort string) *portscan.ScanResult {
+		host, portStr, err := net.SplitHostPort(strings.TrimSpace(hostPort))
+		if err != nil {
+			return nil
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return nil
+		}
+		return facts.Result(host, port)
+	}
+
+	type candidate struct {
+		raw string
+		// scheme 非空表示协议已由端口指纹确定，无需再做协议试探。
+		scheme string
+		fact   *portscan.ScanResult
+	}
 
 	seen := make(map[string]struct{})
-	candidates := make([]string, 0, len(idx.URLs)+len(idx.HostPorts)+len(idx.Hosts))
-	add := func(s string) {
-		s = strings.TrimSpace(s)
-		if s == "" {
+	candidates := make([]candidate, 0, len(idx.URLs)+len(idx.HostPorts)+len(idx.Hosts))
+	add := func(raw, scheme string, fact *portscan.ScanResult) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
 			return
 		}
-		if _, ok := seen[s]; ok {
+		key := scheme + "\x00" + raw
+		if _, ok := seen[key]; ok {
 			return
 		}
-		seen[s] = struct{}{}
-		candidates = append(candidates, s)
+		seen[key] = struct{}{}
+		candidates = append(candidates, candidate{raw: raw, scheme: scheme, fact: fact})
 	}
+	// 用户显式给出的 URL 自带协议，保持原样。
 	for _, u := range idx.URLs {
-		add(u)
+		add(u, "", nil)
 	}
 	for _, hp := range idx.HostPorts {
-		add(hp)
+		fact := factFor(hp)
+		scheme, ok := webProbeScheme(fact)
+		if !ok {
+			continue
+		}
+		add(hp, scheme, fact)
 	}
+	// 裸主机名没有端口信息，无法与指纹结论关联，仍走协议试探。
 	for _, h := range idx.Hosts {
-		add(h)
+		add(h, "", nil)
 	}
 	if len(candidates) == 0 {
 		return nil
@@ -159,6 +338,13 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	totalCandidates := len(candidates)
 	var processed uint64
 	var lastPercent int32 = -1
+	webStart := time.Now()
+	// 阶段边界行（started/completed）默认不打印：进度条已经标出当前阶段，
+	// 这些行在常规输出里只是噪音；-debug 时恢复，便于对齐排查。
+	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
+		clearProgressLine()
+		gologger.Print().Msgf("%-9s | %-9s | candidates=%d", utils.StageWebProbe, "started", totalCandidates)
+	}
 	if runner.options.OnPhaseProgress != nil {
 		runner.options.OnPhaseProgress("webprobe", "running", 0, int64(totalCandidates), 0)
 	}
@@ -175,10 +361,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	ticker := time.NewTicker(time.Second / time.Duration(rate))
 	defer ticker.Stop()
 
-	type task struct {
-		raw string
-	}
-	tasks := make(chan task, con*4)
+	tasks := make(chan candidate, con*4)
 	var wg sync.WaitGroup
 
 	var mu sync.Mutex
@@ -207,45 +390,42 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 			runner.OnWebProbe(meta)
 		}
 		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
-			extinfo := ""
+			// 目标 URL 放最前：用户扫视时以目标为锚点，状态码只是它的属性，
+			// 与漏洞结果行 `poc-id SEVERITY target` 的「主体在前」口径一致。
+			// 不带编号：编号在并发探测下顺序并不稳定，端口/漏洞结果行也统一去掉了它。
+			parts := make([]string, 0, 4)
+			parts = append(parts, urlStr)
+			if meta.Status > 0 {
+				parts = append(parts, log.LogColor.StatusCode(meta.Status))
+			}
 			if t := strings.TrimSpace(meta.Title); t != "" {
-				t = utils.Str2UTF8(t)
-				extinfo += "[" + log.LogColor.Title(t) + "]"
+				parts = append(parts, "["+log.LogColor.Title(utils.Str2UTF8(t))+"]")
+			} else {
+				parts = append(parts, log.LogColor.DarkGray("(no title)"))
 			}
-			serverOrPowered := ""
-			if s := strings.TrimSpace(meta.Server); s != "" {
-				serverOrPowered = s
-			}
-			if p := strings.TrimSpace(meta.PoweredBy); p != "" {
-				if serverOrPowered == "" {
-					serverOrPowered = p
-				} else {
-					serverOrPowered += "," + p
-				}
-			}
-			if serverOrPowered != "" {
-				extinfo += "[" + log.LogColor.DarkGray(serverOrPowered) + "]"
+			if fp := strings.TrimSpace(meta.Fingerprint); fp != "" {
+				parts = append(parts, "["+log.LogColor.DarkGray(utils.Str2UTF8(fp))+"]")
 			}
 
-			number := utils.GetNumberText(int(atomic.AddUint64(&printSeq, 1)))
-			seq := log.LogColor.Time(number)
-			if extinfo == "" {
-				fmt.Printf("\r%v %s\r\n", seq, urlStr)
-			} else {
-				fmt.Printf("\r%v %s %s\r\n", seq, urlStr, extinfo)
-			}
+			// 结果行必须和端口扫描结果走同一条 stderr 通道：直写 stdout 时，只收 stderr 的
+			// 终端里完全看不到这些行，而 -json-stream 的 stdout 只允许承载 NDJSON。
+			// 打印前先清掉进度条所在行，否则结果行会与进度条互相覆盖。
+			clearProgressLine()
+			gologger.Print().Msgf("%s", strings.Join(parts, " "))
 		}
 	}
 
-	fetchMeta := func(urlStr string) WebMeta {
+	// fetchResponse 请求一次目标并提取标题与关键响应头。
+	// 返回的 resp 为 nil 表示服务端没有响应（协议探测已被上游省略时需要它判定存活）。
+	fetchResponse := func(urlStr string) (WebMeta, *proto.Response) {
+		meta := WebMeta{URL: urlStr}
 		vm := make(map[string]any, 4)
 		if ctx != nil {
 			vm[retryhttpclient.ContextVarKey] = ctx
 		}
-		meta := WebMeta{URL: urlStr}
 		u, err := url.Parse(urlStr)
 		if err != nil {
-			return meta
+			return meta, nil
 		}
 		reqURI := strings.TrimSpace(u.RequestURI())
 		if reqURI == "" {
@@ -255,18 +435,37 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 		rule.Request.Method = "GET"
 		rule.Request.Path = "^" + reqURI
 		rule.Request.FollowRedirects = true
-		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
+		err = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
 
 		resp, _ := vm["response"].(*proto.Response)
 		if resp == nil {
-			return meta
+			return meta, nil
 		}
+		meta.Status = int(resp.Status)
 		if len(resp.Headers) > 0 {
 			meta.Server = strings.TrimSpace(resp.Headers["server"])
 			meta.PoweredBy = strings.TrimSpace(resp.Headers["x-powered-by"])
 		}
 		meta.Title = extractTitle(resp.Body)
-		return meta
+		return meta, resp
+	}
+
+	// fetchFavicon 额外抓取 /favicon.ico，仅在调用方判定需要时调用（-w-favicon 或外置
+	// 规则集含 favicon 规则）。
+	fetchFavicon := func(urlStr string) []byte {
+		vm := make(map[string]any, 4)
+		if ctx != nil {
+			vm[retryhttpclient.ContextVarKey] = ctx
+		}
+		rule := poc.Rule{}
+		rule.Request.Method = "GET"
+		rule.Request.Path = "^/favicon.ico"
+		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
+		resp, _ := vm["response"].(*proto.Response)
+		if resp == nil || len(resp.Body) == 0 || len(resp.Body) > maxFaviconBytes {
+			return nil
+		}
+		return resp.Body
 	}
 
 	for i := 0; i < con; i++ {
@@ -301,33 +500,73 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 						return
 					case <-ticker.C:
 					}
-					u, err := retryhttpclient.CheckProtocol(it.raw)
-					if err != nil || strings.TrimSpace(u) == "" {
+					var u string
+					switch {
+					case it.scheme != "":
+						// 端口指纹已给出 TLS 事实，直接构造 URL，省去一次协议试探。
+						u = it.scheme + "://" + it.raw
+					case strings.Contains(it.raw, "://"):
+						// 用户显式给出的 URL 自带协议，无需再试探。
+						u = it.raw
+					default:
+						resolved, err := retryhttpclient.CheckProtocol(it.raw)
+						if err != nil || strings.TrimSpace(resolved) == "" {
+							continue
+						}
+						u = resolved
+					}
+					meta, resp := fetchResponse(u)
+					if resp == nil {
 						continue
 					}
-					meta := fetchMeta(u)
+					if strings.TrimSpace(meta.Server) == "" && it.fact != nil {
+						// HTTP 响应没有 Server 头时，回落到端口指纹识别的产品与版本。
+						meta.Server = strings.Join(strings.Fields(it.fact.Product+" "+it.fact.Version), " ")
+					}
+					webfp := webscan.Response{
+						StatusCode: meta.Status,
+						Headers:    resp.Headers,
+						Body:       resp.Body,
+					}
+					// 抓 favicon 会多一次请求，因此默认不抓：只有显式开启 -w-favicon，或外置
+					// 规则集里写了 favicon 规则（用户意图明显）时才抓。
+					if runner.options.WebFavicon || matcher.HasFavicon() {
+						webfp.Favicon = fetchFavicon(u)
+					}
+					applyWebFingerprint(&meta, matcher.Match(webfp))
 					record(u, meta)
 				}
 			}
 		}()
 	}
 
+	// 取消后必须停止投递：select 里的 break 只跳出 select 本身，因此这里用标签跳出整个循环，
+	// 否则取消后仍会继续往 tasks 里塞任务（虽然消费方已退出，只会做无用功）。
+dispatch:
 	for _, c := range candidates {
 		if runner.ctx.Err() != nil || (ctx != nil && ctx.Err() != nil) {
 			break
 		}
 		select {
 		case <-runner.ctx.Done():
-			break
+			break dispatch
 		case <-ctx.Done():
-			break
-		case tasks <- task{raw: c}:
+			break dispatch
+		case tasks <- c:
 		}
 	}
 	close(tasks)
 	wg.Wait()
+	done := atomic.LoadUint64(&processed)
+	status := "completed"
+	if ctx != nil && ctx.Err() != nil {
+		status = "interrupted"
+	} else if runner.ctx != nil && runner.ctx.Err() != nil {
+		status = "interrupted"
+	} else if int(done) != totalCandidates {
+		status = "interrupted"
+	}
 	if runner.options.OnPhaseProgress != nil {
-		done := atomic.LoadUint64(&processed)
 		percent := 0
 		if totalCandidates > 0 {
 			percent = int(done * 100 / uint64(totalCandidates))
@@ -335,17 +574,21 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 				percent = 100
 			}
 		}
-		status := "completed"
-		if ctx != nil && ctx.Err() != nil {
-			status = "interrupted"
-		} else if runner.ctx != nil && runner.ctx.Err() != nil {
-			status = "interrupted"
-		} else if int(done) != totalCandidates {
-			status = "interrupted"
-		} else if totalCandidates > 0 {
+		if status == "completed" && totalCandidates > 0 {
 			percent = 100
 		}
 		runner.options.OnPhaseProgress("webprobe", status, int64(done), int64(totalCandidates), percent)
+	}
+	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
+		clearProgressLine()
+		gologger.Print().Msgf("%-9s | %-9s | candidates=%d/%d alive=%d duration=%s",
+			utils.StageWebProbe,
+			status,
+			done,
+			totalCandidates,
+			len(webURLs),
+			time.Since(webStart).Truncate(time.Second),
+		)
 	}
 
 	runner.webMu.Lock()
@@ -358,12 +601,6 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex) []
 	runner.webMu.Unlock()
 
 	return webURLs
-}
-
-func (c *openPortsCollector) Add(host string, port int) {
-	c.mu.Lock()
-	c.open[host] = append(c.open[host], port)
-	c.mu.Unlock()
 }
 
 func (c *openPortsCollector) Snapshot() map[string][]int {
@@ -429,6 +666,55 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 		}
 	}
 	return true
+}
+
+// webTechRequires 把 -w 阶段识别出的 Web 技术栈翻译成 requires 词表。
+//
+// requires 原本只能命中「指纹 PoC 的 tag/id」，粒度受限于指纹 PoC；接入 Web 指纹后，
+// requires: [wordpress] / [thinkphp] / [apache-shiro] 这类写法可直接命中响应里识别出的
+// 技术栈，从而跳过明显不可能命中的 PoC。
+//
+// targets 是本次扫描真正会跑的目标列表，metas 是 webProbe 的原始结果（键为去掉路径的
+// host:port）。这里按 host:port 反查，使带路径的目标也能用上其站点级指纹；键仍取
+// keyFromTargetWithPath，保证与 shouldSkipRequires 的查表口径一致。
+func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[string]struct{} {
+	if len(targets) == 0 || len(metas) == 0 {
+		return nil
+	}
+	techsByKey := make(map[string][]WebTech, len(metas))
+	for k, meta := range metas {
+		if len(meta.Technologies) > 0 {
+			techsByKey[k] = meta.Technologies
+		}
+	}
+	if len(techsByKey) == 0 {
+		return nil
+	}
+	out := make(map[string]map[string]struct{})
+	for _, t := range targets {
+		techs, ok := techsByKey[fingerprint.KeyFromTarget(t)]
+		if !ok {
+			continue
+		}
+		key := keyFromTargetWithPath(t)
+		if key == "" {
+			continue
+		}
+		set := out[key]
+		if set == nil {
+			set = make(map[string]struct{}, len(techs)*3)
+			out[key] = set
+		}
+		for _, tech := range techs {
+			for _, tok := range webscan.MatchTokens(tech.RuleID, tech.Name, tech.Category) {
+				set[tok] = struct{}{}
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[string]struct{}, targetTags map[string]struct{}, pocTags map[string]struct{}) bool {
@@ -790,7 +1076,7 @@ func (e *Engine) pedmLog(options *config.Options, line string) {
 		options.OnPedmLog(line)
 		return
 	}
-	gologger.Info().Msg(log.LogColor.Time(line))
+	gologger.Print().Msg(log.LogColor.Time(line))
 }
 
 func pedmPairKey(target, pocID string) string {
@@ -1034,6 +1320,9 @@ func (runner *Runner) Execute() {
 	// javascript PoC 加载汇总放在启动横幅之后打印，避免插进 Core/POC/Cur/OOB 这一组中间。
 	options.PrintJSReport()
 
+	// portFacts 汇总端口扫描阶段的指纹结论，供后续 webProbe 复用，避免重复探测。
+	var portFacts *openPortsCollector
+
 	// portscan pre-scan: run after OOB status output to ensure ordering
 	if options.PortScan {
 		origTargets := runner.options.Targets.List()
@@ -1065,9 +1354,12 @@ func (runner *Runner) Execute() {
 		if len(hosts) > 0 {
 			psOpts := portscan.DefaultOptions()
 			psOpts.Targets = hosts
-			// Let portscan module handle its own output and progress
-			psOpts.Debug = !options.Silent
-			psOpts.LiveStats = options.LiveStats
+			// CLI 端只保留 main.go 那一条统一进度条（由 OnPhaseProgress 驱动），
+			// 所以关掉 portscan 自带的进度条与调试输出，避免两条进度条抢同一行。
+			psOpts.Debug = false
+			psOpts.LiveStats = false
+			// 阶段边界行默认静默，只有 -debug 时才让 portscan 打印它们。
+			psOpts.StageLog = options.Debug
 			psOpts.Quiet = false
 			if options.OnPhaseProgress != nil {
 				psOpts.OnProgress = func(phase string, status string, finished int, total int, percent int) {
@@ -1104,15 +1396,21 @@ func (runner *Runner) Execute() {
 			if options.PSNoAdaptiveTimeout {
 				psOpts.AdaptiveTimeout = false
 			}
+			psOpts.ServiceProbes = options.PSServiceProbe
+			psOpts.FingerprintDir = options.PSFingerprintDir
 			collector := newOpenPortsCollector()
+			portFacts = collector
 			psOpts.OnResult = func(r *portscan.ScanResult) {
 				if options.OnPortScanResult != nil {
-					options.OnPortScanResult(r.Host, r.Port)
+					options.OnPortScanResult(toPortScanInfo(r))
 				}
 				if !options.SDKMode {
-					gologger.Print().Msgf("%s:%d", r.Host, r.Port)
+					// 与 Web/漏洞结果行统一：不带编号（并发命中时编号顺序不稳定），
+					// 打印前先清掉进度条所在行，避免结果行与进度条互相覆盖。
+					clearProgressLine()
+					gologger.Print().Msgf("%s", formatPortResult(r))
 				}
-				collector.Add(r.Host, r.Port)
+				collector.AddResult(r)
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
 				baseCtx := runner.ctx
@@ -1144,16 +1442,16 @@ func (runner *Runner) Execute() {
 					}
 				}
 			}
-		} else if !options.SDKMode {
-			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
-			gologger.Info().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
+		} else if options.Debug && !options.SDKMode {
+			gologger.Print().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
+			gologger.Print().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
 		} else if options.OnPhaseProgress != nil {
 			options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
 			options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 		}
-	} else if !options.SDKMode {
-		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
-		gologger.Info().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
+	} else if options.Debug && !options.SDKMode {
+		gologger.Print().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
+		gologger.Print().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
 	} else if options.OnPhaseProgress != nil {
 		options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
 		options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
@@ -1185,7 +1483,7 @@ func (runner *Runner) Execute() {
 	netTargetsStrict := append([]string(nil), idx.HostPorts...)
 	var webTargets []string
 	if options.EnableWebProbe {
-		webTargets = runner.webProbe(baseCtx, idx)
+		webTargets = runner.webProbe(baseCtx, idx, portFacts)
 	}
 	if !runner.options.SDKMode {
 		webMetas := make([]WebMeta, 0, len(webTargets))
@@ -1383,12 +1681,14 @@ func (runner *Runner) Execute() {
 		options.SmartControl()
 	}
 
-	if !options.SDKMode {
+	// 与 PORT-SCAN / WEB-PROBE 同一口径：阶段边界行仅在 -debug 时输出。
+	if options.Debug && !options.SDKMode {
 		pocTotal := len(pocSlice)
 		if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
 			pocTotal += len(fingerprintPocs)
 		}
-		gologger.Info().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), pocTotal, options.Count)
+		clearProgressLine()
+		gologger.Print().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), pocTotal, options.Count)
 	}
 
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
@@ -1436,8 +1736,9 @@ func (runner *Runner) Execute() {
 	}
 
 	// fingerTagsByKey 只放「指纹 tag」，供指纹过滤使用；
-	// fingerRequiresByKey 额外并入指纹 PoC 的 id，供 requires 匹配使用
-	// （作者既可能写 requires: [mysql]（tag），也可能写 requires: [ajp-protocol-detect]（id））。
+	// fingerRequiresByKey 额外并入指纹 PoC 的 id 与 -w 识别出的 Web 技术栈，供 requires
+	// 匹配使用（作者既可能写 requires: [mysql]（tag），也可能写 requires: [ajp-protocol-detect]
+	// （指纹 PoC id），还可能写 requires: [wordpress]（Web 指纹））。
 	fingerTagsByKey := make(map[string]map[string]struct{})
 	fingerRequiresByKey := make(map[string]map[string]struct{})
 	globalFingerTags := make(map[string]struct{})
@@ -1476,6 +1777,28 @@ func (runner *Runner) Execute() {
 			fingerTagsByKey[k] = tagSet
 			for t := range tagSet {
 				globalFingerTags[t] = struct{}{}
+			}
+		}
+	}
+
+	// 把 -w 识别出的 Web 技术栈并入 requires 词表：Web 指纹比指纹 PoC 更能说清
+	// 「这个站点是什么」，因此 requires: [wordpress] 这类门控才真正落地。
+	if len(webScanTargets) > 0 {
+		runner.webMu.Lock()
+		webSnap := make(map[string]WebMeta, len(runner.webMetaByKey))
+		for k, v := range runner.webMetaByKey {
+			webSnap[k] = v
+		}
+		runner.webMu.Unlock()
+
+		for k, set := range webTechRequires(webScanTargets, webSnap) {
+			reqSet := fingerRequiresByKey[k]
+			if reqSet == nil {
+				reqSet = make(map[string]struct{}, len(set))
+				fingerRequiresByKey[k] = reqSet
+			}
+			for tok := range set {
+				reqSet[tok] = struct{}{}
 			}
 		}
 	}
@@ -2050,24 +2373,12 @@ func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
 
 	status, msg := runner.getOOBStatus(reversePocs)
 
+	// 与 banner 的 Core/POC/Cur 状态行保持同一种紧凑样式，整块状态输出观感一致。
 	if !status {
-		config.PrintStatusLine(
-			log.LogColor.Red(config.GetErrorSymbol()),
-			"OOB: ",
-			log.LogColor.Red(msg),
-			"",
-		)
-		config.PrintSeparator()
-
-		return
+		fmt.Printf("[%s] OOB %s\n", log.LogColor.Red(config.GetErrorSymbol()), log.LogColor.Red(msg))
+	} else {
+		fmt.Printf("[%s] OOB %s\n", log.LogColor.Low(config.GetOkSymbol()), log.LogColor.Green(msg))
 	}
-	config.PrintStatusLine(
-		log.LogColor.Low(config.GetOkSymbol()),
-		"OOB: ",
-		log.LogColor.Green(msg),
-		"",
-	)
-
 	config.PrintSeparator()
 }
 

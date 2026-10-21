@@ -1,11 +1,8 @@
 package portscan
 
 import (
-	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -34,6 +31,10 @@ type Scanner struct {
 	hostSems          sync.Map // host -> chan struct{} (per-target concurrency gate)
 	scanPortTotal     uint64
 	scanStageMajor    uint32
+
+	fingerprinter *Fingerprinter
+	grabber       *Grabber
+	verifyGrabber *Grabber
 }
 
 // NewScanner creates a new scanner instance
@@ -42,8 +43,24 @@ func NewScanner(opt *Options) (*Scanner, error) {
 		opt = DefaultOptions()
 	}
 
+	fp, err := NewFingerprinter(opt.FingerprintDir)
+	if err != nil {
+		if opt.FingerprintDir == "" {
+			return nil, err
+		}
+		// 外置指纹目录不可用时回退到内置指纹集，避免用户自定义文件写错就中断扫描。
+		gologger.Warning().Msgf("%-9s | %-9s | %v, falling back to built-in fingerprints", utils.StagePortScan, "fingerprint", err)
+		if fp, err = NewFingerprinter(""); err != nil {
+			return nil, err
+		}
+	}
+
 	scanner := &Scanner{
-		options: opt,
+		options:       opt,
+		fingerprinter: fp,
+		grabber:       NewGrabber(fp, opt.Timeout, opt.ServiceProbes),
+		// 复核可疑主机时必须拿到证据，因此强制开启主动探针。
+		verifyGrabber: NewGrabber(fp, opt.Timeout, true),
 	}
 
 	return scanner, nil
@@ -108,6 +125,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	}
 	atomic.StoreUint64(&s.scanPortTotal, uint64(portTotal))
 
+	// 阶段边界行默认静默，只有显式打开 StageLog（CLI 的 -debug）时才打印，
+	// 常规输出只保留结果行与统一进度条。
+	stageLog := s.options.StageLog || s.options.Debug
+
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
 	hostIter := NewHostIterator(s.options.Targets)
 
@@ -120,8 +141,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		origHosts := hostIter.GetHosts()
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
 		discStart := time.Now()
-		if !s.options.Quiet {
-			gologger.Info().Msgf("%-9s | %-9s | targets=%d method=%s", utils.StageHostDiscovery, "started", len(origHosts), s.options.DiscoveryMethod)
+		if stageLog && !s.options.Quiet {
+			gologger.Print().Msgf("%-9s | %-9s | targets=%d method=%s", utils.StageHostDiscovery, "started", len(origHosts), s.options.DiscoveryMethod)
 		}
 		aliveHosts, derr := DiscoverAliveHosts(discCtx, s.options, origHosts)
 		if derr != nil {
@@ -133,8 +154,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 		}
 		discStop()
-		if !s.options.Quiet {
-			gologger.Info().Msgf("%-9s | %-9s | alive=%d/%d duration=%s", utils.StageHostDiscovery, "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
+		if stageLog && !s.options.Quiet {
+			gologger.Print().Msgf("%-9s | %-9s | alive=%d/%d duration=%s", utils.StageHostDiscovery, "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
 		}
 		hostIter = NewHostIterator(aliveHosts)
 	} else if s.options.OnProgress != nil {
@@ -148,12 +169,13 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	total := hostIter.Total() * portTotal
 	startTime := time.Now()
 
-	if !s.options.Quiet {
+	if stageLog && !s.options.Quiet {
 		if !s.options.LiveStats {
+			// 端口排名数据版本属于内部实现细节，只在对齐调试时打印，避免污染常规输出。
 			if isBuiltinPortsSpec(s.options.Ports) {
-				gologger.Info().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
+				gologger.Print().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
 			}
-			gologger.Info().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
+			gologger.Print().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
 		}
 	}
 
@@ -194,7 +216,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 			atomic.StoreInt32(&lastPercent, int32(percent))
 		}
-		elapsed := strings.Split(time.Since(startTime).String(), ".")[0] + "s"
+		// 与漏洞扫描阶段共用同一条渲染口径，形状与字段完全一致。
 		suffix := ""
 		if s.options.LiveStats {
 			if v := stageCursor.Load(); v != nil {
@@ -203,8 +225,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				}
 			}
 		}
+		line := progress.RenderLine(utils.StagePortScan, percent, int64(curr), int64(total), time.Since(startTime), suffix)
+		if line == "" {
+			return
+		}
 		fmt.Fprint(os.Stderr, "\r\033[2K")
-		fmt.Fprintf(os.Stderr, "\r[%s] %d%% (%d/%d), %s%s", progress.GetProgressBar(percent, 0), percent, curr, total, elapsed, suffix)
+		fmt.Fprintf(os.Stderr, "\r%s", line)
 	}
 
 	if printEnabled || callbackEnabled {
@@ -371,9 +397,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
 	}
-	if !s.options.Quiet {
+	if stageLog && !s.options.Quiet {
 		if !s.options.LiveStats {
-			gologger.Info().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
+			// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
+			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+			gologger.Print().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
 				utils.StagePortScan,
 				"completed",
 				hostIter.Total(),
@@ -418,14 +446,14 @@ type hostScanStat struct {
 	mu         sync.Mutex
 	verified   map[int]struct{}
 	discovered map[int]struct{}
-	pending    []int
+	pending    []*ScanResult
 }
 
 func newHostScanStat() *hostScanStat {
 	return &hostScanStat{
 		verified:   make(map[int]struct{}),
 		discovered: make(map[int]struct{}),
-		pending:    make([]int, 0, 256),
+		pending:    make([]*ScanResult, 0, 64),
 	}
 }
 
@@ -637,11 +665,19 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 		return
 	}
 
+	// 连接还握在手里，直接复用它做被动 banner 抓取与指纹识别，不产生额外连接。
+	res := &ScanResult{
+		Host:        host,
+		Port:        port,
+		State:       PortStateOpen,
+		ServiceInfo: *s.grabber.Grab(conn, host, port),
+	}
+
 	if s.shouldBufferHost(st) {
 		st.mu.Lock()
 		mode := atomic.LoadUint32(&st.mode)
 		if (mode == hostModeUndecided || mode == hostModeDeciding) && len(st.pending) < 2048 {
-			st.pending = append(st.pending, port)
+			st.pending = append(st.pending, res)
 			st.mu.Unlock()
 			return
 		}
@@ -651,7 +687,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 		}
 	}
 
-	s.emitOpen(host, port, "")
+	s.emitResult(res)
 }
 
 func (s *Scanner) shouldBufferHost(st *hostScanStat) bool {
@@ -689,9 +725,11 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 		// Everything answers: almost certainly a security device/proxy instead of
 		// real listeners. Keep the state so ports already discovered are still
 		// verified below (verifyAndEmit also re-checks every discovered port),
-		// instead of silently dropping them.
+		// instead of silently dropping them. Buffered results are dropped here to
+		// release the banners they hold.
 		st.mu.Lock()
 		atomic.StoreUint32(&st.mode, hostModeSuspicious)
+		st.pending = nil
 		st.mu.Unlock()
 		if !s.options.Quiet {
 			gologger.Warning().Msgf("%-9s | %-9s | host=%s open-rate=%.2f%% (%d/%d) verify-only", utils.StagePortScan, "suspected", host, openRate*100, open, scanned)
@@ -711,7 +749,7 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 		return
 	}
 
-	var pending []int
+	var pending []*ScanResult
 	st.mu.Lock()
 	if len(st.pending) > 0 {
 		pending = append(pending, st.pending...)
@@ -719,8 +757,8 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 	}
 	atomic.StoreUint32(&st.mode, hostModeNormal)
 	st.mu.Unlock()
-	for _, p := range pending {
-		s.emitOpen(host, p, "")
+	for _, res := range pending {
+		s.emitResult(res)
 	}
 }
 
@@ -755,22 +793,8 @@ func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint6
 	}
 }
 
-func (s *Scanner) emitOpen(host string, port int, banner string) {
+func (s *Scanner) emitResult(res *ScanResult) {
 	atomic.AddUint64(&s.resultsCount, 1)
-
-	res := &ScanResult{
-		Host:   host,
-		Port:   port,
-		State:  PortStateOpen,
-		Banner: cleanBanner(banner),
-	}
-	if res.Banner != "" {
-		if fp := IdentifyService(res.Banner, port); fp != nil {
-			res.Fingerprint = fp
-			res.Service = fp.Name
-			res.Version = fp.Version
-		}
-	}
 
 	if s.options.OnResult != nil {
 		if s.options.Debug && !s.options.Quiet {
@@ -811,7 +835,7 @@ func (s *Scanner) verifyAndEmit(ctx context.Context, host string, st *hostScanSt
 		default:
 		}
 
-		ok, banner := s.verifyPort(ctx, host, port)
+		ok, info := s.verifyPort(ctx, host, port)
 		if !ok {
 			continue
 		}
@@ -824,106 +848,36 @@ func (s *Scanner) verifyAndEmit(ctx context.Context, host string, st *hostScanSt
 		st.verified[port] = struct{}{}
 		st.mu.Unlock()
 
-		s.emitOpen(host, port, banner)
+		s.emitResult(&ScanResult{
+			Host:        host,
+			Port:        port,
+			State:       PortStateOpen,
+			ServiceInfo: *info,
+		})
 	}
 }
 
-func (s *Scanner) verifyPort(ctx context.Context, host string, port int) (bool, string) {
+// verifyPort 复核可疑主机上的单个端口。可疑主机的典型特征是「每个端口都能连上」，
+// 所以只连上不算数，必须真的收到服务端数据（banner 或规则命中）才认定为真实服务。
+func (s *Scanner) verifyPort(ctx context.Context, host string, port int) (bool, *ServiceInfo) {
 	timeout := 800 * time.Millisecond
 	if s.options.Timeout > 0 && s.options.Timeout < timeout {
 		timeout = s.options.Timeout
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	dialCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	d := net.Dialer{Timeout: timeout}
-	conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	conn, err := d.DialContext(dialCtx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
-		return false, ""
+		return false, nil
 	}
 	defer conn.Close()
 
-	baseDeadline := time.Now().Add(timeout)
-	_ = conn.SetDeadline(baseDeadline)
-
-	if isLikelyTLSPort(port) {
-		serverName := ""
-		if net.ParseIP(host) == nil {
-			serverName = host
-		}
-		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true, ServerName: serverName})
-		if err := tlsConn.HandshakeContext(ctx); err == nil {
-			_ = tlsConn.Close()
-			return true, "tls"
-		}
-		return false, ""
+	// 复核路径必须拿到证据，因此固定使用带主动探针的抓取器。
+	info := s.verifyGrabber.Grab(conn, host, port)
+	if info.Banner == "" && info.Confidence < ConfidenceProbable {
+		return false, nil
 	}
-
-	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Millisecond))
-	early := make([]byte, 128)
-	nEarly, _ := conn.Read(early)
-	_ = conn.SetReadDeadline(baseDeadline)
-	if nEarly > 0 {
-		sEarly := string(early[:nEarly])
-		if strings.HasPrefix(sEarly, "SSH-") || strings.HasPrefix(sEarly, "HTTP/") {
-			return true, sEarly
-		}
-		if strings.HasPrefix(sEarly, "220") || strings.HasPrefix(sEarly, "200") {
-			return true, sEarly
-		}
-		if nEarly >= 1 && early[0] == 0x0a {
-			return true, "mysql"
-		}
-		if strings.Contains(sEarly, "PONG") {
-			return true, sEarly
-		}
-	}
-
-	reader := bufio.NewReader(conn)
-
-	if port == 6379 {
-		_, _ = conn.Write([]byte("PING\r\n"))
-		buf := make([]byte, 32)
-		n, _ := reader.Read(buf)
-		if n > 0 && strings.Contains(string(buf[:n]), "PONG") {
-			return true, string(buf[:n])
-		}
-		return false, ""
-	}
-
-	if port == 3306 {
-		b := make([]byte, 1)
-		n, _ := io.ReadFull(reader, b)
-		if n == 1 && b[0] == 0x0a {
-			return true, "mysql"
-		}
-		return false, ""
-	}
-
-	_, _ = conn.Write([]byte("GET / HTTP/1.0\r\nHost: " + host + "\r\n\r\n"))
-	line, _ := reader.ReadString('\n')
-	if strings.HasPrefix(line, "HTTP/") {
-		return true, line
-	}
-
-	buf := make([]byte, 64)
-	n, _ := reader.Read(buf)
-	if n > 0 {
-		return true, string(buf[:n])
-	}
-	return false, ""
-}
-
-func isLikelyTLSPort(port int) bool {
-	switch port {
-	case 443, 8443, 9443, 993, 995, 465:
-		return true
-	default:
-		return false
-	}
-}
-
-func cleanBanner(banner string) string {
-	// Remove newlines and non-printable chars
-	return strings.TrimSpace(banner)
+	return true, info
 }

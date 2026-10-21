@@ -112,6 +112,16 @@ type Options struct {
 	FingerprintFilterMode string
 	DefaultAccept         bool
 
+	// WebFingerprintDir optionally points at a directory containing rules.yaml
+	// that overrides the built-in web fingerprint set used by the -w stage.
+	WebFingerprintDir string
+
+	// WebFavicon makes the -w stage fetch /favicon.ico so that favicon rules
+	// can match. It costs one extra request per target, so it is off by
+	// default; the built-in rule set already carries favicon rules, they are
+	// simply never used unless fetching is enabled.
+	WebFavicon bool
+
 	// StopOnFirstMatch stops the scan as soon as a vulnerability is found.
 	StopOnFirstMatch bool
 
@@ -187,6 +197,13 @@ type PortScanOptions struct {
 	Retries       int
 	SkipDiscovery bool
 	ChunkSize     int
+	// ServiceProbe enables active service probes (application payloads) so
+	// that services without a spontaneous banner can still be identified.
+	ServiceProbe bool
+	// FingerprintDir optionally points at a directory containing
+	// probes.yaml/services.yaml/ports.yaml that overrides the built-in
+	// port fingerprint set.
+	FingerprintDir string
 }
 
 // CyberspaceEngine values accepted by CyberspaceOptions.Engine.
@@ -861,6 +878,26 @@ func WithFingerprintFilterMode(mode string) Option {
 // WithWebProbe enables the web probing stage.
 func WithWebProbe() Option {
 	return func(o *Options) error { o.EnableWebProbe = true; return nil }
+}
+
+// WithWebFingerprintDir points the -w stage at a directory containing
+// rules.yaml that overrides or extends the built-in web fingerprint set.
+func WithWebFingerprintDir(dir string) Option {
+	return func(o *Options) error {
+		o.WebFingerprintDir = dir
+		return nil
+	}
+}
+
+// WithWebFavicon makes the -w stage fetch /favicon.ico during probing, which
+// enables the favicon rules of the web fingerprint set at the cost of one
+// extra request per target.
+//
+// It is equivalent to the CLI's -w-favicon. Pointing WithWebFingerprintDir at
+// a directory whose rules.yaml has favicon rules also enables fetching
+// automatically, so this option is only needed for the built-in rules.
+func WithWebFavicon() Option {
+	return func(o *Options) error { o.WebFavicon = true; return nil }
 }
 
 // --- network ---

@@ -25,20 +25,12 @@ func (s PortState) String() string {
 
 // ScanResult holds the result of a single port scan
 type ScanResult struct {
-	Host        string
-	Port        int
-	State       PortState
-	Service     string
-	Version     string
-	Banner      string
-	Fingerprint *ServiceFingerprint
-}
+	Host  string
+	Port  int
+	State PortState
 
-// ServiceFingerprint represents detected service details
-type ServiceFingerprint struct {
-	Name    string
-	Version string
-	Extras  map[string]string
+	// ServiceInfo 是端口指纹识别的结果，内嵌后字段可直接访问（res.Service 等）。
+	ServiceInfo
 }
 
 // ScanMode defines the scanning strategy

@@ -62,40 +62,27 @@ func ShowBanner(u *AfrogUpdate, curated *Curated) {
 	// 分隔线
 	PrintSeparator()
 
-	// 核心信息行
-	PrintStatusLine(
-		log.LogColor.Low(okSymbol),
-		"Core:",
-		EngineV(u),
-		"",
-	)
-
-	// POC信息行
+	// 状态压缩为一行：Core / POC / Cur。推广链接等与扫描无关的信息不再混入状态输出。
 	pocLine := PocV(u)
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
 		pocLine += " " + log.LogColor.Extractor("(update available)")
 	}
-	PrintStatusLine(log.LogColor.Low(okSymbol), "POC: ", pocLine, "")
 
 	count, lastErr := curatedStats()
-	planetLink := log.LogColor.Extractor("https://t.zsxq.com/lV66x")
-	symbol := log.LogColor.Low(okSymbol)
-	value := fmt.Sprintf("%d/pocs", count)
-	extra := ""
+	curSymbol := log.LogColor.Low(okSymbol)
+	curLine := fmt.Sprintf("%d/pocs", count)
 	if !curatedEnabled(curated) {
-		extra = log.LogColor.DarkGray("(off)")
-	} else {
-		errMsg := strings.TrimSpace(lastErr)
-		if errMsg != "" {
-			symbol = log.LogColor.Red(errorSymbol)
-			extra = log.LogColor.Red("update failed: " + truncateError(errMsg))
-		}
+		curLine += " " + log.LogColor.DarkGray("(off)")
+	} else if errMsg := strings.TrimSpace(lastErr); errMsg != "" {
+		curSymbol = log.LogColor.Red(errorSymbol)
+		curLine += " " + log.LogColor.Red("update failed: "+truncateError(errMsg))
 	}
-	line := value + " " + planetLink
-	if strings.TrimSpace(extra) != "" {
-		line = value + " " + extra + " " + planetLink
-	}
-	PrintStatusLine(symbol, "Cur:", line, "")
+
+	fmt.Printf("[%s] Core %s  [%s] POC %s  [%s] Cur %s\n",
+		log.LogColor.Low(okSymbol), EngineV(u),
+		log.LogColor.Low(okSymbol), pocLine,
+		curSymbol, curLine,
+	)
 }
 
 func ShowVersion() {

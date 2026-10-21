@@ -237,9 +237,20 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 			return
 		}
 		portData := map[string]interface{}{
-			"host": ev.Port.Host,
-			"port": ev.Port.Port,
-			"ts":   ts,
+			"host":       ev.Port.Host,
+			"port":       ev.Port.Port,
+			"service":    ev.Port.Service,
+			"product":    ev.Port.Product,
+			"version":    ev.Port.Version,
+			"device":     ev.Port.Device,
+			"hostname":   ev.Port.Hostname,
+			"os":         ev.Port.OS,
+			"cpe":        ev.Port.CPE,
+			"info":       ev.Port.Info,
+			"tls":        ev.Port.TLS,
+			"confidence": ev.Port.Confidence,
+			"banner":     ev.Port.Banner,
+			"ts":         ts,
 		}
 		publish(t, ScanEvent{Type: "port", Data: portData})
 		// 落库，让历史任务的「资产发现」也能回看
@@ -262,8 +273,24 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 			"url":         ev.WebProbe.URL,
 			"status":      ev.WebProbe.Status,
 			"title":       ev.WebProbe.Title,
+			"server":      ev.WebProbe.Server,
+			"powered_by":  ev.WebProbe.PoweredBy,
 			"fingerprint": ev.WebProbe.Fingerprint,
+			"confidence":  ev.WebProbe.Confidence,
 			"ts":          ts,
+		}
+		if len(ev.WebProbe.Technologies) > 0 {
+			techs := make([]map[string]interface{}, 0, len(ev.WebProbe.Technologies))
+			for _, t := range ev.WebProbe.Technologies {
+				techs = append(techs, map[string]interface{}{
+					"name":       t.Name,
+					"version":    t.Version,
+					"category":   t.Category,
+					"cpe":        t.CPE,
+					"confidence": t.Confidence,
+				})
+			}
+			webData["technologies"] = techs
 		}
 		publish(t, ScanEvent{Type: "webprobe", Data: webData})
 		// 落库，让历史任务的「资产发现」也能回看

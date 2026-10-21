@@ -88,6 +88,31 @@ afrog -t 192.168.1.0/24 -ps -p all -prate 2000 -ptimeout 800 -ptries 1
 afrog -t 192.168.1.0/24 -ps -w
 ```
 
+当 `-ps` 与 `-w` 同时开启时，两者会自动联动：
+
+- **只探真 Web 端口**：`-ps` 的端口指纹结论会传给 `-w`，已确认为非 Web 的端口（如 `mysql`、`ssh`、`redis`）不再发起 HTTP 探测。
+- **协议不再靠猜**：指纹确认是 TLS 的端口直接按 `https://` 探测，其余 Web 端口直接按 `http://` 探测，省去一次协议试探请求。
+- **结果互补**：HTTP 响应里没有 `Server` 头时，Web 探测输出会回落到端口指纹识别出的产品与版本。
+
+只用 `-w`（不带 `-ps`）时行为与以前一致，仍按目标端口自行试探协议。
+
+##### Web 指纹识别
+`-w` 会对每个存活 Web 目标做一次指纹识别（响应头 / 正文 / 标题），输出结构化的技术栈，例如 `Nginx 1.25.3, WordPress 6.4.2`。
+
+- **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch`）与 `certain`（强特征，如专属响应头、`meta generator`）。
+- **外置指纹库**：`-w-fingerprint-dir <dir>` 指定目录下放置 `rules.yaml` 即可覆盖/扩展内置规则；**外置规则整体排在内置之前，同 `id` 覆盖内置**，新增的 specific 规则不会被内置通用规则抢先命中。
+- **favicon 匹配按需开启**：抓 `/favicon.ico` 会额外产生一次请求，因此默认不抓；加 `-w-favicon` 即可开启，命中内置的 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）。若外置 `rules.yaml` 里出现 `source: favicon` 规则，也会自动开启抓取，无需再加开关。
+- **驱动 `requires` 门控**：识别出的技术栈会并入 PoC 的 `requires` 词表，`requires: [wordpress]`、`[thinkphp]`、`[apache-shiro]`、`[cms]` 这类写法从此有据可依，明显不可能命中的 PoC 会被直接跳过，不再浪费请求。可用标识为：规则 `id`（如 `nextjs` / `rails`）、技术名（`Next.js` → `next.js`）、技术名连字符写法（`Apache Shiro` → `apache-shiro`）与 `category`（如 `cms`）。
+- 事件流 / SDK / gRPC 输出同时提供 `fingerprint`（一行摘要）与 `technologies`（`name`/`version`/`category`/`cpe`/`confidence` 明细）。
+
+```bash
+# 使用自建 Web 指纹库
+afrog -t https://example.com -w -w-fingerprint-dir ./my-web-fingerprints
+
+# 额外抓取 favicon，识别「页面上看不出」的产品
+afrog -t https://example.com -w -w-favicon
+```
+
 #### 2.5 常见服务探测 → 弱口令/默认口令探测
 端口预扫得到的是 `host:port`，随后 Afrog 会进行指纹识别；当服务类型能被识别时，对应的弱口令/默认口令 PoC（位于 `pocs/afrog-pocs/default-pwd/`）就可以自动跑起来（例如 `ssh-weak-login` 的 `requires: [ssh]`）。
 

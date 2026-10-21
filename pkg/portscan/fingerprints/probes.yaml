@@ -1,0 +1,137 @@
+# afrog 端口指纹探针定义。
+#
+# 探针 = 在一条已建立的 TCP 连接上要发送（或不发送）的一段 payload。识别分两个阶段：
+#   passive 探针：不携带应用层语义的 payload（NULL 不发送数据，TLS 只做协议协商），
+#                 默认识别阶段就会使用。
+#   active  探针：需要应用层 payload 激发（GET /、PING、BSON 查询……），仅在显式
+#                 开启 -ps-service-probe 后才使用，每个开放端口会多出若干次往返。
+#
+# 字段：
+#   id      探针标识，唯一，供规则引用、调试与日志使用
+#           注意：id 若与 YAML 保留字冲突（如 NULL 会被解析成空值）必须加引号
+#   desc    说明
+#   mode    passive | active
+#   data    文本 payload（YAML 双引号转义，如 "\r\n\r\n"）
+#   hex     二进制 payload（十六进制），与 data 二选一
+#   tls     true 表示先完成 TLS 握手再发送 payload（未提供 data 时即只做握手）
+#   ports   适用端口；留空表示对所有端口生效
+#
+# 注意：ports 留空的 active 探针（GetRequest/GenericLines/HTTPOptions）会发往每一个
+# 开放端口，这正是 nmap 的默认行为，也是它们被归为 active、必须显式开启的原因。
+
+# ---------------------------- passive ----------------------------
+
+- id: "NULL"
+  desc: 只读，不发送任何数据，等待服务端主动吐出 banner
+  mode: passive
+
+# TLS 握手按 passive 处理：它不发送任何应用层数据，只做协议协商。没有它就无法观察
+# 443/8443 这类只讲 TLS 的服务，代价是 TLS 端口上多一次往返（仅对开放端口发生）。
+- id: TLS
+  desc: 仅完成 TLS 握手，用于确认 TLS 服务并取回协商版本与证书信息
+  mode: passive
+  tls: true
+
+# ---------------------------- active ----------------------------
+
+- id: GenericLines
+  desc: 发送空行，激发行式文本协议（部分 SMTP/POP3 服务端需要一次输入才回 banner）
+  mode: active
+  data: "\r\n\r\n"
+
+- id: GetRequest
+  desc: HTTP 请求激发
+  mode: active
+  data: "GET / HTTP/1.0\r\nHost: localhost\r\nUser-Agent: Mozilla/5.0 (compatible; afrog)\r\nAccept: */*\r\n\r\n"
+
+- id: HTTPOptions
+  desc: HTTP OPTIONS 激发（部分服务器只对 OPTIONS 返回 Server 头）
+  mode: active
+  data: "OPTIONS / HTTP/1.0\r\nHost: localhost\r\n\r\n"
+
+- id: TLSGetRequest
+  desc: TLS 之上的 HTTP 请求激发，用于把 443/8443 这类端口识别成 https 而非裸 TLS
+  mode: active
+  tls: true
+  data: "GET / HTTP/1.0\r\nHost: localhost\r\nUser-Agent: Mozilla/5.0 (compatible; afrog)\r\nAccept: */*\r\n\r\n"
+
+- id: IdentQuery
+  desc: 'ident 协议查询（RFC 1413），响应形如 "113, 113 : USERID : UNIX : root"'
+  mode: active
+  ports: [113]
+  data: "113, 113\r\n"
+
+- id: DNSVersionBind
+  desc: DNS version.bind CH TXT 查询（TCP，消息前带 2 字节长度前缀）
+  mode: active
+  ports: [53]
+  hex: "001e0000010000010000000000000776657273696f6e0462696e640000100003"
+
+- id: MediaStream
+  desc: RTSP OPTIONS 激发
+  mode: active
+  ports: [554, 8554]
+  data: "OPTIONS rtsp://localhost/ RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: afrog\r\n\r\n"
+
+- id: MQTTConnect
+  desc: MQTT 3.1.1 CONNECT（协议名 MQTT、级别 4、clean session、空 clientId）
+  mode: active
+  ports: [1883, 8883]
+  hex: "100c00044d5154540402003c0000"
+
+- id: AMQPGreeting
+  desc: AMQP 0-9-1 协议头，用于引出 Connection.Start 方法帧
+  mode: active
+  ports: [5672, 5671]
+  hex: "414d515000000901"
+
+- id: ZabbixAgentVersion
+  desc: Zabbix agent 被动检查 agent.version（ZBXD 头 + 8 字节小端长度）
+  mode: active
+  ports: [10050]
+  hex: "5a425844010d000000000000006167656e742e76657273696f6e"
+
+- id: RedisPing
+  desc: Redis PING
+  mode: active
+  ports: [6379, 6380, 6381, 6382]
+  data: "PING\r\n"
+
+- id: RedisInfo
+  desc: Redis INFO server，用于取回版本号与运行模式
+  mode: active
+  ports: [6379, 6380, 6381, 6382, 26379]
+  data: "INFO server\r\n"
+
+- id: MemcachedStats
+  desc: Memcached stats
+  mode: active
+  ports: [11211, 11212, 11213]
+  data: "stats\r\n"
+
+- id: ZooKeeperRuok
+  desc: ZooKeeper ruok 四字命令，正常应答 "imok"
+  mode: active
+  ports: [2181, 2182, 2183]
+  data: "ruok"
+
+- id: PostgresStartup
+  desc: PostgreSQL StartupMessage（长度 0x17 + 协议 3.0 + user=postgres），用于引出 FATAL 错误包
+  mode: active
+  ports: [5432, 5433]
+  # int32 length=23, int32 protocol=196608(3.0), "user\0" "postgres\0" "\0"
+  hex: "00000017000300007573657200706f7374677265730000"
+
+- id: MongoIsMaster
+  desc: "MongoDB OP_QUERY admin.$cmd { isMaster: 1 }"
+  mode: active
+  ports: [27017, 27018, 27019]
+  # OP_QUERY 帧：messageLength=58, requestID=0, responseTo=0, opCode=2004,
+  # flags=0, "admin.$cmd\0", skip=0, return=-1, BSON {"isMaster":1}
+  hex: "3a0000000000000000000000d40700000000000061646d696e2e24636d640000000000ffffffff130000001069734d6173746572000100000000"
+
+- id: XMPPStreamOpen
+  desc: XMPP stream 开头，用于引出 stream:features / mechanisms
+  mode: active
+  ports: [5222, 5269]
+  data: "<?xml version='1.0'?><stream:stream to='localhost' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"

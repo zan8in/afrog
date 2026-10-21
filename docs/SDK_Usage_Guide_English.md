@@ -401,7 +401,7 @@ case err != nil:
 
 ## Port pre-scanning
 
-Open ports discovered before the PoC scan are appended to the target set as `host:port`:
+Open ports discovered before the PoC scan are appended to the target set as `host:port`. Besides host and port, `PortHandler` also receives the service fingerprint identified on that port (`Service`/`Product`/`Version`/`CPE`/`Confidence`, etc.), which is handy for building an asset profile first:
 
 ```go
 scanner, _ := sdk.New(ctx,
@@ -411,9 +411,11 @@ scanner, _ := sdk.New(ctx,
 		Ports:         "top",  // top|full|all|80,443|1-1024
 		TimeoutMs:     500,
 		SkipDiscovery: true,
+		ServiceProbe:  true, // send extra active probes: more accurate but slower
 	}),
 	sdk.WithPortHandler(func(p sdk.PortEvent) {
-		fmt.Printf("open: %s:%d\n", p.Host, p.Port)
+		fmt.Printf("open: %s:%d %s %s %s (%s, %s)\n",
+			p.Host, p.Port, p.Service, p.Product, p.Version, p.Confidence, p.Banner)
 	}),
 )
 
@@ -421,6 +423,8 @@ scanner.Execute(ctx)
 
 open := scanner.OpenPorts() // map[string][]int
 ```
+
+`Confidence` reflects how strong the identifying evidence is: `port` is a port-prior guess only, `probable` is a weak match, and `certain` is an explicit banner match.
 
 ## OOB (out-of-band) detection
 

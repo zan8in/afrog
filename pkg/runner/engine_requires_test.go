@@ -70,6 +70,71 @@ func TestShouldSkipRequires_TestMode(t *testing.T) {
 	}
 }
 
+// webTechRequires 把 -w 的技术栈翻译成 requires 词表：站点根与带路径的目标都要覆盖，
+// 无关目标不能凭空多出条目。
+func TestWebTechRequires(t *testing.T) {
+	metas := map[string]WebMeta{
+		"127.0.0.1:8080": {URL: "http://127.0.0.1:8080", Technologies: []WebTech{
+			{Name: "WordPress", Category: "cms", RuleID: "wordpress"},
+			{Name: "Apache Shiro", Category: "framework", RuleID: "apache-shiro", Confidence: "probable"},
+		}},
+		// 没有技术栈的探测结果不应产生 requires 词。
+		"127.0.0.1:9090": {URL: "http://127.0.0.1:9090"},
+	}
+	targets := []string{
+		"http://127.0.0.1:8080",
+		"http://127.0.0.1:8080/wp-login.php",
+		"http://127.0.0.1:9090",
+		"127.0.0.1:8080",
+	}
+	got := webTechRequires(targets, metas)
+
+	for _, key := range []string{"127.0.0.1:8080", "127.0.0.1:8080/wp-login.php"} {
+		set, ok := got[key]
+		if !ok {
+			t.Fatalf("missing entry for %s: %v", key, got)
+		}
+		for _, want := range []string{"wordpress", "cms", "apache-shiro", "apache shiro", "framework"} {
+			if _, ok := set[want]; !ok {
+				t.Fatalf("key %s missing token %q: %v", key, want, set)
+			}
+		}
+	}
+	if _, ok := got["127.0.0.1:9090"]; ok {
+		t.Fatalf("target without technologies should not appear: %v", got)
+	}
+	if webTechRequires(nil, metas) != nil {
+		t.Fatal("expected nil for empty target list")
+	}
+	if webTechRequires(targets, nil) != nil {
+		t.Fatal("expected nil for empty meta list")
+	}
+}
+
+// 合并 Web 技术栈后，requires: [wordpress] 应命中 WordPress 站点而跳过其它站点。
+func TestShouldSkipRequires_WithWebFingerprint(t *testing.T) {
+	metas := map[string]WebMeta{
+		"127.0.0.1:8080": {URL: "http://127.0.0.1:8080", Technologies: []WebTech{
+			{Name: "WordPress", Category: "cms", RuleID: "wordpress"},
+		}},
+	}
+	merged := webTechRequires([]string{"http://127.0.0.1:8080"}, metas)
+
+	p := poc.Poc{Info: poc.Info{Requires: []string{"wordpress"}}}
+	if shouldSkipRequires("http://127.0.0.1:8080", p, keyFromTargetWithPath, merged, false) {
+		t.Fatal("expected not skip when requires matches web fingerprint")
+	}
+	if !shouldSkipRequires("http://127.0.0.1:8081", p, keyFromTargetWithPath, merged, false) {
+		t.Fatal("expected skip when target has no matching web fingerprint")
+	}
+
+	// opportunistic 下也应有证据才放行：目标有 Web 指纹但不含该技术时跳过。
+	op := poc.Poc{Info: poc.Info{Requires: []string{"thinkphp"}, RequiresMode: "opportunistic"}}
+	if !shouldSkipRequires("http://127.0.0.1:8080", op, keyFromTargetWithPath, merged, false) {
+		t.Fatal("expected skip when opportunistic and web fingerprint mismatches")
+	}
+}
+
 func TestShouldSkipFingerprintFilteredByMode_Strict_EmptyTargetTags(t *testing.T) {
 	global := map[string]struct{}{"redis": {}}
 	pocTags := map[string]struct{}{"redis": {}}
