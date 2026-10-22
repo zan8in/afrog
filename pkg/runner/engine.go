@@ -255,7 +255,12 @@ func extractTitle(body []byte) string {
 
 // clearProgressLine 在输出阶段日志/结果行之前清掉进度条所在行。
 // 这些输出与进度条都写 stderr，不清行时两者会拼接在同一行上。
-func clearProgressLine() {
+// -silent 下不渲染任何进度条，清行序列也就没有意义：旧终端会把 \033[2K
+// 这类转义渲染成乱码，反而把结果行搅乱，所以此时直接跳过。
+func (runner *Runner) clearProgressLine() {
+	if runner == nil || runner.options == nil || runner.options.Silent {
+		return
+	}
 	fmt.Fprint(os.Stderr, "\r\033[2K\r")
 }
 
@@ -342,7 +347,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	// 阶段边界行（started/completed）默认不打印：进度条已经标出当前阶段，
 	// 这些行在常规输出里只是噪音；-debug 时恢复，便于对齐排查。
 	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
-		clearProgressLine()
+		runner.clearProgressLine()
 		gologger.Print().Msgf("%-9s | %-9s | candidates=%d", utils.StageWebProbe, "started", totalCandidates)
 	}
 	if runner.options.OnPhaseProgress != nil {
@@ -389,7 +394,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		if runner.OnWebProbe != nil {
 			runner.OnWebProbe(meta)
 		}
-		if runner.options != nil && !runner.options.SDKMode && !runner.options.Silent {
+		// -silent 只表示「只要结果、不要装饰」，Web 存活行本身就是结果，
+		// 与端口/漏洞结果行同一口径：照常打印（颜色已由 -silent 全局关掉）。
+		if runner.options != nil && !runner.options.SDKMode {
 			// 目标 URL 放最前：用户扫视时以目标为锚点，状态码只是它的属性，
 			// 与漏洞结果行 `poc-id SEVERITY target` 的「主体在前」口径一致。
 			// 不带编号：编号在并发探测下顺序并不稳定，端口/漏洞结果行也统一去掉了它。
@@ -410,7 +417,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			// 结果行必须和端口扫描结果走同一条 stderr 通道：直写 stdout 时，只收 stderr 的
 			// 终端里完全看不到这些行，而 -json-stream 的 stdout 只允许承载 NDJSON。
 			// 打印前先清掉进度条所在行，否则结果行会与进度条互相覆盖。
-			clearProgressLine()
+			runner.clearProgressLine()
 			gologger.Print().Msgf("%s", strings.Join(parts, " "))
 		}
 	}
@@ -580,7 +587,7 @@ dispatch:
 		runner.options.OnPhaseProgress("webprobe", status, int64(done), int64(totalCandidates), percent)
 	}
 	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
-		clearProgressLine()
+		runner.clearProgressLine()
 		gologger.Print().Msgf("%-9s | %-9s | candidates=%d/%d alive=%d duration=%s",
 			utils.StageWebProbe,
 			status,
@@ -1407,7 +1414,7 @@ func (runner *Runner) Execute() {
 				if !options.SDKMode {
 					// 与 Web/漏洞结果行统一：不带编号（并发命中时编号顺序不稳定），
 					// 打印前先清掉进度条所在行，避免结果行与进度条互相覆盖。
-					clearProgressLine()
+					runner.clearProgressLine()
 					gologger.Print().Msgf("%s", formatPortResult(r))
 				}
 				collector.AddResult(r)
@@ -1687,7 +1694,7 @@ func (runner *Runner) Execute() {
 		if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
 			pocTotal += len(fingerprintPocs)
 		}
-		clearProgressLine()
+		runner.clearProgressLine()
 		gologger.Print().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), pocTotal, options.Count)
 	}
 

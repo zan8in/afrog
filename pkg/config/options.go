@@ -25,6 +25,7 @@ import (
 	"github.com/zan8in/afrog/v3/pocs"
 	"github.com/zan8in/goflags"
 	"github.com/zan8in/gologger"
+	"github.com/zan8in/gologger/formatter"
 	fileutil "github.com/zan8in/pins/file"
 	"gopkg.in/yaml.v2"
 )
@@ -464,8 +465,12 @@ func NewOptions() (*Options, error) {
 
 func (opt *Options) VerifyOptions() error {
 
-	if opt.NoColor {
+	// -silent 面向「只取结果」的场景（常见于老旧终端/日志管道），这里同样关闭 ANSI 着色：
+	// 旧终端会把转义序列渲染成乱码，反而看不清结果。
+	if opt.NoColor || opt.Silent {
 		log.EnableColor = false
+		// 日志分级标签（[WRN]/[ERR]）由 gologger 自己着色，与 log.EnableColor 无关，需一并关闭。
+		gologger.DefaultLogger.SetFormatter(formatter.NewCLI(true))
 	}
 
 	if len(opt.Validate) > 0 {

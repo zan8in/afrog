@@ -77,7 +77,9 @@ func main() {
 		}
 	}
 
-	if !options.Web && !jsonStreamMode && options.AfrogUpdate != nil {
+	// -silent 的语义是「只给结果」：banner 属于装饰，且它是少数硬编码 ANSI 色的输出，
+	// 老旧终端会把转义序列渲染成乱码，所以这里一并跳过。
+	if !options.Web && !jsonStreamMode && !options.Silent && options.AfrogUpdate != nil {
 		var curated *config.Curated
 		if options.Config != nil {
 			curated = &options.Config.Curated
@@ -376,7 +378,10 @@ func main() {
 			}
 
 			lock.Lock()
-			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+			// -silent 下没有进度条，清行转义只会变成乱码，跳过。
+			if progressEnabled {
+				fmt.Fprint(os.Stderr, "\r\033[2K\r")
+			}
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
@@ -446,7 +451,10 @@ func main() {
 
 		if result.IsVul {
 			lock.Lock()
-			fmt.Fprint(os.Stderr, "\r\033[2K\r")
+			// -silent 下没有进度条，清行转义只会变成乱码，跳过。
+			if progressEnabled {
+				fmt.Fprint(os.Stderr, "\r\033[2K\r")
+			}
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
