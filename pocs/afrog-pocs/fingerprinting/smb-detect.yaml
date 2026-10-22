@@ -16,16 +16,55 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：SMB2/3 NEGOTIATE 请求（携带方言 2.0.2 / 2.1 / 3.0 / 3.0.2），可识别所有支持 SMB2/3 的服务
+  # NBSS(00 00 00 6C) + SMB2 Header(64) + NEGOTIATE Body(44)
   r0:
     request:
       type: tcp
       host: "{{host}}"
       steps:
         - write:
-            data: "00000066fe534d42400000000000000000003f0000000000000000000000000000000000fffe000000000000000000000000000000000000000000000000000000000000000000000000240001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            data: "0000006cfe534d424000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002400040000000000000000000000000000000000000000000000000000000000000000000202100200030203"
             data-type: hex
         - read:
             read-size: 4096
             read-timeout: 3
-    expression: response.raw.bcontains(b"\xfeSMB")
-expression: r0()
+    # 判定要点（避免把服务端“字节回显”误判为 SMB）：
+    #   1) NBSS 首字节为 0x00（会话消息类型）
+    #   2) offset 4 起为协议魔数 \xfeSMB（SMB2/3）或 \xffSMB（SMB1）
+    #   3) SMB2 响应必须带 SERVER_TO_REDIR 标志位（Flags 低字节为 0x01），回显的请求里该字段为 0x00
+    #   4) SMB1 NEGOTIATE 响应 offset 36 的 WordCount 固定为 0x11(17)
+    expression: |
+      response.raw.bstartsWith(b"\x00") &&
+      (
+        (size(response.raw) >= 24 &&
+         substr(response.raw, 4, 4) == b"\xfeSMB" &&
+         substr(response.raw, 20, 1) == b"\x01") ||
+        (size(response.raw) >= 37 &&
+         substr(response.raw, 4, 4) == b"\xffSMB" &&
+         substr(response.raw, 36, 1) == b"\x11")
+      )
+  # r1：SMB1 NEGOTIATE 请求（携带 SMB2 方言表），用于兼容仅支持 SMB1 的老旧服务
+  # NBSS(00 00 00 45) + SMB1 Header(32) + WordCount(00) + ByteCount(22 00) + 方言表(34)
+  r1:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "00000045ff534d4272000000001853c80000000000000000000000000000000000000000002200024e54204c4d20302e31320002534d4220322e3030320002534d4220322e3f3f3f00"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
+    expression: |
+      response.raw.bstartsWith(b"\x00") &&
+      (
+        (size(response.raw) >= 24 &&
+         substr(response.raw, 4, 4) == b"\xfeSMB" &&
+         substr(response.raw, 20, 1) == b"\x01") ||
+        (size(response.raw) >= 37 &&
+         substr(response.raw, 4, 4) == b"\xffSMB" &&
+         substr(response.raw, 36, 1) == b"\x11")
+      )
+expression: r0() || r1()
