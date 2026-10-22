@@ -3,7 +3,7 @@ id: directory-listing
 info:
   name: 目录浏览 列目录
   author: zan8in
-  severity: info
+  severity: medium
   verified: true
   description: |-
     目录浏览 列目录
