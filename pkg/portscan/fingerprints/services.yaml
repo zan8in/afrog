@@ -451,6 +451,192 @@
       version: $version
       info: "registry api $version"
 
+# ================================ 远程桌面 / 目录 / 文件共享 ================================
+
+- id: rdp
+  service: ms-wbt-server
+  product: Microsoft RDP
+  probes: [RDP]
+  ports: [3389, 3388]
+  encoding: binary
+  match:
+    # TPKT(03 00 .. ..) + X.224 CC(0e d0) + RDP Negotiation Response(02 00 08 00 ..)
+    - pattern: '^\x03\x00[\s\S]{2}\x0e\xd0'
+      info: "RDP Negotiation Response"
+    # 协商失败时返回 X.224 Disconnect Request(0e 80)，同样说明是 RDP
+    - pattern: '^\x03\x00[\s\S]{2}\x0e\x80'
+      info: "RDP Negotiation Failure"
+      confidence: probable
+
+- id: ldap
+  service: ldap
+  product: LDAP
+  probes: [LDAP]
+  ports: [389, 3268]
+  encoding: binary
+  match:
+    # LDAPMessage: SEQUENCE { INTEGER msgID, BindResponse(tag 0x61) }
+    - pattern: '^\x30[\s\S]{0,6}\x02\x01[\s\S]{0,3}\x61'
+      info: "LDAP anonymous bind response"
+
+- id: smb
+  service: microsoft-ds
+  product: SMB
+  probes: [SMB]
+  ports: [445, 139]
+  encoding: binary
+  match:
+    # NBSS(00 00 00 xx) + SMB1 协议头 "\xFFSMB"
+    - pattern: '^\x00[\s\S]{3}\xffSMB'
+      info: "SMB1 negotiate response"
+    # NBSS(00 00 00 xx) + SMB2/3 协议头 "\xFESMB"
+    - pattern: '^\x00[\s\S]{3}\xfeSMB'
+      info: "SMB2/3 negotiate response"
+
+- id: sip
+  service: sip
+  product: SIP
+  probes: [SipOptions]
+  ports: [5060, 5061]
+  match:
+    - pattern: '(?i)^SIP/2\.0 (?<code>\d{3})'
+      info: "SIP $code"
+    - pattern: '(?im)^(?:Server|User-Agent):[ ]*(?<product>[^\r\n]{1,80})'
+      product: $product
+      info: "$product"
+
+# ======================= 国产 / 全球主流中间件与数据服务 =======================
+
+- id: influxdb
+  service: http
+  product: InfluxDB
+  probes: [GetRequest, HTTPOptions, TLSGetRequest, "NULL"]
+  ports: [8086]
+  match:
+    - pattern: '(?im)^X-Influxdb-Version:[ ]*(?<version>[^\r\n]{1,32})'
+      version: $version
+      info: "InfluxDB $version"
+    - pattern: "(?im)^X-Influxdb-Build:"
+      info: "InfluxDB"
+
+- id: couchdb
+  service: http
+  product: CouchDB
+  probes: [GetRequest, "NULL"]
+  ports: [5984]
+  match:
+    - pattern: '(?is)"couchdb"\s*:\s*"Welcome"[\s\S]{0,160}?"version"\s*:\s*"(?<version>[^"]{1,24})"'
+      version: $version
+      info: "CouchDB $version"
+    - pattern: '(?is)"couchdb"\s*:\s*"Welcome"'
+      info: "CouchDB"
+
+- id: nacos
+  service: http
+  product: Nacos
+  probes: [GetRequest, "NULL"]
+  ports: [8848]
+  match:
+    - pattern: '(?i)<title>\s*Nacos'
+      info: "Nacos Console"
+    - pattern: '(?i)nacos\.home\.title'
+      info: "Nacos Console"
+    - pattern: "(?im)^Server:[ ]*nacos"
+      info: "Nacos"
+
+- id: rabbitmq-management
+  service: http
+  product: RabbitMQ
+  probes: [GetRequest, "NULL"]
+  ports: [15672]
+  match:
+    - pattern: '(?i)<title>\s*RabbitMQ Management'
+      info: "RabbitMQ Management"
+    - pattern: "(?i)rabbitmq_management"
+      info: "RabbitMQ Management"
+      confidence: probable
+
+- id: kibana
+  service: http
+  product: Kibana
+  probes: [GetRequest, "NULL"]
+  ports: [5601]
+  match:
+    - pattern: '(?i)<title>\s*Kibana'
+      info: "Kibana"
+    - pattern: '(?i)\bkbn-name'
+      info: "Kibana"
+      confidence: probable
+
+- id: sonarqube
+  service: http
+  product: SonarQube
+  probes: [GetRequest, "NULL"]
+  ports: [9000]
+  match:
+    - pattern: '(?i)<title>\s*SonarQube'
+      info: "SonarQube"
+    - pattern: "(?im)^X-SonarQube-"
+      info: "SonarQube"
+
+- id: hadoop
+  service: http
+  product: Apache Hadoop
+  probes: [GetRequest, "NULL"]
+  ports: [50070, 9870, 8088, 50075, 50090]
+  match:
+    - pattern: '(?i)<title>\s*(?<role>NameNode|DataNode|ResourceManager|NodeManager|Hadoop)'
+      info: "Hadoop $role"
+    - pattern: '(?i)\bstatic/hadoop'
+      info: "Hadoop Web UI"
+      confidence: probable
+
+- id: druid-monitor
+  service: http
+  product: Alibaba Druid
+  probes: [GetRequest, "NULL"]
+  ports: [7080]
+  match:
+    - pattern: '(?i)<title>\s*Druid Stat (?:Index|View)'
+      info: "Druid Monitor"
+
+- id: baota-panel
+  service: http
+  product: BaoTa Panel
+  probes: [GetRequest, "NULL"]
+  ports: [8888]
+  match:
+    - pattern: '(?i)<title>\s*(?:BT-Panel|宝塔)'
+      info: "BaoTa Panel"
+    - pattern: '(?im)^(?:Server):[ ]*nginx[\s\S]{0,200}?BT-Panel'
+      info: "BaoTa Panel"
+      confidence: probable
+
+- id: nexus
+  service: http
+  product: Nexus Repository
+  probes: [GetRequest, "NULL"]
+  ports: [8081]
+  match:
+    - pattern: '(?im)^Server:[ ]*Nexus(?:/(?<version>[^\s\r\n]{1,24}))?'
+      version: $version
+      info: "Nexus Repository $version"
+    - pattern: '(?i)<title>\s*Nexus Repository Manager'
+      info: "Nexus Repository Manager"
+
+- id: weblogic
+  service: http
+  product: Oracle WebLogic
+  probes: [GetRequest, "NULL"]
+  ports: [7001, 7002]
+  match:
+    - pattern: '(?i)<title>\s*Error 404--Not Found'
+      info: "WebLogic default 404 page"
+    - pattern: "(?im)^X-Weblogic-"
+      info: "WebLogic"
+    - pattern: '(?i)<title>\s*Oracle(?:®)? WebLogic'
+      info: "WebLogic"
+
 # ================================ 通用 HTTP ================================
 
 - id: http

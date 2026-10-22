@@ -79,6 +79,8 @@
 - { port: 1723, service: pptp }
 - { port: 1755, service: ms-streaming }
 - { port: 1812, service: radius }
+- { port: 1813, service: radius-acct }
+- { port: 1880, service: http }
 - { port: 1883, service: mqtt }
 - { port: 1900, service: upnp }
 - { port: 2049, service: nfs }
@@ -107,6 +109,7 @@
 - { port: 4369, service: epmd }
 - { port: 4443, service: https-alt, tls: true }
 - { port: 5000, service: http }
+- { port: 5001, service: https-alt, tls: true }
 - { port: 5044, service: logstash }
 - { port: 5060, service: sip }
 - { port: 5061, service: sips, tls: true }
@@ -136,6 +139,7 @@
 - { port: 6667, service: irc }
 - { port: 7001, service: http }
 - { port: 7002, service: https-alt, tls: true }
+- { port: 7080, service: http }
 - { port: 7474, service: http }
 - { port: 7687, service: bolt }
 - { port: 8000, service: http }
@@ -158,6 +162,7 @@
 - { port: 8500, service: http }
 - { port: 8529, service: http }
 - { port: 8834, service: https-alt, tls: true }
+- { port: 8848, service: http }
 - { port: 8880, service: http }
 - { port: 8883, service: mqtts, tls: true }
 - { port: 8888, service: http }
@@ -175,6 +180,7 @@
 - { port: 9300, service: elasticsearch-transport }
 - { port: 9418, service: git }
 - { port: 9443, service: https-alt, tls: true }
+- { port: 9870, service: http }
 - { port: 9999, service: http }
 - { port: 10000, service: http }
 - { port: 10050, service: zabbix-agent }
@@ -185,6 +191,7 @@
 - { port: 11212, service: memcached }
 - { port: 11213, service: memcached }
 - { port: 15672, service: http }
+- { port: 26379, service: redis-sentinel }
 - { port: 27017, service: mongodb }
 - { port: 27018, service: mongodb }
 - { port: 27019, service: mongodb }

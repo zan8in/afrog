@@ -193,6 +193,15 @@
       header: server
       pattern: '(?i)\bminio\b'
 
+- id: undertow
+  name: Undertow
+  category: web-server
+  cpe: cpe:/a:redhat:jboss_undertow
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bundertow\b'
+
 # ================================ 反向代理 / CDN ================================
 
 - id: cloudflare
@@ -233,6 +242,25 @@
       header: server
       pattern: '(?i)\bawselb(?:/(?<version>[\d.]+))?'
       version: ${version}
+
+- id: apisix
+  name: Apache APISIX
+  category: api-gateway
+  cpe: cpe:/a:apache:apisix
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bAPISIX(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: envoy
+  name: Envoy
+  category: proxy
+  cpe: cpe:/a:envoyproxy:envoy
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\benvoy\b'
 
 # ================================ 语言 / 运行时 ================================
 
@@ -532,6 +560,354 @@
     - source: body
       pattern: '(?i)"swagger"\s*:'
 
+# ======================= 中间件 / 面板 / 运维平台 =======================
+
+- id: prometheus
+  name: Prometheus
+  category: monitoring
+  cpe: cpe:/a:prometheus:prometheus
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Prometheus'
+
+- id: alertmanager
+  name: Alertmanager
+  category: monitoring
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Alertmanager'
+
+- id: consul
+  name: Consul
+  category: service-discovery
+  cpe: cpe:/a:hashicorp:consul
+  match:
+    - source: header
+      header: x-consul-index
+      pattern: '\d'
+    - source: body
+      pattern: '(?i)<title>\s*Consul'
+
+- id: vault
+  name: HashiCorp Vault
+  category: secrets
+  cpe: cpe:/a:hashicorp:vault
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Vault'
+
+- id: rabbitmq-management
+  name: RabbitMQ Management
+  category: mq
+  cpe: cpe:/a:pivotal_software:rabbitmq
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*RabbitMQ Management'
+    - source: body
+      pattern: "(?i)rabbitmq_management"
+
+- id: kibana
+  name: Kibana
+  category: monitoring
+  cpe: cpe:/a:elastic:kibana
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Kibana'
+    - source: header
+      header: kbn-name
+      pattern: '\S'
+
+- id: elasticsearch
+  name: Elasticsearch
+  category: search
+  cpe: cpe:/a:elastic:elasticsearch
+  match:
+    - source: header
+      header: x-elastic-product
+      pattern: "(?i)Elasticsearch"
+
+- id: nacos
+  name: Nacos
+  category: service-discovery
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Nacos'
+    - source: body
+      pattern: '(?i)nacos\.home\.title'
+
+- id: nexus
+  name: Nexus Repository
+  category: registry
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bnexus(?:/(?<version>[\d.]+))?'
+      version: ${version}
+    - source: body
+      pattern: '(?i)<title>\s*Nexus Repository Manager'
+
+- id: baota-panel
+  name: BaoTa Panel
+  category: panel
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*BT-Panel'
+    - source: body
+      pattern: '(?i)<title>\s*宝塔'
+
+- id: portainer
+  name: Portainer
+  category: panel
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Portainer'
+
+- id: sonarqube
+  name: SonarQube
+  category: ci
+  cpe: cpe:/a:sonarsource:sonarqube
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*SonarQube'
+
+- id: druid-monitor
+  name: Alibaba Druid
+  category: panel
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Druid Stat'
+
+- id: kong
+  name: Kong
+  category: api-gateway
+  match:
+    - source: body
+      pattern: '(?i)"tagline"\s*:\s*"Welcome to Kong"'
+    - source: header
+      header: server
+      pattern: '(?i)\bkong(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: influxdb
+  name: InfluxDB
+  category: database
+  match:
+    - source: header
+      header: x-influxdb-version
+      pattern: '(?<version>[^\s]+)'
+      version: ${version}
+    - source: header
+      header: x-influxdb-build
+      pattern: '\S'
+
+- id: couchdb
+  name: CouchDB
+  category: database
+  cpe: cpe:/a:apache:couchdb
+  match:
+    - source: body
+      pattern: '(?s)"couchdb"\s*:\s*"Welcome"'
+
+- id: gitlab
+  name: GitLab
+  category: devops
+  cpe: cpe:/a:gitlab:gitlab
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b_gitlab_session='
+
+- id: gitea
+  name: Gitea
+  category: devops
+  cpe: cpe:/a:gitea:gitea
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bi_like_gitea='
+
+- id: gogs
+  name: Gogs
+  category: devops
+  cpe: cpe:/a:gogs:gogs
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bi_like_gogs='
+
+- id: jira
+  name: Atlassian Jira
+  category: itsm
+  cpe: cpe:/a:atlassian:jira
+  match:
+    - source: header
+      header: x-arequestid
+      pattern: '\S'
+    - source: body
+      pattern: "(?i)ajs-version-number"
+
+- id: confluence
+  name: Atlassian Confluence
+  category: wiki
+  cpe: cpe:/a:atlassian:confluence
+  match:
+    - source: header
+      header: x-confluence-request-time
+      pattern: '\d'
+
+# ======================= 国产 / 全球 CMS 与应用 =======================
+
+- id: zentao
+  name: ZenTao
+  category: project-management
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bzentaosid='
+    - source: body
+      pattern: '(?i)<title>\s*ZenTao'
+
+- id: weaver-eoffice
+  name: Weaver e-cology
+  category: oa
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\becology_JSessionid='
+    - source: body
+      pattern: "(?i)/spa/portal/"
+
+- id: tongda-oa
+  name: Tongda OA
+  category: oa
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*通达OA'
+    - source: body
+      pattern: "(?i)/ispirit/"
+
+- id: ruoyi
+  name: RuoYi
+  category: framework
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*(?:若依|RuoYi)'
+
+- id: jeecg-boot
+  name: JeecgBoot
+  category: framework
+  softmatch: true
+  match:
+    - source: body
+      pattern: "(?i)jeecg"
+
+- id: dedecms
+  name: DedeCMS
+  category: cms
+  match:
+    - source: body
+      pattern: "(?i)Powered by DedeCMS"
+      confidence: certain
+    - source: body
+      pattern: "(?i)/templets/default/"
+      confidence: probable
+
+- id: phpcms
+  name: PHPCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)\bPHPCMS\b'
+
+- id: empirecms
+  name: EmpireCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)\bEmpireCMS\b'
+    - source: body
+      pattern: "(?i)/e/data/"
+
+- id: emlog
+  name: Emlog
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']EMLOG'
+    - source: body
+      pattern: "(?i)/content/templates/"
+      confidence: probable
+
+- id: zblogphp
+  name: Z-BlogPHP
+  category: cms
+  match:
+    - source: header
+      header: x-powered-by
+      pattern: "(?i)Z-BlogPHP"
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Z-BlogPHP'
+
+- id: magento
+  name: Magento
+  category: ecommerce
+  cpe: cpe:/a:magento:magento
+  match:
+    - source: body
+      pattern: '(?i)Mage\.Cookies'
+
+- id: prestashop
+  name: PrestaShop
+  category: ecommerce
+  match:
+    - source: body
+      pattern: '(?i)\bprestashop\b'
+
+- id: opencart
+  name: OpenCart
+  category: ecommerce
+  match:
+    - source: body
+      pattern: '(?i)index\.php\?route='
+
+- id: mediawiki
+  name: MediaWiki
+  category: wiki
+  cpe: cpe:/a:mediawiki:mediawiki
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']MediaWiki'
+    - source: body
+      pattern: '(?i)/load\.php\?'
+      confidence: probable
+
+- id: moodle
+  name: Moodle
+  category: lms
+  cpe: cpe:/a:moodle:moodle
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bMoodleSession='
+    - source: title
+      pattern: "(?i)Moodle"
+      confidence: probable
+
+- id: phpbb
+  name: phpBB
+  category: forum
+  cpe: cpe:/a:phpbb:phpbb
+  match:
+    - source: body
+      pattern: '(?i)\bphpBB\b'
+
+- id: vbulletin
+  name: vBulletin
+  category: forum
+  match:
+    - source: body
+      pattern: '(?i)\bvBulletin\b'
+
 # ============================== favicon 指纹 ==============================
 #
 # 只有把 /favicon.ico 抓下来（CLI 加 -w-favicon，或外置规则集里自己写了 favicon 规则）才会
@@ -545,88 +921,91 @@
   category: automation
   match:
     - source: favicon
-      pattern: '^-831756631$'
+      pattern: "^-831756631$"
 
 - id: emqx
   name: EMQX
   category: mq
   match:
     - source: favicon
-      pattern: '^-670975485$'
+      pattern: "^-670975485$"
 
 - id: xxl-job
   name: XXL-JOB
   category: scheduler
   match:
     - source: favicon
-      pattern: '^1691956220$'
+      pattern: "^1691956220$"
 
 - id: seeyon
   name: 致远 OA
   category: oa
   match:
     - source: favicon
-      pattern: '^-187813927$'
+      pattern: "^-187813927$"
 
 - id: zabbix
   name: Zabbix
   category: monitoring
   match:
     - source: favicon
-      pattern: '^892542951$'
+      pattern: "^892542951$"
 
 - id: harbor
   name: Harbor
   category: registry
   match:
+    - source: body
+      pattern: '(?i)<title>\s*Harbor'
+      confidence: probable
     - source: favicon
-      pattern: '^657337228$'
+      pattern: "^657337228$"
 
 - id: sysaid
   name: SysAid
   category: itsm
   match:
     - source: favicon
-      pattern: '^1540720428$'
+      pattern: "^1540720428$"
 
 - id: zimbra
   name: Zimbra
   category: mail
   match:
     - source: favicon
-      pattern: '^1624375939$'
+      pattern: "^1624375939$"
 
 - id: owa
   name: Microsoft Exchange OWA
   category: mail
   match:
     - source: favicon
-      pattern: '^1768726119$'
+      pattern: "^1768726119$"
 
 - id: juniper-jweb
   name: Juniper J-Web
   category: network-device
   match:
     - source: favicon
-      pattern: '^2141724739$'
+      pattern: "^2141724739$"
 
 - id: dlink-dview
   name: D-Link D-View
   category: network-device
   match:
     - source: favicon
-      pattern: '^-1317621215$'
+      pattern: "^-1317621215$"
 
 - id: superset
   name: Apache Superset
   category: bi
   match:
     - source: favicon
-      pattern: '^1582430156$'
+      pattern: "^1582430156$"
 
 - id: mcms
   name: MCMS
   category: cms
   match:
     - source: favicon
-      pattern: '^1464851260$'
+      pattern: "^1464851260$"

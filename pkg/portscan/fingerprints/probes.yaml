@@ -135,3 +135,30 @@
   mode: active
   ports: [5222, 5269]
   data: "<?xml version='1.0'?><stream:stream to='localhost' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"
+
+- id: RDP
+  desc: RDP X.224 Connection Request（MS-RDPBCGR 2.2.1.1），用于确认 3389 上的远程桌面
+  mode: active
+  ports: [3389, 3388]
+  # TPKT 03 00 00 13 + X.224 CR (0e e0) + RDP Negotiation Request (01 00 08 00 03 00 00 00)
+  hex: "030000130ee000000000000100080003000000"
+
+- id: LDAP
+  desc: LDAP 匿名 Simple Bind 请求（BER），用于确认 389/3268 上的目录服务
+  mode: active
+  ports: [389, 3268]
+  # SEQUENCE { msgID 1, BindRequest(0x60) v3 anonymous }
+  hex: "300c020101600702010304008000"
+
+- id: SMB
+  desc: SMB1 Negotiate Protocol 请求，用于确认 445/139 上的 SMB 服务与支持的方言
+  mode: active
+  ports: [445, 139]
+  # NBSS(4) + SMB1 头(32) + WordCount(1) + ByteCount(2) + 方言表(34) = 73 字节，NBSS 长度=0x45
+  hex: "00000045 ff534d42 72 00000000 18 53c8 0000 0000000000000000 0000 0000 0000 0000 0000 00 2200 024e54204c4d20302e313200 02534d4220322e30303200 02534d4220322e3f3f3f00"
+
+- id: SipOptions
+  desc: SIP OPTIONS 请求，用于确认 5060/5061 上的 SIP 服务
+  mode: active
+  ports: [5060, 5061]
+  data: "OPTIONS sip:localhost SIP/2.0\r\nVia: SIP/2.0/TCP localhost;branch=z9hG4bKafrog\r\nFrom: <sip:afrog@localhost>;tag=afrog\r\nTo: <sip:localhost>\r\nCall-ID: afrog@localhost\r\nCSeq: 1 OPTIONS\r\nContact: <sip:afrog@localhost>\r\nMax-Forwards: 70\r\nUser-Agent: afrog\r\nContent-Length: 0\r\n\r\n"
