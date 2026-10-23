@@ -30,7 +30,6 @@ type Scanner struct {
 	hostStats         sync.Map
 	hostSems          sync.Map // host -> chan struct{} (per-target concurrency gate)
 	scanPortTotal     uint64
-	scanStageMajor    uint32
 
 	fingerprinter *Fingerprinter
 	grabber       *Grabber
@@ -70,11 +69,6 @@ func NewScanner(opt *Options) (*Scanner, error) {
 func (s *Scanner) Scan(ctx context.Context) error {
 	normalizedPorts := strings.ToLower(strings.TrimSpace(s.options.Ports))
 	stageMajor := normalizedPorts == "full" || normalizedPorts == "all"
-	if stageMajor {
-		atomic.StoreUint32(&s.scanStageMajor, 1)
-	} else {
-		atomic.StoreUint32(&s.scanStageMajor, 0)
-	}
 
 	type stagePlan struct {
 		label     string
@@ -370,6 +364,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	}
 
 	wg.Wait()
+
+	// A host leaves the decision buffer only after enough probes have been made
+	// against it. A scan that ends before that would strand those results, so
+	// emit whatever is still held before reporting completion.
+	s.flushPendingResults()
 
 	if scanCtx.Err() != nil && !s.options.Quiet {
 		if printEnabled {
@@ -691,21 +690,53 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 }
 
 func (s *Scanner) shouldBufferHost(st *hostScanStat) bool {
-	if atomic.LoadUint32(&s.scanStageMajor) != 1 {
-		return false
-	}
-	if atomic.LoadUint64(&s.scanPortTotal) < 5000 {
+	if !s.hostHeuristicsEnabled() {
 		return false
 	}
 	mode := atomic.LoadUint32(&st.mode)
 	return mode == hostModeUndecided || mode == hostModeDeciding
 }
 
+// heuristicsMinPorts is the smallest per-host port count at which the
+// buffer/decide/warn heuristics are worth running. They only resolve after a
+// few hundred probes against a host, so a handful of ports would add jitter
+// for nothing. The default `top` scan (600 ports) sits comfortably above it.
+//
+// The predecessor of this gate only enabled the heuristics for `full` scans,
+// which silently turned them off for the default scan — a host dropping most
+// probes (packet filter / rate limiter) then got no `filtered` warning at all,
+// and its incomplete result set was easy to mistake for a scanner bug.
+const heuristicsMinPorts = 500
+
+func (s *Scanner) hostHeuristicsEnabled() bool {
+	return atomic.LoadUint64(&s.scanPortTotal) >= heuristicsMinPorts
+}
+
+// flushPendingResults emits every result still held in a host's decision buffer
+// and marks that host decided. Results are only buffered while a host is
+// undecided, so this is a no-op for hosts that were already resolved (their
+// buffer is empty) and for hosts flagged as suspicious (their buffer was
+// dropped and re-verified instead).
+func (s *Scanner) flushPendingResults() {
+	s.hostStats.Range(func(_, v any) bool {
+		st, ok := v.(*hostScanStat)
+		if !ok || st == nil {
+			return true
+		}
+		st.mu.Lock()
+		pending := st.pending
+		st.pending = nil
+		atomic.StoreUint32(&st.mode, hostModeNormal)
+		st.mu.Unlock()
+		for _, res := range pending {
+			s.emitResult(res)
+		}
+		return true
+	})
+}
+
 func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScanStat, scanned uint64) {
-	if atomic.LoadUint32(&s.scanStageMajor) != 1 {
-		return
-	}
-	if atomic.LoadUint64(&s.scanPortTotal) < 5000 {
+	if !s.hostHeuristicsEnabled() {
 		return
 	}
 	if scanned < 50 {
@@ -768,10 +799,7 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 // discards data; it only makes the condition visible instead of silently
 // reporting every port as closed.
 func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint64) {
-	if atomic.LoadUint32(&s.scanStageMajor) != 1 {
-		return
-	}
-	if atomic.LoadUint64(&s.scanPortTotal) < 5000 {
+	if !s.hostHeuristicsEnabled() {
 		return
 	}
 	if scanned < 200 {
@@ -780,8 +808,11 @@ func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint6
 	if atomic.LoadUint32(&st.warned) == 1 {
 		return
 	}
+	// 0.80 rather than a stricter 0.95: a rate-limited or partially-filtering
+	// host usually drops a fraction (not almost all) of the probes, so a very
+	// high bar silently hides exactly the case this warning exists for.
 	timeouts := atomic.LoadUint64(&st.timeouts)
-	if float64(timeouts)/float64(scanned) < 0.95 {
+	if float64(timeouts)/float64(scanned) < 0.80 {
 		return
 	}
 	if !atomic.CompareAndSwapUint32(&st.warned, 0, 1) {

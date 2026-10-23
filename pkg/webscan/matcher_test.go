@@ -254,6 +254,55 @@ func TestSummarize(t *testing.T) {
 	}
 }
 
+// WAF/CDN 前置层规则只认各家专属的响应头或 Cookie 名，命中后 category 必须是 waf/cdn。
+func TestMatchWAFAndCDNHeaders(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	tests := []struct {
+		name     string
+		headers  map[string]string
+		wantName string
+		wantCat  string
+	}{
+		{name: "cloudfront", headers: map[string]string{"x-amz-cf-id": "abc123"}, wantName: "AWS CloudFront", wantCat: "cdn"},
+		{name: "cloudflare", headers: map[string]string{"cf-ray": "7f0e-abc"}, wantName: "Cloudflare", wantCat: "cdn"},
+		{name: "imperva", headers: map[string]string{"x-iinfo": "9-12345-12346"}, wantName: "Imperva Incapsula", wantCat: "waf"},
+		{name: "aliyun", headers: map[string]string{"set-cookie": "acw_tc=0b1c2d; path=/"}, wantName: "Alibaba Cloud WAF", wantCat: "waf"},
+		{name: "baota", headers: map[string]string{"server": "btwaf/1.0"}, wantName: "BT Panel WAF", wantCat: "waf"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := m.Match(Response{StatusCode: 200, Headers: tt.headers})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].Name == tt.wantName {
+					got = &res.Technologies[i]
+				}
+			}
+			if got == nil {
+				t.Fatalf("expected %s, got %+v", tt.wantName, res.Technologies)
+			}
+			if got.Category != tt.wantCat {
+				t.Fatalf("%s category = %q, want %q", tt.wantName, got.Category, tt.wantCat)
+			}
+		})
+	}
+
+	// 普通站点响应不应误报前置层。
+	plain := m.Match(Response{
+		StatusCode: 200,
+		Headers:    map[string]string{"server": "nginx/1.25.3", "content-type": "text/html"},
+		Body:       []byte("<html><head><title>Hello</title></head><body>ok</body></html>"),
+	})
+	for _, tech := range plain.Technologies {
+		if tech.Category == "waf" || tech.Category == "cdn" {
+			t.Fatalf("unexpected front-layer match on plain response: %+v", tech)
+		}
+	}
+}
+
 // requires 门控的词表必须覆盖「id / 名 / 连字符名 / 分类」，且小写去重。
 func TestTechnologyMatchTokens(t *testing.T) {
 	tests := []struct {

@@ -8,7 +8,7 @@
 # 字段：
 #   id        规则标识，唯一
 #   name      技术名（写入 Technology.Name），留空时取 id
-#   category  分类，如 web-server / cms / framework / language / cdn / js-library / panel
+#   category  分类，如 web-server / cms / framework / language / cdn / waf / js-library / panel
 #   cpe       默认 CPE，可被 match 覆盖；支持 $1 / ${name} 引用捕获组
 #   softmatch true 表示该规则特征偏弱，命中记为 probable 而不是 certain
 #   match     规则列表，按顺序取第一个命中的
@@ -222,6 +222,173 @@
     - source: header
       header: server
       pattern: '(?i)\bAkamaiGHost\b'
+
+# ================================ WAF / CDN 前置层 ================================
+#
+# 这一组回答的是「站点前面挡了什么」，而不是「站点自己用什么」：引擎会把 category 为
+# waf/cdn 的命中单独外露成 WAF 字段，不再混进技术栈摘要，避免同一层信息被说两遍。
+# 特征一律取各家专属的响应头或 Cookie 名，不用泛化关键词，以免误报。
+# 只靠 Cookie 名或通用头判断的规则标为 softmatch（记为 probable）。
+
+- id: aws-cloudfront
+  name: AWS CloudFront
+  category: cdn
+  match:
+    - source: header
+      header: x-amz-cf-id
+      pattern: '\S'
+
+- id: aws-waf
+  name: AWS WAF
+  category: waf
+  match:
+    - source: header
+      header: x-amzn-waf-action
+      pattern: '\S'
+
+- id: azure-front-door
+  name: Azure Front Door
+  category: cdn
+  match:
+    - source: header
+      header: x-azure-ref
+      pattern: '\S'
+
+- id: sucuri
+  name: Sucuri
+  category: waf
+  match:
+    - source: header
+      header: x-sucuri-id
+      pattern: '\S'
+    - source: header
+      header: server
+      pattern: '(?i)\bsucuri\b'
+
+- id: imperva-incapsula
+  name: Imperva Incapsula
+  category: waf
+  match:
+    - source: header
+      header: x-iinfo
+      pattern: '\S'
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b(?:incap_ses|visid_incap)_\d+='
+
+- id: f5-big-ip-asm
+  name: F5 BIG-IP ASM
+  category: waf
+  match:
+    - source: header
+      header: x-wa-info
+      pattern: '\S'
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bTS[0-9a-f]{8}='
+
+- id: barracuda-waf
+  name: Barracuda WAF
+  category: waf
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bbarra_counter_session='
+
+- id: modsecurity
+  name: ModSecurity
+  category: waf
+  softmatch: true
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bmod_?security\b'
+
+- id: vercel
+  name: Vercel
+  category: cdn
+  match:
+    - source: header
+      header: x-vercel-id
+      pattern: '\S'
+
+- id: netlify
+  name: Netlify
+  category: cdn
+  match:
+    - source: header
+      header: x-nf-request-id
+      pattern: '\S'
+
+- id: aliyun-waf
+  name: Alibaba Cloud WAF
+  category: waf
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b(?:acw_tc|acw_sc__v2|ssxmod_itna)='
+
+- id: jiasule
+  name: Jiasule
+  category: waf
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b(?:__jsluid_s?|jsl_clearance_s?)='
+    - source: header
+      header: server
+      pattern: '(?i)\bjiasule\b'
+
+- id: wangzhan360
+  name: 360 Website Guard
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\b360wzws\b'
+
+- id: yunjiasu
+  name: Baidu Yunjiasu
+  category: waf
+  softmatch: true
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\byunjiasu\b'
+
+- id: baota-waf
+  name: BT Panel WAF
+  category: waf
+  softmatch: true
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bbtwaf\b'
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bbtwaf[a-z_]*='
+
+- id: tencent-cloud-cdn
+  name: Tencent Cloud CDN
+  category: cdn
+  softmatch: true
+  match:
+    - source: header
+      header: x-nws-log-uuid
+      pattern: '\S'
+
+- id: qiniu-cdn
+  name: Qiniu CDN
+  category: cdn
+  softmatch: true
+  match:
+    - source: header
+      header: x-qiniu-zone
+      pattern: '\S'
+    - source: header
+      header: x-reqid
+      pattern: '\S'
 
 - id: varnish
   name: Varnish

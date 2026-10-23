@@ -267,11 +267,14 @@ type Options struct {
 	PSFingerprintDir    string
 	WebFingerprintDir   string
 	WebFavicon          bool
-	OnPortScanResult    func(info PortScanInfo)
-	OnHostDiscovered    func(host string)
-	OnPhaseProgress     func(phase string, status string, finished int64, total int64, percent int)
-	OnScanInfoUpdate    func(info ScanInfoUpdate)
-	OnPedmLog           func(line string)
+	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒），默认 30。
+	// 与全局 -timeout 解耦：信息收集阶段不该被漏洞扫描的长超时拖住。
+	WebProbeTimeout  int
+	OnPortScanResult func(info PortScanInfo)
+	OnHostDiscovered func(host string)
+	OnPhaseProgress  func(phase string, status string, finished int64, total int64, percent int)
+	OnScanInfoUpdate func(info ScanInfoUpdate)
+	OnPedmLog        func(line string)
 
 	// path to the afrog configuration file
 	ConfigFile string
@@ -388,9 +391,10 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
 		flagSet.BoolVar(&options.PSServiceProbe, "ps-service-probe", false, "send active service probes (application payloads) during port pre-scan to identify services more accurately"),
 		flagSet.StringVar(&options.PSFingerprintDir, "ps-fingerprint-dir", "", "directory with probes.yaml/services.yaml/ports.yaml overriding the built-in port fingerprint set"),
-		flagSet.BoolVar(&options.EnableWebProbe, "w", false, "enable webprobe stage (alive web probing)"),
+		flagSet.BoolVar(&options.EnableWebProbe, "w", true, "collect web asset info (url/status/title/server/tech-stack fingerprint) before scanning; enabled by default, disable with -w=false"),
 		flagSet.StringVar(&options.WebFingerprintDir, "w-fingerprint-dir", "", "directory with rules.yaml overriding the built-in web fingerprint set"),
 		flagSet.BoolVar(&options.WebFavicon, "w-favicon", false, "fetch /favicon.ico during web probe to match favicon rules (adds one extra request per target)"),
+		flagSet.IntVar(&options.WebProbeTimeout, "w-timeout", 30, "web probe timeout in seconds for each request and certificate fetch, independent of the global -timeout"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
 		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),

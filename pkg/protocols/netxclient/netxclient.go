@@ -450,7 +450,7 @@ func (s *ConnSession) ReceiveUntil(readSize int, readTimeout time.Duration, unti
 	if s == nil || s.conn == nil {
 		return nil, fmt.Errorf("nil session")
 	}
-	if strings.TrimSpace(until) == "" {
+	if until == "" {
 		return s.Receive(readSize, readTimeout)
 	}
 	if readSize <= 0 {
@@ -726,8 +726,10 @@ func fromHex(data string) string {
 	return data
 }
 
+// unescapeCommon 展开 `\r` `\n` `\t` 等转义序列。
+// 分隔符中的空白是语义的一部分，因此这里不做 TrimSpace：
+// YAML 双引号写法 "\r\n" 解析后本身就是真实 CRLF，TrimSpace 会把它吃成空串。
 func unescapeCommon(s string) string {
-	s = strings.TrimSpace(s)
 	if s == "" {
 		return s
 	}

@@ -83,10 +83,31 @@ afrog -t 192.168.1.0/24 -ps
 
 ### `-w`
 
-对目标进行 Web 探测，适合在漏洞扫描前先识别 HTTP(S) 资产。
+在漏洞扫描前先做一轮 Web 资产信息收集：识别 HTTP(S) 资产，并输出 URL、状态码、标题、Server 与技术栈指纹（如 `php`、`apache`、`thinkphp`），让安全工程师先对目标资产有直观认知。
+
+**该阶段默认开启**，想关掉用 `-w=false`：
 
 ```bash
-afrog -t 192.168.1.0/24 -ps -w
+afrog -t 192.168.1.0/24 -ps           # 默认已含 Web 探测
+afrog -t 192.168.1.0/24 -ps -w=false  # 显式关闭
+```
+
+### `-w-timeout`
+
+控制 Web 探测阶段单次请求与证书获取的超时（秒），默认 `30`。
+
+它与全局 `-timeout` 相互独立：全局超时管 PoC 请求，`-w-timeout` 只管探测阶段。目标响应慢时可以单独调大，而不必放宽整个扫描的超时。真实的共享主机 / 中间设备常在 10s 后才吐出响应头，因此默认值不宜过紧。
+
+```bash
+afrog -t http://example.com -w -w-timeout 30
+```
+
+### `-w-favicon`
+
+在 Web 探测阶段额外抓取 favicon 并计算 hash，用于识别同一套资产或不易从标题暴露的应用。**默认关闭**，开启后每个目标会多一次请求。
+
+```bash
+afrog -t http://example.com -w -w-favicon
 ```
 
 ### `-p`
@@ -602,7 +623,7 @@ afrog -T targets.txt -S high,critical
 ### 网段资产探测 + Web 探测 + 漏扫
 
 ```bash
-afrog -t 192.168.1.0/24 -ps -w
+afrog -t 192.168.1.0/24 -ps        # Web 探测默认已包含，关闭用 -w=false
 ```
 
 ### 批量稳定扫描

@@ -107,8 +107,13 @@ type Options struct {
 
 	// --- fingerprinting and probing ---
 
-	DisableFingerprint    bool
-	EnableWebProbe        bool
+	DisableFingerprint bool
+
+	// DisableWebProbe 关闭 Web 探测（-w）阶段。零值即启用（默认开启）：
+	// 该阶段承担扫描前的资产信息收集（URL/状态码/标题/Server/技术栈指纹），
+	// 只想纯跑漏洞、不愿额外发探测请求时用 WithWebProbe(false) 关闭。
+	DisableWebProbe bool
+
 	FingerprintFilterMode string
 	DefaultAccept         bool
 
@@ -121,6 +126,12 @@ type Options struct {
 	// default; the built-in rule set already carries favicon rules, they are
 	// simply never used unless fetching is enabled.
 	WebFavicon bool
+
+	// WebProbeTimeout is the per-request timeout of the -w stage in seconds,
+	// covering both the HTTP request and the TLS certificate fetch. It is
+	// independent of the global timeout: zero means "use the engine default"
+	// (30s), matching the CLI's -w-timeout.
+	WebProbeTimeout int
 
 	// StopOnFirstMatch stops the scan as soon as a vulnerability is found.
 	StopOnFirstMatch bool
@@ -875,9 +886,10 @@ func WithFingerprintFilterMode(mode string) Option {
 	}
 }
 
-// WithWebProbe enables the web probing stage.
-func WithWebProbe() Option {
-	return func(o *Options) error { o.EnableWebProbe = true; return nil }
+// WithWebProbe enables or disables the web probing (-w) stage.
+// Enabled by default; pass false to disable.
+func WithWebProbe(enabled bool) Option {
+	return func(o *Options) error { o.DisableWebProbe = !enabled; return nil }
 }
 
 // WithWebFingerprintDir points the -w stage at a directory containing
@@ -898,6 +910,21 @@ func WithWebFingerprintDir(dir string) Option {
 // automatically, so this option is only needed for the built-in rules.
 func WithWebFavicon() Option {
 	return func(o *Options) error { o.WebFavicon = true; return nil }
+}
+
+// WithWebProbeTimeout sets the per-request timeout of the -w stage in seconds,
+// covering both the HTTP request and the TLS certificate fetch.
+//
+// It is equivalent to the CLI's -w-timeout and is independent of WithTimeout,
+// which only bounds PoC requests. Non-positive values are ignored so the
+// engine default applies.
+func WithWebProbeTimeout(seconds int) Option {
+	return func(o *Options) error {
+		if seconds > 0 {
+			o.WebProbeTimeout = seconds
+		}
+		return nil
+	}
 }
 
 // --- network ---

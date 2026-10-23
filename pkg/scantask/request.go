@@ -42,6 +42,9 @@ type Request struct {
 	Ports             string
 	SkipHostDiscovery bool
 	WebFingerprint    bool
+	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用引擎默认值。
+	WebProbeTimeout int
+	WebFavicon      bool
 
 	// OOB
 	EnableOOB  bool
@@ -118,6 +121,8 @@ func BuildSpec(req Request) (*executor.Spec, func(), error) {
 		Ports:             strings.TrimSpace(req.Ports),
 		SkipHostDiscovery: req.SkipHostDiscovery,
 		WebFingerprint:    req.WebFingerprint,
+		WebProbeTimeout:   req.WebProbeTimeout,
+		WebFavicon:        req.WebFavicon,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOBAdapter),
 		TaskName:          strings.TrimSpace(req.TaskName),

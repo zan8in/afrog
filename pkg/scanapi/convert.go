@@ -95,6 +95,17 @@ func ToProtoEvent(ev *scanstream.Event) *afrogv1.ScanEvent {
 				Server:      ev.WebProbe.Server,
 				PoweredBy:   ev.WebProbe.PoweredBy,
 				Confidence:  ev.WebProbe.Confidence,
+				Redirects:   ev.WebProbe.Redirects,
+				FaviconHash: ev.WebProbe.FaviconHash,
+				Waf:         ev.WebProbe.WAF,
+			}
+			if ev.WebProbe.TLS != nil {
+				wp.Tls = &afrogv1.WebTLSInfo{
+					Subject:  ev.WebProbe.TLS.Subject,
+					Issuer:   ev.WebProbe.TLS.Issuer,
+					NotAfter: ev.WebProbe.TLS.NotAfter,
+					DnsNames: ev.WebProbe.TLS.DNSNames,
+				}
 			}
 			if len(ev.WebProbe.Technologies) > 0 {
 				wp.Technologies = make([]*afrogv1.WebTechnology, 0, len(ev.WebProbe.Technologies))

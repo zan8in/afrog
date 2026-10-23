@@ -140,9 +140,19 @@ type SDKOptions struct {
 	MaxHostError      int
 	Smart             bool
 
-	DisableFingerprint    bool
-	EnableWebProbe        bool
+	DisableFingerprint bool
+	// EnableWebProbe 是旧字段，语义仍为「开启 Web 探测」；NewSDKOptions 已默认置 true。
+	// 新代码推荐用 DisableWebProbe 关闭。
+	EnableWebProbe bool
+	// DisableWebProbe 关闭 Web 探测（-w）阶段；默认开启，与 CLI 的 -w 默认值一致。
+	DisableWebProbe       bool
 	FingerprintFilterMode string
+
+	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒）；0 表示用引擎
+	// 默认值（30s），对应 CLI 的 -w-timeout，与全局 Timeout 相互独立。
+	WebProbeTimeout int
+	// WebFavicon 开启 favicon 抓取（每个目标多一次请求），对应 CLI 的 -w-favicon。
+	WebFavicon bool
 
 	MaxRespBodySize  int
 	BruteMaxRequests int
@@ -249,6 +259,7 @@ func NewSDKOptions() *SDKOptions {
 		MaxRespBodySize:       2,
 		BruteMaxRequests:      5000,
 		DefaultAccept:         true,
+		EnableWebProbe:        true,
 		FingerprintFilterMode: "strict",
 		PSPorts:               "top",
 		PSS4Chunk:             1000,
@@ -431,8 +442,14 @@ func (s *SDKScanner) build() (*sdk.Scanner, error) {
 	if v := strings.TrimSpace(o.FingerprintFilterMode); v != "" {
 		options = append(options, sdk.WithFingerprintFilterMode(v))
 	}
-	if o.EnableWebProbe {
-		options = append(options, sdk.WithWebProbe())
+	// Web 探测默认开启；EnableWebProbe 与 DisableWebProbe 任一为「关」即关闭，
+	// 其中前者用于兼容既有集成，后者是推荐的新写法。
+	options = append(options, sdk.WithWebProbe(o.EnableWebProbe && !o.DisableWebProbe))
+	if o.WebProbeTimeout > 0 {
+		options = append(options, sdk.WithWebProbeTimeout(o.WebProbeTimeout))
+	}
+	if o.WebFavicon {
+		options = append(options, sdk.WithWebFavicon())
 	}
 
 	if v := strings.TrimSpace(o.Proxy); v != "" {

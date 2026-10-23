@@ -135,7 +135,8 @@ func TestCompat_BasicScan(t *testing.T) {
 	}
 }
 
-// Defaults must match the original ones exactly.
+// Defaults must match the original ones, with the one deliberate exception:
+// web probing (-w) is now on by default, mirroring the CLI's -w default.
 func TestCompat_NewSDKOptionsDefaults(t *testing.T) {
 	o := NewSDKOptions()
 	tests := []struct {
@@ -143,6 +144,8 @@ func TestCompat_NewSDKOptionsDefaults(t *testing.T) {
 		got  any
 		want any
 	}{
+		{"EnableWebProbe", o.EnableWebProbe, true},
+		{"DisableWebProbe", o.DisableWebProbe, false},
 		{"RateLimit", o.RateLimit, 150},
 		{"Concurrency", o.Concurrency, 25},
 		{"Retries", o.Retries, 1},
@@ -757,6 +760,42 @@ func TestCompat_EveryOptionReachesTheEngine(t *testing.T) {
 	}
 	if len(in.ExcludePocs) != 1 {
 		t.Errorf("ExcludePocs did not reach the engine: %v", in.ExcludePocs)
+	}
+}
+
+// The SDK's -w default must match the CLI's: on unless explicitly disabled.
+func TestCompat_WebProbeDefaultsOnAndCanBeDisabled(t *testing.T) {
+	srv := newCompatServer(t)
+	dir := t.TempDir()
+	writeCompatPoc(t, dir, "webprobe-default")
+
+	base := func() *SDKOptions {
+		o := NewSDKOptions()
+		o.Silent = true
+		o.Targets = []string{srv.URL}
+		o.PocFile = dir
+		o.DisableFingerprint = true
+		return o
+	}
+
+	on, err := NewSDKScanner(base())
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer on.Close()
+	if got := on.Scanner().EngineOptions().EnableWebProbe; !got {
+		t.Error("web probing should be on by default")
+	}
+
+	offOpts := base()
+	offOpts.DisableWebProbe = true
+	off, err := NewSDKScanner(offOpts)
+	if err != nil {
+		t.Fatalf("NewSDKScanner: %v", err)
+	}
+	defer off.Close()
+	if got := off.Scanner().EngineOptions().EnableWebProbe; got {
+		t.Error("DisableWebProbe should turn web probing off")
 	}
 }
 

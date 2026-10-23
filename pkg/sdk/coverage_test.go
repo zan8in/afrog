@@ -45,10 +45,15 @@ func TestOptions_EveryOptionApplies(t *testing.T) {
 		{"WithFingerprintDisabled", WithFingerprintDisabled(), func(o *Options) bool { return o.DisableFingerprint }},
 		{"WithFingerprintFilterMode", WithFingerprintFilterMode(FingerprintOpportunistic),
 			func(o *Options) bool { return o.FingerprintFilterMode == FingerprintOpportunistic }},
-		{"WithWebProbe", WithWebProbe(), func(o *Options) bool { return o.EnableWebProbe }},
+		{"WithWebProbe", WithWebProbe(true), func(o *Options) bool { return !o.DisableWebProbe }},
+		{"WithWebProbeDisabled", WithWebProbe(false), func(o *Options) bool { return o.DisableWebProbe }},
 		{"WithWebFingerprintDir", WithWebFingerprintDir("d"),
 			func(o *Options) bool { return o.WebFingerprintDir == "d" }},
 		{"WithWebFavicon", WithWebFavicon(), func(o *Options) bool { return o.WebFavicon }},
+		{"WithWebProbeTimeout", WithWebProbeTimeout(9), func(o *Options) bool { return o.WebProbeTimeout == 9 }},
+		// 非正值表示「用引擎默认值」，不该被写进配置。
+		{"WithWebProbeTimeoutIgnoredWhenNotPositive", WithWebProbeTimeout(0),
+			func(o *Options) bool { return o.WebProbeTimeout == 0 }},
 
 		{"WithProxy", WithProxy("http://127.0.0.1:8080"), func(o *Options) bool { return o.Proxy != "" }},
 		{"WithHeaders", WithHeaders("X-A: 1"), func(o *Options) bool { return len(o.Headers) == 1 }},
@@ -132,8 +137,9 @@ func TestScanner_OptionsReachTheEngine(t *testing.T) {
 		WithMaxRespBodySize(5),
 		WithRequestLimitPerTarget(6),
 		WithSmartConcurrency(),
-		WithWebProbe(),
+		WithWebProbe(true),
 		WithWebFavicon(),
+		WithWebProbeTimeout(9),
 		WithSearch("reach"),
 		WithHeaders("X-Test: 1"),
 		WithStopOnFirstMatch(),
@@ -159,6 +165,7 @@ func TestScanner_OptionsReachTheEngine(t *testing.T) {
 		{"Smart", in.Smart, true},
 		{"EnableWebProbe", in.EnableWebProbe, true},
 		{"WebFavicon", in.WebFavicon, true},
+		{"WebProbeTimeout", in.WebProbeTimeout, 9},
 		{"Search", in.Search, "reach"},
 		{"DisableFingerprint", in.DisableFingerprint, true},
 		{"StopOnFirstMatch", in.VulnerabilityScannerBreakpoint, true},
@@ -292,7 +299,7 @@ func TestScanner_ProgressBeforeFinishIsWeighted(t *testing.T) {
 		WithFingerprintDisabled(),
 		// Both stages carry weight, so the port and web-probe phases are read.
 		WithPortScan(PortScanOptions{Ports: "80", SkipDiscovery: true}),
-		WithWebProbe(),
+		WithWebProbe(true),
 	)
 	if err != nil {
 		t.Fatalf("New: %v", err)

@@ -263,6 +263,17 @@ func (s *Scanner) installRunnerHooks() {
 			PoweredBy:   strings.TrimSpace(meta.PoweredBy),
 			Fingerprint: strings.TrimSpace(meta.Fingerprint),
 			Confidence:  strings.TrimSpace(meta.Confidence),
+			Redirects:   meta.Redirects,
+			FaviconHash: strings.TrimSpace(meta.FaviconHash),
+			WAF:         strings.TrimSpace(meta.WAF),
+		}
+		if meta.TLS != nil {
+			ev.TLS = &WebTLS{
+				Subject:  meta.TLS.Subject,
+				Issuer:   meta.TLS.Issuer,
+				NotAfter: meta.TLS.NotAfter,
+				DNSNames: meta.TLS.DNSNames,
+			}
 		}
 		if len(meta.Technologies) > 0 {
 			ev.Technologies = make([]WebTechnology, 0, len(meta.Technologies))
@@ -908,7 +919,7 @@ func (s *Scanner) Progress() float64 {
 			portStage = float64(discovery+portscan) / 2
 		}
 	}
-	if s.opts.EnableWebProbe {
+	if !s.opts.DisableWebProbe {
 		weightWeb = 0.2
 		webStage = float64(s.phasePercent(PhaseWebProbe))
 	}
@@ -1111,9 +1122,10 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		Smart:                          opts.Smart,
 		DefaultAccept:                  opts.DefaultAccept,
 		DisableFingerprint:             opts.DisableFingerprint,
-		EnableWebProbe:                 opts.EnableWebProbe,
+		EnableWebProbe:                 !opts.DisableWebProbe,
 		WebFingerprintDir:              opts.WebFingerprintDir,
 		WebFavicon:                     opts.WebFavicon,
+		WebProbeTimeout:                opts.WebProbeTimeout,
 		FingerprintFilterMode:          opts.FingerprintFilterMode,
 		VulnerabilityScannerBreakpoint: opts.StopOnFirstMatch,
 		Proxy:                          opts.Proxy,

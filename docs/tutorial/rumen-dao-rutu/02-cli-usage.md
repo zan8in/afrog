@@ -16,7 +16,7 @@
 | :--- | :--- |
 | 单个 URL 扫漏洞 | `afrog -t http://example.com` |
 | 批量 URL 扫漏洞 | `afrog -T targets.txt` |
-| 网段资产探测（端口 → Web → 漏洞） | `afrog -t 192.168.1.0/24 -ps -w` |
+| 网段资产探测（端口 → Web → 漏洞） | `afrog -t 192.168.1.0/24 -ps` |
 | 全端口扫描（绝对全量） | `afrog -t 1.2.3.4 -ps -p 1-65535 -Pn` |
 | 快速只扫高危 | `afrog -T targets.txt -S high,critical` |
 | 只跑某类 PoC（关键词） | `afrog -t http://example.com -s spring,weblogic` |
@@ -38,7 +38,7 @@ afrog -T targets.txt
 当你的输入不是“URL”，而是 “IP / 网段 / 段范围”时，最佳姿势通常是：
 
 1) 用 `-ps` 做端口预扫，把 `host:port` 资产捞出来  
-2) 用 `-w` 做 Web 存活探测，把可访问的 Web URL（含标题等信息）捞出来  
+2) Web 探测**默认开启**，自动把可访问的 Web URL 捞出来，并给出 URL / 状态码 / 标题 / Server / 技术栈指纹；不需要时用 `-w=false` 关闭  
 3) Afrog 再基于这些资产跑指纹与漏洞 PoC
 
 #### 2.1 CIDR / 段范围作为目标
@@ -80,21 +80,26 @@ afrog -t 192.168.1.0/24 -ps -p all -prate 2000 -ptimeout 800 -ptries 1
 
 `-p all/full` 时，内部会把大端口集合切块扫描；可以用 `-ps-s4-chunk` 控制块大小（更稳但更慢，或更快但更吃资源）。
 
-#### 2.4 Web 存活探测：`-w`
-`-w` 会对目标集合做 Web 探测，自动补全/识别可访问的 HTTP(S) URL，并输出常见元信息（如标题、Server 等）。它适合你在跑漏洞前快速摸清 Web 面。
+#### 2.4 Web 存活探测：`-w`（默认开启）
+Web 探测会对目标集合做一轮资产信息收集：自动补全/识别可访问的 HTTP(S) URL，并输出 URL、状态码、标题、Server 与技术栈指纹（如 `php`、`apache`、`thinkphp`）。它适合你在跑漏洞前快速摸清 Web 面。
+
+**该阶段默认开启**，不需要时用 `-w=false` 关闭。
 
 ```bash
-# 端口预扫 + Web 探测 + 漏洞扫描
-afrog -t 192.168.1.0/24 -ps -w
+# 端口预扫 + 漏洞扫描（Web 探测默认已包含）
+afrog -t 192.168.1.0/24 -ps
+
+# 显式关闭 Web 探测
+afrog -t 192.168.1.0/24 -ps -w=false
 ```
 
-当 `-ps` 与 `-w` 同时开启时，两者会自动联动：
+当 `-ps` 与 `-w` 同时生效时，两者会自动联动：
 
 - **只探真 Web 端口**：`-ps` 的端口指纹结论会传给 `-w`，已确认为非 Web 的端口（如 `mysql`、`ssh`、`redis`）不再发起 HTTP 探测。
 - **协议不再靠猜**：指纹确认是 TLS 的端口直接按 `https://` 探测，其余 Web 端口直接按 `http://` 探测，省去一次协议试探请求。
 - **结果互补**：HTTP 响应里没有 `Server` 头时，Web 探测输出会回落到端口指纹识别出的产品与版本。
 
-只用 `-w`（不带 `-ps`）时行为与以前一致，仍按目标端口自行试探协议。
+未开 `-ps` 时（如直接 `-t host:port`），Web 探测会先查内置端口先验：先验中登记为非 Web 的端口（如 `3306`、`6379`）直接跳过，不做无效的 HTTP 请求；其余端口仍按目标端口自行试探协议。
 
 ##### Web 指纹识别
 `-w` 会对每个存活 Web 目标做一次指纹识别（响应头 / 正文 / 标题），输出结构化的技术栈，例如 `Nginx 1.25.3, WordPress 6.4.2`。
@@ -102,6 +107,7 @@ afrog -t 192.168.1.0/24 -ps -w
 - **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch`）与 `certain`（强特征，如专属响应头、`meta generator`）。
 - **外置指纹库**：`-w-fingerprint-dir <dir>` 指定目录下放置 `rules.yaml` 即可覆盖/扩展内置规则；**外置规则整体排在内置之前，同 `id` 覆盖内置**，新增的 specific 规则不会被内置通用规则抢先命中。
 - **favicon 匹配按需开启**：抓 `/favicon.ico` 会额外产生一次请求，因此默认不抓；加 `-w-favicon` 即可开启，命中内置的 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）。若外置 `rules.yaml` 里出现 `source: favicon` 规则，也会自动开启抓取，无需再加开关。
+- **探测超时单独可控**：`-w-timeout <秒>` 控制探测阶段单次请求与证书获取的超时，默认 `30`；它与全局 `-timeout` 相互独立，目标响应慢时可只放宽探测阶段而不影响 PoC 扫描。
 - **驱动 `requires` 门控**：识别出的技术栈会并入 PoC 的 `requires` 词表，`requires: [wordpress]`、`[thinkphp]`、`[apache-shiro]`、`[cms]` 这类写法从此有据可依，明显不可能命中的 PoC 会被直接跳过，不再浪费请求。可用标识为：规则 `id`（如 `nextjs` / `rails`）、技术名（`Next.js` → `next.js`）、技术名连字符写法（`Apache Shiro` → `apache-shiro`）与 `category`（如 `cms`）。
 - 事件流 / SDK / gRPC 输出同时提供 `fingerprint`（一行摘要）与 `technologies`（`name`/`version`/`category`/`cpe`/`confidence` 明细）。
 
@@ -118,8 +124,8 @@ afrog -t https://example.com -w -w-favicon
 
 实战示例：
 ```bash
-# 网段资产探测 + Web 探测
-afrog -t 192.168.1.0/24 -ps -w
+# 网段资产探测（Web 探测默认已包含）
+afrog -t 192.168.1.0/24 -ps
 
 # 只盯一个服务（示例：SSH 弱口令）
 afrog -t 192.168.1.0/24 -ps -p 22 -s ssh

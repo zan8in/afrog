@@ -341,6 +341,11 @@ func defaultHeader() string {
 			.webprobe-url:hover{text-decoration:underline}
 			.webprobe-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-start}
 			.webprobe-badge{padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.08);color:#B4C1C3;font-size:11px;max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+			.webprobe-fingerprint{background:rgba(97,214,214,0.16);color:#61D6D6}
+			.webprobe-summary{padding:8px 10px;border-top:1px solid #60786F;background:#1d313a;color:#DDE2DE;font-family:'Consolas','Menlo','Liberation Mono','DejaVu Sans Mono',monospace;font-size:12px;line-height:2}
+			.webprobe-summary-row{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+			.webprobe-summary-label{color:#8FA3A6;min-width:56px;text-transform:uppercase;letter-spacing:.4px}
+			.webprobe-summary-assets{background:rgba(97,214,214,0.16);color:#61D6D6}
 			.oob-box{margin-top:10px;border:1px solid #60786F;border-radius:6px;background:#223B46;color:#DDE2DE;padding:10px}
 			.oob-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 			.oob-label{font-weight:bold;letter-spacing:.2px}

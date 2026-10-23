@@ -19,12 +19,12 @@ func TestBuildArgs(t *testing.T) {
 		{
 			name: "single target",
 			spec: &Spec{Targets: []string{"http://a.example"}},
-			want: []string{"-t", "http://a.example", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "target whitespace trimmed",
 			spec: &Spec{Targets: []string{"  http://a.example  ", "", "   "}},
-			want: []string{"-t", "http://a.example", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "poc file severity search",
@@ -39,6 +39,7 @@ func TestBuildArgs(t *testing.T) {
 				"-P", "/tmp/custom.yaml",
 				"-s", "tomcat",
 				"-S", "high,critical",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -53,6 +54,7 @@ func TestBuildArgs(t *testing.T) {
 				"-t", "http://a.example",
 				"-ap", "/home/u/.config/afrog/pocs-curated",
 				"-ap", "/home/u/.config/afrog/pocs-my",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -76,6 +78,7 @@ func TestBuildArgs(t *testing.T) {
 				"-retries", "2",
 				"-mhe", "5",
 				"-smart",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -92,6 +95,7 @@ func TestBuildArgs(t *testing.T) {
 				"-proxy", "http://127.0.0.1:8080",
 				"-H", "X-A: 1",
 				"-H", "Cookie: a=b",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -116,6 +120,23 @@ func TestBuildArgs(t *testing.T) {
 			},
 		},
 		{
+			name: "web probe tuning",
+			spec: &Spec{
+				Targets:         []string{"http://a.example"},
+				WebFingerprint:  true,
+				WebProbeTimeout: 20,
+				WebFavicon:      true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-w",
+				"-w-timeout", "20",
+				"-w-favicon",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
 			name: "oob adapter",
 			spec: &Spec{
 				Targets:    []string{"http://a.example"},
@@ -126,6 +147,7 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-w=false",
 				"-oob", "dnslogcn",
 				"-json-stream",
 				"-disable-output-html",
@@ -137,7 +159,7 @@ func TestBuildArgs(t *testing.T) {
 				Targets:   []string{"http://a.example"},
 				EnableOOB: true,
 			},
-			want: []string{"-t", "http://a.example", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "port scan without custom ports",
@@ -148,6 +170,7 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-ps",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -191,7 +214,7 @@ func TestBuildArgs_MultipleTargetsUsesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildArgs: %v", err)
 	}
-	if len(args) != 4 || args[0] != "-T" || args[2] != "-json-stream" || args[3] != "-disable-output-html" {
+	if len(args) != 5 || args[0] != "-T" || args[2] != "-w=false" || args[3] != "-json-stream" || args[4] != "-disable-output-html" {
 		t.Fatalf("unexpected args: %v", args)
 	}
 	path := args[1]

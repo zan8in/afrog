@@ -29,11 +29,11 @@ afrog -cs zoomeye -q "app:'tomcat'" -qc 1000
 ## Probe before scanning on network ranges
 
 ```bash
-afrog -t 192.168.1.0/24 -ps -w
+afrog -t 192.168.1.0/24 -ps
 ```
 
 - `-ps`: enable port pre-scanning, suited to IPs, ranges and CIDRs
-- `-w`: probe targets for web services to identify HTTP(S) assets first
+- `-w`: web asset info collection (URL / status / title / Server / tech-stack fingerprint), **enabled by default**; turn it off with `-w=false`
 - `-p`: control the port range with `top`, `full`, `80,443,8080`, or `1-65535`
 - `-Pn`: skip host discovery and go straight to port scanning
 
@@ -108,6 +108,22 @@ afrog -t https://example.com -test    # test mode, disables requires gating
 ```
 
 Both `-nf` and `-test` affect `requires`-based gating, so avoid using them as regular scan modes.
+
+### Open ports differ between runs
+
+Scanning the same target twice and getting a different port list is usually the **target rate-limiting or blocking you**, not the scanner dropping results:
+
+- A closed port answers with `RST`; a dropped probe answers with nothing. Under load the target (or the device in front of it) discards some `SYN`s, so a few ports go missing each time.
+- It gets worse with concurrency: per-host concurrency defaults to 50; pushing it into the hundreds easily trips the target's connection limit, and more ports go missing rather than fewer.
+- If a host drops nearly every probe, the scanner prints a `PORT-SCAN | filtered` warning that the result set may be incomplete.
+
+```bash
+afrog -t 192.0.2.10 -ps -p full -ps-host-concurrency 20   # lower per-host concurrency further (default 50)
+afrog -t 192.0.2.10 -ps -ptries 4                          # more retries
+afrog -t 192.0.2.10 -ps -ptimeout 2000                     # a longer connect timeout
+```
+
+To confirm: scan from a machine on a different network, or at a different time. If the results become consistent, the throttling is on the target side.
 
 ## Notifications and web services
 

@@ -123,6 +123,14 @@ type WebTechnology struct {
 	Confidence string `json:"confidence,omitempty"`
 }
 
+// WebTLS is the TLS certificate summary of an https target.
+type WebTLS struct {
+	Subject  string   `json:"subject,omitempty"`
+	Issuer   string   `json:"issuer,omitempty"`
+	NotAfter string   `json:"not_after,omitempty"`
+	DNSNames []string `json:"dns_names,omitempty"`
+}
+
 // WebProbeEvent reports the metadata of a probed web service.
 //
 // Fingerprint is the human-readable one-line summary of the detected stack;
@@ -137,6 +145,14 @@ type WebProbeEvent struct {
 	Fingerprint  string          `json:"fingerprint,omitempty"`
 	Confidence   string          `json:"confidence,omitempty"`
 	Technologies []WebTechnology `json:"technologies,omitempty"`
+	// Redirects lists every hop after the initial URL; the last entry is the final URL.
+	Redirects []string `json:"redirects,omitempty"`
+	// FaviconHash is the mmh3 hash of the favicon; empty when not fetched.
+	FaviconHash string `json:"favicon_hash,omitempty"`
+	// TLS is the certificate summary of an https target; empty for non-https.
+	TLS *WebTLS `json:"tls,omitempty"`
+	// WAF names the detected WAF/CDN in front of the site; empty when unknown.
+	WAF string `json:"waf,omitempty"`
 }
 
 // Phase names reported through PhaseProgress.

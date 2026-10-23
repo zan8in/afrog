@@ -62,7 +62,9 @@ These single-target throttling strategies are mutually exclusive. Setting more t
 | --- | --- |
 | `WithFingerprintDisabled()` | fingerprinting is enabled by default |
 | `WithFingerprintFilterMode(mode)` | `"strict"`, optional `"opportunistic"` |
-| `WithWebProbe()` | disabled by default |
+| `WithWebProbe()` | enabled by default (matching the CLI `-w`); pass `false` to disable |
+| `WithWebProbeTimeout(seconds)` | `0`, meaning the engine default (30s); equivalent to `-w-timeout` |
+| `WithWebFavicon()` | off by default; equivalent to `-w-favicon`, costing one extra request per target |
 
 ## Network
 

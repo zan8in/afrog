@@ -611,7 +611,9 @@ Despite the CLI flag being named monitor-targets, it does **not** watch the targ
 |--------|---------|
 | `WithFingerprintDisabled()` | Fingerprinting is on by default |
 | `WithFingerprintFilterMode(mode)` | `"strict"` (or `"opportunistic"`) |
-| `WithWebProbe()` | Off by default |
+| `WithWebProbe(enabled)` | Web probing is on by default (matching the CLI `-w`); pass `false` to disable |
+| `WithWebProbeTimeout(seconds)` | `0`, meaning the engine default (30s); equivalent to `-w-timeout` |
+| `WithWebFavicon()` | off by default; equivalent to `-w-favicon`, costing one extra request per target |
 
 ### Network
 

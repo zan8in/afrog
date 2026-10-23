@@ -134,6 +134,22 @@ type WebProbeEvent struct {
 	Fingerprint  string               `json:"fingerprint"`
 	Confidence   string               `json:"confidence,omitempty"`
 	Technologies []WebTechnologyEvent `json:"technologies,omitempty"`
+	// Redirects 是初始 URL 之后每一次跳转的落点，末位即最终 URL；无跳转时为空。
+	Redirects []string `json:"redirects,omitempty"`
+	// FaviconHash 是 favicon 的 mmh3 哈希，未抓取 favicon 时为空。
+	FaviconHash string `json:"favicon_hash,omitempty"`
+	// TLS 是 https 目标的证书摘要，非 https 或握手失败时为空。
+	TLS *WebTLSEvent `json:"tls,omitempty"`
+	// WAF 是命中的 WAF/CDN 名称，未识别时为空。
+	WAF string `json:"waf,omitempty"`
+}
+
+// WebTLSEvent 是 https 目标的证书摘要。只保留判断所需的最小字段。
+type WebTLSEvent struct {
+	Subject  string   `json:"subject,omitempty"`
+	Issuer   string   `json:"issuer,omitempty"`
+	NotAfter string   `json:"not_after,omitempty"`
+	DNSNames []string `json:"dns_names,omitempty"`
 }
 
 // HostEvent 描述资产发现阶段发现的一个存活主机。

@@ -2,6 +2,7 @@ package portscan
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dlclark/regexp2"
@@ -120,6 +121,38 @@ func IsWebService(service string) bool {
 		return true
 	}
 	return strings.Contains(service, "http") || strings.Contains(service, "web")
+}
+
+// builtinPriors 按需加载一次内置 ports.yaml 的端口先验。
+//
+// 单独缓存是为了让「某端口惯例上是不是 Web」这类轻量查询不必构造完整
+// Fingerprinter——那会连带编译全部规则正则。
+var (
+	builtinPriorsOnce sync.Once
+	builtinPriors     map[int]*PortPrior
+)
+
+// PriorPortService 返回端口的惯例服务名（内置 ports.yaml），未登记时返回空串。
+//
+// 该结论只代表端口惯例，不包含任何探测证据，供调用方在缺少端口扫描结论时
+// 做先验判断（例如判断某端口是否值得做一次 Web 探测）。
+func PriorPortService(port int) string {
+	builtinPriorsOnce.Do(func() {
+		builtinPriors = make(map[int]*PortPrior)
+		var priors []*PortPrior
+		if err := unmarshalEmbedded(builtinPortsFile, &priors); err != nil {
+			return
+		}
+		for _, p := range priors {
+			if p != nil {
+				builtinPriors[p.Port] = p
+			}
+		}
+	})
+	if p := builtinPriors[port]; p != nil {
+		return p.Service
+	}
+	return ""
 }
 
 // Probes 返回应在指定端口上执行的探针（保持文件顺序即优先级），

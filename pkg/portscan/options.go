@@ -42,7 +42,7 @@ func DefaultOptions() *Options {
 		Ports:                  "full",
 		S4ChunkSize:            1000,
 		RateLimit:              500,
-		MaxHostConcurrency:     200,
+		MaxHostConcurrency:     50,
 		Timeout:                1000 * time.Millisecond,
 		Retries:                2,
 		AdaptiveTimeout:        true,
@@ -57,18 +57,4 @@ func DefaultOptions() *Options {
 		DiscoveryRetries:       1,
 		LogDiscoveredHosts:     true,
 	}
-}
-
-func ApplyQuickStrategy(o *Options) {
-	o.RateLimit = 500
-	o.MaxHostConcurrency = 200
-	o.Timeout = 800 * time.Millisecond
-	o.Retries = 2
-}
-
-func ApplyQuickestStrategy(o *Options) {
-	o.RateLimit = 1500
-	o.MaxHostConcurrency = 500
-	o.Timeout = 1500 * time.Millisecond
-	o.Retries = 2
 }

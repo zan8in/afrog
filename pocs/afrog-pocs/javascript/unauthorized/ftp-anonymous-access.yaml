@@ -1,0 +1,192 @@
+id: ftp-anonymous-access
+
+info:
+  name: FTP Anonymous Access (Read/Write)
+  author: zan8in
+  severity: high
+  verified: true
+  description: |-
+    FTP 服务允许匿名登录，并进一步确认匿名身份能否读写文件。
+
+    与仅判断匿名登录的 ftp-anonymous-login 不同，本 PoC 在登录成功后继续验证实际权限：
+      1. 进入被动模式（PASV，失败时回退 EPSV），在**第二条数据连接**上执行 LIST，
+         以控制连接收到 150/226 判定匿名可读；
+      2. 再次进入被动模式并执行 STOR，写入一个随机命名的小文件以判定匿名可写，
+         写入成功后立即用 DELE 删除，不在目标上留下残留文件。
+
+    匿名可写通常意味着攻击者可以直接投递文件，风险显著高于只读。端口取自目标端口
+    （{{Port}}），因此非标准端口的 FTP 服务也能覆盖。
+
+    判定依据：banner 220、登录 230，且 LIST 返回 150+226 或 STOR 返回 150+226。
+    仅匿名登录成功、但读写均无法确认时不报出（该场景由 ftp-anonymous-login 覆盖），
+    例如 PASV 数据端口被防火墙拦截的目标。
+  reference:
+    - https://tools.ietf.org/html/rfc2577
+    - https://cwe.mitre.org/data/definitions/284.html
+  tags: network,ftp,unauthorized,anonymous,misconfig
+  requires: [ftp]
+  created: 2026/10/22
+
+rules:
+  r0:
+    request:
+      type: javascript
+      # 数据连接必须新开一条 TCP，且 LIST/STOR 之间需要按响应码分支，这是 tcp+steps
+      # 规则表达不了的，因此用 javascript。
+      code: |
+        var net = require("afrog/net");
+
+        var IO_TIMEOUT = 8;
+        var BUFFER_SIZE = 16384;
+
+        // 取响应行里的三位状态码（FTP 响应固定以三位数字开头）。
+        function replyCode(s) {
+          if (!s || s.length < 3) return "";
+          return s.substring(0, 3);
+        }
+
+        // 读一条完整响应行，返回值包含 CRLF。
+        function readReply(c) {
+          return c.RecvUntil("\r\n");
+        }
+
+        // 解析 PASV 的 227 响应：227 Entering Passive Mode (h1,h2,h3,h4,p1,p2)
+        function parsePasv(r) {
+          var m = /\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+)\)/.exec(r);
+          if (!m) return null;
+          return {
+            ip: m[1] + "." + m[2] + "." + m[3] + "." + m[4],
+            port: parseInt(m[5], 10) * 256 + parseInt(m[6], 10)
+          };
+        }
+
+        // 进入被动模式并解析数据连接地址：优先 PASV，不支持（回 500/502 等）时回退 EPSV。
+        function enterPassive(c) {
+          c.Send("PASV\r\n");
+          var r = readReply(c);
+          if (replyCode(r) === "227") {
+            var pv = parsePasv(r);
+            if (pv) return pv;
+          }
+          c.Send("EPSV\r\n");
+          r = readReply(c);
+          if (replyCode(r) === "229") {
+            var m = /\(\|\|\|(\d+)\|\)/.exec(r);
+            if (m) return { ip: "", port: parseInt(m[1], 10) };
+          }
+          return null;
+        }
+
+        // 连接数据端口。优先用服务端通告的地址；通告地址不可用（NAT 后的内网地址、
+        // 0.0.0.0）时回退到控制连接的主机。
+        function connectData(ctlHost, pv) {
+          var hosts = [];
+          if (pv.ip && pv.ip !== "0.0.0.0") hosts.push(pv.ip);
+          if (ctlHost !== pv.ip) hosts.push(ctlHost);
+          for (var i = 0; i < hosts.length; i++) {
+            var dc = net.TCPClient();
+            dc.SetTimeout(IO_TIMEOUT);
+            dc.SetReadSize(BUFFER_SIZE);
+            if (dc.Connect(hosts[i], pv.port)) return dc;
+            dc.Close();
+          }
+          return null;
+        }
+
+        var banner = "";
+        var result = "anonymous=false";
+
+        var ctl = net.TCPClient();
+        ctl.SetTimeout(IO_TIMEOUT);
+        ctl.SetReadSize(BUFFER_SIZE);
+
+        if (ctl.Connect(Host, Port)) {
+          banner = readReply(ctl);
+          if (replyCode(banner) === "220") {
+            var loggedIn = false;
+            ctl.Send("USER anonymous\r\n");
+            var r1 = readReply(ctl);
+            if (replyCode(r1) === "230") {
+              // 部分服务端无需密码，USER 直接返回 230
+              loggedIn = true;
+            } else if (replyCode(r1) === "331") {
+              ctl.Send("PASS anonymous@afrog.invalid\r\n");
+              loggedIn = replyCode(readReply(ctl)) === "230";
+            }
+
+            if (loggedIn) {
+              ctl.Send("TYPE I\r\n");
+              readReply(ctl);
+
+              // 可读：数据连接建立成功，且控制连接以 150 开始、226 结束
+              var canRead = false;
+              var pvRead = enterPassive(ctl);
+              if (pvRead) {
+                var dcRead = connectData(Host, pvRead);
+                if (dcRead) {
+                  ctl.Send("LIST\r\n");
+                  var c150 = readReply(ctl);
+                  dcRead.Recv(BUFFER_SIZE);
+                  dcRead.Close();
+                  var c226 = readReply(ctl);
+                  canRead = (replyCode(c150) === "150" || replyCode(c150) === "125") &&
+                            replyCode(c226) === "226";
+                }
+              }
+
+              // 可写：STOR 上传随机命名的小文件，确认后立即 DELE 清理
+              var canWrite = false;
+              var pvWrite = enterPassive(ctl);
+              if (pvWrite) {
+                var dcWrite = connectData(Host, pvWrite);
+                if (dcWrite) {
+                  var fname = "afrog_" + Math.random().toString(36).slice(2, 10) + ".txt";
+                  ctl.Send("STOR " + fname + "\r\n");
+                  var s150 = readReply(ctl);
+                  if (replyCode(s150) === "150" || replyCode(s150) === "125") {
+                    dcWrite.Send("afrog anonymous write test\r\n");
+                    dcWrite.Close();
+                    canWrite = replyCode(readReply(ctl)) === "226";
+                    if (canWrite) {
+                      ctl.Send("DELE " + fname + "\r\n");
+                      readReply(ctl);
+                    }
+                  } else {
+                    dcWrite.Close();
+                  }
+                }
+              }
+
+              result = "anonymous=true;read=" + canRead + ";write=" + canWrite;
+            }
+          }
+          ctl.Send("QUIT\r\n");
+          ctl.Close();
+        }
+
+        if (banner) {
+          result = result + ";banner=" + banner.replace(/[\r\n]+/g, " ").substring(0, 120);
+        }
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
+    expression: response.raw.bcontains(b"anonymous=true;read=true") || response.raw.bcontains(b"anonymous=true;write=true")
+    extractors:
+      - name: read
+        type: regex
+        part: raw
+        regex: "anonymous=true;read=(?P<read>[^;]*);write=(?P<write>[^;]*)"
+        group: read
+      - name: write
+        type: regex
+        part: raw
+        regex: "anonymous=true;read=(?P<read>[^;]*);write=(?P<write>[^;]*)"
+        group: write
+      - name: banner
+        type: regex
+        part: raw
+        regex: "banner=(?P<banner>.*)"
+        group: banner
+
+expression: r0()

@@ -58,6 +58,10 @@ type Spec struct {
 	Ports             string
 	SkipHostDiscovery bool
 	WebFingerprint    bool
+	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用 CLI 默认值。
+	WebProbeTimeout int
+	// WebFavicon 开启 favicon 抓取（每个目标多一次请求）。
+	WebFavicon bool
 
 	// 报告输出：OutputHTML 为真时子进程写 HTML 报告（-o），否则用 -disable-output-html。
 	// OutputFile 只是文件名：子进程 CWD 是每任务独立的临时目录，实际路径由执行器固定

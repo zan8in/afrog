@@ -212,6 +212,17 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 			PoweredBy:   meta.PoweredBy,
 			Fingerprint: webProbeFingerprint(meta),
 			Confidence:  meta.Confidence,
+			Redirects:   meta.Redirects,
+			FaviconHash: meta.FaviconHash,
+			WAF:         meta.WAF,
+		}
+		if meta.TLS != nil {
+			ev.TLS = &scanstream.WebTLSEvent{
+				Subject:  meta.TLS.Subject,
+				Issuer:   meta.TLS.Issuer,
+				NotAfter: meta.TLS.NotAfter,
+				DNSNames: meta.TLS.DNSNames,
+			}
 		}
 		if len(meta.Technologies) > 0 {
 			ev.Technologies = make([]scanstream.WebTechnologyEvent, 0, len(meta.Technologies))

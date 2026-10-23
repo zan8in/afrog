@@ -76,6 +76,17 @@ type WebTech struct {
 	RuleID string
 }
 
+// TLSInfo 是 Web 探测顺带取到的服务端证书摘要，仅 https 目标有值。
+//
+// 证书信息在信息收集阶段的价值就是「这家站是谁签的、什么时候过期」，
+// 因此只保留判断所需的最小字段，不落完整证书。
+type TLSInfo struct {
+	Subject  string
+	Issuer   string
+	NotAfter string
+	DNSNames []string
+}
+
 // WebMeta 是一次 Web 探测的结果，也是全链路 WebProbeEvent 的唯一来源。
 type WebMeta struct {
 	URL       string
@@ -89,6 +100,15 @@ type WebMeta struct {
 	// Confidence 是 Web 指纹命中的最高可信度，未命中时为空。
 	Confidence   string
 	Technologies []WebTech
+	// Redirects 是初始 URL 之后每一次跳转的落点，无重定向时为空。
+	// 末位即最终 URL：用户据此判断自己填的目标最终落到了哪。
+	Redirects []string
+	// FaviconHash 是 favicon 的 mmh3 哈希；未抓取 favicon 时为空。
+	FaviconHash string
+	// TLS 是 https 目标的证书摘要；非 https 或握手失败时为空。
+	TLS *TLSInfo
+	// WAF 是命中的 WAF/CDN 名称；未识别时为空。
+	WAF string
 }
 
 // joinNonEmpty 用逗号连接非空字段，全部为空时返回空串。

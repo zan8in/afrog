@@ -80,6 +80,8 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		OutputHTML:        req.OutputHTML,
 		OutputFile:        strings.TrimSpace(req.OutputFile),
 		WebFingerprint:    req.WebProbe || req.WebFingerprint,
+		WebProbeTimeout:   req.WebProbeTimeout,
+		WebFavicon:        req.WebFavicon,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOB),
 		OOBRateLimit:      req.OobRateLimit,

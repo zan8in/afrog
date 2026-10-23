@@ -160,6 +160,11 @@ message ScanSpec {
   string ports = 19;
   bool skip_host_discovery = 20;
   bool web_fingerprint = 21;
+  // 单次 Web 探测请求与证书获取的超时（秒），0 表示用引擎默认值（30s）。
+  // 与 -timeout 相互独立：全局超时管 PoC 请求，它只管探测阶段。
+  int32 web_probe_timeout = 26;
+  // 开启 favicon 抓取，每个目标多一次请求。
+  bool web_favicon = 27;
 
   // OOB
   bool enable_oob = 22;
@@ -214,7 +219,11 @@ message WebTechnology { string name = 1; string version = 2; string category = 3
                        string cpe = 4; string confidence = 5; }
 message WebProbeEvent{ string url = 1; int32 status = 2; string title = 3;
                        string fingerprint = 4; string server = 5; string powered_by = 6;
-                       string confidence = 7; repeated WebTechnology technologies = 8; }
+                       string confidence = 7; repeated WebTechnology technologies = 8;
+                       repeated string redirects = 9; string favicon_hash = 10;
+                       WebTLSInfo tls = 11; string waf = 12; }
+message WebTLSInfo   { string subject = 1; string issuer = 2; string not_after = 3;
+                       repeated string dns_names = 4; }
 message HostEvent    { string host = 1; }
 message LogEvent     { string level = 1; string text = 2; }
 message DoneEvent    { string status = 1; Summary summary = 2; }

@@ -62,7 +62,9 @@ last_reviewed: 2026-09-16
 | --- | --- |
 | `WithFingerprintDisabled()` | 指纹默认开启 |
 | `WithFingerprintFilterMode(mode)` | `"strict"`，可选 `"opportunistic"` |
-| `WithWebProbe()` | 默认关闭 |
+| `WithWebProbe()` | 默认开启（与 CLI 的 `-w` 一致），传 `false` 关闭 |
+| `WithWebProbeTimeout(seconds)` | `0`，表示用引擎默认值（30s），对应 `-w-timeout` |
+| `WithWebFavicon()` | 默认关闭，对应 `-w-favicon`，每个目标多一次请求 |
 
 ## 网络
 

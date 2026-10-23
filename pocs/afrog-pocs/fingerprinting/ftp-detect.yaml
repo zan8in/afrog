@@ -6,7 +6,25 @@ info:
   severity: info
   verified: true
   description: |-
-    FTP service was detected.
+    FTP 服务识别。判定不依赖 banner 文案，而用协议级交互确认：读到欢迎 banner 后
+    依次发送 RFC 959 要求服务端实现的两条命令，看响应码：
+
+      - SYST 正常响应 215
+      - HELP 正常响应 214
+
+    banner 以 220 开头、且 SYST / HELP 任一返回正常码，即判定为 FTP。相比旧版
+    要求 banner 字面出现 "ftp"，FileZilla Server、以及
+    "220 Service ready for new user." 这类不含产品名的 banner 不再漏报。
+
+    banner 读取以最后一行的 "220 " 结束，因此
+    "220-...\r\n220-...\r\n220 ..." 形式的多行 banner 也能对齐，不会把续行
+    误当成命令响应。
+
+    r0 覆盖明文控制通道：显式 FTPS（AUTH TLS）在升级 TLS 前的控制通道同样是明文
+    FTP 语义，因此也被 r0 覆盖；r1 覆盖隐式 FTPS（banner 直接出现在 TLS 会话里，
+    如 990），该规则要求目标端口本身被扫描到。
+  reference:
+    - https://datatracker.ietf.org/doc/html/rfc959
   tags: network,ftp,fingerprint
   created: 2026/01/09
 
@@ -21,6 +39,52 @@ rules:
         - read:
             read-size: 4096
             read-timeout: 3
+            read-until: "220 "
+            read-type: bytes
+            save-as: banner
+        - write:
+            data: "SYST\r\n"
+        - read:
+            read-size: 4096
+            read-timeout: 2
             read-until: "\r\n"
-    expression: response.raw.bcontains(b"220") && response.raw.ibcontains(b"ftp")
-expression: r0()
+            read-type: bytes
+            save-as: syst
+        - write:
+            data: "HELP\r\n"
+        - read:
+            read-size: 4096
+            read-timeout: 2
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: help
+    expression: banner.bcontains(b"220") && (syst.bcontains(b"215") || help.bcontains(b"214"))
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "220 "
+            read-type: bytes
+            save-as: banner
+        - write:
+            data: "SYST\r\n"
+        - read:
+            read-size: 4096
+            read-timeout: 2
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: syst
+        - write:
+            data: "HELP\r\n"
+        - read:
+            read-size: 4096
+            read-timeout: 2
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: help
+    expression: banner.bcontains(b"220") && (syst.bcontains(b"215") || help.bcontains(b"214"))
+expression: r0() || r1()

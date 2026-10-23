@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +16,18 @@ import (
 
 var PoCScanProgress []string
 
+// webProbeLinePrefix 是 Web 探测结果在断点文件里的行前缀。
+//
+// Web 探测的结果不能只记「做过了」：恢复时必须把 URL、指纹、WAF 这些结论一并灌回引擎，
+// 否则 requires 门控会因为指纹丢失而把整批 PoC 误跳过——那比重新探测更糟。
+const webProbeLinePrefix = "wp:"
+
+// webProbeRecord 是断点文件里的一行 Web 探测结果（JSON 单行，无换行）。
+type webProbeRecord struct {
+	Key  string  `json:"key"`
+	Meta WebMeta `json:"meta"`
+}
+
 type ScanProgress struct {
 	mergedProgress  map[string]struct{} // 合并后的完整进度
 	resumeProgress  []string            // 原始恢复文件中的进度
@@ -21,8 +35,10 @@ type ScanProgress struct {
 	DoneTasks       uint32              // 已完成任务数（用于恢复进度显示）
 	TotalTasks      uint32              // 总任务数（用于展示/诊断）
 	perPocTasks     map[string]map[string]struct{}
-	mutex           sync.Mutex
-	saveMutex       sync.Mutex
+	// webProbes 是已完成的 Web 探测结论，key 与引擎内的 webMetaByKey 一致。
+	webProbes map[string]WebMeta
+	mutex     sync.Mutex
+	saveMutex sync.Mutex
 }
 
 func pocKey(pocID string) string {
@@ -40,6 +56,7 @@ func NewScanProgress(resume string) (*ScanProgress, error) {
 		resumeProgress:  make([]string, 0),
 		currentProgress: make([]string, 0),
 		perPocTasks:     make(map[string]map[string]struct{}),
+		webProbes:       make(map[string]WebMeta),
 	}
 
 	if len(resume) > 0 {
@@ -60,6 +77,17 @@ func NewScanProgress(resume string) (*ScanProgress, error) {
 					v := strings.TrimPrefix(line, "@total_tasks=")
 					if n, e := strconv.ParseUint(strings.TrimSpace(v), 10, 32); e == nil {
 						sp.TotalTasks = uint32(n)
+					}
+					continue
+				}
+
+				// Web 探测结论整行是 JSON，必须在按逗号切分之前认出来，
+				// 否则 URL 里的逗号会把这一行拆碎。
+				if strings.HasPrefix(line, webProbeLinePrefix) {
+					var rec webProbeRecord
+					payload := strings.TrimPrefix(line, webProbeLinePrefix)
+					if e := json.Unmarshal([]byte(payload), &rec); e == nil && rec.Key != "" {
+						sp.webProbes[rec.Key] = rec.Meta
 					}
 					continue
 				}
@@ -182,6 +210,36 @@ func (p *ScanProgress) Contains(id string) bool {
 	return p.ContainsPoc(id)
 }
 
+// RecordWebProbe 记录一条已完成的 Web 探测结论（key 与引擎内 webMetaByKey 同一口径）。
+func (p *ScanProgress) RecordWebProbe(key string, meta WebMeta) {
+	if p == nil || key == "" {
+		return
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if p.webProbes == nil {
+		p.webProbes = make(map[string]WebMeta)
+	}
+	p.webProbes[key] = meta
+}
+
+// ResumedWebProbes 返回断点文件里已完成的 Web 探测结论；没有时返回 nil。
+func (p *ScanProgress) ResumedWebProbes() map[string]WebMeta {
+	if p == nil {
+		return nil
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if len(p.webProbes) == 0 {
+		return nil
+	}
+	out := make(map[string]WebMeta, len(p.webProbes))
+	for k, v := range p.webProbes {
+		out[k] = v
+	}
+	return out
+}
+
 // 新增方法：原子化保存到指定文件
 func (p *ScanProgress) AtomicSave(filename string, doneTasks, totalTasks uint32) error {
 	p.mutex.Lock()
@@ -194,6 +252,29 @@ func (p *ScanProgress) AtomicSave(filename string, doneTasks, totalTasks uint32)
 	buf.WriteString("@total_tasks=")
 	buf.WriteString(strconv.FormatUint(uint64(totalTasks), 10))
 	buf.WriteString("\n")
+
+	// Web 探测结论整体回灌：只记「探测过了」没用，恢复时引擎必须拿到 URL 与指纹，
+	// 否则 requires 门控会因指纹缺失把整批 PoC 误跳过。排序只是为了让文件内容稳定，
+	// 便于 diff 与人工排查。
+	if len(p.webProbes) > 0 {
+		keys := make([]string, 0, len(p.webProbes))
+		for k := range p.webProbes {
+			if k != "" {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			payload, err := json.Marshal(webProbeRecord{Key: k, Meta: p.webProbes[k]})
+			if err != nil {
+				continue
+			}
+			buf.WriteString(webProbeLinePrefix)
+			buf.Write(payload)
+			buf.WriteString("\n")
+		}
+	}
+
 	for id := range p.mergedProgress {
 		if id == "" || strings.HasPrefix(id, "@") {
 			continue

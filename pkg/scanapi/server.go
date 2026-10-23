@@ -300,6 +300,8 @@ func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 		Ports:             spec.GetPorts(),
 		SkipHostDiscovery: spec.GetSkipHostDiscovery(),
 		WebFingerprint:    spec.GetWebFingerprint(),
+		WebProbeTimeout:   int(spec.GetWebProbeTimeout()),
+		WebFavicon:        spec.GetWebFavicon(),
 		EnableOOB:         spec.GetEnableOob(),
 		OOBAdapter:        spec.GetOobAdapter(),
 		TaskName:          spec.GetTaskName(),

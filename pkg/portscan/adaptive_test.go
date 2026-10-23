@@ -2,6 +2,7 @@ package portscan
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -103,4 +104,50 @@ func TestAcquireHostSlot(t *testing.T) {
 		t.Fatal("slot should be free after release")
 	}
 	rel()
+}
+
+func TestHostHeuristicsEnabled(t *testing.T) {
+	s := &Scanner{}
+
+	// A short, user-specified port list is below the decision thresholds, so the
+	// heuristics stay off instead of jittering on a handful of probes.
+	atomic.StoreUint64(&s.scanPortTotal, 3)
+	if s.hostHeuristicsEnabled() {
+		t.Fatal("heuristics should be off for a 3-port scan")
+	}
+
+	// The default `top` scan is 600 ports, which must be enough — the filtered
+	// and suspected-host warnings used to be disabled for exactly this case.
+	atomic.StoreUint64(&s.scanPortTotal, 600)
+	if !s.hostHeuristicsEnabled() {
+		t.Fatal("heuristics should be on for the default top-port scan")
+	}
+}
+
+func TestFlushPendingResults(t *testing.T) {
+	var got []int
+	s := &Scanner{options: &Options{
+		OnResult: func(r *ScanResult) { got = append(got, r.Port) },
+	}}
+	st := newHostScanStat()
+	st.pending = []*ScanResult{{Host: "h", Port: 80}, {Host: "h", Port: 443}}
+	s.hostStats.Store("h", st)
+
+	s.flushPendingResults()
+
+	if len(got) != 2 {
+		t.Fatalf("expected 2 emitted results, got %d (%v)", len(got), got)
+	}
+	if len(st.pending) != 0 {
+		t.Fatalf("expected the buffer to be drained, got %d entries", len(st.pending))
+	}
+	if mode := atomic.LoadUint32(&st.mode); mode != hostModeNormal {
+		t.Fatalf("expected the host to be marked decided, got mode=%d", mode)
+	}
+
+	// Running it again must not re-emit anything.
+	s.flushPendingResults()
+	if len(got) != 2 {
+		t.Fatalf("second flush emitted duplicates: %v", got)
+	}
 }

@@ -83,10 +83,31 @@ afrog -t 192.168.1.0/24 -ps
 
 ### `-w`
 
-Probe web services on targets before vulnerability scanning.
+Collect web asset info before vulnerability scanning: identify HTTP(S) assets and print URL, status, title, Server and tech-stack fingerprints (e.g. `php`, `apache`, `thinkphp`).
+
+**Enabled by default**; disable with `-w=false`:
 
 ```bash
-afrog -t 192.168.1.0/24 -ps -w
+afrog -t 192.168.1.0/24 -ps           # web probing is already on
+afrog -t 192.168.1.0/24 -ps -w=false  # disable explicitly
+```
+
+### `-w-timeout`
+
+Per-request timeout (seconds) for the web probing stage, covering both the HTTP request and the TLS certificate fetch. Defaults to `30`.
+
+It is independent of the global `-timeout`: the global timeout governs PoC requests, while `-w-timeout` only governs the probing stage. Raise it on its own when a target is slow instead of relaxing the whole scan. Shared hosting and middleboxes often take more than 10s to emit response headers, so keep this default generous.
+
+```bash
+afrog -t http://example.com -w -w-timeout 30
+```
+
+### `-w-favicon`
+
+Also fetch the favicon during web probing and compute its hash, which helps identify a shared asset set or applications that titles do not reveal. **Off by default**; each target costs one extra request.
+
+```bash
+afrog -t http://example.com -w -w-favicon
 ```
 
 ### `-p`
@@ -601,7 +622,7 @@ afrog -T targets.txt -S high,critical
 ### Network discovery plus web probing plus vulnerability scanning
 
 ```bash
-afrog -t 192.168.1.0/24 -ps -w
+afrog -t 192.168.1.0/24 -ps        # web probing is on by default; disable with -w=false
 ```
 
 ### Stable batch scanning

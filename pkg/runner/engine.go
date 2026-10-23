@@ -2,10 +2,13 @@ package runner
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -24,7 +27,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
-	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/report"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -144,6 +146,153 @@ func (c *openPortsCollector) Result(host string, port int) *portscan.ScanResult 
 // maxFaviconBytes 是抓取 favicon 时接受的最大体积，超过则视为非 favicon 直接丢弃。
 const maxFaviconBytes = 1 << 20
 
+// webProbeMaxRedirects 是 Web 探测最多跟随的跳转次数，与浏览器口径一致。
+const webProbeMaxRedirects = 10
+
+// redirectTraceKey 用于把跳转落点收集器塞进探测请求的 context。
+//
+// http.Client 的 CheckRedirect 是「客户端级」回调，一次探测要拿到自己的跳转链，
+// 只能靠 context 把收集器带进去，否则并发探测下几个目标的链会搅在一起。
+type redirectTraceKey struct{}
+
+// redirectTrace 收集一次探测里每一次跳转的落点（不含初始 URL）。
+type redirectTrace struct {
+	mu   sync.Mutex
+	urls []string
+}
+
+func (t *redirectTrace) add(u string) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.urls = append(t.urls, u)
+	t.mu.Unlock()
+}
+
+func (t *redirectTrace) result() []string {
+	if t == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.urls) == 0 {
+		return nil
+	}
+	return append([]string(nil), t.urls...)
+}
+
+// webProbeTimeout 返回 Web 探测的单次请求超时（-w-timeout，默认 30s）。
+//
+// 与全局 -timeout 解耦：-timeout 是给漏洞 PoC 留出的长超时（默认 50s），
+// 信息收集阶段跟着等 50 秒只会让扫描在最前面就卡住。
+// 30s 是实测标定值：真实站点尾部延迟常超过 10s（本次回归即因 10s 过紧而整批探测失败），
+// 而 30s 已能覆盖抖动、又明显短于 PoC 的 50s。
+func (runner *Runner) webProbeTimeout() time.Duration {
+	secs := 30
+	if runner != nil && runner.options != nil && runner.options.WebProbeTimeout > 0 {
+		secs = runner.options.WebProbeTimeout
+	}
+	return time.Duration(secs) * time.Second
+}
+
+// newWebProbeClient 构造 Web 探测专用的 HTTP 客户端。
+//
+// 不复用 PoC 扫描的 retryhttpclient：那里的重定向与 TLS 握手都封在 retryablehttp
+// 连接池内部，拿不到跳转链与证书，而「站是谁签的、跳到了哪」恰恰是信息收集的产出。
+// 自建客户端还让探测阶段拥有独立短超时，且一次请求就能带齐这三样，请求数仍是 1。
+func newWebProbeClient(options *config.Options, timeout time.Duration) *http.Client {
+	transport := &http.Transport{
+		// 扫描器语义：证书是否可信交给使用者判断，这里先把证书取回来。
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+		MaxIdleConnsPerHost: 4,
+		IdleConnTimeout:     30 * time.Second,
+	}
+	if options != nil {
+		if p := strings.TrimSpace(strings.Split(options.Proxy, ",")[0]); p != "" {
+			if u, err := url.Parse(p); err == nil && u.Host != "" {
+				transport.Proxy = http.ProxyURL(u)
+			}
+		}
+	}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if trace, ok := req.Context().Value(redirectTraceKey{}).(*redirectTrace); ok {
+				trace.add(req.URL.String())
+			}
+			if len(via) >= webProbeMaxRedirects {
+				return http.ErrUseLastResponse
+			}
+			return nil
+		},
+	}
+}
+
+// applyWebProbeHeaders 把 CLI 的 -H 自定义头与默认 UA 加到探测请求上，
+// 使探测请求的外发特征与 PoC 请求一致（否则 WAF 按 UA 就把探测挡了）。
+func applyWebProbeHeaders(req *http.Request, options *config.Options) {
+	if req == nil {
+		return
+	}
+	if options != nil {
+		for _, line := range options.Header {
+			key, val, ok := strings.Cut(line, ":")
+			key = strings.TrimSpace(key)
+			if !ok || key == "" {
+				continue
+			}
+			if strings.EqualFold(key, "Host") {
+				req.Host = strings.TrimSpace(val)
+				continue
+			}
+			req.Header.Set(key, strings.TrimSpace(val))
+		}
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", utils.RandomUA())
+	}
+}
+
+// tlsInfoFromState 从一次 TLS 握手结果里提取证书摘要，没有证书时返回 nil。
+func tlsInfoFromState(state *tls.ConnectionState) *TLSInfo {
+	if state == nil || len(state.PeerCertificates) == 0 {
+		return nil
+	}
+	leaf := state.PeerCertificates[0]
+	subject := strings.TrimSpace(leaf.Subject.CommonName)
+	if subject == "" {
+		subject = leaf.Subject.String()
+	}
+	// 签发者取组织名（Let's Encrypt、DigiCert Inc…）比取 CN 更贴近「谁签的」这个问题。
+	issuer := ""
+	if len(leaf.Issuer.Organization) > 0 {
+		issuer = strings.TrimSpace(leaf.Issuer.Organization[0])
+	}
+	if issuer == "" {
+		issuer = strings.TrimSpace(leaf.Issuer.CommonName)
+	}
+	if issuer == "" {
+		issuer = leaf.Issuer.String()
+	}
+	return &TLSInfo{
+		Subject:  subject,
+		Issuer:   issuer,
+		NotAfter: leaf.NotAfter.Format("2006-01-02"),
+		DNSNames: append([]string(nil), leaf.DNSNames...),
+	}
+}
+
+// webProbeBodyLimit 返回探测时读取响应体的上限（字节），与 PoC 请求同口径。
+func webProbeBodyLimit(options *config.Options) int64 {
+	mb := 2
+	if options != nil && options.MaxRespBodySize > 0 {
+		mb = options.MaxRespBodySize
+	}
+	return int64(mb) << 20
+}
+
 // applyWebFingerprint 把 Web 指纹匹配结果写入探测元数据。
 //
 // Fingerprint 是给人与前端看的一行摘要：优先用识别出的技术栈，无命中时回落到
@@ -166,11 +315,184 @@ func applyWebFingerprint(meta *WebMeta, res webscan.Result) {
 		}
 		meta.Confidence = res.Confidence.String()
 	}
-	fingerprint := webscan.Summarize(res.Technologies)
+	// WAF/CDN 单独外露：它不属于站点自身的技术栈，混进指纹摘要会把
+	// 「站点用什么」和「前面挡了什么」两件事搅在一起。cdn 与 waf 同属前置层，
+	// 一并归到这里，否则 Cloudflare/Akamai 这类最常见的拦截层会漏掉。
+	for _, t := range meta.Technologies {
+		if !isFrontLayerCategory(t.Category) {
+			continue
+		}
+		if name := strings.Join(strings.Fields(t.Name+" "+t.Version), " "); name != "" {
+			meta.WAF = name
+			break
+		}
+	}
+	meta.FaviconHash = strings.TrimSpace(res.FaviconHash)
+	fingerprint := webTechSummary(meta.Technologies)
 	if fingerprint == "" {
 		fingerprint = joinNonEmpty(meta.Server, meta.PoweredBy)
 	}
 	meta.Fingerprint = fingerprint
+}
+
+// webTechSummary 把识别出的技术栈渲染成一行摘要，如 "PHP 8.1, ThinkPHP 6.0"。
+//
+// WAF/CDN 不计入摘要：它们属于站点前面的拦截层，已经由 WAF 字段单独外露，
+// 混进来只会让同一行里出现两遍 Cloudflare 之类的重复。
+func webTechSummary(techs []WebTech) string {
+	parts := make([]string, 0, len(techs))
+	for _, t := range techs {
+		name := strings.TrimSpace(t.Name)
+		if name == "" || isFrontLayerCategory(t.Category) {
+			continue
+		}
+		if v := strings.TrimSpace(t.Version); v != "" {
+			name += " " + v
+		}
+		parts = append(parts, name)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// webTechNames 返回识别出的技术名（不含 WAF/CDN），供报告做分布汇总。
+// 与 webTechSummary 的区别：这里只要名字，不带版本、不做拼接。
+func webTechNames(techs []WebTech) []string {
+	names := make([]string, 0, len(techs))
+	for _, t := range techs {
+		if name := strings.TrimSpace(t.Name); name != "" && !isFrontLayerCategory(t.Category) {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
+
+// isFrontLayerCategory 判断分类是否属于「站点前面的拦截层」（WAF/CDN）。
+func isFrontLayerCategory(category string) bool {
+	switch strings.ToLower(strings.TrimSpace(category)) {
+	case "waf", "cdn":
+		return true
+	}
+	return false
+}
+
+// webAssetSummary 把一批 Web 资产压成一行汇总，回答「这批目标整体是什么」。
+//
+// 单个结果行回答的是「这个 URL 是什么」；当目标是网段时，真正有价值的往往是分布：
+// 多少个站挂在同一款中间件后面、多少站前面有 WAF/CDN、证书都是谁签的。
+func webAssetSummary(metas []WebMeta) string {
+	if len(metas) == 0 {
+		return ""
+	}
+	servers := make(map[string]int, 4)
+	wafs := make(map[string]int, 2)
+	issuers := make(map[string]int, 2)
+	https := 0
+	for _, m := range metas {
+		if p := serverProduct(m.Server); p != "" {
+			servers[p]++
+		}
+		if w := strings.TrimSpace(m.WAF); w != "" {
+			wafs[w]++
+		}
+		if m.TLS != nil {
+			https++
+			if iss := strings.TrimSpace(m.TLS.Issuer); iss != "" {
+				issuers[iss]++
+			}
+		}
+	}
+
+	parts := make([]string, 0, 5)
+	parts = append(parts, fmt.Sprintf("assets=%d", len(metas)))
+	if https > 0 {
+		parts = append(parts, fmt.Sprintf("https=%d", https))
+	}
+	if s := formatCounts(servers, webAssetSummaryTop); s != "" {
+		parts = append(parts, "server: "+s)
+	}
+	if s := formatCounts(wafs, webAssetSummaryTop); s != "" {
+		parts = append(parts, "waf: "+s)
+	}
+	if s := formatCounts(issuers, webAssetSummaryTop); s != "" {
+		parts = append(parts, "tls: "+s)
+	}
+	return strings.Join(parts, " | ")
+}
+
+// webAssetSummaryTop 限制汇总里每一类最多列出多少项，避免网段扫描时刷屏。
+const webAssetSummaryTop = 3
+
+// serverProduct 从 Server 响应头里取出产品名（去掉版本号），用于聚合分组。
+// "nginx/1.25.3 (CentOS)" → "nginx"。
+func serverProduct(server string) string {
+	server = strings.ToLower(strings.TrimSpace(server))
+	if server == "" {
+		return ""
+	}
+	if i := strings.IndexAny(server, "/ "); i > 0 {
+		server = server[:i]
+	}
+	return strings.TrimSpace(server)
+}
+
+// formatCounts 把计数表渲染成 "name(3), name(2)"：按次数降序、同次数按名称升序，
+// 最多取 limit 项；limit <= 0 表示不限。
+func formatCounts(counts map[string]int, limit int) string {
+	if len(counts) == 0 {
+		return ""
+	}
+	type entry struct {
+		name  string
+		count int
+	}
+	items := make([]entry, 0, len(counts))
+	for name, count := range counts {
+		items = append(items, entry{name: name, count: count})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].count != items[j].count {
+			return items[i].count > items[j].count
+		}
+		return items[i].name < items[j].name
+	})
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	rendered := make([]string, 0, len(items))
+	for _, it := range items {
+		rendered = append(rendered, fmt.Sprintf("%s(%d)", it.name, it.count))
+	}
+	return strings.Join(rendered, ", ")
+}
+
+// webConfidenceLabel 把内部可信度枚举渲染成与端口结果行同一套词。
+// 内部枚举（certain/probable）是给程序看的，直接打给用户属于黑话。
+func webConfidenceLabel(confidence string) string {
+	switch strings.ToLower(strings.TrimSpace(confidence)) {
+	case "certain":
+		return "verified"
+	case "probable":
+		return "likely"
+	}
+	return ""
+}
+
+// headerCoveredByTech 判断响应头里的产品是否已经出现在技术栈摘要中，
+// 避免 `[Apache httpd 2.4.6] [server: Apache/2.4.6 (CentOS)]` 这类同义重复。
+// 只比较产品名（斜杠/空格前的第一段），并忽略大小写与版本写法差异。
+func headerCoveredByTech(techSummary, header string) bool {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return false
+	}
+	token := header
+	if i := strings.IndexAny(token, "/ "); i > 0 {
+		token = token[:i]
+	}
+	return strings.Contains(strings.ToLower(techSummary), strings.ToLower(token))
 }
 
 // webProbeScheme 依据端口指纹结论决定候选是否值得做 Web 探测，以及应采用的协议。
@@ -188,6 +510,59 @@ func webProbeScheme(fact *portscan.ScanResult) (scheme string, ok bool) {
 		return "", false
 	}
 	return "http", true
+}
+
+// webProbeCandidateURL 在不发任何网络请求的前提下算出候选的最终 URL。
+// 端口指纹给了 scheme、或用户直接写了带协议的 URL 时能算出来；裸主机名要先做协议
+// 试探才知道是 http 还是 https，这时返回空串表示「暂时算不出来」。
+func webProbeCandidateURL(raw, scheme string) string {
+	raw = strings.TrimSpace(raw)
+	switch {
+	case scheme != "":
+		return scheme + "://" + raw
+	case strings.Contains(raw, "://"):
+		return raw
+	}
+	return ""
+}
+
+// webProbeResumeKey 在不发包的前提下算出候选的断点 key；算不出来时返回空串。
+//
+// 能提前算出的有两种：
+//   - 端口指纹给了 scheme，或用户直接写了带协议的 URL：最终 URL 就是它；
+//   - 裸 host:port：最终 key 只取决于端口（协议是 http 还是 https 都归一成
+//     host:port），所以不必先做协议试探。
+//
+// 只有裸主机名返回空——它的最终 key 落在 host:80 还是 host:443 取决于协议试探，
+// 只能等工作协程拿到 URL 后再判。
+func webProbeResumeKey(raw, scheme string) string {
+	if u := webProbeCandidateURL(raw, scheme); u != "" {
+		return fingerprint.KeyFromTarget(u)
+	}
+	return keyFromTargetWithPath(raw)
+}
+
+// webProbeSkipByPrior 用内置端口先验挡掉惯例上确定不是 Web 的端口（如 22/3306/6379，
+// 以及 465/993/995 这类「TLS 但非 Web」的服务），避免默认开启 -w 后对这些端口盲发
+// HTTP 请求。
+//
+// 只有「端口先验里登记了服务名且该服务不是 Web」才跳过：未登记的端口一律照试，
+// 因为 Web 服务完全可能挂在任意端口上，先验只说明惯例、不构成事实。调用方在拿不到
+// 指纹结论、或指纹的 TLS 标记会掩盖「非 Web」事实时，都可以用它做最后的把关。
+func webProbeSkipByPrior(hostPort string) bool {
+	_, portStr, err := net.SplitHostPort(strings.TrimSpace(hostPort))
+	if err != nil {
+		return false
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return false
+	}
+	service := portscan.PriorPortService(port)
+	if service == "" {
+		return false
+	}
+	return !portscan.IsWebService(service)
 }
 
 // toPortScanInfo 把 portscan 的识别结果转换成 config 层结构，供回调与事件流使用。
@@ -331,6 +706,14 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		if !ok {
 			continue
 		}
+		// 端口惯例上确定不是 Web 的候选要挡掉，避免误发 HTTP 请求。除开「没有端口
+		// 扫描结论」的情形，这里还覆盖了 465/993/995 这类「TLS 但非 Web」的服务：
+		// smtps/imaps/pop3s 的 tls:true 会让 webProbeScheme 提前判成 https，从而换来
+		// 一堆 malformed HTTP status code 噪音。
+		// 唯一的例外是指纹已正面判定为 Web 服务——Web 可能挂在任意端口上，先验只说明惯例。
+		if webProbeSkipByPrior(hp) && (fact == nil || !portscan.IsWebService(fact.Service)) {
+			continue
+		}
 		add(hp, scheme, fact)
 	}
 	// 裸主机名没有端口信息，无法与指纹结论关联，仍走协议试探。
@@ -340,6 +723,29 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	if len(candidates) == 0 {
 		return nil
 	}
+
+	// 断点续传：上一轮已经探测出结论的目标直接复用结论，不再重复发包。
+	// 结论必须整体灌回引擎（而非只记「探测过了」），否则 requires 门控会因指纹丢失
+	// 把整批依赖指纹的 PoC 误跳过——那比重新探测一遍更糟。
+	var resumed map[string]WebMeta
+	if runner.ScanProgress != nil {
+		resumed = runner.ScanProgress.ResumedWebProbes()
+	}
+	if len(resumed) > 0 {
+		kept := candidates[:0]
+		for _, c := range candidates {
+			// 只有「不试探就能算出断点 key」的候选才能在这里预先剔除；
+			// 裸主机名要走协议试探才知道最终 URL，留给工作协程在拿到 URL 后再判。
+			if k := webProbeResumeKey(c.raw, c.scheme); k != "" {
+				if _, ok := resumed[k]; ok {
+					continue
+				}
+			}
+			kept = append(kept, c)
+		}
+		candidates = kept
+	}
+
 	totalCandidates := len(candidates)
 	var processed uint64
 	var lastPercent int32 = -1
@@ -363,7 +769,22 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		con = 1
 	}
 
-	ticker := time.NewTicker(time.Second / time.Duration(rate))
+	// Web 探测默认开启，因此必须「可解释」：用户得知道程序正在主动发包、发多少个、
+	// 每个目标发几次、以及怎么关掉。这一行不是阶段边界日志，而是默认开启的知情声明，
+	// 所以照常可见（-silent 只要结果、SDK 由调用方掌控节奏，两者都跳过）。
+	if !runner.options.SDKMode && !runner.options.Silent && totalCandidates > 0 {
+		runner.clearProgressLine()
+		gologger.Print().Msgf("%-9s | probing %d web candidate(s), 1 request each, rate %d/s (disable with -w=false)",
+			utils.StageWebProbe, totalCandidates, rate)
+	}
+
+	interval := time.Second / time.Duration(rate)
+	if interval <= 0 {
+		// Web 探测默认开启后这条路径必然被执行：极高的限速会让 time.Second/rate
+		// 截断为 0，而 time.NewTicker 在非正区间上会 panic。
+		interval = time.Nanosecond
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	tasks := make(chan candidate, con*4)
@@ -373,6 +794,26 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	webURLs := make([]string, 0)
 	webURLByKey := make(map[string]string)
 	webMetaByKey := make(map[string]WebMeta)
+
+	// 续传结论先灌进结果集：它们没有经过本轮 record()，但报告、资产汇总与 requires
+	// 门控都必须看到它们。不重复打印存活行——上一轮已经打过，恢复时再刷一遍只是噪音。
+	if len(resumed) > 0 {
+		keys := make([]string, 0, len(resumed))
+		for k := range resumed {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			meta := resumed[k]
+			if strings.TrimSpace(meta.URL) == "" {
+				continue
+			}
+			webURLByKey[k] = meta.URL
+			webMetaByKey[k] = meta
+			webURLs = append(webURLs, meta.URL)
+			runner.options.Targets.SetNum(meta.URL, ActiveTarget)
+		}
+	}
 
 	record := func(urlStr string, meta WebMeta) {
 		key := fingerprint.KeyFromTarget(urlStr)
@@ -391,6 +832,10 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		webMetaByKey[key] = meta
 		webURLs = append(webURLs, urlStr)
 		mu.Unlock()
+		// 本轮探测结论写回断点进度，供中断后 -resume 直接复用（含指纹与 WAF）。
+		if runner.ScanProgress != nil {
+			runner.ScanProgress.RecordWebProbe(key, meta)
+		}
 		if runner.OnWebProbe != nil {
 			runner.OnWebProbe(meta)
 		}
@@ -400,7 +845,11 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			// 目标 URL 放最前：用户扫视时以目标为锚点，状态码只是它的属性，
 			// 与漏洞结果行 `poc-id SEVERITY target` 的「主体在前」口径一致。
 			// 不带编号：编号在并发探测下顺序并不稳定，端口/漏洞结果行也统一去掉了它。
-			parts := make([]string, 0, 4)
+			//
+			// 技术栈、Server、X-Powered-By 三者并列输出：早先把它们合并进一个
+			// Fingerprint 字段，命中 ThinkPHP 这类框架后 Apache 与 PHP 版本就被挤没了，
+			// 而这几个字段恰恰是信息收集阶段最该一眼看到的东西。
+			parts := make([]string, 0, 6)
 			parts = append(parts, urlStr)
 			if meta.Status > 0 {
 				parts = append(parts, log.LogColor.StatusCode(meta.Status))
@@ -410,8 +859,48 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			} else {
 				parts = append(parts, log.LogColor.DarkGray("(no title)"))
 			}
-			if fp := strings.TrimSpace(meta.Fingerprint); fp != "" {
-				parts = append(parts, "["+log.LogColor.DarkGray(utils.Str2UTF8(fp))+"]")
+			techSummary := webTechSummary(meta.Technologies)
+			if techSummary != "" {
+				if label := webConfidenceLabel(meta.Confidence); label != "" {
+					techSummary += " · " + label
+				}
+				parts = append(parts, "["+log.LogColor.DarkGray(utils.Str2UTF8(techSummary))+"]")
+			}
+			// 原始响应头只在指纹没认出来时才补打：认出来时再打一遍只是同义重复，
+			// 而一旦没认出来，这两行往往就是用户判断「这是什么服务」的唯一线索。
+			// WAF 名也算已覆盖：Cloudflare 已经由 waf 徽标说清楚了。
+			coveredBy := joinNonEmpty(techSummary, meta.WAF)
+			if s := strings.TrimSpace(meta.Server); s != "" && !headerCoveredByTech(coveredBy, s) {
+				parts = append(parts, "["+log.LogColor.DarkGray("server: "+utils.Str2UTF8(s))+"]")
+			}
+			if p := strings.TrimSpace(meta.PoweredBy); p != "" && !headerCoveredByTech(coveredBy, p) {
+				parts = append(parts, "["+log.LogColor.DarkGray("x-powered-by: "+utils.Str2UTF8(p))+"]")
+			}
+			// WAF/CDN 与站点自身技术栈是两件事：前面挡了什么，直接影响后续能打成什么。
+			if w := strings.TrimSpace(meta.WAF); w != "" {
+				parts = append(parts, "["+log.LogColor.DarkGray("waf: "+utils.Str2UTF8(w))+"]")
+			}
+			// 跳转链与最终落点：用户填的目标可能只是入口，真实站点在别处。
+			if len(meta.Redirects) > 0 {
+				chain := strings.Join(meta.Redirects, " → ")
+				parts = append(parts, "["+log.LogColor.DarkGray("→ "+utils.Str2UTF8(chain))+"]")
+			}
+			// 证书摘要回答「站是谁签的、什么时候过期」，是 https 目标的基础事实。
+			if meta.TLS != nil {
+				desc := strings.TrimSpace(meta.TLS.Subject)
+				if iss := strings.TrimSpace(meta.TLS.Issuer); iss != "" {
+					desc = joinNonEmpty(desc, iss)
+				}
+				if exp := strings.TrimSpace(meta.TLS.NotAfter); exp != "" {
+					desc = joinNonEmpty(desc, "expires "+exp)
+				}
+				if desc != "" {
+					parts = append(parts, "["+log.LogColor.DarkGray("tls: "+utils.Str2UTF8(desc))+"]")
+				}
+			}
+			// favicon 哈希是按图定位同一套站的稳定标识，抓到了就外露（未抓取时为空）。
+			if h := strings.TrimSpace(meta.FaviconHash); h != "" {
+				parts = append(parts, "["+log.LogColor.DarkGray("favicon: "+h)+"]")
 			}
 
 			// 结果行必须和端口扫描结果走同一条 stderr 通道：直写 stdout 时，只收 stderr 的
@@ -422,57 +911,81 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		}
 	}
 
-	// fetchResponse 请求一次目标并提取标题与关键响应头。
-	// 返回的 resp 为 nil 表示服务端没有响应（协议探测已被上游省略时需要它判定存活）。
-	fetchResponse := func(urlStr string) (WebMeta, *proto.Response) {
+	// probeClient 是探测阶段的专用客户端：它决定了这一阶段的超时（-w-timeout）
+	// 与「一次请求带齐状态码/标题/跳转链/TLS 证书」的能力。
+	probeClient := newWebProbeClient(runner.options, runner.webProbeTimeout())
+	bodyLimit := webProbeBodyLimit(runner.options)
+
+	// webProbeFetch 是一次探测的网络层产出，供指纹匹配与元数据组装共用。
+	type webProbeFetch struct {
+		status  int
+		headers map[string]string
+		body    []byte
+	}
+
+	// fetchResponse 请求一次目标，拿到状态码、响应头、正文、跳转链与证书。
+	// 返回 nil 表示服务端没有响应（用于判定存活）。
+	fetchResponse := func(urlStr string) (WebMeta, *webProbeFetch) {
 		meta := WebMeta{URL: urlStr}
-		vm := make(map[string]any, 4)
-		if ctx != nil {
-			vm[retryhttpclient.ContextVarKey] = ctx
-		}
-		u, err := url.Parse(urlStr)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 		if err != nil {
 			return meta, nil
 		}
-		reqURI := strings.TrimSpace(u.RequestURI())
-		if reqURI == "" {
-			reqURI = "/"
-		}
-		rule := poc.Rule{}
-		rule.Request.Method = "GET"
-		rule.Request.Path = "^" + reqURI
-		rule.Request.FollowRedirects = true
-		err = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
+		trace := &redirectTrace{}
+		req = req.WithContext(context.WithValue(req.Context(), redirectTraceKey{}, trace))
+		applyWebProbeHeaders(req, runner.options)
 
-		resp, _ := vm["response"].(*proto.Response)
-		if resp == nil {
+		resp, err := probeClient.Do(req)
+		if err != nil {
+			if resp != nil {
+				resp.Body.Close()
+			}
 			return meta, nil
 		}
-		meta.Status = int(resp.Status)
-		if len(resp.Headers) > 0 {
-			meta.Server = strings.TrimSpace(resp.Headers["server"])
-			meta.PoweredBy = strings.TrimSpace(resp.Headers["x-powered-by"])
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, bodyLimit))
+
+		headers := make(map[string]string, len(resp.Header))
+		for k, v := range resp.Header {
+			headers[strings.ToLower(k)] = strings.Join(v, ";")
 		}
-		meta.Title = extractTitle(resp.Body)
-		return meta, resp
+
+		meta.Status = resp.StatusCode
+		meta.Server = strings.TrimSpace(resp.Header.Get("Server"))
+		meta.PoweredBy = strings.TrimSpace(resp.Header.Get("X-Powered-By"))
+		meta.Title = extractTitle(body)
+		meta.Redirects = trace.result()
+		meta.TLS = tlsInfoFromState(resp.TLS)
+		return meta, &webProbeFetch{status: resp.StatusCode, headers: headers, body: body}
 	}
 
 	// fetchFavicon 额外抓取 /favicon.ico，仅在调用方判定需要时调用（-w-favicon 或外置
 	// 规则集含 favicon 规则）。
 	fetchFavicon := func(urlStr string) []byte {
-		vm := make(map[string]any, 4)
-		if ctx != nil {
-			vm[retryhttpclient.ContextVarKey] = ctx
-		}
-		rule := poc.Rule{}
-		rule.Request.Method = "GET"
-		rule.Request.Path = "^/favicon.ico"
-		_ = retryhttpclient.Request(urlStr, runner.options.Header, rule, vm)
-		resp, _ := vm["response"].(*proto.Response)
-		if resp == nil || len(resp.Body) == 0 || len(resp.Body) > maxFaviconBytes {
+		u, err := url.Parse(urlStr)
+		if err != nil {
 			return nil
 		}
-		return resp.Body
+		u.Path = "/favicon.ico"
+		u.RawQuery = ""
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+		if err != nil {
+			return nil
+		}
+		applyWebProbeHeaders(req, runner.options)
+		resp, err := probeClient.Do(req)
+		if err != nil {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return nil
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxFaviconBytes+1))
+		if len(body) == 0 || len(body) > maxFaviconBytes {
+			return nil
+		}
+		return body
 	}
 
 	for i := 0; i < con; i++ {
@@ -522,8 +1035,16 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 						}
 						u = resolved
 					}
-					meta, resp := fetchResponse(u)
-					if resp == nil {
+					// 裸主机名的候选预先剔除不掉（试探完才知道 URL），在这里补判一次。
+					if len(resumed) > 0 {
+						if k := webProbeResumeKey(u, ""); k != "" {
+							if _, ok := resumed[k]; ok {
+								continue
+							}
+						}
+					}
+					meta, fetched := fetchResponse(u)
+					if fetched == nil {
 						continue
 					}
 					if strings.TrimSpace(meta.Server) == "" && it.fact != nil {
@@ -531,9 +1052,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 						meta.Server = strings.Join(strings.Fields(it.fact.Product+" "+it.fact.Version), " ")
 					}
 					webfp := webscan.Response{
-						StatusCode: meta.Status,
-						Headers:    resp.Headers,
-						Body:       resp.Body,
+						StatusCode: fetched.status,
+						Headers:    fetched.headers,
+						Body:       fetched.body,
 					}
 					// 抓 favicon 会多一次请求，因此默认不抓：只有显式开启 -w-favicon，或外置
 					// 规则集里写了 favicon 规则（用户意图明显）时才抓。
@@ -596,6 +1117,22 @@ dispatch:
 			len(webURLs),
 			time.Since(webStart).Truncate(time.Second),
 		)
+	}
+
+	// 资产聚合汇总：单个结果行回答「这个 URL 是什么」，汇总行回答「这批目标整体是什么」。
+	// 与 VULN-SCAN | completed 同一口径，属于默认可见的总结行；中断时也打印，
+	// 让用户在拿到半份结果的同时知道已经摸清了哪些资产。
+	if !runner.options.SDKMode && !runner.options.Silent {
+		probed := make([]WebMeta, 0, len(webMetaByKey))
+		for _, u := range webURLs {
+			if meta, ok := webMetaByKey[fingerprint.KeyFromTarget(u)]; ok {
+				probed = append(probed, meta)
+			}
+		}
+		if summary := webAssetSummary(probed); summary != "" {
+			runner.clearProgressLine()
+			gologger.Print().Msgf("%-9s | %-9s | %s", utils.StageWebProbe, "summary", summary)
+		}
 	}
 
 	runner.webMu.Lock()
@@ -1520,13 +2057,29 @@ func (runner *Runner) Execute() {
 						continue
 					}
 					number := utils.GetNumberText(i + 1)
-					entries = append(entries, report.WebProbeEntry{
-						Number:    number,
-						URL:       urlStr,
-						Title:     strings.TrimSpace(meta.Title),
-						Server:    strings.TrimSpace(meta.Server),
-						PoweredBy: strings.TrimSpace(meta.PoweredBy),
-					})
+					entry := report.WebProbeEntry{
+						Number: number,
+						URL:    urlStr,
+						Title:  strings.TrimSpace(meta.Title),
+						// Fingerprint 只放技术栈摘要，不回落 Server/X-Powered-By：
+						// 后两者在报告里各占一个徽标，回落会造成同义重复。
+						Fingerprint:  webTechSummary(meta.Technologies),
+						Confidence:   strings.TrimSpace(meta.Confidence),
+						Technologies: webTechNames(meta.Technologies),
+						Server:       strings.TrimSpace(meta.Server),
+						PoweredBy:    strings.TrimSpace(meta.PoweredBy),
+						Redirects:    meta.Redirects,
+						FaviconHash:  strings.TrimSpace(meta.FaviconHash),
+						WAF:          strings.TrimSpace(meta.WAF),
+					}
+					if meta.TLS != nil {
+						entry.TLS = &report.WebProbeTLS{
+							Subject:  meta.TLS.Subject,
+							Issuer:   meta.TLS.Issuer,
+							NotAfter: meta.TLS.NotAfter,
+						}
+					}
+					entries = append(entries, entry)
 				}
 				_ = runner.Report.AppendWebProbeEntries(entries)
 			}

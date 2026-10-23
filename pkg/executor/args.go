@@ -136,6 +136,17 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	}
 	if spec.WebFingerprint {
 		args = append(args, "-w")
+	} else {
+		// CLI 的 -w 现在默认开启，因此「不要 Web 探测」必须显式关掉：
+		// 只省略这个 flag 等于把决定权交回子进程默认值，Web 控制台里关闭探测会失效。
+		args = append(args, "-w=false")
+	}
+	// 探测阶段的细粒度参数：0/未开启时省略，让子进程用自己的默认值。
+	if spec.WebProbeTimeout > 0 {
+		args = append(args, "-w-timeout", strconv.Itoa(spec.WebProbeTimeout))
+	}
+	if spec.WebFavicon {
+		args = append(args, "-w-favicon")
 	}
 
 	// OOB：CLI 只有 -oob <adapter> 用于选择适配器；key/domain 等凭据来自子进程的
