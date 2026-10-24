@@ -419,7 +419,7 @@ func webAssetSummary(metas []WebMeta) string {
 	if s := formatCounts(issuers, webAssetSummaryTop); s != "" {
 		parts = append(parts, "tls: "+s)
 	}
-	return strings.Join(parts, " | ")
+	return strings.Join(parts, " · ")
 }
 
 // webAssetSummaryTop 限制汇总里每一类最多列出多少项，避免网段扫描时刷屏。
@@ -585,29 +585,28 @@ func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
 	}
 }
 
-// formatPortResult 渲染一行端口结果：host:port service product version (tls, confidence)。
-func formatPortResult(r *portscan.ScanResult) string {
+// formatPortResult 渲染一行端口结果：`序号 [open] host:port  [service] · [tls] · [verified]`。
+// 与 Web / 漏洞结果行共用同一套语法：序号 + 徽标 + 目标 + 方括号属性。
+func formatPortResult(r *portscan.ScanResult, seq int) string {
 	// net.JoinHostPort 保证 IPv6 写成 [::1]:80，而不是拼接出无法解析的 ::1:80。
-	line := net.JoinHostPort(r.Host, strconv.Itoa(r.Port))
+	target := net.JoinHostPort(r.Host, strconv.Itoa(r.Port))
+	attrs := make([]string, 0, 4)
+	// 识别出的服务名是这一行的「主值」，用绿色强调；其余属性保持暗灰。
 	if svc := strings.Join(strings.Fields(r.Service+" "+r.Product+" "+r.Version), " "); svc != "" {
-		line += " " + svc
+		attrs = append(attrs, log.LogColor.Vulner(svc))
 	}
-	var flags []string
 	if r.TLS {
-		flags = append(flags, "tls")
+		attrs = append(attrs, log.Dim("tls"))
 	}
 	// 内部可信度枚举对用户不可读：verified/likely 才有意义，
 	// 「仅端口开放未识别服务」与 unknown 属无信息状态，直接省略（避免出现 (port) 这类黑话）。
 	switch r.Confidence {
 	case portscan.ConfidenceCertain:
-		flags = append(flags, "verified")
+		attrs = append(attrs, log.Dim("verified"))
 	case portscan.ConfidenceProbable:
-		flags = append(flags, "likely")
+		attrs = append(attrs, log.Dim("likely"))
 	}
-	if len(flags) > 0 {
-		line += " (" + strings.Join(flags, ", ") + ")"
-	}
-	return line
+	return log.ResNum(seq, log.KindBadge("open"), target, attrs...)
 }
 
 func extractTitle(body []byte) string {
@@ -658,7 +657,8 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	if err != nil {
 		matcher = webscan.NewMatcher(nil)
 		if !runner.options.Silent {
-			gologger.Warning().Msgf("webprobe: load web fingerprint rules: %v", err)
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageWebProbe,
+				"fingerprint rules unavailable", err.Error(), "tech detection disabled"))
 		}
 	}
 
@@ -754,7 +754,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	// 这些行在常规输出里只是噪音；-debug 时恢复，便于对齐排查。
 	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
 		runner.clearProgressLine()
-		gologger.Print().Msgf("%-9s | %-9s | candidates=%d", utils.StageWebProbe, "started", totalCandidates)
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe, "started", fmt.Sprintf("candidates=%d", totalCandidates)))
 	}
 	if runner.options.OnPhaseProgress != nil {
 		runner.options.OnPhaseProgress("webprobe", "running", 0, int64(totalCandidates), 0)
@@ -774,8 +774,11 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	// 所以照常可见（-silent 只要结果、SDK 由调用方掌控节奏，两者都跳过）。
 	if !runner.options.SDKMode && !runner.options.Silent && totalCandidates > 0 {
 		runner.clearProgressLine()
-		gologger.Print().Msgf("%-9s | probing %d web candidate(s), 1 request each, rate %d/s (disable with -w=false)",
-			utils.StageWebProbe, totalCandidates, rate)
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe,
+			fmt.Sprintf("%d candidate(s)", totalCandidates),
+			"1 request each",
+			fmt.Sprintf("rate %d/s", rate),
+			"disable: -w=false"))
 	}
 
 	interval := time.Second / time.Duration(rate)
@@ -849,41 +852,41 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			// 技术栈、Server、X-Powered-By 三者并列输出：早先把它们合并进一个
 			// Fingerprint 字段，命中 ThinkPHP 这类框架后 Apache 与 PHP 版本就被挤没了，
 			// 而这几个字段恰恰是信息收集阶段最该一眼看到的东西。
-			parts := make([]string, 0, 6)
-			parts = append(parts, urlStr)
+			attrs := make([]string, 0, 9)
 			if meta.Status > 0 {
-				parts = append(parts, log.LogColor.StatusCode(meta.Status))
+				attrs = append(attrs, log.LogColor.StatusCode(meta.Status))
 			}
+			// 标题是 Web 资产最有用的一条事实，用浅蓝强调；缺失时降级为暗灰占位。
 			if t := strings.TrimSpace(meta.Title); t != "" {
-				parts = append(parts, "["+log.LogColor.Title(utils.Str2UTF8(t))+"]")
+				attrs = append(attrs, log.LogColor.Title(utils.Str2UTF8(t)))
 			} else {
-				parts = append(parts, log.LogColor.DarkGray("(no title)"))
+				attrs = append(attrs, log.Dim("(no title)"))
 			}
 			techSummary := webTechSummary(meta.Technologies)
 			if techSummary != "" {
 				if label := webConfidenceLabel(meta.Confidence); label != "" {
 					techSummary += " · " + label
 				}
-				parts = append(parts, "["+log.LogColor.DarkGray(utils.Str2UTF8(techSummary))+"]")
+				attrs = append(attrs, log.Dim(utils.Str2UTF8(techSummary)))
 			}
 			// 原始响应头只在指纹没认出来时才补打：认出来时再打一遍只是同义重复，
 			// 而一旦没认出来，这两行往往就是用户判断「这是什么服务」的唯一线索。
-			// WAF 名也算已覆盖：Cloudflare 已经由 waf 徽标说清楚了。
+			// WAF 名也算已覆盖：Cloudflare 已经由 waf 属性说清楚了。
 			coveredBy := joinNonEmpty(techSummary, meta.WAF)
 			if s := strings.TrimSpace(meta.Server); s != "" && !headerCoveredByTech(coveredBy, s) {
-				parts = append(parts, "["+log.LogColor.DarkGray("server: "+utils.Str2UTF8(s))+"]")
+				attrs = append(attrs, log.Dim("server: "+utils.Str2UTF8(s)))
 			}
 			if p := strings.TrimSpace(meta.PoweredBy); p != "" && !headerCoveredByTech(coveredBy, p) {
-				parts = append(parts, "["+log.LogColor.DarkGray("x-powered-by: "+utils.Str2UTF8(p))+"]")
+				attrs = append(attrs, log.Dim("x-powered-by: "+utils.Str2UTF8(p)))
 			}
 			// WAF/CDN 与站点自身技术栈是两件事：前面挡了什么，直接影响后续能打成什么。
 			if w := strings.TrimSpace(meta.WAF); w != "" {
-				parts = append(parts, "["+log.LogColor.DarkGray("waf: "+utils.Str2UTF8(w))+"]")
+				attrs = append(attrs, log.Dim("waf: "+utils.Str2UTF8(w)))
 			}
 			// 跳转链与最终落点：用户填的目标可能只是入口，真实站点在别处。
 			if len(meta.Redirects) > 0 {
 				chain := strings.Join(meta.Redirects, " → ")
-				parts = append(parts, "["+log.LogColor.DarkGray("→ "+utils.Str2UTF8(chain))+"]")
+				attrs = append(attrs, log.Dim("→ "+utils.Str2UTF8(chain)))
 			}
 			// 证书摘要回答「站是谁签的、什么时候过期」，是 https 目标的基础事实。
 			if meta.TLS != nil {
@@ -895,19 +898,19 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 					desc = joinNonEmpty(desc, "expires "+exp)
 				}
 				if desc != "" {
-					parts = append(parts, "["+log.LogColor.DarkGray("tls: "+utils.Str2UTF8(desc))+"]")
+					attrs = append(attrs, log.Dim("tls: "+utils.Str2UTF8(desc)))
 				}
 			}
 			// favicon 哈希是按图定位同一套站的稳定标识，抓到了就外露（未抓取时为空）。
 			if h := strings.TrimSpace(meta.FaviconHash); h != "" {
-				parts = append(parts, "["+log.LogColor.DarkGray("favicon: "+h)+"]")
+				attrs = append(attrs, log.Dim("favicon: "+h))
 			}
 
 			// 结果行必须和端口扫描结果走同一条 stderr 通道：直写 stdout 时，只收 stderr 的
 			// 终端里完全看不到这些行，而 -json-stream 的 stdout 只允许承载 NDJSON。
 			// 打印前先清掉进度条所在行，否则结果行会与进度条互相覆盖。
 			runner.clearProgressLine()
-			gologger.Print().Msgf("%s", strings.Join(parts, " "))
+			gologger.Print().Msgf("%s", log.ResNum(int(atomic.AddUint32(&runner.webSeq, 1)), log.KindBadge("web"), urlStr, attrs...))
 		}
 	}
 
@@ -1109,18 +1112,16 @@ dispatch:
 	}
 	if runner.options.Debug && !runner.options.SDKMode && !runner.options.Silent {
 		runner.clearProgressLine()
-		gologger.Print().Msgf("%-9s | %-9s | candidates=%d/%d alive=%d duration=%s",
-			utils.StageWebProbe,
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe,
 			status,
-			done,
-			totalCandidates,
-			len(webURLs),
-			time.Since(webStart).Truncate(time.Second),
-		)
+			fmt.Sprintf("probed %d/%d", done, totalCandidates),
+			fmt.Sprintf("alive %d", len(webURLs)),
+			time.Since(webStart).Truncate(time.Second).String(),
+		))
 	}
 
 	// 资产聚合汇总：单个结果行回答「这个 URL 是什么」，汇总行回答「这批目标整体是什么」。
-	// 与 VULN-SCAN | completed 同一口径，属于默认可见的总结行；中断时也打印，
+	// 与 vuln-scan 的收尾汇总同一口径，属于默认可见的总结行；中断时也打印，
 	// 让用户在拿到半份结果的同时知道已经摸清了哪些资产。
 	if !runner.options.SDKMode && !runner.options.Silent {
 		probed := make([]WebMeta, 0, len(webMetaByKey))
@@ -1131,7 +1132,7 @@ dispatch:
 		}
 		if summary := webAssetSummary(probed); summary != "" {
 			runner.clearProgressLine()
-			gologger.Print().Msgf("%-9s | %-9s | %s", utils.StageWebProbe, "summary", summary)
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe, summary))
 		}
 	}
 
@@ -1902,9 +1903,11 @@ func (runner *Runner) Execute() {
 			// 所以关掉 portscan 自带的进度条与调试输出，避免两条进度条抢同一行。
 			psOpts.Debug = false
 			psOpts.LiveStats = false
-			// 阶段边界行默认静默，只有 -debug 时才让 portscan 打印它们。
+			// 阶段边界行（host-disc / port-scan started、端口排名版本）默认静默，只有 -debug 时才让 portscan 打印。
 			psOpts.StageLog = options.Debug
-			psOpts.Quiet = false
+			// Quiet 表达「只要结果、不要过程」：-silent 与 SDK 场景下，端口扫描不再输出收尾汇总
+			// 与丢包/封禁告警。常规终端保持 false，让收尾汇总与 web-probe / vuln-scan 一致地出现。
+			psOpts.Quiet = options.SDKMode || options.Silent
 			if options.OnPhaseProgress != nil {
 				psOpts.OnProgress = func(phase string, status string, finished int, total int, percent int) {
 					options.OnPhaseProgress(phase, status, int64(finished), int64(total), percent)
@@ -1949,10 +1952,11 @@ func (runner *Runner) Execute() {
 					options.OnPortScanResult(toPortScanInfo(r))
 				}
 				if !options.SDKMode {
-					// 与 Web/漏洞结果行统一：不带编号（并发命中时编号顺序不稳定），
+					// 与 Web/漏洞结果行统一：序号只回答「本阶段累积了多少条」，
+					// 不表示先后（并发命中时到达顺序本就随机）。
 					// 打印前先清掉进度条所在行，避免结果行与进度条互相覆盖。
 					runner.clearProgressLine()
-					gologger.Print().Msgf("%s", formatPortResult(r))
+					gologger.Print().Msgf("%s", formatPortResult(r, int(atomic.AddUint32(&runner.portSeq, 1))))
 				}
 				collector.AddResult(r)
 			}
@@ -1987,15 +1991,15 @@ func (runner *Runner) Execute() {
 				}
 			}
 		} else if options.Debug && !options.SDKMode {
-			gologger.Print().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StageHostDiscovery, "skipped")
-			gologger.Print().Msgf("%-9s | %-9s | no valid hosts for pre-scan", utils.StagePortScan, "skipped")
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery, "skipped", "no valid hosts"))
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan, "skipped", "no valid hosts"))
 		} else if options.OnPhaseProgress != nil {
 			options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
 			options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
 		}
 	} else if options.Debug && !options.SDKMode {
-		gologger.Print().Msgf("%-9s | %-9s | -ps not enabled", utils.StageHostDiscovery, "skipped")
-		gologger.Print().Msgf("%-9s | %-9s | -ps not enabled", utils.StagePortScan, "skipped")
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery, "skipped", "-ps not enabled"))
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan, "skipped", "-ps not enabled"))
 	} else if options.OnPhaseProgress != nil {
 		options.OnPhaseProgress("host_discovery", "skipped", 0, 0, 0)
 		options.OnPhaseProgress("portscan", "skipped", 0, 0, 0)
@@ -2248,7 +2252,12 @@ func (runner *Runner) Execute() {
 			pocTotal += len(fingerprintPocs)
 		}
 		runner.clearProgressLine()
-		gologger.Print().Msgf("%-9s | %-9s | targets=%d pocs=%d tasks=%d", utils.StageVulnScan, "started", options.Targets.Len(), pocTotal, options.Count)
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageVulnScan,
+			"started",
+			fmt.Sprintf("targets=%d", options.Targets.Len()),
+			fmt.Sprintf("pocs=%d", pocTotal),
+			fmt.Sprintf("tasks=%d", options.Count),
+		))
 	}
 
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {
@@ -2904,7 +2913,7 @@ type TransData struct {
 // 获取OOB状态信息
 func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	if len(reversePocs) == 0 {
-		return true, "Not required (no OOB PoCs)"
+		return true, "not required · no OOB PoCs"
 	}
 
 	runner.options.SetOOBAdapter()
@@ -2913,14 +2922,14 @@ func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	serviceName := strings.ToLower(runner.options.OOB)
 
 	if runner.engine == nil || runner.engine.oobAdapter == nil {
-		return false, fmt.Sprintf("%s (Not configured)", serviceName)
+		return false, serviceName + " · not configured"
 	}
 
 	if !runner.engine.oobAdapter.IsVaild() {
-		return false, fmt.Sprintf("%s (Connection failed)", serviceName)
+		return false, serviceName + " · connection failed"
 	}
 
-	return true, fmt.Sprintf("%s (Active)", serviceName)
+	return true, serviceName + " · active"
 }
 
 // 新增OOB状态显示函数
@@ -2930,16 +2939,21 @@ func (runner *Runner) printOOBStatus(reversePocs []poc.Poc) {
 	if runner.options.SDKMode || runner.options.Silent {
 		return
 	}
+	// 本轮没有反连类 PoC 时，OOB 是否配置与结果无关，打一行「未使用」只是噪音。
+	if len(reversePocs) == 0 {
+		return
+	}
 
 	status, msg := runner.getOOBStatus(reversePocs)
 
-	// 与 banner 的 Core/POC/Cur 状态行保持同一种紧凑样式，整块状态输出观感一致。
+	// 与进度行/结果行同一套运维行语法：`[LEV] 阶段  事实`。
+	// 状态本身已由级别标签表达，正文不再重复上色，避免整行都是饱和色。
+	level := log.LevelInfo
 	if !status {
-		fmt.Printf("[%s] OOB %s\n", log.LogColor.Red(config.GetErrorSymbol()), log.LogColor.Red(msg))
-	} else {
-		fmt.Printf("[%s] OOB %s\n", log.LogColor.Low(config.GetOkSymbol()), log.LogColor.Green(msg))
+		level = log.LevelErr
 	}
-	config.PrintSeparator()
+	// 与其他运维行一样走 stderr：stdout 要留给 -json-stream 的 NDJSON。
+	fmt.Fprintln(os.Stderr, log.Op(level, "oob", msg))
 }
 
 // func parseElaspsedTime(time time.Duration) string {

@@ -74,14 +74,14 @@ func GetProgressBar(progress, width int) string {
 	if barLength > 0 {
 		progressBar.WriteString(strings.Repeat(filledChar, barLength))
 	}
+	// 箭头占用 1 格：进度未满时先画箭头再补空格，满格时箭头位置也由实心格填满，
+	// 两种情况的总宽都严格等于 width，避免 100% 时进度条凭空多出一格。
 	if barLength < width {
 		progressBar.WriteString(arrowChar)
-		remaining := width - barLength - 1 // 扣除箭头占位
+		remaining := width - barLength - 1
 		if remaining > 0 {
 			progressBar.WriteString(strings.Repeat(emptyChar, remaining))
 		}
-	} else {
-		progressBar.WriteString(filledChar) // 100%时用完整字符
 	}
 
 	return progressBar.String()
@@ -89,11 +89,14 @@ func GetProgressBar(progress, width int) string {
 
 // RenderLine 渲染一行统一的进度输出，三个阶段（端口扫描 / Web 探测 / 漏洞扫描）共用：
 //
-//	PORT-SCAN [━━━━╺─────] 12% (400/3200) 210/s ETA 13s
-//	VULN-SCAN [━━╺───────]  9% (1543/16220) 15/s ETA 16m15s found=2
+//	port-scan [━━━━╺─────]  12% · 400/3200 · 210/s · ETA 13s
+//	vuln-scan [━━╺───────]   9% · 1543/16220 · 15/s · ETA 16m15s · found=2
 //
-// stage 固定占 9 字符，与阶段日志的 `%-9s | %-9s |` 对齐；tail 交给调用方补充
-// 阶段特有的信息（如 found=）。total <= 0 表示没有可统计的任务，返回空串。
+// stage 是小写阶段名（见 utils.StageXxx），固定占 9 字符与运维行对齐；行首缩进 4 格，
+// 与结果行的序号列对齐，使整屏输出成为一个网格。字段之间用 ` · ` 分隔，与结果行同一套语言。
+// tail 交给调用方补充阶段特有信息（如 ` · found=2`）。
+// 跑满时不再输出 ETA：剩余时间已经恒为 0，留着只是噪音。
+// total <= 0 表示没有可统计的任务，返回空串。
 func RenderLine(stage string, percent int, current, total int64, elapsed time.Duration, tail string) string {
 	if total <= 0 {
 		return ""
@@ -116,11 +119,19 @@ func RenderLine(stage string, percent int, current, total int64, elapsed time.Du
 	if sec := elapsed.Seconds(); sec >= 1 {
 		rate = float64(current) / sec
 	}
-	eta := "--"
-	if rate > 0 && current < total {
-		eta = time.Duration(float64(total-current) / rate * float64(time.Second)).Round(time.Second).String()
+	fields := []string{
+		fmt.Sprintf("%3d%%", percent),
+		fmt.Sprintf("%d/%d", current, total),
+		fmt.Sprintf("%.0f/s", rate),
+	}
+	// 未跑满才谈得上「还要多久」；跑满后 ETA 恒为 0，属纯噪音。
+	if current < total {
+		eta := "--"
+		if rate > 0 {
+			eta = time.Duration(float64(total-current) / rate * float64(time.Second)).Round(time.Second).String()
+		}
+		fields = append(fields, "ETA "+eta)
 	}
 
-	return fmt.Sprintf("%-9s [%s] %d%% (%d/%d) %.0f/s ETA %s%s",
-		stage, GetProgressBar(percent, 0), percent, current, total, rate, eta, tail)
+	return fmt.Sprintf("%-9s [%s] %s%s", stage, GetProgressBar(percent, 0), strings.Join(fields, " · "), tail)
 }

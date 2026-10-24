@@ -185,23 +185,34 @@ func (r *Result) PrintResultInfo() string {
 	return "[" + utils.GetNowDateTime() + "] [" + r.PocInfo.Id + "] [" + r.PocInfo.Info.Severity + "] " + r.Target
 }
 
-// PrintColorResultInfoConsole 输出一行漏洞命中：`<poc-id> <SEVERITY> <target> <extractor>`。
-// 不带编号与时间：并发命中时编号顺序并不稳定，时间戳对定位目标也没有帮助，
-// 去掉后与端口/Web 结果行保持同一观感。
-func (r *Result) PrintColorResultInfoConsole() {
-	parts := []string{
-		log.LogColor.Vulner(r.PocInfo.Id),
-		log.LogColor.GetColor(r.PocInfo.Info.Severity, strings.ToUpper(r.PocInfo.Info.Severity)),
-		r.FullTarget,
+// PrintColorResultInfoConsole 输出一行漏洞命中：`序号 [严重度] [poc-id] 目标  [证据]`。
+// 序号在最左侧，是 afrog 的历史特征，用 3 位定宽让每条命中都能被稳定引用；
+// 严重度徽标固定成列，一屏扫下来可以按列读等级；poc-id 用绿色强调（afrog 原味）。
+// poc-id 紧跟严重度、排在目标之前，与 nuclei 的 `[template-id] host` 同序：元数据在前、目标在后。
+// 不带时间戳：并发命中时它既不能定位目标，也挤占横向空间。
+func (r *Result) PrintColorResultInfoConsole(number int) {
+	severity := ""
+	if r.PocInfo != nil {
+		severity = r.PocInfo.Info.Severity
 	}
+	// 徽标位承载「严重度 + poc-id」两块元数据，目标位仍是裸的 URL。
+	head := log.SeverityBadge(severity)
+	if r.PocInfo != nil {
+		if id := strings.TrimSpace(r.PocInfo.Id); id != "" {
+			head += " " + log.Attrs(log.LogColor.Vulner(id))
+		}
+	}
+	// 提取结果是「打到了什么」的证据，跟目标同列、排在目标之后。
+	var extra []string
 	if ex := formatExtractorInline(r.Extractor); ex != "" {
-		parts = append(parts, ex)
+		extra = append(extra, ex)
 	}
 	// 与端口/Web 结果行一样走 stderr，避免污染 -json-stream 的 stdout。
-	fmt.Fprintln(os.Stderr, strings.Join(parts, " "))
+	fmt.Fprintln(os.Stderr, log.ResNum(number, head, r.FullTarget, extra...))
 }
 
-// formatExtractorInline 把提取结果渲染成控制台内联片段：`[key=value,key=value]`。
+// formatExtractorInline 把提取结果渲染成内联片段：`key=value,key=value`。
+// 只返回内容，不带方括号——方括号由结果行基元（log.Attrs）统一补齐，避免出现 [[…]]。
 // 只在必要时给值加引号（空值、或含空白/逗号/引号），并支持字符串以外的常见类型，
 // 让类型化提取器（数字、布尔、字符串列表）也能正常展示。无可用值时返回空串。
 func formatExtractorInline(extractor yaml.MapSlice) string {
@@ -223,7 +234,7 @@ func formatExtractorInline(extractor yaml.MapSlice) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return "[" + strings.Join(parts, ",") + "]"
+	return strings.Join(parts, ",")
 }
 
 // extractorValueText 把提取值渲染成文本；不支持的复杂类型返回 false（跳过）。

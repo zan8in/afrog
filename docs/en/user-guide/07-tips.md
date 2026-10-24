@@ -115,7 +115,7 @@ Scanning the same target twice and getting a different port list is usually the 
 
 - A closed port answers with `RST`; a dropped probe answers with nothing. Under load the target (or the device in front of it) discards some `SYN`s, so a few ports go missing each time.
 - It gets worse with concurrency: per-host concurrency defaults to 50; pushing it into the hundreds easily trips the target's connection limit, and more ports go missing rather than fewer.
-- If a host drops nearly every probe, the scanner prints a `PORT-SCAN | filtered` warning that the result set may be incomplete.
+- If a host drops nearly every probe, the scanner prints a `[WRN] port-scan filtered host=… · drop-rate=… · probes=… · results may be incomplete` warning that the result set may be incomplete.
 
 ```bash
 afrog -t 192.0.2.10 -ps -p full -ps-host-concurrency 20   # lower per-host concurrency further (default 50)

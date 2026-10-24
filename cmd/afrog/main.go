@@ -17,6 +17,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/jsonstream"
+	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -73,7 +74,7 @@ func main() {
 		// 会员（curated）能力的装配与 Web 端「会员中心」保存配置共用同一实现，
 		// 避免"启动会清理残留、保存却不会"这类口径漂移。拉不到 PoC 不等于未激活。
 		if err := web.AssembleCurated(options.Config.Curated, options.ConfigFile, options.CuratedForceUpdate); err != nil {
-			gologger.Warning().Msgf("curated mount failed: %s", strings.TrimSpace(err.Error()))
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "curated", "mount failed", strings.TrimSpace(err.Error())))
 		}
 	}
 
@@ -220,18 +221,16 @@ func main() {
 			if pedm := r.PedmStatusSuffix(); pedm != "" {
 				suffix += pedm
 			}
-			if v, ok := oobFinalize.Load().(oobFinalizeProgress); ok && strings.TrimSpace(v.Status) != "" {
+			// total<=0 表示本轮没有待收尾的 OOB 命中，`oobf=0/0` 只是噪音。
+			if v, ok := oobFinalize.Load().(oobFinalizeProgress); ok && strings.TrimSpace(v.Status) != "" && v.Total > 0 {
 				remain := v.Total - v.Finished
 				if remain < 0 {
 					remain = 0
 				}
-				if v.Total < 0 {
-					v.Total = 0
-				}
-				suffix = fmt.Sprintf(" oobf=%d/%d %s", remain, v.Total, v.Status)
+				suffix = fmt.Sprintf(" · oobf=%d/%d · %s", remain, v.Total, v.Status)
 			}
 		}
-		tail := fmt.Sprintf(" found=%d%s", atomic.LoadUint32(&number), suffix)
+		tail := fmt.Sprintf(" · found=%d%s", atomic.LoadUint32(&number), suffix)
 		return progress.RenderLine(utils.StageVulnScan, pgress, current, total, time.Since(starttime), tail)
 	}
 
@@ -385,7 +384,7 @@ func main() {
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
-				rst.PrintColorResultInfoConsole()
+				rst.PrintColorResultInfoConsole(int(atomic.LoadUint32(&number)))
 			}
 			if progressEnabled {
 				renderProgress()
@@ -458,7 +457,7 @@ func main() {
 
 			atomic.AddUint32(&number, 1)
 			if !jsonStreamMode {
-				result.PrintColorResultInfoConsole()
+				result.PrintColorResultInfoConsole(int(atomic.LoadUint32(&number)))
 			}
 			if progressEnabled {
 				renderProgress()
@@ -527,16 +526,16 @@ func main() {
 			}
 
 			gologger.Print().Msg("")
-			gologger.Print().Msg("Scan termination signal received")
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "interrupt", "termination signal received", "stopping"))
 
 			interrupted.Store(true)
 			runner.Stop()
 
 			// 立即保存进度
 			if err := r.ScanProgress.AtomicSave(autoSaveFile, atomic.LoadUint32(&options.CurrentCount), uint32(options.Count)); err != nil {
-				gologger.Error().Msgf("Could not preserve scan state: %s", err)
+				gologger.Print().Msgf("%s", log.Op(log.LevelErr, "interrupt", "state save failed", err.Error()))
 			} else {
-				gologger.Print().Msgf("Scan state archived: %s\n", autoSaveFile)
+				gologger.Print().Msgf("%s", log.Op(log.LevelInfo, "interrupt", "state saved", autoSaveFile))
 			}
 		}
 	}(r)
@@ -570,10 +569,10 @@ func main() {
 		if jsonStream != nil {
 			jsonStream.Error("scan_failed", runErr.Error())
 		}
-		gologger.Error().Msgf("runner run err: %s\n", runErr.Error())
+		gologger.Print().Msgf("%s", log.Op(log.LevelErr, "run", "failed", runErr.Error()))
 	} else if len(options.Json) > 0 || len(options.JsonAll) > 0 {
 		if err := r.JsonReport.AppendEndOfFile(); err != nil {
-			gologger.Error().Msgf("json or json-all output err: %s\n", err)
+			gologger.Print().Msgf("%s", log.Op(log.LevelErr, "report", "json append failed", err.Error()))
 		}
 	}
 
@@ -594,23 +593,30 @@ func main() {
 	if jsonStreamFinish != nil {
 		jsonStreamFinish(status, int64(atomic.LoadUint32(&number)), int64(atomic.LoadUint32(&options.CurrentCount)))
 	}
-	gologger.Print().Msgf("%-9s | %-9s | tasks=%d/%d found=%d duration=%s",
-		utils.StageVulnScan,
-		status,
-		atomic.LoadUint32(&options.CurrentCount),
-		options.Count,
-		atomic.LoadUint32(&number),
-		time.Since(starttime).Truncate(time.Second),
-	)
+	level := log.LevelInfo
+	if status == "stopped" {
+		level = log.LevelWarn
+	}
+	// 收尾汇总与 port-scan / web-probe 同一口径：常规终端可见，-silent / SDK 静默
+	// （这两个场景「只要结果、不要过程」，结果行自带序号已能反映数量）。
+	// 例外是中断/出错（stopped）：按中断规范必须告知用户「已中断」及恢复命令，
+	// 因此这种异常收尾不受静默抑制。
+	if status == "stopped" || (!options.Silent && !options.SDKMode) {
+		gologger.Print().Msgf("%s", log.Op(level, utils.StageVulnScan,
+			status,
+			fmt.Sprintf("tasks=%d/%d", atomic.LoadUint32(&options.CurrentCount), options.Count),
+			fmt.Sprintf("found=%d", atomic.LoadUint32(&number)),
+			time.Since(starttime).Truncate(time.Second).String(),
+		))
+	}
 
 	// 未跑完（中断/出错）时给出恢复命令，用户可以接着扫而不是从头再来。
 	if status == "stopped" && fileutil.FileExists(autoSaveFile) {
-		args := strings.Join(os.Args[1:], " ")
-		if len(options.Resume) > 0 {
-			gologger.Print().Msgf("resume: afrog %s", args)
-		} else {
-			gologger.Print().Msgf("resume: afrog %s -resume %s", args, autoSaveFile)
+		cmd := "afrog " + strings.Join(os.Args[1:], " ")
+		if len(options.Resume) == 0 {
+			cmd += " -resume " + autoSaveFile
 		}
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, "resume", cmd))
 	}
 
 	// 标记正常退出

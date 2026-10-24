@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gookit/color"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/utils"
@@ -17,100 +16,41 @@ import (
 const (
 	Version     = "3.5.8"
 	ProjectName = "Afrog"
-	Codename    = "The hardest path is never crowded."
-	LineWidth   = 56
 )
 
-var (
-	updateSymbol string
-	okSymbol     string
-	errorSymbol  string
-)
-
-func GetOkSymbol() string {
-	return okSymbol
-}
-
-func GetErrorSymbol() string {
-	return errorSymbol
-}
-
-func initSymbols() {
-	if utils.IsUnicodeSupported() {
-		updateSymbol = "↑"
-		okSymbol = "✓"
-		errorSymbol = "✖"
-	} else {
-		updateSymbol = "^"
-		okSymbol = "√"
-		errorSymbol = "X"
-	}
-}
-
+// ShowBanner 打印极简启动头：一行品牌与版本，一行资源版本。
+// 去掉了分隔线与重复的状态符号，扫描输出从下一行直接开始，不再用装饰抢注意力。
 func ShowBanner(u *AfrogUpdate, curated *Curated) {
-	initSymbols()
+	sep := log.LogColor.DarkGray(" · ")
 
-	// 第一行标题
-	title := fmt.Sprintf("%s/%s | %s | %s",
-		color.FgLightBlue.Render(ProjectName),
-		Version,
-		color.FgYellow.Render("Security Toolkit"),
-		color.FgLightMagenta.Render(Codename),
-	)
-	fmt.Println("\n" + title)
+	head := "  " + log.LogColor.Info(strings.ToLower(ProjectName)) + " " +
+		log.LogColor.DarkGray(Version) + sep + log.LogColor.DarkGray("security toolkit")
 
-	// 分隔线
-	PrintSeparator()
-
-	// 状态压缩为一行：Core / POC / Cur。推广链接等与扫描无关的信息不再混入状态输出。
-	pocLine := PocV(u)
+	tpl := log.LogColor.Green(u.CurrVersion)
 	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
-		pocLine += " " + log.LogColor.Extractor("(update available)")
+		tpl += " " + log.LogColor.Red("→ "+u.LastestVersion)
 	}
 
 	count, lastErr := curatedStats()
-	curSymbol := log.LogColor.Low(okSymbol)
-	curLine := fmt.Sprintf("%d/pocs", count)
-	if !curatedEnabled(curated) {
-		curLine += " " + log.LogColor.DarkGray("(off)")
-	} else if errMsg := strings.TrimSpace(lastErr); errMsg != "" {
-		curSymbol = log.LogColor.Red(errorSymbol)
-		curLine += " " + log.LogColor.Red("update failed: "+truncateError(errMsg))
+	cur := log.LogColor.Green(fmt.Sprintf("%d pocs", count))
+	switch {
+	case !curatedEnabled(curated):
+		cur = log.LogColor.DarkGray(fmt.Sprintf("%d pocs", count))
+	case strings.TrimSpace(lastErr) != "":
+		cur = log.LogColor.Red("update failed")
 	}
 
-	fmt.Printf("[%s] Core %s  [%s] POC %s  [%s] Cur %s\n",
-		log.LogColor.Low(okSymbol), EngineV(u),
-		log.LogColor.Low(okSymbol), pocLine,
-		curSymbol, curLine,
-	)
+	res := "  " + log.LogColor.DarkGray("templates") + " " + tpl + sep +
+		log.LogColor.DarkGray("curated") + " " + cur
+
+	fmt.Println()
+	fmt.Println(head)
+	fmt.Println(res)
+	fmt.Println()
 }
 
 func ShowVersion() {
 	fmt.Printf("%s %s\n", ProjectName, Version)
-}
-
-func PrintSeparator() {
-	fmt.Println(log.LogColor.DarkGray(strings.Repeat("═", LineWidth)))
-}
-
-func PrintStatusLine(symbol, label, value, note string) {
-	fmt.Printf("[%s] %-6s %-18s %s\n", symbol, label, value, note)
-}
-
-func EngineV(u *AfrogUpdate) string {
-	version := Version
-	if utils.Compare(u.LastestAfrogVersion, ">", Version) {
-		return version + log.LogColor.Red(updateSymbol) + log.LogColor.DarkGray(" (up to date)")
-	}
-	return log.LogColor.Green(version)
-}
-
-func PocV(u *AfrogUpdate) string {
-	base := u.CurrVersion
-	if utils.Compare(u.LastestVersion, ">", u.CurrVersion) {
-		return fmt.Sprintf("%s → %s", base, log.LogColor.Red(u.LastestVersion))
-	}
-	return log.LogColor.Green(base)
 }
 
 func curatedEnabled(cur *Curated) bool {
@@ -149,17 +89,4 @@ func readCuratedLastError() string {
 		return ""
 	}
 	return strings.TrimSpace(state.LastError)
-}
-
-func truncateError(msg string) string {
-	if msg == "" {
-		return ""
-	}
-	if i := strings.IndexByte(msg, '\n'); i >= 0 {
-		msg = msg[:i]
-	}
-	if len(msg) > 80 {
-		return msg[:77] + "..."
-	}
-	return msg
 }

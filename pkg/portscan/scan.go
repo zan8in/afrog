@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/panjf2000/ants/v2"
+	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/gologger"
@@ -48,7 +49,7 @@ func NewScanner(opt *Options) (*Scanner, error) {
 			return nil, err
 		}
 		// 外置指纹目录不可用时回退到内置指纹集，避免用户自定义文件写错就中断扫描。
-		gologger.Warning().Msgf("%-9s | %-9s | %v, falling back to built-in fingerprints", utils.StagePortScan, "fingerprint", err)
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan, "fingerprint", fmt.Sprintf("%v", err), "falling back to built-in"))
 		if fp, err = NewFingerprinter(""); err != nil {
 			return nil, err
 		}
@@ -136,7 +137,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
 		discStart := time.Now()
 		if stageLog && !s.options.Quiet {
-			gologger.Print().Msgf("%-9s | %-9s | targets=%d method=%s", utils.StageHostDiscovery, "started", len(origHosts), s.options.DiscoveryMethod)
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery,
+				"started",
+				fmt.Sprintf("targets=%d", len(origHosts)),
+				fmt.Sprintf("method=%s", s.options.DiscoveryMethod),
+			))
 		}
 		aliveHosts, derr := DiscoverAliveHosts(discCtx, s.options, origHosts)
 		if derr != nil {
@@ -144,12 +149,17 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 		if discCtx.Err() != nil {
 			if !s.options.Quiet {
-				gologger.Warning().Msgf("%-9s | %-9s | alive=%d", utils.StageHostDiscovery, "interrupted", len(aliveHosts))
+				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageHostDiscovery,
+					"interrupted", fmt.Sprintf("alive=%d", len(aliveHosts))))
 			}
 		}
 		discStop()
 		if stageLog && !s.options.Quiet {
-			gologger.Print().Msgf("%-9s | %-9s | alive=%d/%d duration=%s", utils.StageHostDiscovery, "completed", len(aliveHosts), len(origHosts), time.Since(discStart).Truncate(time.Second))
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery,
+				"completed",
+				fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),
+				time.Since(discStart).Truncate(time.Second).String(),
+			))
 		}
 		hostIter = NewHostIterator(aliveHosts)
 	} else if s.options.OnProgress != nil {
@@ -167,9 +177,14 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		if !s.options.LiveStats {
 			// 端口排名数据版本属于内部实现细节，只在对齐调试时打印，避免污染常规输出。
 			if isBuiltinPortsSpec(s.options.Ports) {
-				gologger.Print().Msgf("%-9s | %-9s | port-ranking=%s", utils.StagePortScan, "ports", getPortRankingVersion())
+				gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+					"ports", fmt.Sprintf("ranking=%s", getPortRankingVersion())))
 			}
-			gologger.Print().Msgf("%-9s | %-9s | hosts=%d ports=%s", utils.StagePortScan, "started", hostIter.Total(), s.options.Ports)
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+				"started",
+				fmt.Sprintf("hosts=%d", hostIter.Total()),
+				fmt.Sprintf("ports=%s", s.options.Ports),
+			))
 		}
 	}
 
@@ -376,12 +391,12 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		}
 		if v := stageCursor.Load(); v != nil {
 			if cur, ok := v.(string); ok && cur != "" {
-				gologger.Warning().Msgf("%-9s | %-9s | %s partial results", utils.StagePortScan, "interrupted", cur)
+				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan, "interrupted", "partial results", cur))
 			} else {
-				gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
+				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan, "interrupted", "partial results"))
 			}
 		} else {
-			gologger.Warning().Msgf("%-9s | %-9s | partial results", utils.StagePortScan, "interrupted")
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan, "interrupted", "partial results"))
 		}
 	}
 	scanStop()
@@ -396,19 +411,19 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			fmt.Fprint(os.Stderr, "\r\033[2K\r")
 		}
 	}
-	if stageLog && !s.options.Quiet {
-		if !s.options.LiveStats {
-			// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
-			fmt.Fprint(os.Stderr, "\r\033[2K\r")
-			gologger.Print().Msgf("%-9s | %-9s | hosts=%d tasks=%d open=%d duration=%s",
-				utils.StagePortScan,
-				"completed",
-				hostIter.Total(),
-				total,
-				atomic.LoadUint64(&s.resultsCount),
-				time.Since(startTime).Truncate(time.Second),
-			)
-		}
+	// 收尾汇总默认可见，与 web-probe 的资产汇总、vuln-scan 的 completed 对齐：
+	// 三个阶段的「结果行」之外都留一行结论，用户不用回翻进度条也知道这一阶段扫出了什么。
+	// started / 端口排名这类阶段边界行仍由 StageLog（-debug）控制，常规输出只多这一行。
+	if !s.options.Quiet && !s.options.LiveStats {
+		// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+			"completed",
+			fmt.Sprintf("hosts=%d", hostIter.Total()),
+			fmt.Sprintf("tasks=%d", total),
+			fmt.Sprintf("open=%d", atomic.LoadUint64(&s.resultsCount)),
+			time.Since(startTime).Truncate(time.Second).String(),
+		))
 	}
 
 	return nil
@@ -763,7 +778,13 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 		st.pending = nil
 		st.mu.Unlock()
 		if !s.options.Quiet {
-			gologger.Warning().Msgf("%-9s | %-9s | host=%s open-rate=%.2f%% (%d/%d) verify-only", utils.StagePortScan, "suspected", host, openRate*100, open, scanned)
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+				"suspected",
+				fmt.Sprintf("host=%s", host),
+				fmt.Sprintf("open-rate=%.2f%%", openRate*100),
+				fmt.Sprintf("probes=%d/%d", open, scanned),
+				"verify-only",
+			))
 		}
 		if atomic.CompareAndSwapUint32(&st.verifying, 0, 1) {
 			go s.verifyAndEmit(ctx, host, st)
@@ -819,8 +840,13 @@ func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint6
 		return
 	}
 	if !s.options.Quiet {
-		gologger.Warning().Msgf("%-9s | %-9s | host=%s drop-rate=%.2f%% (%d/%d) filtered, results may be incomplete",
-			utils.StagePortScan, "filtered", host, float64(timeouts)/float64(scanned)*100, timeouts, scanned)
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+			"filtered",
+			fmt.Sprintf("host=%s", host),
+			fmt.Sprintf("drop-rate=%.2f%%", float64(timeouts)/float64(scanned)*100),
+			fmt.Sprintf("probes=%d/%d", timeouts, scanned),
+			"results may be incomplete",
+		))
 	}
 }
 

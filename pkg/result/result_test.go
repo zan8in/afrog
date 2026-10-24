@@ -22,27 +22,27 @@ func TestFormatExtractorInline(t *testing.T) {
 		{
 			name: "plain strings",
 			in:   yaml.MapSlice{{Key: "username", Value: "root"}, {Key: "password", Value: "root"}},
-			want: "[username=root,password=root]",
+			want: "username=root,password=root",
 		},
 		{
 			name: "empty value keeps quotes",
 			in:   yaml.MapSlice{{Key: "password", Value: ""}},
-			want: `[password=""]`,
+			want: `password=""`,
 		},
 		{
 			name: "value with space and comma gets quoted",
 			in:   yaml.MapSlice{{Key: "banner", Value: "a b,c"}},
-			want: `[banner="a b,c"]`,
+			want: `banner="a b,c"`,
 		},
 		{
 			name: "numbers and bool",
 			in:   yaml.MapSlice{{Key: "port", Value: 3306}, {Key: "ok", Value: true}},
-			want: "[port=3306,ok=true]",
+			want: "port=3306,ok=true",
 		},
 		{
 			name: "string list",
 			in:   yaml.MapSlice{{Key: "ids", Value: []string{"a", "b"}}},
-			want: "[ids=a,b]",
+			want: "ids=a,b",
 		},
 		{
 			name: "unsupported map is skipped",

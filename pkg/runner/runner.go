@@ -58,10 +58,15 @@ type Runner struct {
 	oobPendingMu      sync.Mutex
 	oobPending        map[string]*oobPendingEntry
 	oobFinalizing     uint32
-	oobResolverStop   chan struct{}
-	oobResolverDone   chan struct{}
-	ctx               context.Context
-	cancel            context.CancelFunc
+	// portSeq / webSeq 是端口与 Web 结果行的独立序号（漏洞命中的序号在 main.go 的 number 里）。
+	// 三者各自从 001 起，靠徽标（[open] / [web] / [严重度]）消歧；序号只回答
+	// 「这个阶段累积了多少条结果」，不表示先后与优先级。
+	portSeq         uint32
+	webSeq          uint32
+	oobResolverStop chan struct{}
+	oobResolverDone chan struct{}
+	ctx             context.Context
+	cancel          context.CancelFunc
 	// OOB           *oobadapter.OOBAdapter
 }
 
@@ -411,7 +416,7 @@ func (r *Runner) LiveStatsSuffix() string {
 	taskWaitMsPerSec := (deltaTaskWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 	reqWaitMsPerSec := (deltaReqWaitNs / int64(time.Millisecond)) * int64(time.Second) / int64(dt)
 
-	suffix := fmt.Sprintf(" ta=%d hi=%d ri=%d ni=%d rlt=%d tw=%dms/%d rw=%dms/%d",
+	suffix := fmt.Sprintf(" · ta=%d · hi=%d · ri=%d · ni=%d · rlt=%d · tw=%dms/%d · rw=%dms/%d",
 		atomic.LoadInt64(&r.engine.activeTasks),
 		cur.HTTPInflight,
 		cur.RawInflight,
@@ -422,15 +427,15 @@ func (r *Runner) LiveStatsSuffix() string {
 		reqWaitMsPerSec,
 		reqWaitPerSec,
 	)
-	suffix += fmt.Sprintf(" q=%d", atomic.LoadInt64(&r.engine.queuedTasks))
+	suffix += fmt.Sprintf(" · q=%d", atomic.LoadInt64(&r.engine.queuedTasks))
 	r.oobPendingMu.Lock()
 	oobPending := len(r.oobPending)
 	r.oobPendingMu.Unlock()
 	if oobPending > 0 || atomic.LoadUint32(&r.oobFinalizing) != 0 {
 		if atomic.LoadUint32(&r.oobFinalizing) != 0 {
-			suffix += fmt.Sprintf(" oobf=%d", oobPending)
+			suffix += fmt.Sprintf(" · oobf=%d", oobPending)
 		} else {
-			suffix += fmt.Sprintf(" oob=%d", oobPending)
+			suffix += fmt.Sprintf(" · oob=%d", oobPending)
 		}
 	}
 	if pedm := r.PedmStatusSuffix(); pedm != "" {
@@ -449,12 +454,12 @@ func (r *Runner) PedmStatusSuffix() string {
 		return ""
 	}
 
-	suffix := fmt.Sprintf(" run=%d q=%d", snap.Active, snap.Queued)
+	suffix := fmt.Sprintf(" · run=%d · q=%d", snap.Active, snap.Queued)
 	if snap.Slow > 0 {
-		suffix += fmt.Sprintf(" slow=%d", snap.Slow)
+		suffix += fmt.Sprintf(" · slow=%d", snap.Slow)
 	}
 	if snap.Longest > 0 {
-		suffix += fmt.Sprintf(" longest=%s", snap.Longest.Truncate(time.Second).String())
+		suffix += fmt.Sprintf(" · longest=%s", snap.Longest.Truncate(time.Second).String())
 	}
 	return suffix
 }

@@ -115,7 +115,7 @@ afrog -t https://example.com -test    # 测试模式，会禁用 requires 门控
 
 - 关闭端口会回 `RST`，被丢弃的探测不会响应。目标（或其前置设备）在压力下会丢弃一部分 `SYN`，于是每次都少几个端口。
 - 并发越高越明显：单目标并发默认 50，拉高到数百时很容易触发目标的连接数限制，缺失的端口反而更多。
-- 如果目标丢弃了绝大多数探测，扫描器会打印一行 `PORT-SCAN | filtered` 警告，提示结果可能不完整。
+- 如果目标丢弃了绝大多数探测，扫描器会打印一行 `[WRN] port-scan filtered host=… · drop-rate=… · probes=… · results may be incomplete` 警告，提示结果可能不完整。
 
 ```bash
 afrog -t 192.0.2.10 -ps -p full -ps-host-concurrency 20   # 把单目标并发再压低（默认 50）
