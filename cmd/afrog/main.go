@@ -227,10 +227,10 @@ func main() {
 				if remain < 0 {
 					remain = 0
 				}
-				suffix = fmt.Sprintf(" · oobf=%d/%d · %s", remain, v.Total, v.Status)
+				suffix = fmt.Sprintf(" oobf=%d/%d %s", remain, v.Total, v.Status)
 			}
 		}
-		tail := fmt.Sprintf(" · found=%d%s", atomic.LoadUint32(&number), suffix)
+		tail := fmt.Sprintf(" found=%d%s", atomic.LoadUint32(&number), suffix)
 		return progress.RenderLine(utils.StageVulnScan, pgress, current, total, time.Since(starttime), tail)
 	}
 

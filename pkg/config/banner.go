@@ -19,11 +19,12 @@ const (
 )
 
 // ShowBanner 打印极简启动头：一行品牌与版本，一行资源版本。
+// 两行都从第 0 列顶格起排（不再有行首缩进），与后续结果行、运维行同一列口径；
 // 去掉了分隔线与重复的状态符号，扫描输出从下一行直接开始，不再用装饰抢注意力。
 func ShowBanner(u *AfrogUpdate, curated *Curated) {
 	sep := log.LogColor.DarkGray(" · ")
 
-	head := "  " + log.LogColor.Info(strings.ToLower(ProjectName)) + " " +
+	head := log.LogColor.Info(strings.ToLower(ProjectName)) + " " +
 		log.LogColor.DarkGray(Version) + sep + log.LogColor.DarkGray("security toolkit")
 
 	tpl := log.LogColor.Green(u.CurrVersion)
@@ -40,7 +41,7 @@ func ShowBanner(u *AfrogUpdate, curated *Curated) {
 		cur = log.LogColor.Red("update failed")
 	}
 
-	res := "  " + log.LogColor.DarkGray("templates") + " " + tpl + sep +
+	res := log.LogColor.DarkGray("pocs") + " " + tpl + sep +
 		log.LogColor.DarkGray("curated") + " " + cur
 
 	fmt.Println()

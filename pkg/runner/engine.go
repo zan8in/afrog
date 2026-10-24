@@ -419,7 +419,7 @@ func webAssetSummary(metas []WebMeta) string {
 	if s := formatCounts(issuers, webAssetSummaryTop); s != "" {
 		parts = append(parts, "tls: "+s)
 	}
-	return strings.Join(parts, " · ")
+	return strings.Join(parts, " ")
 }
 
 // webAssetSummaryTop 限制汇总里每一类最多列出多少项，避免网段扫描时刷屏。
@@ -585,7 +585,7 @@ func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
 	}
 }
 
-// formatPortResult 渲染一行端口结果：`序号 [open] host:port  [service] · [tls] · [verified]`。
+// formatPortResult 渲染一行端口结果：`序号 [open] host:port  [service] [tls] [verified]`。
 // 与 Web / 漏洞结果行共用同一套语法：序号 + 徽标 + 目标 + 方括号属性。
 func formatPortResult(r *portscan.ScanResult, seq int) string {
 	// net.JoinHostPort 保证 IPv6 写成 [::1]:80，而不是拼接出无法解析的 ::1:80。
@@ -769,18 +769,6 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		con = 1
 	}
 
-	// Web 探测默认开启，因此必须「可解释」：用户得知道程序正在主动发包、发多少个、
-	// 每个目标发几次、以及怎么关掉。这一行不是阶段边界日志，而是默认开启的知情声明，
-	// 所以照常可见（-silent 只要结果、SDK 由调用方掌控节奏，两者都跳过）。
-	if !runner.options.SDKMode && !runner.options.Silent && totalCandidates > 0 {
-		runner.clearProgressLine()
-		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe,
-			fmt.Sprintf("%d candidate(s)", totalCandidates),
-			"1 request each",
-			fmt.Sprintf("rate %d/s", rate),
-			"disable: -w=false"))
-	}
-
 	interval := time.Second / time.Duration(rate)
 	if interval <= 0 {
 		// Web 探测默认开启后这条路径必然被执行：极高的限速会让 time.Second/rate
@@ -865,7 +853,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			techSummary := webTechSummary(meta.Technologies)
 			if techSummary != "" {
 				if label := webConfidenceLabel(meta.Confidence); label != "" {
-					techSummary += " · " + label
+					techSummary += " " + label
 				}
 				attrs = append(attrs, log.Dim(utils.Str2UTF8(techSummary)))
 			}
@@ -2913,7 +2901,7 @@ type TransData struct {
 // 获取OOB状态信息
 func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	if len(reversePocs) == 0 {
-		return true, "not required · no OOB PoCs"
+		return true, "not required (no OOB PoCs)"
 	}
 
 	runner.options.SetOOBAdapter()
@@ -2922,14 +2910,14 @@ func (runner *Runner) getOOBStatus(reversePocs []poc.Poc) (bool, string) {
 	serviceName := strings.ToLower(runner.options.OOB)
 
 	if runner.engine == nil || runner.engine.oobAdapter == nil {
-		return false, serviceName + " · not configured"
+		return false, serviceName + " not configured"
 	}
 
 	if !runner.engine.oobAdapter.IsVaild() {
-		return false, serviceName + " · connection failed"
+		return false, serviceName + " connection failed"
 	}
 
-	return true, serviceName + " · active"
+	return true, serviceName + " active"
 }
 
 // 新增OOB状态显示函数

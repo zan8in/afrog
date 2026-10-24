@@ -89,12 +89,12 @@ func GetProgressBar(progress, width int) string {
 
 // RenderLine 渲染一行统一的进度输出，三个阶段（端口扫描 / Web 探测 / 漏洞扫描）共用：
 //
-//	port-scan [━━━━╺─────]  12% · 400/3200 · 210/s · ETA 13s
-//	vuln-scan [━━╺───────]   9% · 1543/16220 · 15/s · ETA 16m15s · found=2
+//	port-scan [━━━━╺─────]  12% 400/3200 210/s ETA 13s
+//	vuln-scan [━━╺───────]   9% 1543/16220 15/s ETA 16m15s found=2
 //
-// stage 是小写阶段名（见 utils.StageXxx），固定占 9 字符与运维行对齐；行首缩进 4 格，
-// 与结果行的序号列对齐，使整屏输出成为一个网格。字段之间用 ` · ` 分隔，与结果行同一套语言。
-// tail 交给调用方补充阶段特有信息（如 ` · found=2`）。
+// stage 是小写阶段名（见 utils.StageXxx），固定占 9 字符与运维行对齐；行首不再有缩进，
+// 与结果行同样从第 0 列起排。字段之间用单个空格分隔，与结果行、运维行同一套语言。
+// tail 交给调用方补充阶段特有信息（如 ` found=2`）。
 // 跑满时不再输出 ETA：剩余时间已经恒为 0，留着只是噪音。
 // total <= 0 表示没有可统计的任务，返回空串。
 func RenderLine(stage string, percent int, current, total int64, elapsed time.Duration, tail string) string {
@@ -133,5 +133,5 @@ func RenderLine(stage string, percent int, current, total int64, elapsed time.Du
 		fields = append(fields, "ETA "+eta)
 	}
 
-	return fmt.Sprintf("%-9s [%s] %s%s", stage, GetProgressBar(percent, 0), strings.Join(fields, " · "), tail)
+	return fmt.Sprintf("%-9s [%s] %s%s", stage, GetProgressBar(percent, 0), strings.Join(fields, " "), tail)
 }
