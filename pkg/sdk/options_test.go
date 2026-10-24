@@ -215,3 +215,19 @@ func TestWithPortScan_KeepsDefaultsForZeroFields(t *testing.T) {
 		t.Errorf("TimeoutMs = %d, want 500", o.PortScan.TimeoutMs)
 	}
 }
+
+func TestResolvePortScanCPS(t *testing.T) {
+	cases := []struct {
+		in   int
+		want int
+	}{
+		{0, -1},    // 零值 = 未设置 -> 跟随档位（保护性默认），绝不能等同命令行里的「不限速」
+		{-1, 0},    // 负值 = 调用方显式要求取消上限
+		{500, 500}, // 显式值原样透传
+	}
+	for _, tc := range cases {
+		if got := resolvePortScanCPS(tc.in); got != tc.want {
+			t.Errorf("resolvePortScanCPS(%d) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsign"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
+	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/validator"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
@@ -254,9 +255,14 @@ type Options struct {
 	EnableOOB bool
 
 	// enable pre-scan host port scanning
-	PortScan            bool
-	PSPorts             string
-	PSRateLimit         int
+	PortScan    bool
+	PSPorts     string
+	PSRateLimit int
+	// PSCPS / PSCPSHost 是端口扫描的每秒新建连接上限（全局 / 单目标），0 = 不限速。
+	// 负值表示「按 -polite/-balanced/-aggressive 档位自动」，见 ResolvePortScanRates。
+	PSCPS               int
+	PSCPSHost           int
+	PSLinkProbe         bool
 	PSTimeout           int
 	PSRetries           int
 	PSSkipDiscovery     bool
@@ -383,9 +389,12 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVarP(&options.PortScan, "portscan", "ps", false, "enable pre-scan host port scanning for input assets"),
 		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (only the specified ports are scanned)"),
 		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
-		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "port pre-scan rate limit"),
+		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "max concurrent probes across all hosts in port pre-scan (global worker pool size, not a per-second rate)"),
+		flagSet.IntVar(&options.PSCPS, "pcps", -1, "max new connections per second in port pre-scan, across all hosts (0 = unlimited, -1 = follow -polite/-balanced/-aggressive; default limits the rate to protect the NAT/conntrack table of the local network)"),
+		flagSet.IntVar(&options.PSCPSHost, "pcps-host", -1, "max new connections per second in port pre-scan against a single host (0 = unlimited, -1 = follow -polite/-balanced/-aggressive)"),
+		flagSet.BoolVar(&options.PSLinkProbe, "ps-link-probe", true, "measure the default gateway RTT during port pre-scan and ease off the connection rate when the local link saturates; disable with -ps-link-probe=false"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
-		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "port pre-scan retries"),
+		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "retries per port in port pre-scan (0 = no retry, the default; raise it only on lossy targets where completeness matters more than speed)"),
 		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
 		flagSet.IntVar(&options.PSHostConcurrency, "ps-host-concurrency", 0, "max concurrent probes against a single host in port pre-scan (0 = module default)"),
 		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
@@ -465,6 +474,36 @@ func NewOptions() (*Options, error) {
 	}
 
 	return options, nil
+}
+
+// ResolvePortScanRates 把端口扫描的限速档位落成具体数值。
+//
+// 为什么端口扫描默认要限速：并发上限约束的是「同时有多少条连接在飞」，约束不了
+// 「每秒新开多少条连接」。500 并发在 1ms RTT 的内网里理论上限是 50 万连接/秒，而
+// 出口设备的 NAT/conntrack 会话表通常只有几千条；被过滤的端口不回包，表项要挂到
+// 30~120s 超时才释放，表满之后同网段所有人的新建连接都会失败。默认档（全局 1000、
+// 单目标 100）把压力压到常见家用/办公路由能承受的量级，需要打满时用 -aggressive
+// 或 -pcps 0 显式放开。
+func (opt *Options) ResolvePortScanRates() {
+	if opt.PSCPS >= 0 && opt.PSCPSHost >= 0 {
+		return
+	}
+	var global, perHost int
+	switch {
+	case opt.Polite:
+		global, perHost = portscan.PresetPoliteGlobalCPS, portscan.PresetPolitePerHostCPS
+	case opt.Aggressive:
+		global, perHost = 0, 0 // 显式要求不限速
+	default:
+		// -balanced 与未指定档位同为默认档。
+		global, perHost = portscan.DefaultGlobalCPS, portscan.DefaultPerHostCPS
+	}
+	if opt.PSCPS < 0 {
+		opt.PSCPS = global
+	}
+	if opt.PSCPSHost < 0 {
+		opt.PSCPSHost = perHost
+	}
 }
 
 func (opt *Options) VerifyOptions() error {
@@ -670,6 +709,8 @@ func (opt *Options) VerifyOptions() error {
 			opt.ReqLimitPerTarget = r
 		}
 	}
+
+	opt.ResolvePortScanRates()
 
 	// init append poc
 	if len(opt.AppendPoc) > 0 {

@@ -1140,6 +1140,11 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		PSRetries:       opts.PortScan.Retries,
 		PSSkipDiscovery: opts.PortScan.SkipDiscovery,
 		PSS4Chunk:       opts.PortScan.ChunkSize,
+		// 连接速率上限：SDK 的零值语义是「未设置」，映射到跟随 -polite/-balanced/
+		// -aggressive 档位（默认档即保护性默认），避免调用方不填就静默不限速。
+		PSCPS:       resolvePortScanCPS(opts.PortScan.ConnectRateLimit),
+		PSCPSHost:   resolvePortScanCPS(opts.PortScan.ConnectRateLimitPerHost),
+		PSLinkProbe: !opts.PortScan.DisableLinkProbe,
 
 		PSServiceProbe:   opts.PortScan.ServiceProbe,
 		PSFingerprintDir: opts.PortScan.FingerprintDir,
@@ -1221,7 +1226,25 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 
 	var envRestore []envEntry
 	curatedErr := mountCurated(internal, &envRestore)
+	// SDK 不走 config.VerifyOptions（那是命令行解析路径），所以在这里显式把档位
+	// 落成具体数值，否则 -1 哨兵会一路传到引擎。
+	internal.ResolvePortScanRates()
 	return &builtConfig{options: internal, curatedErr: curatedErr, envRestore: envRestore}, nil
+}
+
+// resolvePortScanCPS 把 SDK 的每秒新建连接上限映射到引擎的三态约定：
+// >= 0 为显式值（0 = 不限速），< 0 表示跟随 -polite/-balanced/-aggressive 档位。
+// SDK 的零值是「未设置」，因此映射为「跟随档位」（保护性默认），而不是命令行里
+// 表示「不限速」的 0；负值表示调用方显式要求取消上限。
+func resolvePortScanCPS(v int) int {
+	switch {
+	case v == 0:
+		return -1
+	case v < 0:
+		return 0
+	default:
+		return v
+	}
 }
 
 // applyOOB resolves the OOB configuration, falling back to the user config

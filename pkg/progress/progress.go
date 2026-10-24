@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // CreateProgressBar 示例用法：
@@ -49,11 +51,47 @@ func CreateProgressBar(progress, length int, filled, empty rune) string {
 		strings.Repeat(string(empty), emptyCount)
 }
 
+// 进度条宽度。取不到终端宽度（非 TTY、重定向到文件）时用 defaultBarWidth，
+// 否则按整行剩余空间自适应：进度条一旦折行，\r\033[2K 只能清掉最后一行，
+// 上面那半行会永远留在屏幕上，界面就花了。
+const (
+	defaultBarWidth = 24
+	minBarWidth     = 12
+	maxBarWidth     = 50
+)
+
+// stageColumnWidth 是阶段名（port-scan / web-probe / vuln-scan）固定占用的列数。
+const stageColumnWidth = 9
+
+// terminalWidth 返回终端列数；取不到（非 TTY、管道、重定向）时返回 0。
+func terminalWidth() int {
+	if w, _, err := term.GetSize(int(os.Stderr.Fd())); err == nil && w > 0 {
+		return w
+	}
+	return 0
+}
+
+// FitBarWidth 在已知「进度条以外」的固定列数时，算出既不折行又尽量长的进度条宽度。
+func FitBarWidth(overhead int) int {
+	w := terminalWidth()
+	if w <= 0 {
+		return defaultBarWidth
+	}
+	width := w - overhead - 1 // 留 1 列余量，避免正好压满触发终端自动换行
+	if width > maxBarWidth {
+		width = maxBarWidth
+	}
+	if width < minBarWidth {
+		width = minBarWidth
+	}
+	return width
+}
+
 // GetProgressBar 获取带指示箭头的进度条
 func GetProgressBar(progress, width int) string {
 	// 自动宽度处理
 	if width == 0 {
-		width = 50
+		width = defaultBarWidth
 	}
 
 	// 动态选择符号
@@ -89,13 +127,16 @@ func GetProgressBar(progress, width int) string {
 
 // RenderLine 渲染一行统一的进度输出，三个阶段（端口扫描 / Web 探测 / 漏洞扫描）共用：
 //
-//	port-scan [━━━━╺─────]  12% 400/3200 210/s ETA 13s
-//	vuln-scan [━━╺───────]   9% 1543/16220 15/s ETA 16m15s found=2
+//	port-scan [━━━━╺─────]  12% 400/3200 1m30s 210/s
+//	vuln-scan [━━╺───────]   9% 1543/16220 3m20s 15/s found=2
 //
 // stage 是小写阶段名（见 utils.StageXxx），固定占 9 字符与运维行对齐；行首不再有缩进，
 // 与结果行同样从第 0 列起排。字段之间用单个空格分隔，与结果行、运维行同一套语言。
 // tail 交给调用方补充阶段特有信息（如 ` found=2`）。
-// 跑满时不再输出 ETA：剩余时间已经恒为 0，留着只是噪音。
+// 进度条宽度按终端剩余空间自适应（见 FitBarWidth），保证整行始终占一屏宽不折行。
+// 只展示已发生的事实（已用时间、实测速率），不推算剩余时间：剩余量依赖
+// 「剩余任务速度与已完成部分一致」的假设，扫描起步阶段样本少时给出的 ETA
+// 往往离谱（实测出现过 374h57m59s），用户拿百分比和耗时自己估更准。
 // total <= 0 表示没有可统计的任务，返回空串。
 func RenderLine(stage string, percent int, current, total int64, elapsed time.Duration, tail string) string {
 	if total <= 0 {
@@ -114,7 +155,7 @@ func RenderLine(stage string, percent int, current, total int64, elapsed time.Du
 		percent = 100
 	}
 
-	// 只有"已用多久"信息量太低，补上每秒速率与预计剩余时间，用户才能判断还要等多久。
+	// 只给事实：进度、计数、已用时间、实测速率。剩余时间由用户自行估算。
 	rate := 0.0
 	if sec := elapsed.Seconds(); sec >= 1 {
 		rate = float64(current) / sec
@@ -122,16 +163,13 @@ func RenderLine(stage string, percent int, current, total int64, elapsed time.Du
 	fields := []string{
 		fmt.Sprintf("%3d%%", percent),
 		fmt.Sprintf("%d/%d", current, total),
+		elapsed.Round(time.Second).String(),
 		fmt.Sprintf("%.0f/s", rate),
 	}
-	// 未跑满才谈得上「还要多久」；跑满后 ETA 恒为 0，属纯噪音。
-	if current < total {
-		eta := "--"
-		if rate > 0 {
-			eta = time.Duration(float64(total-current) / rate * float64(time.Second)).Round(time.Second).String()
-		}
-		fields = append(fields, "ETA "+eta)
-	}
 
-	return fmt.Sprintf("%-9s [%s] %s%s", stage, GetProgressBar(percent, 0), strings.Join(fields, " "), tail)
+	fieldText := strings.Join(fields, " ")
+	// 进度条宽度按终端剩余空间自适应，整行恰好占一屏宽：
+	// stage(stageColumnWidth) + 空格 + [bar] + 空格 + fieldText + tail。
+	overhead := stageColumnWidth + 1 + 2 + 1 + len(fieldText) + len(tail)
+	return fmt.Sprintf("%-*s [%s] %s%s", stageColumnWidth, stage, GetProgressBar(percent, FitBarWidth(overhead)), fieldText, tail)
 }

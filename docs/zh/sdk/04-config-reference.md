@@ -149,6 +149,18 @@ sdk.WithPortScan(sdk.PortScanOptions{
 - 服务发现
 - 把 `host:port` 动态纳入后续漏洞扫描
 
+`RateLimit` 是并发上限（同时有多少条连接在飞），`ConnectRateLimit` / `ConnectRateLimitPerHost` 是连接速率上限（每秒新开多少条连接，全局 / 单目标）。两者正交：只限并发挡不住低延迟内网里每秒数十万次的连接尝试，会把本机所在网络的 NAT/conntrack 会话表打满。这两个字段留空（`0`）时使用内置的保护性默认（默认档：全局 1000/s、单目标 100/s），设为负值表示不限制。
+
+```go
+sdk.WithPortScan(sdk.PortScanOptions{
+  Ports:            "top",
+  ConnectRateLimit: 200,   // 显式收紧全局速率
+  DisableLinkProbe: true,  // 关闭网关 RTT 探测
+})
+```
+
+`DisableLinkProbe` 关闭扫描期间对默认网关的周期性 RTT 测量。该测量用于在本机出口链路被压满时自动降速，默认开启。
+
 ## 任务级超时
 
 单请求超时和单任务超时不是一回事。后者用于限制“单目标 + 单 PoC”的整体耗时：

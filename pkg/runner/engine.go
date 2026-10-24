@@ -143,6 +143,19 @@ func (c *openPortsCollector) Result(host string, port int) *portscan.ScanResult 
 	return c.results[key]
 }
 
+// FactFor 按 host:port 取指纹结论；格式不对或没有结论（未开 -ps、端口由用户直接指定）时返回 nil。
+func (c *openPortsCollector) FactFor(hostPort string) *portscan.ScanResult {
+	host, portStr, err := net.SplitHostPort(strings.TrimSpace(hostPort))
+	if err != nil {
+		return nil
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil
+	}
+	return c.Result(host, port)
+}
+
 // maxFaviconBytes 是抓取 favicon 时接受的最大体积，超过则视为非 favicon 直接丢弃。
 const maxFaviconBytes = 1 << 20
 
@@ -565,6 +578,24 @@ func webProbeSkipByPrior(hostPort string) bool {
 	return !portscan.IsWebService(service)
 }
 
+// webTargetAllowed 报告一个 host:port 是否值得交给 HTTP PoC 去打。
+//
+// 判据与 webProbe 的候选过滤完全同源，避免「探测阶段认定不是 Web、扫描阶段照样发 HTTP 请求」
+// 这种口径漂移：指纹明确判定非 Web 服务时否掉；指纹缺失或 TLS 标记掩盖了「非 Web」事实时，
+// 再用端口先验把 22/3306/6379 以及 465/993/995 这类服务挡掉。
+//
+// 唯一例外是指纹已正面判定为 Web 服务——Web 可能挂在任意端口上，先验只说明惯例。
+// 既无指纹又无先验的端口一律放行。
+func webTargetAllowed(hostPort string, fact *portscan.ScanResult) bool {
+	if _, ok := webProbeScheme(fact); !ok {
+		return false
+	}
+	if webProbeSkipByPrior(hostPort) && (fact == nil || !portscan.IsWebService(fact.Service)) {
+		return false
+	}
+	return true
+}
+
 // toPortScanInfo 把 portscan 的识别结果转换成 config 层结构，供回调与事件流使用。
 func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
 	return config.PortScanInfo{
@@ -662,19 +693,6 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		}
 	}
 
-	// factFor 按 host:port 取端口指纹结论；没有结论（如端口由用户直接指定）时返回 nil。
-	factFor := func(hostPort string) *portscan.ScanResult {
-		host, portStr, err := net.SplitHostPort(strings.TrimSpace(hostPort))
-		if err != nil {
-			return nil
-		}
-		port, err := strconv.Atoi(portStr)
-		if err != nil {
-			return nil
-		}
-		return facts.Result(host, port)
-	}
-
 	type candidate struct {
 		raw string
 		// scheme 非空表示协议已由端口指纹确定，无需再做协议试探。
@@ -701,7 +719,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		add(u, "", nil)
 	}
 	for _, hp := range idx.HostPorts {
-		fact := factFor(hp)
+		fact := facts.FactFor(hp)
 		scheme, ok := webProbeScheme(fact)
 		if !ok {
 			continue
@@ -1913,10 +1931,16 @@ func (runner *Runner) Execute() {
 			if options.PSRateLimit > 0 {
 				psOpts.RateLimit = options.PSRateLimit
 			}
+			// 连接速率上限与并发上限是两个正交维度：并发管「同时多少条连接」，
+			// 速率管「每秒新开多少条连接」。0 表示不限速（-pcps 0 / -aggressive）。
+			psOpts.ConnectRateLimit = options.PSCPS
+			psOpts.ConnectRateLimitPerHost = options.PSCPSHost
+			psOpts.LinkProbe = options.PSLinkProbe
 			if options.PSTimeout > 0 {
 				psOpts.Timeout = time.Duration(options.PSTimeout) * time.Millisecond
 			}
-			if options.PSRetries > 0 {
+			// 判定用 >= 0：0 是合法值（关闭重试），也是 CLI 与 SDK 的默认值。
+			if options.PSRetries >= 0 {
 				psOpts.Retries = options.PSRetries
 			}
 			if options.PSSkipDiscovery {
@@ -2162,7 +2186,29 @@ func (runner *Runner) Execute() {
 		return out
 	}
 
-	webScanTargets := dedupWebTargets(mergeTargets(idx.URLs, resolvedHosts, webTargets, idx.HostPorts))
+	// webHostPorts 是交给 HTTP PoC 的 host:port 候选，已按协议感知门控过滤。
+	//
+	// 端口扫描会把每个开放端口都变成独立目标，其中 22/3306/6379 这类端口永远不会回
+	// HTTP：对它们跑全套 HTTP PoC，每个任务都要等到 -timeout × -retries 才失败，几个
+	// 这样的目标就足以把整体速率压到个位数。指纹既然已经给出「不是 Web」的结论，就不该
+	// 再让 HTTP PoC 去打——这与 webProbe 的候选过滤是同一把尺子。
+	//
+	// 关闭 -w 时不做任何过滤：此时没有 Web 探测结论，也不存在「探测与扫描口径不一致」
+	// 的问题，保持旧行为，让 PoC 自己去所有端口上试协议。
+	webHostPorts := idx.HostPorts
+	skippedNonWeb := 0
+	if options.EnableWebProbe {
+		webHostPorts = make([]string, 0, len(idx.HostPorts))
+		for _, hp := range idx.HostPorts {
+			if !webTargetAllowed(hp, portFacts.FactFor(hp)) {
+				skippedNonWeb++
+				continue
+			}
+			webHostPorts = append(webHostPorts, hp)
+		}
+	}
+
+	webScanTargets := dedupWebTargets(mergeTargets(idx.URLs, resolvedHosts, webTargets, webHostPorts))
 
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false
@@ -2246,6 +2292,14 @@ func (runner *Runner) Execute() {
 			fmt.Sprintf("pocs=%d", pocTotal),
 			fmt.Sprintf("tasks=%d", options.Count),
 		))
+		// 被门控挡掉的目标必须可追溯：否则用户看到「我的端口没被扫」却找不到原因。
+		if skippedNonWeb > 0 {
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageVulnScan,
+				"gated",
+				fmt.Sprintf("non-http-targets=%d", skippedNonWeb),
+				"skipped http pocs",
+			))
+		}
 	}
 
 	if !options.DisableFingerprint && len(fingerprintPocs) > 0 {

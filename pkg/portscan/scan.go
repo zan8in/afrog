@@ -25,16 +25,28 @@ type Scanner struct {
 	pool              *ants.PoolWithFunc
 	mu                sync.Mutex
 	consecutiveErrors int32
-	currentProgress   uint64
-	resultsCount      uint64
-	adaptiveDelay     int32 // Current delay in milliseconds
-	hostStats         sync.Map
-	hostSems          sync.Map // host -> chan struct{} (per-target concurrency gate)
-	scanPortTotal     uint64
+	// fdErrors 统计因本机 fd/句柄耗尽而失败的探测数，fdWarned 记录是否已就此告警过。
+	// 这类失败不是目标行为（既非端口关闭也非丢包），必须与目标侧信号分开处理，
+	// 否则会把丢包率、filtered 判定与自适应惩罚一起带偏。详见 handleFDExhausted。
+	fdErrors        uint64
+	fdWarned        uint32
+	currentProgress uint64
+	resultsCount    uint64
+	adaptiveDelay   int32 // Current delay in milliseconds
+	hostStats       sync.Map
+	hostSems        sync.Map // host -> chan struct{} (per-target concurrency gate)
+	scanPortTotal   uint64
 
 	fingerprinter *Fingerprinter
 	grabber       *Grabber
 	verifyGrabber *Grabber
+
+	// limiter / hostLimit 限制每秒新发起的探测数（全局与单目标），保护路径上的
+	// NAT/conntrack 会话表；congestion 在运行时按观测到的丢包与网关 RTT 动态调整
+	// 全局速率。三者都在 Scan 内按本次配置装配，语义见 options.go 与 congestion.go。
+	limiter    *rateLimiter
+	hostLimit  *hostLimiter
+	congestion *congestionController
 }
 
 // NewScanner creates a new scanner instance
@@ -124,6 +136,27 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// 常规输出只保留结果行与统一进度条。
 	stageLog := s.options.StageLog || s.options.Debug
 
+	// 以下三件事保护的不是本机（那是 fd 预算的事），而是路径：出口设备的
+	// NAT/conntrack 会话表和网关的转发能力。并发上限约束不了速率——500 并发在
+	// 1ms RTT 的内网里上限是 50 万连接/秒，足以把一台只有几千条表项的路由器打满，
+	// 让同网段所有人的新建连接一起失败。
+	//
+	// 1) 连接速率限制：全局 + 单目标两道闸，按「每秒新发起的探测数」计。
+	// 2) 链路探针：扫描前先量一次网关空载 RTT 作基线，扫描期间周期复测。
+	// 3) 拥塞控制器：丢包或网关 RTT 抬升时乘性降速，链路恢复后加性升回。
+	// 上限为 0（-pcps 0 / -aggressive）表示用户显式要求不限速，不装配任何一环。
+	var link *linkProbe
+	if s.options.LinkProbe && s.options.ConnectRateLimit > 0 {
+		if link = newLinkProbe(); link != nil {
+			link.takeBaseline(ctx)
+		}
+	}
+	s.limiter = newRateLimiter(s.options.ConnectRateLimit)
+	s.hostLimit = newHostLimiter(s.options.ConnectRateLimitPerHost)
+	s.congestion = newCongestionController(ctx, s.limiter, link, s.options.ConnectRateLimit, s.reportCongestion)
+	s.congestion.start()
+	defer s.congestion.close()
+
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
 	hostIter := NewHostIterator(s.options.Targets)
 
@@ -173,6 +206,29 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	total := hostIter.Total() * portTotal
 	startTime := time.Now()
 
+	// 并发按本机 fd 上限收敛。默认全局池是 500，但低配机器、Linux 服务器
+	// （systemd 默认 1024）和容器（256~1024）的 RLIMIT_NOFILE 往往撑不住：fd 一旦
+	// 吃满，连报告、日志、web 监听这些扫描之外的连接也会跟着失败。先尝试把软上限
+	// 提到硬上限（nmap 的做法），再按剩余预算把池子收敛到 min(用户值, 预算)。
+	// fdScanBudget 返回 0 表示拿不到限制或没有实质限制（Windows 亦然），保持用户配置。
+	if raised, ok := raiseFDLimit(); ok && stageLog && !s.options.Quiet {
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+			"fd-limit", fmt.Sprintf("raised=%d", raised)))
+	}
+	rateLimit := s.options.RateLimit
+	if budget := fdScanBudget(); budget > 0 && (rateLimit <= 0 || rateLimit > budget) {
+		requested := rateLimit
+		rateLimit = budget
+		if !s.options.Quiet {
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+				"fd-limit",
+				fmt.Sprintf("probes=%d", budget),
+				fmt.Sprintf("concurrency=%d->%d", requested, rateLimit),
+				"lowered to fit open-file limit",
+			))
+		}
+	}
+
 	if stageLog && !s.options.Quiet {
 		if !s.options.LiveStats {
 			// 端口排名数据版本属于内部实现细节，只在对齐调试时打印，避免污染常规输出。
@@ -191,8 +247,6 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	printEnabled := (s.options.Debug || s.options.LiveStats) && !s.options.Quiet && total > 0
 	callbackEnabled := s.options.OnProgress != nil && total > 0
 	var progressDone chan struct{}
-	var lastPercent int32 = -1
-	var lastCallbackPercent int32 = -1
 	renderProgress := func(final bool) {
 		curr := atomic.LoadUint64(&s.currentProgress)
 		if int(curr) > total {
@@ -206,24 +260,18 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			percent = 100
 			curr = uint64(total)
 		}
+		// 不再按整数百分比去重。刷新本来就只有每秒一次（ticker 驱动），去重只会让
+		// 调用方反复重画同一个 finished，而 elapsed 还在增长，算出的速率于是越来越
+		// 离谱（实测出现过 `0% 1/65535 0/s`，跨过 1% 才跳到下一帧）。
 		if callbackEnabled {
-			if final || int32(percent) != atomic.LoadInt32(&lastCallbackPercent) {
-				atomic.StoreInt32(&lastCallbackPercent, int32(percent))
-				status := "running"
-				if final {
-					status = "completed"
-				}
-				s.options.OnProgress("portscan", status, int(curr), total, percent)
+			status := "running"
+			if final {
+				status = "completed"
 			}
+			s.options.OnProgress("portscan", status, int(curr), total, percent)
 		}
 		if !printEnabled {
 			return
-		}
-		if !final {
-			if int32(percent) == atomic.LoadInt32(&lastPercent) {
-				return
-			}
-			atomic.StoreInt32(&lastPercent, int32(percent))
 		}
 		// 与漏洞扫描阶段共用同一条渲染口径，形状与字段完全一致。
 		suffix := ""
@@ -264,7 +312,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 
 	// Use ants for goroutine pooling
 	scanCtx, scanStop := signal.NotifyContext(ctx, os.Interrupt)
-	pool, err := ants.NewPoolWithFunc(s.options.RateLimit, func(i interface{}) {
+	pool, err := ants.NewPoolWithFunc(rateLimit, func(i interface{}) {
 		defer wg.Done()
 		task := i.(scanTask)
 
@@ -291,6 +339,8 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		return err
 	}
 	defer pool.Release()
+	// 供 handleFDExhausted 在运行时收缩在飞并发（见 shrinkPool）。
+	s.pool = pool
 
 	// Iterate and submit tasks
 	if stageMajor {
@@ -328,6 +378,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 					}
 
 					s.maybeAdaptiveDelay()
+					if err := s.throttleProbe(scanCtx, host); err != nil {
+						break SubmitLoop
+					}
 					wg.Add(1)
 					err := pool.Invoke(scanTask{host: host, port: port})
 					if err != nil {
@@ -343,6 +396,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 		}
 	} else {
+	PortLoop:
 		for _, host := range hosts {
 			select {
 			case <-scanCtx.Done():
@@ -366,6 +420,10 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				port, ok := portIter.Next()
 				if !ok {
 					break
+				}
+
+				if err := s.throttleProbe(scanCtx, host); err != nil {
+					break PortLoop
 				}
 
 				wg.Add(1)
@@ -478,6 +536,118 @@ const (
 	hostModeDeciding   uint32 = 3
 )
 
+// verbose 表示是否打开诊断级输出。portscan 自身的进度条与阶段边界行由 Debug /
+// LiveStats 控制，而 CLI 端统一把 -debug 映射到 StageLog（见 runner/engine.go，
+// psOpts.Debug 恒为 false），所以两者任一为真都算诊断模式。
+func (s *Scanner) verbose() bool {
+	return s != nil && s.options != nil && (s.options.Debug || s.options.StageLog)
+}
+
+// clearProgressLine 清掉进度条残留的半行。进度条用 \r 原地重绘、结尾不换行，光标停在
+// 行尾，直接打印运维行就会叠在进度条上面。CLI 端的进度条由 main.go 渲染，所以这里不能
+// 只看 portscan 自己的开关：Quiet 之外一律清一次。Quiet（-silent / SDK）下不渲染任何
+// 进度条，清行序列反而会被旧终端渲染成乱码。
+func (s *Scanner) clearProgressLine() {
+	if s == nil || s.options == nil || s.options.Quiet {
+		return
+	}
+	fmt.Fprint(os.Stderr, "\r\033[2K\r")
+}
+
+// poolShrinkFloor 是收缩全局池时的地板。fd 耗尽说明本机资源紧张，但把并发压到个位数
+// 只会让扫描退化成不可用，所以收缩到底也保住这个量级。
+const poolShrinkFloor = 16
+
+// handleFDExhausted 处理「本机 fd/句柄耗尽」这一类失败。它不是目标行为，所以既不进
+// st.timeouts（会把丢包率算高、误报 filtered），也不累加 consecutiveErrors（会触发与
+// 目标无关的降速）。首次触发时告警一次并收缩在飞并发，让系统把 fd 还回来。
+func (s *Scanner) handleFDExhausted() {
+	atomic.AddUint64(&s.fdErrors, 1)
+	if !atomic.CompareAndSwapUint32(&s.fdWarned, 0, 1) {
+		return
+	}
+	if !s.options.Quiet {
+		s.clearProgressLine()
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+			"fd-exhausted",
+			fmt.Sprintf("failed=%d", atomic.LoadUint64(&s.fdErrors)),
+			fdAdvice(),
+		))
+	}
+	s.shrinkPool()
+}
+
+// shrinkPool 尽最大努力把全局池减半，减少同时在飞的连接数。只在 fd 耗尽时调用一次
+// （由 fdWarned 保证），且钳到地板。ants 的 Tune 不接受 0（0 表示无上限），所以必须
+// 先钳到 poolShrinkFloor 再传。
+func (s *Scanner) shrinkPool() {
+	p := s.pool
+	if p == nil {
+		return
+	}
+	size := p.Cap()
+	if size <= poolShrinkFloor {
+		return
+	}
+	next := size / 2
+	if next < poolShrinkFloor {
+		next = poolShrinkFloor
+	}
+	p.Tune(next)
+}
+
+// throttleProbe 在提交一个探测前等够限速器要求的间隔。全局闸门与单目标闸门串行
+// 通过；两道都不限速时只是两次原子读，没有额外开销。返回非 nil 表示 ctx 已结束。
+//
+// 这里阻塞的是唯一的提交协程，所以「睡够间隔」本身就是限速手段，池里的 worker 不受影响。
+func (s *Scanner) throttleProbe(ctx context.Context, host string) error {
+	if s.limiter != nil {
+		if err := s.limiter.wait(ctx); err != nil {
+			return err
+		}
+	}
+	return s.hostLimit.wait(ctx, host)
+}
+
+// reportCongestion 渲染拥塞控制器发出的降速/恢复告警。自动降速必须显式可见：用户
+// 看到扫描变慢时需要知道这是我们主动收手保护链路，而不是工具出了问题或目标变慢。
+func (s *Scanner) reportCongestion(ev congestionEvent) {
+	if s.options == nil || s.options.Quiet {
+		return
+	}
+	s.clearProgressLine()
+	if ev.Recovered {
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+			"recovered",
+			fmt.Sprintf("rate=%d->%d", ev.OldRate, ev.NewRate),
+			"link healthy again",
+		))
+		return
+	}
+	facts := []string{
+		fmt.Sprintf("rate=%d->%d", ev.OldRate, ev.NewRate),
+		fmt.Sprintf("no-reply=%d%%", ev.LossPct),
+	}
+	if ev.BaselineRT > 0 {
+		facts = append(facts,
+			fmt.Sprintf("gw-rtt=%s", ev.LinkRTT.Truncate(time.Millisecond)),
+			fmt.Sprintf("baseline=%s", ev.BaselineRT.Truncate(time.Millisecond)),
+		)
+	}
+	if ev.Reason == "link-rtt" {
+		facts = append(facts, "local link congested, easing off to protect it")
+	} else {
+		facts = append(facts, "probes unanswered, easing off to protect the local network")
+	}
+	facts = append(facts, "-pcps 0 disables")
+	gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+		append([]string{"throttled"}, facts...)...))
+}
+
+// maybeAdaptiveDelay 是针对「目标在限我们的速」的逐探测退避。注意它只统计硬错误：
+// 超时不算，因为被防火墙 drop 的端口本来就不回包，把它当错误会让每个提交都睡满
+// 1s，扫描直接废掉。链路层面的持续丢包由 congestionController 统一收敛（它有窗口
+// 统计，不会因为一个被过滤的目标就误判），两者职责不重叠。
 func (s *Scanner) maybeAdaptiveDelay() {
 	errCount := atomic.LoadInt32(&s.consecutiveErrors)
 	currentDelay := atomic.LoadInt32(&s.adaptiveDelay)
@@ -489,8 +659,13 @@ func (s *Scanner) maybeAdaptiveDelay() {
 		}
 		atomic.StoreInt32(&s.adaptiveDelay, newDelay)
 
-		if s.options.Debug && errCount%10 == 0 {
-			gologger.Warning().Msgf("High error rate (%d). Increasing delay to %dms", errCount, newDelay)
+		if s.verbose() && errCount%10 == 0 {
+			s.clearProgressLine()
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+				"throttled",
+				fmt.Sprintf("errors=%d", errCount),
+				fmt.Sprintf("delay=%dms", newDelay),
+			))
 		}
 		time.Sleep(time.Duration(newDelay) * time.Millisecond)
 		return
@@ -641,6 +816,14 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 	conn, err := s.checkPortOpen(st, host, port)
 
 	if err != nil {
+		// 本机 fd/句柄耗尽不是目标的信号：它既不说明端口开着，也不说明被防火墙丢弃。
+		// 若落入 default 分支，会同时污染 st.timeouts（误报 filtered）和
+		// consecutiveErrors（触发与目标无关的降速），所以这里单独处理并直接返回，
+		// 不进入按目标统计与启发式判定。
+		if isFDExhausted(err) {
+			s.handleFDExhausted()
+			return
+		}
 		scanned := atomic.AddUint64(&st.scanned, 1)
 		isTimeout := false
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -653,10 +836,16 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 			// never let it be mistaken for a hard error.
 			atomic.AddUint64(&st.timeouts, 1)
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
+			// 拥塞控制器看的正是这一路信号：回包与否按窗口统计，一个被过滤的目标
+			// 只能把窗口丢包率推高，是否降速由控制器按阈值决定（见 congestion.go）。
+			s.congestion.observe(false)
 		case isConnRefused(err):
+			// 收到 RST 说明对端回了话，路径是通的。
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
+			s.congestion.observe(true)
 		default:
 			atomic.AddInt32(&s.consecutiveErrors, 1)
+			s.congestion.observe(false)
 		}
 		s.maybeDecideHost(ctx, host, st, scanned)
 		s.maybeWarnFiltered(host, st, scanned)
@@ -665,6 +854,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	// Connection successful
 	atomic.StoreInt32(&s.consecutiveErrors, 0)
+	s.congestion.observe(true)
 	defer conn.Close()
 
 	scanned := atomic.AddUint64(&st.scanned, 1)
@@ -777,7 +967,9 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 		atomic.StoreUint32(&st.mode, hostModeSuspicious)
 		st.pending = nil
 		st.mu.Unlock()
-		if !s.options.Quiet {
+		// 与 filtered 同理：这是排查阶段的诊断，默认不打扰终端，-debug 才显示。
+		if s.verbose() {
+			s.clearProgressLine()
 			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
 				"suspected",
 				fmt.Sprintf("host=%s", host),
@@ -839,7 +1031,10 @@ func (s *Scanner) maybeWarnFiltered(host string, st *hostScanStat, scanned uint6
 	if !atomic.CompareAndSwapUint32(&st.warned, 0, 1) {
 		return
 	}
-	if !s.options.Quiet {
+	// 这是诊断信息（排查「结果为何不完整」时才需要），不是扫描结果，默认不打扰
+	// 终端；-debug 才显示，并先清掉进度条所在行。
+	if s.verbose() {
+		s.clearProgressLine()
 		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
 			"filtered",
 			fmt.Sprintf("host=%s", host),

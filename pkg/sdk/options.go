@@ -202,9 +202,27 @@ type Options struct {
 // PortScanOptions configures the port pre-scan stage.
 type PortScanOptions struct {
 	// Ports accepts "top", "full", "all", "80,443" or "1-1024".
-	Ports         string
-	RateLimit     int
-	TimeoutMs     int
+	Ports string
+	// RateLimit caps concurrent probes across all hosts (global worker pool
+	// size), not a per-second request rate.
+	RateLimit int
+	// ConnectRateLimit / ConnectRateLimitPerHost cap how many new connections
+	// the port pre-scan opens per second, globally and per single host.
+	// Concurrency (RateLimit) and rate are orthogonal: a few hundred concurrent
+	// probes are enough to exhaust the NAT/conntrack table of the local network
+	// when RTT is low. Zero keeps the built-in protective default; a negative
+	// value disables the cap.
+	ConnectRateLimit        int
+	ConnectRateLimitPerHost int
+	// DisableLinkProbe turns off the periodic default-gateway RTT probe used to
+	// detect a saturated local link and ease the connection rate off. It is on
+	// by default; disable it only when probing the gateway is undesirable.
+	DisableLinkProbe bool
+	// TimeoutMs is the per-attempt connect timeout; 0 keeps the module default.
+	TimeoutMs int
+	// Retries is the per-port retry count; 0 (the default) means no retry,
+	// which keeps lossy full-port scans fast. Raise it only when completeness
+	// on a rate-limiting target matters more than speed.
 	Retries       int
 	SkipDiscovery bool
 	ChunkSize     int

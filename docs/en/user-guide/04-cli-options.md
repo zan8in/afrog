@@ -92,6 +92,10 @@ afrog -t 192.168.1.0/24 -ps           # web probing is already on
 afrog -t 192.168.1.0/24 -ps -w=false  # disable explicitly
 ```
 
+The web probing result also decides which targets the HTTP PoCs hit: when `-ps` is on, a `host:port` the port fingerprint has already ruled out as HTTP(S) (such as `22`/`3306`/`6379`, or TLS-but-not-web services like `465`/`993`/`995`) is kept out of the HTTP PoC target pool, while TCP/SSL PoCs still cover every port. Non-web ports found by `-p all` therefore no longer make every HTTP task sit there until it times out.
+
+With `-w=false` this gating is off and HTTP PoCs are fired at every target as before. Use `-debug` to see how many targets were gated (`vuln-scan gated non-http-targets=N`).
+
 ### `-w-timeout`
 
 Per-request timeout (seconds) for the web probing stage, covering both the HTTP request and the TLS certificate fetch. Defaults to `30`.
@@ -384,6 +388,8 @@ These are preset per-target throttling strategies:
 
 They are most useful in batch scans where you want to protect individual targets from being overwhelmed.
 
+The preset also sets the connection rate cap of the port pre-scan (see `-pcps`): `200/20` for `-polite`, `1000/100` for `-balanced` (the default), and no cap for `-aggressive`.
+
 ### `-mhe`
 
 Maximum accumulated errors per host before afrog skips it. The default is `3`.
@@ -443,15 +449,31 @@ Final OOB wait timeout in seconds. `-1` uses the pending timeout, and `0` disabl
 
 ### `-prate`
 
-Rate limit for port pre-scan.
+Global concurrency cap (worker pool size) for port pre-scan — not a per-second request rate. The default is `500`.
+
+The effective value is additionally bounded by the local open-file limit: afrog first tries to raise the soft `ulimit -n` up to the hard limit, then narrows the pool to `min(-prate, budget)`. When it narrows, it prints a `[WRN] port-scan fd-limit ...` line explaining why. See [Practical Tips](./07-tips.md).
+
+### `-pcps`
+
+Global connection rate cap for the port pre-scan, in new connections per second. It follows the throttling preset by default: `1000` for `-balanced` (the default), `200` for `-polite`, and no cap for `-aggressive`. `-pcps 0` disables the cap explicitly; a positive value sets it explicitly.
+
+Concurrency (`-prate`) and rate (`-pcps`) are two orthogonal dimensions: concurrency bounds how many connections are in flight, while the rate bounds how many new connections are opened per second. Concurrency alone is not enough — a few hundred concurrent probes at low RTT mean hundreds of thousands of connection attempts per second on a LAN, which exhausts the NAT/conntrack session table of the local exit device (a home or office router). Filtered ports never reply, so their entries linger for the 30–120s timeout; once the table is full, every new connection from anyone on that network fails. The default cap exists to prevent exactly that.
+
+### `-pcps-host`
+
+Connection rate cap for the port pre-scan against a single host, in new connections per second. It follows the preset by default: `100` for `-balanced`, `20` for `-polite`, and no cap for `-aggressive`. Its semantics match `-pcps`.
+
+### `-ps-link-probe`
+
+Whether to periodically measure the RTT to the default gateway during the port pre-scan. The default is `true`. A rising gateway RTT means the local uplink is saturated, so the scan eases its rate off and prints a `[WRN] port-scan throttled ...` line; it speeds back up once the link is healthy again. Disable it with `-ps-link-probe=false`.
 
 ### `-ptimeout`
 
-Timeout for port pre-scan, in milliseconds.
+Timeout for port pre-scan, in milliseconds. The default is `1000`.
 
 ### `-ptries`
 
-Retry count for port pre-scan.
+Retry count per port in port pre-scan. The default is `0` (no retry). Each extra retry makes a dropping port pay another full timeout plus backoff, so a full-port scan slows down in multiples — raise it only for lossy targets.
 
 ### `-ps-s4-chunk`
 

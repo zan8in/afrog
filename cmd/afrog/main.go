@@ -159,6 +159,9 @@ func main() {
 		webhookWG = sync.WaitGroup{}
 		starttime = time.Now()
 		number    uint32
+		// vulnStageStart 是漏洞扫描阶段自己的计时起点。用整轮扫描的 starttime 当分母，
+		// 会把端口扫描与 Web 探测的耗时算进漏洞扫描的速率里，显示出来的速率天然偏低。
+		vulnStageStart time.Time
 	)
 
 	progressEnabled := !options.Silent
@@ -189,7 +192,7 @@ func main() {
 		prev, _ := dst.Load().(phaseBarState)
 		next := phaseBarState{status: status, finished: finished, total: total, percent: percent}
 		// started 只在阶段进入 running 的那一刻取一次，后续同一个阶段的回调沿用，
-		// 否则每次刷新都会把已用时间重置成 0，速率与 ETA 会算错。
+		// 否则每次刷新都会把已用时间重置成 0，行内耗时就失真了。
 		if status == "running" && prev.status != "running" {
 			next.started = time.Now()
 		} else {
@@ -211,6 +214,11 @@ func main() {
 		if total <= 0 {
 			return ""
 		}
+		// Count 只在漏洞扫描阶段开始时被引擎写入一次，所以「首次看到非零」就是这个
+		// 阶段的起点，行内耗时与速率都以此为基准。
+		if vulnStageStart.IsZero() {
+			vulnStageStart = time.Now()
+		}
 		current := int64(atomic.LoadUint32(&options.CurrentCount))
 		pgress := int(current * 100 / total)
 
@@ -231,7 +239,7 @@ func main() {
 			}
 		}
 		tail := fmt.Sprintf(" found=%d%s", atomic.LoadUint32(&number), suffix)
-		return progress.RenderLine(utils.StageVulnScan, pgress, current, total, time.Since(starttime), tail)
+		return progress.RenderLine(utils.StageVulnScan, pgress, current, total, time.Since(vulnStageStart), tail)
 	}
 
 	renderProgress := func() {
@@ -602,11 +610,20 @@ func main() {
 	// 例外是中断/出错（stopped）：按中断规范必须告知用户「已中断」及恢复命令，
 	// 因此这种异常收尾不受静默抑制。
 	if status == "stopped" || (!options.Silent && !options.SDKMode) {
+		// 与 port-scan / web-probe 的收尾汇总同一口径：耗时记本阶段自己的，
+		// 而不是整轮（含端口扫描与 Web 探测）的耗时。
+		lock.Lock()
+		vulnStart := vulnStageStart
+		lock.Unlock()
+		if vulnStart.IsZero() {
+			// 本轮没有可执行的漏洞任务（例如只列出 PoC），退回整轮耗时。
+			vulnStart = starttime
+		}
 		gologger.Print().Msgf("%s", log.Op(level, utils.StageVulnScan,
 			status,
 			fmt.Sprintf("tasks=%d/%d", atomic.LoadUint32(&options.CurrentCount), options.Count),
 			fmt.Sprintf("found=%d", atomic.LoadUint32(&number)),
-			time.Since(starttime).Truncate(time.Second).String(),
+			time.Since(vulnStart).Truncate(time.Second).String(),
 		))
 	}
 
