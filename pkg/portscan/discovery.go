@@ -268,70 +268,120 @@ func DiscoverAliveHosts(ctx context.Context, opt *Options, hosts []string) ([]st
 	return res, nil
 }
 
+// icmpTarget 是一台待探测的主机。host 保持用户输入的原样（可能是主机名），dst 是实际
+// 发包用的解析结果。
+type icmpTarget struct {
+	host string
+	dst  *net.IPAddr
+}
+
+// buildICMPTargets 解析候选主机，并返回「应答源 IP -> 用户输入主机名」的反查表。
+//
+// ICMP 回包只带源 IP。原实现直接拿源 IP 与用户输入做字符串比对，目标是主机名时永远
+// 匹配不上（NewHostIterator 对主机名原样透传），整个 ICMP 阶段白跑；即便凑巧是 IP，
+// 存活列表里也会丢掉用户书写的形式。先解析再反查，两个问题一起解决。
+func buildICMPTargets(hosts []string) (map[string]string, []icmpTarget) {
+	byIP := make(map[string]string, len(hosts))
+	targets := make([]icmpTarget, 0, len(hosts))
+	for _, h := range hosts {
+		dst, err := net.ResolveIPAddr("ip", h)
+		if err != nil || dst == nil {
+			continue
+		}
+		ip := dst.String()
+		if _, dup := byIP[ip]; dup {
+			continue
+		}
+		byIP[ip] = h
+		targets = append(targets, icmpTarget{host: h, dst: dst})
+	}
+	return byIP, targets
+}
+
 func runICMPListen(ctx context.Context, hosts []string, conn *icmp.PacketConn, opt *Options, pp *phaseProgress) ([]string, error) {
-	var alive []string
-	seen := make(map[string]struct{})
-	var mu sync.Mutex
-	endflag := false
+	if len(hosts) == 0 {
+		return nil, nil
+	}
+	byIP, targets := buildICMPTargets(hosts)
+	if len(targets) == 0 {
+		return nil, nil
+	}
+	shuffled := append([]icmpTarget(nil), targets...)
+	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
+	var (
+		alive []string
+		seen  = make(map[string]struct{})
+		mu    sync.Mutex
+	)
+	// end 被接收 goroutine 与发送/等待循环同时读写，必须是原子类型：这里用普通 bool
+	// 是实打实的数据竞争。done 用于收尾时唤醒 ctx 监听 goroutine，避免它一直挂到 ctx 结束。
+	var end atomic.Bool
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		select {
 		case <-ctx.Done():
-			endflag = true
+			end.Store(true)
+		case <-done:
 		}
 	}()
-	shuffled := append([]string(nil), hosts...)
-	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
+	aliveCount := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(alive)
+	}
+
 	go func() {
 		buf := make([]byte, 128)
-		for {
-			if endflag {
-				return
-			}
+		for !end.Load() {
 			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 			_, src, err := conn.ReadFrom(buf)
 			if err != nil || src == nil {
 				continue
 			}
-			ip := src.String()
+			host, ok := byIP[src.String()]
+			if !ok {
+				continue
+			}
 			mu.Lock()
-			if _, ok := seen[ip]; !ok && containsHost(hosts, ip) {
-				seen[ip] = struct{}{}
+			if _, dup := seen[host]; !dup {
+				seen[host] = struct{}{}
 				if pp != nil {
-					pp.markAlive(ip, "icmp-listen")
+					pp.markAlive(host, "icmp-listen")
 				} else {
-					logHostAlive(ip, "icmp-listen", opt)
+					logHostAlive(host, "icmp-listen", opt)
 				}
-				alive = append(alive, ip)
+				alive = append(alive, host)
 			}
 			mu.Unlock()
 		}
 	}()
-	for _, h := range shuffled {
-		if ctx.Err() != nil || endflag {
+
+	for _, t := range shuffled {
+		if ctx.Err() != nil || end.Load() {
 			break
 		}
 		if pp != nil {
 			pp.attempt()
 		}
-		dst, _ := net.ResolveIPAddr("ip", h)
-		msg := makeICMPEcho(h)
-		conn.WriteTo(msg, dst)
+		conn.WriteTo(makeICMPEcho(t.host), t.dst)
 	}
+
 	start := time.Now()
-	for {
-		if len(alive) == len(hosts) {
-			break
-		}
+	goal := len(byIP)
+	for aliveCount() < goal {
 		wait := 6 * time.Second
-		if len(hosts) <= 256 {
+		if len(targets) <= 256 {
 			wait = 3 * time.Second
 		}
-		if time.Since(start) > wait || ctx.Err() != nil || endflag {
+		if time.Since(start) > wait || ctx.Err() != nil || end.Load() {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	endflag = true
+	end.Store(true)
 	return alive, nil
 }
 
@@ -340,9 +390,15 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options, pp *phas
 	if num <= 0 {
 		num = 1000
 	}
+	// 原生 ICMP 是「一台主机一个裸套接字」，同样吃本机 fd。发现阶段跑在正式扫描之前，
+	// 必须和端口扫描一样按 fd 预算收敛，否则低配机器会在还没开始扫时先耗尽句柄。
+	if fdBudget := fdScanBudget(); fdBudget > 0 && num > fdBudget {
+		num = fdBudget
+	}
 	if len(hosts) < num {
 		num = len(hosts)
 	}
+	budget := icmpProbeTimeout(opt)
 	var alive []string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -366,7 +422,7 @@ func runICMPNoListen(ctx context.Context, hosts []string, opt *Options, pp *phas
 				return
 			default:
 			}
-			if icmpAlive(host) {
+			if icmpAlive(host, budget) {
 				mu.Lock()
 				if pp != nil {
 					pp.markAlive(host, "icmp")
@@ -457,10 +513,121 @@ func shuffledInts(in []int) []int {
 	return out
 }
 
-func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phaseProgress) []string {
-	var alive []string
-	var mu sync.Mutex
+const (
+	// tcpDiscoveryFanout 是单台主机在发现阶段同时打开的探测连接数。给一点并发是为了让
+	// 「目标只开一个非顶层端口」能在一个预算内被找到，同时不至于让一台主机吃掉整个额度。
+	tcpDiscoveryFanout = 8
+	// tcpDiscoveryMinSockets 是发现阶段套接字闸门的地板，保证预算被压得极低时仍能推进。
+	tcpDiscoveryMinSockets = 16
+)
+
+// tcpDiscoverySocketLimit 收敛发现阶段的在飞套接字数：既尊重用户/档位配置，也不越过
+// 本机 fd 预算。发现阶段跑在正式扫描之前，同样占用套接字，不能只让端口扫描去守预算。
+func tcpDiscoverySocketLimit(opt *Options) int {
+	limit := opt.RateLimit
+	if limit <= 0 {
+		limit = 100
+	}
+	if budget := fdScanBudget(); budget > 0 && limit > budget {
+		limit = budget
+	}
+	if limit < tcpDiscoveryMinSockets {
+		limit = tcpDiscoveryMinSockets
+	}
+	return limit
+}
+
+// discoveryDial 是发现阶段实际使用的连接探测函数。抽成变量是为了让测试能注入「连得上
+// 却不回包」的 filtered 主机，验证预算按主机计的这条不变量；生产路径固定为 dialProvesAlive。
+var discoveryDial = dialProvesAlive
+
+// dialProvesAlive 判断一次 TCP 连接尝试是否足以证明主机在线：连上（开放端口）或收到
+// RST（连接被拒绝）都说明对端协议栈在工作；只有超时、无路由这类沉默结果才不算证据。
+func dialProvesAlive(ctx context.Context, host string, port int) bool {
+	var d net.Dialer
+	c, err := d.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if err == nil {
+		c.Close()
+		return true
+	}
+	return isConnRefused(err)
+}
+
+// probePorts 用最多 tcpDiscoveryFanout 个 worker 并发探测 ports，任一探测证明主机在线
+// 就立即取消其余探测返回 true。所有连接都从 sem 取额度，保证全局在飞套接字不超预算。
+func probePorts(ctx context.Context, host string, ports []int, sem chan struct{}) bool {
+	if len(ports) == 0 {
+		return false
+	}
+	pctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var alive atomic.Bool
+	work := make(chan int)
+	// 投喂 goroutine 不加入 wg：worker 提前退出时它靠 pctx.Done 解阻塞，如果把它算进
+	// wg，就会出现「worker 等 wg、wg 等投喂」的互等。
+	go func() {
+		defer close(work)
+		for _, p := range ports {
+			select {
+			case work <- p:
+			case <-pctx.Done():
+				return
+			}
+		}
+	}()
+
+	workers := tcpDiscoveryFanout
+	if len(ports) < workers {
+		workers = len(ports)
+	}
 	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for p := range work {
+				select {
+				case sem <- struct{}{}:
+				case <-pctx.Done():
+					return
+				}
+				proved := discoveryDial(pctx, host, p)
+				<-sem
+				if proved {
+					alive.Store(true)
+					cancel()
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	return alive.Load()
+}
+
+// tcpHostAlive 在一个 opt.Timeout 的预算内判断主机是否在线：先试 primary 端口，仍有
+// 余量且开启回退时再试 fallback 端口。
+//
+// 预算按「主机」而非「端口」计。原实现对每台主机顺序试 40 个 primary + 20 个 fallback
+// 端口，每个都用完整 opt.Timeout，一台不回包的主机就要耗掉几十秒——既让发现阶段漫长得
+// 不可接受，也把出口设备的 NAT/conntrack 表当成了压力测试靶。
+func tcpHostAlive(ctx context.Context, host string, primary, fallback []int, opt *Options, sem chan struct{}) bool {
+	hctx, cancel := context.WithTimeout(ctx, opt.Timeout)
+	defer cancel()
+	if probePorts(hctx, host, primary, sem) {
+		return true
+	}
+	if !opt.DiscoveryFallback || hctx.Err() != nil {
+		return false
+	}
+	return probePorts(hctx, host, fallback, sem)
+}
+
+func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phaseProgress) []string {
+	if len(hosts) == 0 {
+		return nil
+	}
 	primary := opt.DiscoveryPorts
 	if len(primary) == 0 {
 		primary = shuffledInts(defaultDiscoveryPrimaryPorts())
@@ -469,20 +636,27 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 	if len(fallback) == 0 {
 		fallback = shuffledInts(defaultDiscoveryFallbackPorts())
 	}
-	limit := opt.RateLimit
-	if limit < 100 {
-		limit = 100
+
+	var alive []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	// 闸门一：在飞套接字总数（worker 每拨一个连接取一次额度）。
+	sem := make(chan struct{}, tcpDiscoverySocketLimit(opt))
+	// 闸门二：同时在飞的主机数，按 fanout 折算，保证「主机数 × fanout」不越过闸门一。
+	hostLimit := cap(sem) / tcpDiscoveryFanout
+	if hostLimit < 1 {
+		hostLimit = 1
 	}
-	sem := make(chan struct{}, limit)
+	hostGate := make(chan struct{}, hostLimit)
 	for _, host := range hosts {
 		if ctx.Err() != nil {
 			break
 		}
 		wg.Add(1)
-		sem <- struct{}{}
+		hostGate <- struct{}{}
 		go func(h string) {
 			defer func() {
-				<-sem
+				<-hostGate
 				wg.Done()
 			}()
 			if pp != nil {
@@ -493,34 +667,7 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 				return
 			default:
 			}
-			ok := false
-			for _, p := range primary {
-				c, e := net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(p)), opt.Timeout)
-				if e == nil {
-					c.Close()
-					ok = true
-					break
-				}
-				if isConnRefused(e) {
-					ok = true
-					break
-				}
-			}
-			if !ok && opt.DiscoveryFallback {
-				for _, p := range fallback {
-					c, e := net.DialTimeout("tcp", net.JoinHostPort(h, strconv.Itoa(p)), opt.Timeout)
-					if e == nil {
-						c.Close()
-						ok = true
-						break
-					}
-					if isConnRefused(e) {
-						ok = true
-						break
-					}
-				}
-			}
-			if ok {
+			if tcpHostAlive(ctx, h, primary, fallback, opt, sem) {
 				mu.Lock()
 				if pp != nil {
 					pp.markAlive(h, "tcp")
@@ -536,22 +683,39 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 	return alive
 }
 
-func icmpAlive(host string) bool {
+// icmpProbeTimeout 把原生 ICMP 的等待时间对齐到用户的 -timeout：ICMP 比 TCP connect
+// 更容易被限速丢弃，给 2 倍余量，并把结果收敛到 [2s, 6s]。原来的固定 6s 与用户配置
+// 无关，在大网段上是白等。
+func icmpProbeTimeout(opt *Options) time.Duration {
+	base := opt.Timeout
+	if base <= 0 {
+		base = time.Second
+	}
+	d := base * 2
+	if d < 2*time.Second {
+		d = 2 * time.Second
+	}
+	if d > 6*time.Second {
+		d = 6 * time.Second
+	}
+	return d
+}
+
+// icmpAlive 用一个原生 ICMP socket 探测主机，budget 是本次探测的总预算。
+func icmpAlive(host string, budget time.Duration) bool {
 	start := time.Now()
-	conn, err := net.DialTimeout("ip4:icmp", host, 6*time.Second)
+	conn, err := net.DialTimeout("ip4:icmp", host, budget)
 	if err != nil {
 		return false
 	}
 	defer conn.Close()
-	conn.SetDeadline(start.Add(6 * time.Second))
+	conn.SetDeadline(start.Add(budget))
 	msg := makeICMPEcho(host)
-	_, err = conn.Write(msg)
-	if err != nil {
+	if _, err = conn.Write(msg); err != nil {
 		return false
 	}
 	recv := make([]byte, 64)
-	_, err = conn.Read(recv)
-	if err != nil {
+	if _, err = conn.Read(recv); err != nil {
 		return false
 	}
 	return true
@@ -683,15 +847,6 @@ func ident(host string) (byte, byte) {
 		return host[0], 0
 	}
 	return 0, 0
-}
-
-func containsHost(list []string, h string) bool {
-	for _, v := range list {
-		if v == h {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeUnique(a, b []string) []string {

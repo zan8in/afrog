@@ -153,3 +153,143 @@ func TestVerifyPortHTTPOnRandomPort(t *testing.T) {
 
 	<-done
 }
+
+// ICMP 回包只带源 IP，必须反查回用户输入的主机名，否则主机名目标在整个 ICMP 阶段
+// 永远匹配不上（NewHostIterator 对主机名是原样透传的）。
+func TestBuildICMPTargetsMapsReplyIPBackToHostname(t *testing.T) {
+	byIP, targets := buildICMPTargets([]string{"localhost", "127.0.0.1"})
+
+	if len(targets) != 1 {
+		t.Fatalf("同一 IP 的重复目标应去重，实际 %d 个", len(targets))
+	}
+	if got := byIP["127.0.0.1"]; got != "localhost" {
+		t.Fatalf("byIP[127.0.0.1]=%q，期望保留先出现的主机名 localhost", got)
+	}
+	if targets[0].host != "localhost" {
+		t.Fatalf("targets[0].host=%q，期望 localhost", targets[0].host)
+	}
+}
+
+// 无法解析的目标不参与探测，也不该让整轮发现失败。
+func TestBuildICMPTargetsSkipsUnresolvable(t *testing.T) {
+	byIP, targets := buildICMPTargets([]string{"host.invalid.", "127.0.0.1"})
+	if len(targets) != 1 || targets[0].host != "127.0.0.1" {
+		t.Fatalf("targets=%v，期望只保留 127.0.0.1", targets)
+	}
+	if len(byIP) != 1 {
+		t.Fatalf("byIP 大小=%d，期望 1", len(byIP))
+	}
+}
+
+// 原生 ICMP 的等待时间跟随 -timeout，并收敛到 [2s, 6s]。
+func TestICMPProbeTimeoutFollowsUserBudget(t *testing.T) {
+	cases := []struct {
+		in   time.Duration
+		want time.Duration
+	}{
+		{0, 2 * time.Second},
+		{300 * time.Millisecond, 2 * time.Second},
+		{time.Second, 2 * time.Second},
+		{2 * time.Second, 4 * time.Second},
+		{5 * time.Second, 6 * time.Second},
+		{30 * time.Second, 6 * time.Second},
+	}
+	for _, tc := range cases {
+		if got := icmpProbeTimeout(&Options{Timeout: tc.in}); got != tc.want {
+			t.Fatalf("icmpProbeTimeout(%s)=%s，期望 %s", tc.in, got, tc.want)
+		}
+	}
+}
+
+// 发现阶段的套接字闸门同样受 fd 预算约束，并保留地板。
+func TestTCPDiscoverySocketLimitRespectsFDBudget(t *testing.T) {
+	opts := DefaultOptions()
+	opts.RateLimit = 1 << 20
+	got := tcpDiscoverySocketLimit(opts)
+
+	if budget := fdScanBudget(); budget > 0 && budget >= tcpDiscoveryMinSockets && got > budget {
+		t.Fatalf("limit=%d 越过 fd 预算 %d", got, budget)
+	}
+	if got < tcpDiscoveryMinSockets {
+		t.Fatalf("limit=%d 低于地板 %d", got, tcpDiscoveryMinSockets)
+	}
+}
+
+// 探测预算按「主机」而非「端口」计：一台不回包的主机不该耗掉几十个超时。
+// 用 RFC 5737 文档网段（192.0.2.0/24）作为不会响应的目标。
+func TestTCPDiscoveryBudgetBoundedPerHost(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Timeout = 300 * time.Millisecond
+	opts.RateLimit = 64
+	opts.Quiet = true
+	opts.LogDiscoveredHosts = false
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	alive := runTCPDiscovery(ctx, opts, []string{"192.0.2.1"}, nil)
+	elapsed := time.Since(start)
+
+	if len(alive) != 0 {
+		t.Fatalf("文档网段不该被判存活，实际 %v", alive)
+	}
+	// primary + fallback 各一个预算，留足调度余量；原来的逐端口串行会是 60 倍预算。
+	if limit := 10 * opts.Timeout; elapsed > limit {
+		t.Fatalf("单主机探测耗时 %s，超出预算上限 %s", elapsed, limit)
+	}
+}
+
+// 已取消的上下文应立即返回，不再发起新探测。
+func TestProbePortsStopsOnCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	start := time.Now()
+	if probePorts(ctx, "127.0.0.1", []int{1, 2, 3, 4}, make(chan struct{}, 4)) {
+		t.Fatalf("已取消的上下文不该判定存活")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("已取消的上下文应立即返回，实际耗时 %s", elapsed)
+	}
+}
+
+// 核心不变量：一台「连得上却不回包」的 filtered 主机只该吃掉一个主机预算（primary +
+// fallback 各一次），而不是 40+20 个端口各自的超时。用注入的阻塞式探测模拟黑洞目标。
+func TestTCPDiscoveryFilteredHostCostsOneBudget(t *testing.T) {
+	orig := discoveryDial
+	var calls int32
+	discoveryDial = func(ctx context.Context, host string, port int) bool {
+		atomic.AddInt32(&calls, 1)
+		select {
+		case <-ctx.Done():
+		case <-time.After(30 * time.Second):
+		}
+		return false
+	}
+	t.Cleanup(func() { discoveryDial = orig })
+
+	opts := DefaultOptions()
+	opts.Timeout = 300 * time.Millisecond
+	opts.RateLimit = 64
+	opts.Quiet = true
+	opts.LogDiscoveredHosts = false
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	alive := runTCPDiscovery(ctx, opts, []string{"10.11.12.13"}, nil)
+	elapsed := time.Since(start)
+
+	if len(alive) != 0 {
+		t.Fatalf("黑洞目标不该被判存活，实际 %v", alive)
+	}
+	if limit := 4 * opts.Timeout; elapsed > limit {
+		t.Fatalf("单台 filtered 主机耗时 %s，超出 %s（预算未按主机计）", elapsed, limit)
+	}
+	// 每个阶段最多 fanout 个 worker 各卡在一次探测上，两阶段合计不超过 2×fanout。
+	if max := int32(2 * tcpDiscoveryFanout); calls > max {
+		t.Fatalf("发起了 %d 次探测，超出上限 %d（在逐端口串行尝试）", calls, max)
+	}
+}

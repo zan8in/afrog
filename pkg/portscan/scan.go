@@ -197,6 +197,15 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),
 				time.Since(discStart).Truncate(time.Second).String(),
 			))
+			// 被判 down 的主机会被静默移出扫描范围（与 nmap 同语义），但「沉默地丢掉目标」
+			// 是最容易被误解的失败模式：目标常常只是挡掉了 ICMP 与探测端口。这里补一行
+			// 数量与逃生口，免得用户以为目标真的是死的。
+			if down := len(origHosts) - len(aliveHosts); down > 0 {
+				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageHostDiscovery,
+					fmt.Sprintf("down=%d", down),
+					"not scanned, use -Pn to scan anyway",
+				))
+			}
 		}
 		hostIter = NewHostIterator(aliveHosts)
 	} else if s.options.OnProgress != nil {
