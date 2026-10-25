@@ -309,11 +309,21 @@ func DbName() (string, error) {
 	return filepath.Join(path, DBName+".db"), nil
 }
 
+// NewSnowFlake 初始化本进程的 SnowFlake ID 生成器。
+//
+// 节点 ID 必须在一台机器上「同时存活的进程」之间唯一：result 表主键由 SnowFlake
+// 生成，而本机所有 afrog 进程共用一个 ~/.config/afrog/afrog.db。此前这里硬编码为 1，
+// 于是并发进程在同一毫秒会算出完全相同的 ID，后写入的一方直接
+// UNIQUE constraint failed: result.id (1555) 丢结果。
+//
+// 用 PID 取模映射到 0..1023 的节点位：同一时刻存活的两个进程 PID 必然不同，只有
+// 相差 1024 整数倍时才会落到同一节点 ID，且还要求命中同一毫秒，实际不会发生。
+// 跨机器结果入库时主键会由本机重新分配，所以无需全局唯一，PID 这个粒度足够。
 func NewSnowFlake() error {
-	if node, err := snowflake.NewSnowflake(1); err != nil {
+	node, err := snowflake.NewSnowflake(int64(os.Getpid()) % 1024)
+	if err != nil {
 		return err
-	} else {
-		SnowFlake = node
-		return nil
 	}
+	SnowFlake = node
+	return nil
 }

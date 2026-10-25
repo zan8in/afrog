@@ -101,8 +101,12 @@ func (report *Report) check(fileName string) error {
 		if !fileutil.FolderExists(OutputDirectory) {
 			fileutil.CreateFolder(OutputDirectory)
 		}
-		fileName = filepath.Join(OutputDirectory, timeutil.Format(timeutil.Format_1)+".html")
-		report.ReportFile = fileName
+		name, err := createUniqueReportName(OutputDirectory, ".html")
+		if err != nil {
+			return err
+		}
+		report.ReportFile = name
+		return nil
 	}
 
 	suffix := path.Ext(fileName)
@@ -121,13 +125,47 @@ func (report *Report) check(fileName string) error {
 
 		report.ReportFile = fileName
 
-		return os.Remove(fileName)
+		// 这里只是探测目录可写，文件本身留给后续 Write 创建。清理失败（并发下
+		// 可能已被别的进程删掉）不该让整个扫描退出，所以忽略错误。
+		_ = os.Remove(fileName)
 
+		return nil
 	}
 
 	report.ReportFile = fileName
 
 	return nil
+}
+
+// createUniqueReportName 在 dir 下为本次扫描独占一个报告文件名。
+//
+// 默认报告名是秒级精度的时间戳（MMDD-HHMMSS），同一秒内并发启动的多个 afrog
+// 进程会算出同一个名字：彼此覆盖内容，先删的一方还会让另一方拿到 ENOENT。
+// 这里用 O_EXCL 原子抢占占位文件，冲突时追加自增序号，既保证跨进程唯一，
+// 又让无冲突（绝大多数）情况下的文件名保持原样。
+//
+// 返回的占位文件已被删除，实际文件由后续 Write 创建。
+func createUniqueReportName(dir, ext string) (string, error) {
+	base := timeutil.Format(timeutil.Format_1)
+	for i := 0; i < 1000; i++ {
+		name := base + ext
+		if i > 0 {
+			name = fmt.Sprintf("%s-%d%s", base, i, ext)
+		}
+		fileName := filepath.Join(dir, name)
+
+		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+		if err != nil {
+			if os.IsExist(err) {
+				continue
+			}
+			return "", fmt.Errorf("unable to create output file: %v", err)
+		}
+		file.Close()
+		_ = os.Remove(fileName)
+		return fileName, nil
+	}
+	return "", fmt.Errorf("unable to create output file: too many reports share the name %q", base)
 }
 
 func (report *Report) SetResult(result *result.Result) {

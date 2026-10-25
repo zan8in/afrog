@@ -55,6 +55,10 @@ func writeSmokePoc(t *testing.T, id, token string) string {
 // isolateHome 把 HOME 指向临时目录，避免冒烟测试拉起子进程时把扫描记录写进
 // 用户真实的 ~/.config/afrog（sqlite / curated 状态），同时关掉 curated 挂载，
 // 免得测试触发外部网络请求。
+//
+// 必须在 buildAfrogBinary 之后调用：go 的 GOPATH / GOMODCACHE / GOCACHE 默认都挂在
+// HOME 下，先换 HOME 再 build，子进程里的 go build 会拿到空模块缓存，进而重新下载
+// go.mod 里声明的 toolchain，离线或沙箱环境下会一路卡到测试超时。
 func isolateHome(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
@@ -80,8 +84,8 @@ func TestLocalProcessSmoke(t *testing.T) {
 		t.Skip("set AFROG_EXECUTOR_SMOKE=1 to run the local-process smoke test")
 	}
 
-	isolateHome(t)
 	bin := buildAfrogBinary(t)
+	isolateHome(t)
 
 	const token = "AFROG_EXECUTOR_SMOKE_TOKEN"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -163,10 +167,10 @@ func TestLocalProcessSmoke_ConcurrentSpecsDoNotInterfere(t *testing.T) {
 		t.Skip("set AFROG_EXECUTOR_SMOKE=1 to run the local-process smoke test")
 	}
 
+	bin := buildAfrogBinary(t)
 	isolateHome(t)
 
 	const scans = 3
-	bin := buildAfrogBinary(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -188,7 +192,23 @@ func TestLocalProcessSmoke_ConcurrentSpecsDoNotInterfere(t *testing.T) {
 		wg       sync.WaitGroup
 	)
 
-	lp := &LocalProcess{BinaryPath: bin, ExtraArgs: []string{"-duc"}}
+	// 收集子进程 stderr：并发问题是进程级的，失败时若只有一句「total_targets=0」
+	// 的裸断言，根本看不出子进程为什么退出（例如建库失败、参数非法）。
+	var (
+		stderrMu  sync.Mutex
+		stderrBuf []string
+	)
+	lp := &LocalProcess{
+		BinaryPath: bin,
+		ExtraArgs:  []string{"-duc"},
+		OnStderr: func(line string) {
+			stderrMu.Lock()
+			defer stderrMu.Unlock()
+			if len(stderrBuf) < 20 {
+				stderrBuf = append(stderrBuf, line)
+			}
+		},
+	}
 
 	for n := 0; n < scans; n++ {
 		taskID := fmt.Sprintf("iso-task-%d", n)
@@ -259,8 +279,11 @@ func TestLocalProcessSmoke_ConcurrentSpecsDoNotInterfere(t *testing.T) {
 			t.Fatalf("scan %d received events for another task: %v", n, out.mislabeled)
 		}
 		if out.totalTargets != n+1 {
-			t.Fatalf("scan %d scan_info.total_targets = %d, want %d (参数被其他扫描覆盖)",
-				n, out.totalTargets, n+1)
+			stderrMu.Lock()
+			tail := append([]string(nil), stderrBuf...)
+			stderrMu.Unlock()
+			t.Fatalf("scan %d scan_info.total_targets = %d, want %d (参数被其他扫描覆盖)\nchild stderr:\n%s",
+				n, out.totalTargets, n+1, strings.Join(tail, "\n"))
 		}
 		if out.doneStatus != "completed" {
 			t.Fatalf("scan %d done status = %q, want completed", n, out.doneStatus)

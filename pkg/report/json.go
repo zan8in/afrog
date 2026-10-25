@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	fileutil "github.com/zan8in/pins/file"
-	timeutil "github.com/zan8in/pins/time"
 	"gopkg.in/yaml.v2"
 )
 
@@ -92,8 +90,12 @@ func (report *JsonReport) checkJson(fileName string) error {
 		if !fileutil.FolderExists(OutputDirectory) {
 			fileutil.CreateFolder(OutputDirectory)
 		}
-		fileName = filepath.Join(OutputDirectory, timeutil.Format(timeutil.Format_1)+".json")
-		report.ReportFile = fileName
+		name, err := createUniqueReportName(OutputDirectory, ".json")
+		if err != nil {
+			return err
+		}
+		report.ReportFile = name
+		return nil
 	}
 
 	suffix := path.Ext(fileName)
@@ -112,8 +114,11 @@ func (report *JsonReport) checkJson(fileName string) error {
 
 		report.ReportFile = fileName
 
-		return os.Remove(fileName)
+		// 这里只是探测目录可写，文件本身留给后续 Append 创建。清理失败（并发下
+		// 可能已被别的进程删掉）不该让整个扫描退出，所以忽略错误。
+		_ = os.Remove(fileName)
 
+		return nil
 	}
 
 	report.ReportFile = fileName

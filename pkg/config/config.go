@@ -467,7 +467,7 @@ func ensureCuratedSection(configPath string, curated Curated) error {
 			lines = append(lines, "")
 		}
 		lines = append(lines, curatedSectionLines(0, curated)...)
-		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+		return writeConfigFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
 	}
 
 	baseIndent := leadingSpaces(lines[curatedIdx])
@@ -509,7 +509,7 @@ func ensureCuratedSection(configPath string, curated Curated) error {
 	out = append(out, lines[:end]...)
 	out = append(out, insert...)
 	out = append(out, lines[end:]...)
-	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	return writeConfigFile(configPath, []byte(strings.Join(out, "\n")), 0644)
 }
 
 func ensureInteractshSection(configPath string, interactsh Interactsh) error {
@@ -537,7 +537,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 			lines = append(lines, "")
 		}
 		lines = append(lines, reverseInteractshSectionLines(0, interactsh)...)
-		return os.WriteFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
+		return writeConfigFile(configPath, []byte(strings.Join(lines, "\n")), 0644)
 	}
 
 	baseIndent := leadingSpaces(lines[reverseIdx])
@@ -574,7 +574,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 		}
 		out = append(out, insert...)
 		out = append(out, lines[reverseEnd:]...)
-		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+		return writeConfigFile(configPath, []byte(strings.Join(out, "\n")), 0644)
 	}
 
 	interactshEnd := reverseEnd
@@ -615,7 +615,7 @@ func ensureInteractshSection(configPath string, interactsh Interactsh) error {
 	out = append(out, lines[:interactshEnd]...)
 	out = append(out, insert...)
 	out = append(out, lines[interactshEnd:]...)
-	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	return writeConfigFile(configPath, []byte(strings.Join(out, "\n")), 0644)
 }
 
 func reverseInteractshSectionLines(baseIndent int, interactsh Interactsh) []string {
@@ -711,7 +711,7 @@ func replaceTopLevelSection(configPath, key string, block []string) error {
 			out = append(out, "")
 		}
 		out = append(out, block...)
-		return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+		return writeConfigFile(configPath, []byte(strings.Join(out, "\n")), 0644)
 	}
 
 	baseIndent := leadingSpaces(lines[start])
@@ -730,7 +730,7 @@ func replaceTopLevelSection(configPath, key string, block []string) error {
 	out = append(out, lines[:start]...)
 	out = append(out, block...)
 	out = append(out, lines[end:]...)
-	return os.WriteFile(configPath, []byte(strings.Join(out, "\n")), 0644)
+	return writeConfigFile(configPath, []byte(strings.Join(out, "\n")), 0644)
 }
 
 // clusterSectionLines 按 afrog-config.yaml 的手写风格生成 cluster 段。
@@ -867,6 +867,43 @@ func leadingSpaces(s string) int {
 	return n
 }
 
+// writeConfigFile 原子写回配置文件（先写同目录临时文件，再 rename 覆盖）。
+//
+// 原先直接 os.WriteFile，语义是「先截断、再写入」。同一台机器上并发启动的多个 afrog
+// 进程会同时读同一个 ~/.config/afrog/afrog-config.yaml，读方恰好落进截断窗口就会读到
+// 0 字节，yaml.NewDecoder(...).Decode 随即返回 io.EOF，NewConfig 失败、整个扫描零事件
+// 退出——命令行上只留下一句没头没尾的 [ERR] EOF。
+//
+// rename 在同一文件系统内是原子的：读方要么看到旧内容、要么看到新内容，不会读到半截
+// 文件。因此临时文件必须建在目标文件的同目录，跨设备 rename 会直接失败。
+func writeConfigFile(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".afrog-config-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	// CreateTemp 建出来是 0600，改回调用方给的权限，避免写一次配置就把文件收窄。
+	if err := os.Chmod(tmpName, perm); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return nil
+}
+
 // WriteConfiguration writes the updated afrog configuration to disk
 func WriteConfiguration(config *Config, configFile string) error {
 	var afrogConfigFile string
@@ -885,19 +922,5 @@ func WriteConfiguration(config *Config, configFile string) error {
 		return err
 	}
 
-	// afrogConfigFile, err = getConfigFile()
-	// if err != nil {
-	// 	return err
-	// }
-
-	file, err := os.OpenFile(afrogConfigFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	if _, err := file.Write(afrogConfigYAML); err != nil {
-		return err
-	}
-	return nil
+	return writeConfigFile(afrogConfigFile, afrogConfigYAML, 0644)
 }

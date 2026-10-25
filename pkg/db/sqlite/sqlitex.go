@@ -67,16 +67,24 @@ func saveToDatabaseX() {
 }
 
 func NewWebSqliteDB() error {
-	// 初始化数据库连接（增加 busy_timeout，开启 WAL）
-	// 备注：logoove/sqlite 驱动使用名为 sqlite3 的驱动注册
+	// 初始化数据库连接（开启 WAL + busy_timeout）
+	//
+	// 备注：logoove/sqlite 驱动使用名为 sqlite3 的驱动注册，但它只认 `_pragma=` 形式的
+	// 参数（见驱动 applyQueryParams），mattn 风格的 `_journal_mode` / `_busy_timeout` 会被
+	// 静默忽略。此前正是这个原因让 busy_timeout 形同虚设：同一台机器上并发启动的多个
+	// afrog 进程共用一个 ~/.config/afrog/afrog.db，后启动的一方在建表时就撞上
+	// SQLITE_BUSY 并直接退出（子进程零事件）。
 	dbName, err := db2.DbName()
 	if err != nil {
 		return err
 	}
-	dsn := "file:" + dbName + "?cache=shared&mode=rwc&_journal_mode=WAL&_busy_timeout=5000"
+	dsn := "file:" + dbName +
+		"?cache=shared&mode=rwc" +
+		"&_pragma=busy_timeout(5000)" +
+		"&_pragma=synchronous(NORMAL)"
 	db, err := sqlx.Connect("sqlite3", dsn)
 	if err != nil {
-		return err
+		return fmt.Errorf("open sqlite db: %v", err)
 	}
 	dbx = db
 
@@ -84,28 +92,36 @@ func NewWebSqliteDB() error {
 	dbx.SetMaxOpenConns(1)
 	dbx.SetMaxIdleConns(1)
 
-	_, err = dbx.Exec(db2.SqliteCreate)
+	// WAL 不能放进 DSN 的 _pragma：切换日志模式需要短暂独占锁，而驱动的 connect
+	// 阶段没有退避重试——并发启动的进程里，后到者会直接在建立连接时 SQLITE_BUSY
+	// 失败（报错为 database is locked），整个扫描零事件退出。连接建好之后再单独
+	// 开启，就能用 execBusyRetry 把这段争抢兜住。
+	if _, err = execBusyRetry("PRAGMA journal_mode=WAL"); err != nil {
+		return fmt.Errorf("enable wal: %v", err)
+	}
+
+	_, err = execBusyRetry(db2.SqliteCreate)
 	if err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating table: %v", err)
 	}
 
-	if _, err = dbx.Exec(ledgerDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+	if _, err = execBusyRetry(ledgerDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ledger table: %v", err)
 	}
 
-	if _, err = dbx.Exec(assetDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+	if _, err = execBusyRetry(assetDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating asset table: %v", err)
 	}
 
-	if _, err = dbx.Exec(scanTaskDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+	if _, err = execBusyRetry(scanTaskDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating scan task table: %v", err)
 	}
 
-	if _, err = dbx.Exec(probeDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+	if _, err = execBusyRetry(probeDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating scan probe table: %v", err)
 	}
 
-	if _, err = dbx.Exec(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+	if _, err = execBusyRetry(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
 
@@ -116,6 +132,37 @@ func NewWebSqliteDB() error {
 	return dbx.Ping()
 }
 
+// execBusyRetry 执行一条 DDL/DML，遇到 SQLITE_BUSY 就退避重试。
+//
+// 同一台机器上并发启动的多个 afrog 进程共用一个 ~/.config/afrog/afrog.db：启动
+// 阶段的建表/迁移会互相抢写锁，而建表语句本身受不住这种争抢。驱动侧虽然已经设了
+// busy_timeout，但 WAL 切换与部分 DDL 路径不受它保护，仍会直接返回 SQLITE_BUSY，
+// 导致后启动的进程建库失败、整个扫描零事件退出。这里显式退避重试兜底。
+//
+// 只对「数据库被锁」重试：这类错误是暂时的，且启动期的 DDL 全是
+// CREATE ... IF NOT EXISTS，重复执行安全。
+func execBusyRetry(query string, args ...any) (sql.Result, error) {
+	const attempts = 10
+	var (
+		res sql.Result
+		err error
+	)
+	for i := 0; i < attempts; i++ {
+		res, err = dbx.Exec(query, args...)
+		if err == nil || !isBusyError(err) {
+			return res, err
+		}
+		// 50ms 起步、线性退避，累计约 2.7s：足够错开同秒启动的一批进程。
+		randutil.RandSleep(50 + i*50)
+	}
+	return res, err
+}
+
+// isBusyError 判断是否为 sqlite 的「数据库被锁」错误。
+func isBusyError(err error) bool {
+	return err != nil && strings.Contains(strings.ToLower(err.Error()), "database is locked")
+}
+
 // ensureResultNodeColumn 给已有库补上 result.node 列。
 //
 // 建表用的是 CREATE TABLE IF NOT EXISTS，老库不会因为改了这个常量就长出新列；
@@ -124,27 +171,40 @@ func ensureResultNodeColumn() error {
 	if dbx == nil {
 		return fmt.Errorf("sqlite not initialized")
 	}
-	rows, err := dbx.Queryx("PRAGMA table_info(" + db2.TableName + ")")
+	hasNode, err := hasResultNodeColumn()
 	if err != nil {
 		return err
+	}
+	if hasNode {
+		return nil
+	}
+
+	_, err = execBusyRetry("ALTER TABLE " + db2.TableName + " ADD COLUMN \"node\" TEXT NOT NULL DEFAULT ''")
+	return err
+}
+
+// hasResultNodeColumn 判断 result 表是否已有 node 列。
+//
+// 必须先把读游标读干净再返回：连接池只有一条连接（SetMaxOpenConns(1)），
+// 游标未关闭时读事务仍持有 WAL 快照，紧接着的 ALTER 会因为无法把读快照升级为写
+// 而报 SQLITE_BUSY_SNAPSHOT(261)，且无论退避重试多少次都不会好转。
+func hasResultNodeColumn() (bool, error) {
+	rows, err := dbx.Queryx("PRAGMA table_info(" + db2.TableName + ")")
+	if err != nil {
+		return false, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		col := map[string]interface{}{}
 		if err := rows.MapScan(col); err != nil {
-			return err
+			return false, err
 		}
 		if name, ok := col["name"]; ok && fmt.Sprintf("%v", name) == "node" {
-			return nil
+			return true, nil
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	_, err = dbx.Exec("ALTER TABLE " + db2.TableName + " ADD COLUMN \"node\" TEXT NOT NULL DEFAULT ''")
-	return err
+	return false, rows.Err()
 }
 
 func CloseX() {
