@@ -154,13 +154,15 @@ func SeverityBadge(severity string) string {
 	}
 }
 
-// KindBadge 返回固定语义徽标：端口开放（open）/ Web 资产（web）。
+// KindBadge 返回固定语义徽标：端口开放（open）/ Web 资产（web）/ 存活主机（alive）。
 func KindBadge(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "open":
 		return badge("open", LogColor.Green)
 	case "web":
 		return badge("web", LogColor.Info)
+	case "alive":
+		return badge("alive", LogColor.Green)
 	default:
 		return badge(kind, LogColor.DarkGray)
 	}

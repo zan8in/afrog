@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/gologger"
 	"golang.org/x/net/icmp"
@@ -101,12 +102,35 @@ func (p *phaseProgress) markAlive(host, proto string) {
 	if p.opt.OnDiscoveredHost != nil && strings.TrimSpace(host) != "" {
 		p.opt.OnDiscoveredHost(host)
 	}
-	if p.opt.LogDiscoveredHosts || p.opt.Debug {
-		if p.opt.Debug && !p.opt.Quiet {
-			fmt.Fprint(os.Stderr, "\r\033[2K\r")
-		}
-		gologger.Print().Msg(host)
+	printAliveHost(host, proto, p.opt)
+}
+
+// formatAliveHost 渲染一条存活主机结果行：`序号 [alive] host [proto]`，与 port-scan /
+// web-probe 的结果行同一语法（序号 + 徽标 + 目标 + 方括号属性）。proto 是判定依据
+// （icmp / ping / tcp），排障时能看出这台机器是怎么被认出来的。
+func formatAliveHost(seq int, host, proto string) string {
+	attrs := make([]string, 0, 1)
+	if p := strings.TrimSpace(proto); p != "" {
+		attrs = append(attrs, log.Dim(p))
 	}
+	return log.ResNum(seq, log.KindBadge("alive"), host, attrs...)
+}
+
+// printAliveHost 输出一条存活主机结果行。存活列表是「结果」而非过程日志，默认可见；
+// 序号按本次扫描递增，靠 [alive] 徽标与端口 [open] / Web [web] 消歧。
+func printAliveHost(host, proto string, opt *Options) {
+	if opt == nil || strings.TrimSpace(host) == "" {
+		return
+	}
+	if !opt.LogDiscoveredHosts && !opt.Debug {
+		return
+	}
+	seq := int(atomic.AddUint64(&opt.aliveSeq, 1))
+	// 发现阶段的进度条与结果行同走 stderr，先清行再打印，否则两者会拼在同一行上。
+	if !opt.Quiet {
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
+	}
+	gologger.Print().Msgf("%s", formatAliveHost(seq, host, proto))
 }
 
 func (p *phaseProgress) render(final bool) {
@@ -588,9 +612,7 @@ func countTop(list []string, top int, bSegment bool) (keys []string, vals []int)
 	return
 }
 func logHostAlive(host, proto string, opt *Options) {
-	if opt.LogDiscoveredHosts || opt.Debug {
-		gologger.Print().Msg(host)
-	}
+	printAliveHost(host, proto, opt)
 }
 func execPing(ip string) bool {
 	for _, c := range []string{";", "&", "|", "`", "$", "\\", "'", "%", "\"", "\n"} {

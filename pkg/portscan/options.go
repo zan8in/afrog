@@ -52,6 +52,11 @@ type Options struct {
 	DiscoveryTop            int
 	DiscoveryRetries        int
 	LogDiscoveredHosts      bool
+
+	// aliveSeq 是存活主机结果行的序号计数器，按本次扫描递增。放在 Options 上是因为
+	// 打印发生在 portscan 内部，而发现过程会跨 icmp / ping / tcp 多个阶段，需要一个
+	// 生命周期覆盖整轮发现的共享计数（各阶段的 phaseProgress 是相互独立的）。
+	aliveSeq uint64
 }
 
 // DefaultOptions returns a safe default configuration

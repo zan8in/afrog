@@ -187,7 +187,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 		}
 		discStop()
-		if stageLog && !s.options.Quiet {
+		// 收尾汇总默认可见，与 port-scan 的 completed、web-probe 的资产汇总对齐：
+		// 存活行逐条回答「哪台机器活着」，汇总行回答「这批目标整体活了多少」。
+		// started / method 这类阶段边界行仍由 StageLog（-debug）控制。
+		if !s.options.Quiet && !s.options.LiveStats {
+			s.clearProgressLine()
 			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery,
 				"completed",
 				fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),

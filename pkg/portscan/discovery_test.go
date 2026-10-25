@@ -3,10 +3,50 @@ package portscan
 import (
 	"context"
 	"net"
+	"regexp"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+var ansiRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// 存活主机结果行与 port-scan / web-probe 同一语法：序号 + [alive] + 目标 + 方括号属性。
+func TestFormatAliveHost(t *testing.T) {
+	strip := func(s string) string { return ansiRe.ReplaceAllString(s, "") }
+
+	cases := []struct {
+		seq   int
+		host  string
+		proto string
+		want  string
+	}{
+		{1, "127.0.0.1", "icmp", "001 [alive] 127.0.0.1 [icmp]"},
+		{12, "example.com", "tcp", "012 [alive] example.com [tcp]"},
+		{3, "10.0.0.9", "", "003 [alive] 10.0.0.9"},
+		{0, "10.0.0.9", "ping", "[alive] 10.0.0.9 [ping]"}, // n<=0 退化为不带序号的普通结果行
+	}
+	for _, tc := range cases {
+		if got := strip(formatAliveHost(tc.seq, tc.host, tc.proto)); got != tc.want {
+			t.Fatalf("formatAliveHost(%d,%q,%q)=%q，期望 %q", tc.seq, tc.host, tc.proto, got, tc.want)
+		}
+	}
+}
+
+// 存活行是「结果」而非过程日志：门控关闭时既不出行，也不该占用序号。
+func TestPrintAliveHostGatedOff(t *testing.T) {
+	opts := DefaultOptions()
+	opts.Quiet = true
+	opts.LogDiscoveredHosts = false
+	opts.Debug = false
+
+	printAliveHost("10.0.0.1", "icmp", opts)
+
+	if got := atomic.LoadUint64(&opts.aliveSeq); got != 0 {
+		t.Fatalf("被门控关闭时不该占用序号，实际 %d", got)
+	}
+}
 
 func TestScanWithTCPDiscoveryTreatsConnRefusedAsAlive(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
