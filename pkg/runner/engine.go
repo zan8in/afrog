@@ -658,6 +658,63 @@ func extractTitle(body []byte) string {
 	return t
 }
 
+// installHostBreakerReporter 把 HTTP 熔断提示接到 CLI 输出上。
+//
+// 熔断会让一部分目标「不再被扫」，这必须显式可见：否则用户只看到速率变快，却不知道
+// 有一批目标被跳过了。与端口扫描的拥塞告警同一口径——只在 -debug 下打一行，且先清掉
+// 进度条残留；其余模式一律静默，避免污染结果行与 -json-stream。
+func (runner *Runner) installHostBreakerReporter() {
+	if runner == nil || runner.options == nil || !runner.options.Debug {
+		retryhttpclient.SetHostBreakerReporter(nil)
+		return
+	}
+	retryhttpclient.SetHostBreakerReporter(func(host string, until time.Time, failures int) {
+		if runner.options.Silent {
+			return
+		}
+		runner.clearProgressLine()
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageVulnScan,
+			"unreachable",
+			host,
+			fmt.Sprintf("failures=%d", failures),
+			"cooldown="+time.Until(until).Truncate(time.Second).String(),
+		))
+	})
+}
+
+// installAutoReqLimitReporter 把自适应单目标限速的调整接到 CLI 输出上。
+//
+// 与熔断同理：限速被调低意味着扫描会变慢，用户有权知道原因。只在 -debug 下打一行，
+// 恢复时用 [INF] 提示一次方向翻转。
+func (runner *Runner) installAutoReqLimitReporter() {
+	if runner == nil || runner.options == nil || !runner.options.Debug {
+		retryhttpclient.SetAutoReqLimitReporter(nil)
+		return
+	}
+	retryhttpclient.SetAutoReqLimitReporter(func(ev retryhttpclient.AutoReqLimitEvent) {
+		if runner.options.Silent {
+			return
+		}
+		attrs := []string{
+			fmt.Sprintf("%d->%d", ev.OldRate, ev.NewRate),
+			"fail=" + strconv.Itoa(ev.FailPct) + "%",
+			"latency=" + ev.Latency.Truncate(time.Millisecond).String(),
+			"baseline=" + ev.Baseline.Truncate(time.Millisecond).String(),
+		}
+		if ev.QueueWait > 0 {
+			attrs = append(attrs, "queue="+ev.QueueWait.Truncate(time.Millisecond).String())
+		}
+		level, action := log.LevelWarn, "req-limit-down"
+		if ev.Recovered {
+			level, action = log.LevelInfo, "req-limit-up"
+		} else {
+			attrs = append(attrs, "reason="+ev.Reason)
+		}
+		runner.clearProgressLine()
+		gologger.Print().Msgf("%s", log.Op(level, utils.StageVulnScan, append([]string{action}, attrs...)...))
+	})
+}
+
 // clearProgressLine 在输出阶段日志/结果行之前清掉进度条所在行。
 // 这些输出与进度条都写 stderr，不清行时两者会拼接在同一行上。
 // -silent 下不渲染任何进度条，清行序列也就没有意义：旧终端会把 \033[2K
@@ -2816,6 +2873,11 @@ func (e runnerFingerprintExecutor) Exec(ctx context.Context, target string, p *p
 			pocID = c.Result.PocInfo.Id
 		}
 		for i, pr := range c.Result.AllPocResult {
+			// 请求在捕获前就失败时（例如被熔断跳过），没有任何内容可 dump，
+			// 打一对「Dumped Request / unavailable」纯属噪音。
+			if pr == nil || (pr.ResultRequest == nil && pr.ResultResponse == nil) {
+				continue
+			}
 			idx := i + 1
 			gologger.Info().Msgf("\r\n[%d][%s] Dumped Request\n", idx, pocID)
 			gologger.Print().Msgf("%s\n", result.DebugDumpRequestText(pr))

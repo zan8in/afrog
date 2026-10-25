@@ -1,6 +1,7 @@
 package config
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,6 +161,11 @@ type Options struct {
 	Polite            bool
 	Balanced          bool
 	Aggressive        bool
+
+	// setFlags 记录本次运行中用户显式传入的 flag 名。用于区分「沿用默认值」与
+	// 「用户明确指定」——例如 -auto-req-limit 默认开启，而 -rlt 的 0 值既可能是
+	// 「用户要求不限速」，也可能只是「没设置」，只有知道 flag 是否显式传入才能区分。
+	setFlags map[string]bool
 
 	// maximum number of afrog-pocs to be executed in parallel (default 25)
 	Concurrency int
@@ -366,7 +372,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVarP(&options.Concurrency, "concurrency", "c", 25, "maximum number of afrog-pocs to be executed in parallel"),
 		flagSet.IntVarP(&options.RateLimit, "rate-limit", "rl", 150, "maximum number of requests to send per second"),
 		flagSet.IntVarP(&options.ReqLimitPerTarget, "req-limit-per-target", "rlt", 0, "maximum number of requests per second per target (host:port), 0 disables"),
-		flagSet.BoolVar(&options.AutoReqLimit, "auto-req-limit", false, "automatically set per-target request limit (host:port)"),
+		flagSet.BoolVar(&options.AutoReqLimit, "auto-req-limit", true, "adaptive per-target request limit (host:port), on by default; set -auto-req-limit=false to disable"),
 		flagSet.BoolVar(&options.Polite, "polite", false, "use polite per-target request limit (host:port)"),
 		flagSet.BoolVar(&options.Balanced, "balanced", false, "use balanced per-target request limit (host:port)"),
 		flagSet.BoolVar(&options.Aggressive, "aggressive", false, "use aggressive per-target request limit (host:port)"),
@@ -469,6 +475,10 @@ func NewOptions() (*Options, error) {
 
 	_ = flagSet.Parse()
 
+	// 记录显式传入的 flag，供 VerifyOptions 区分「默认值」与「用户指定」。
+	options.setFlags = make(map[string]bool)
+	flagSet.CommandLine.Visit(func(f *flag.Flag) { options.setFlags[f.Name] = true })
+
 	if err := options.VerifyOptions(); err != nil {
 		return options, err
 	}
@@ -504,6 +514,102 @@ func (opt *Options) ResolvePortScanRates() {
 	if opt.PSCPSHost < 0 {
 		opt.PSCPSHost = perHost
 	}
+}
+
+// deriveAutoStartRate 推导自适应限速的起始速率：与 -rl 挂钩，并按并发做保守收敛。
+//
+// 起速只是起点——健康目标会在运行时被加性抬升，劣化目标会被乘性压低；这一步只决定
+// 开局不要把压力给太满。
+func deriveAutoStartRate(opt *Options) int {
+	baseRate := opt.RateLimit
+	if baseRate <= 0 {
+		baseRate = 150
+	}
+	r := baseRate / 10
+	if r < 5 {
+		r = 5
+	}
+	if r > 15 {
+		r = 15
+	}
+	con := opt.Concurrency
+	if con <= 0 {
+		con = 1
+	}
+	// 并发越高，单目标起速越保守，避免多目标同时起步时瞬间堆叠连接。
+	if con >= 100 && r > 8 {
+		r = 8
+	} else if con >= 50 && r > 12 {
+		r = 12
+	}
+	return r
+}
+
+// resolveRequestLimitMode 把用户的限速选择落成 ReqLimitPerTarget / AutoReqLimit 两个字段。
+// 优先级：显式指定 > 默认走自适应。
+//
+// 为什么要看 setFlags：-auto-req-limit 现在默认开启，而 -rlt 的 0 值既可能是
+// 「用户明确要求不限速」，也可能只是「没设置」。只有知道 flag 是否被显式传入，
+// 才能正确区分这两者，否则 -rlt 0 会把默认的自适应误当成「不限速」。
+func (opt *Options) resolveRequestLimitMode() error {
+	explicitRlt := opt.setFlags["req-limit-per-target"]
+	explicitAuto := opt.setFlags["auto-req-limit"]
+
+	presetCount := 0
+	if opt.Polite {
+		presetCount++
+	}
+	if opt.Balanced {
+		presetCount++
+	}
+	if opt.Aggressive {
+		presetCount++
+	}
+	if presetCount > 1 {
+		return fmt.Errorf("only one of --polite/--balanced/--aggressive can be used")
+	}
+	if opt.ReqLimitPerTarget < 0 {
+		return fmt.Errorf("--req-limit-per-target must be >= 0")
+	}
+
+	// 三个互斥的显式档位最多只能选一个。
+	chosen := 0
+	if explicitRlt {
+		chosen++
+	}
+	if explicitAuto && opt.AutoReqLimit {
+		chosen++
+	}
+	if presetCount > 0 {
+		chosen++
+	}
+	if chosen > 1 {
+		return fmt.Errorf("only one of --req-limit-per-target/--auto-req-limit/--polite/--balanced/--aggressive can be used")
+	}
+
+	switch {
+	case explicitRlt:
+		// 用户显式给了 -rlt：>0 为固定速率，0 为完全不限速。
+		opt.AutoReqLimit = false
+	case presetCount > 0:
+		opt.AutoReqLimit = false
+		switch {
+		case opt.Polite:
+			opt.ReqLimitPerTarget = 5
+		case opt.Balanced:
+			opt.ReqLimitPerTarget = 15
+		default:
+			opt.ReqLimitPerTarget = 50
+		}
+	case opt.AutoReqLimit:
+		// 默认档：自适应限速。起速保守，运行时由 AIMD 依据目标状态升降，
+		// 上限由 runner 放开到全局速率，健康目标基本不受限。
+		opt.ReqLimitPerTarget = deriveAutoStartRate(opt)
+	default:
+		// 显式 -auto-req-limit=false：完全不限速。
+		opt.ReqLimitPerTarget = 0
+	}
+	return nil
 }
 
 func (opt *Options) VerifyOptions() error {
@@ -655,59 +761,8 @@ func (opt *Options) VerifyOptions() error {
 		return fmt.Errorf("--oob-finalize-timeout must be <= 3600")
 	}
 
-	limitModeCount := 0
-	if opt.ReqLimitPerTarget > 0 {
-		limitModeCount++
-	}
-	if opt.AutoReqLimit {
-		limitModeCount++
-	}
-	if opt.Polite {
-		limitModeCount++
-	}
-	if opt.Balanced {
-		limitModeCount++
-	}
-	if opt.Aggressive {
-		limitModeCount++
-	}
-	if limitModeCount > 1 {
-		return fmt.Errorf("only one of --req-limit-per-target/--auto-req-limit/--polite/--balanced/--aggressive can be used")
-	}
-	if opt.ReqLimitPerTarget < 0 {
-		return fmt.Errorf("--req-limit-per-target must be >= 0")
-	}
-
-	if opt.ReqLimitPerTarget == 0 {
-		if opt.Polite {
-			opt.ReqLimitPerTarget = 5
-		} else if opt.Balanced {
-			opt.ReqLimitPerTarget = 15
-		} else if opt.Aggressive {
-			opt.ReqLimitPerTarget = 50
-		} else if opt.AutoReqLimit {
-			baseRate := opt.RateLimit
-			if baseRate <= 0 {
-				baseRate = 150
-			}
-			r := baseRate / 10
-			if r < 5 {
-				r = 5
-			}
-			if r > 15 {
-				r = 15
-			}
-			con := opt.Concurrency
-			if con <= 0 {
-				con = 1
-			}
-			if con >= 100 && r > 8 {
-				r = 8
-			} else if con >= 50 && r > 12 {
-				r = 12
-			}
-			opt.ReqLimitPerTarget = r
-		}
+	if err := opt.resolveRequestLimitMode(); err != nil {
+		return err
 	}
 
 	opt.ResolvePortScanRates()

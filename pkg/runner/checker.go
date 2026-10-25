@@ -310,7 +310,9 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 				err = exec.Execute(target, rule, c.Options, c.VariableMap)
 			}
 
-			if err != nil && c.Options != nil && c.Options.Debug {
+			// 被熔断跳过的请求是「设计内」的：host:port 已失联，跳过它正是我们要的结果。
+			// 熔断触发时上游已经打过一行 [WRN]，这里再逐条刷 ERR 只会淹没日志。
+			if err != nil && c.Options != nil && c.Options.Debug && !retryhttpclient.IsHostBreakerSuppressed(err) {
 				gologger.Error().Msgf("[%s] request failed: %v", k, err)
 			}
 			isMatch = c.evalRuleMatch(&rule, pocItem)

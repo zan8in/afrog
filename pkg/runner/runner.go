@@ -160,8 +160,16 @@ func NewRunner(options *config.Options) (*Runner, error) {
 	}
 
 	runner.engine = NewEngine(options)
+	runner.installHostBreakerReporter()
+	runner.installAutoReqLimitReporter()
 	if options.AutoReqLimit {
-		retryhttpclient.StartAutoReqLimit(runner.engine.quit, 5, 30)
+		// 上限放开到全局速率（-rl）：健康目标靠排队信号一路加性爬升，基本不受限；
+		// 只有真正劣化的目标才会被乘性压低。下限 5 保证劣化目标仍有可用性。
+		maxRate := options.RateLimit
+		if maxRate < 5 {
+			maxRate = 150
+		}
+		retryhttpclient.StartAutoReqLimit(runner.engine.quit, 5, maxRate)
 	}
 
 	if options.Dingtalk {
@@ -322,8 +330,9 @@ func NewRunner(options *config.Options) (*Runner, error) {
 
 func (runner *Runner) Run() error {
 	// 协议探测的记忆缓存是包级全局状态，长驻进程（SDK / afrogweb）跨扫描复用它会让上一轮的
-	// 失败冷却污染本轮，因此每轮扫描开始前清一次。
+	// 失败冷却污染本轮，因此每轮扫描开始前清一次。HTTP 熔断状态同理。
 	retryhttpclient.ResetCheckProtocolCache()
+	retryhttpclient.ResetHostBreaker()
 
 	if runner.options.MonitorTargets {
 		go runner.monitorTargets()

@@ -23,6 +23,7 @@ func TestNewOptions_Defaults(t *testing.T) {
 		{"MaxHostError", o.MaxHostError, DefaultMaxHostError},
 		{"MaxRespBodySize", o.MaxRespBodySize, DefaultMaxRespBodySize},
 		{"BruteMaxRequests", o.BruteMaxRequests, DefaultBruteMaxRequests},
+		{"AutoReqLimit", o.AutoReqLimit, true},
 		{"StreamBuffer", o.StreamBuffer, DefaultStreamBuffer},
 		{"FingerprintFilterMode", o.FingerprintFilterMode, FingerprintStrict},
 		{"IncludeRequestResponse", o.IncludeRequestResponse, true},
@@ -141,6 +142,68 @@ func TestOptions_RequestLimitPresets(t *testing.T) {
 			}
 			if o.ReqLimitPerTarget != tt.want {
 				t.Errorf("ReqLimitPerTarget = %d, want %d", o.ReqLimitPerTarget, tt.want)
+			}
+		})
+	}
+}
+
+// NewOptions 默认开启自适应单目标限速，所以「默认值」不能与用户显式选择的档位
+// 判成互斥；同时必须留一个显式关闭的入口。
+func TestOptions_AutoReqLimitDefaultAndOptOut(t *testing.T) {
+	tests := []struct {
+		name     string
+		apply    []Option
+		wantRlt  int
+		wantAuto bool
+	}{
+		{
+			name:     "default enables adaptive",
+			wantRlt:  DefaultRateLimit / 10,
+			wantAuto: true,
+		},
+		{
+			name:     "explicit fixed rate overrides the default",
+			apply:    []Option{WithRequestLimitPerTarget(12)},
+			wantRlt:  12,
+			wantAuto: false,
+		},
+		{
+			name:     "explicit zero rate means no limit",
+			apply:    []Option{WithRequestLimitPerTarget(0)},
+			wantRlt:  0,
+			wantAuto: false,
+		},
+		{
+			name:     "preset overrides the default",
+			apply:    []Option{WithPolite()},
+			wantRlt:  5,
+			wantAuto: false,
+		},
+		{
+			name:     "opt out of the adaptive limiter",
+			apply:    []Option{WithoutAutoRequestLimit()},
+			wantRlt:  0,
+			wantAuto: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := NewOptions()
+			o.Targets = []string{"http://127.0.0.1:1"}
+			for _, opt := range tt.apply {
+				if err := opt(o); err != nil {
+					t.Fatalf("apply option: %v", err)
+				}
+			}
+			if err := o.validate(); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
+			if o.ReqLimitPerTarget != tt.wantRlt {
+				t.Errorf("ReqLimitPerTarget = %d, want %d", o.ReqLimitPerTarget, tt.wantRlt)
+			}
+			if o.AutoReqLimit != tt.wantAuto {
+				t.Errorf("AutoReqLimit = %v, want %v", o.AutoReqLimit, tt.wantAuto)
 			}
 		})
 	}

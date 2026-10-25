@@ -19,12 +19,12 @@ func TestBuildArgs(t *testing.T) {
 		{
 			name: "single target",
 			spec: &Spec{Targets: []string{"http://a.example"}},
-			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "target whitespace trimmed",
 			spec: &Spec{Targets: []string{"  http://a.example  ", "", "   "}},
-			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "poc file severity search",
@@ -39,6 +39,7 @@ func TestBuildArgs(t *testing.T) {
 				"-P", "/tmp/custom.yaml",
 				"-s", "tomcat",
 				"-S", "high,critical",
+				"-auto-req-limit=false",
 				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
@@ -54,6 +55,7 @@ func TestBuildArgs(t *testing.T) {
 				"-t", "http://a.example",
 				"-ap", "/home/u/.config/afrog/pocs-curated",
 				"-ap", "/home/u/.config/afrog/pocs-my",
+				"-auto-req-limit=false",
 				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
@@ -78,6 +80,7 @@ func TestBuildArgs(t *testing.T) {
 				"-retries", "2",
 				"-mhe", "5",
 				"-smart",
+				"-auto-req-limit=false",
 				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
@@ -92,6 +95,7 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-proxy", "http://127.0.0.1:8080",
 				"-H", "X-A: 1",
 				"-H", "Cookie: a=b",
@@ -111,6 +115,7 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-ps",
 				"-p", "80,443",
 				"-Pn",
@@ -129,6 +134,7 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-w",
 				"-w-timeout", "20",
 				"-w-favicon",
@@ -147,6 +153,7 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-w=false",
 				"-oob", "dnslogcn",
 				"-json-stream",
@@ -159,7 +166,7 @@ func TestBuildArgs(t *testing.T) {
 				Targets:   []string{"http://a.example"},
 				EnableOOB: true,
 			},
-			want: []string{"-t", "http://a.example", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "port scan without custom ports",
@@ -169,7 +176,78 @@ func TestBuildArgs(t *testing.T) {
 			},
 			want: []string{
 				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-ps",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "explicit per-target limit",
+			spec: &Spec{
+				Targets:           []string{"http://a.example"},
+				ReqLimitPerTarget: 25,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-rlt", "25",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "explicit adaptive limit",
+			spec: &Spec{
+				Targets:      []string{"http://a.example"},
+				AutoReqLimit: true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "explicit polite preset",
+			spec: &Spec{
+				Targets: []string{"http://a.example"},
+				Polite:  true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-polite",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "explicit balanced preset",
+			spec: &Spec{
+				Targets:  []string{"http://a.example"},
+				Balanced: true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-balanced",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "explicit aggressive preset",
+			spec: &Spec{
+				Targets:    []string{"http://a.example"},
+				Aggressive: true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-aggressive",
 				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
@@ -214,7 +292,7 @@ func TestBuildArgs_MultipleTargetsUsesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildArgs: %v", err)
 	}
-	if len(args) != 5 || args[0] != "-T" || args[2] != "-w=false" || args[3] != "-json-stream" || args[4] != "-disable-output-html" {
+	if len(args) != 6 || args[0] != "-T" || args[2] != "-auto-req-limit=false" || args[3] != "-w=false" || args[4] != "-json-stream" || args[5] != "-disable-output-html" {
 		t.Fatalf("unexpected args: %v", args)
 	}
 	path := args[1]
@@ -257,5 +335,21 @@ func TestBuildArgs_AlwaysIncludesJSONStream(t *testing.T) {
 			t.Fatalf("case %d: -disable-output-html missing: %v", i, args)
 		}
 		cleanup()
+	}
+}
+
+// CLI 的 -auto-req-limit 现在默认开启，Web 端「未选择任何档位」必须显式关闭它，
+// 否则 Web 控制台里选「不限速」会静默变成开启自适应。
+func TestBuildArgs_DefaultDisablesAutoReqLimit(t *testing.T) {
+	args, cleanup, err := buildArgs("t", &Spec{Targets: []string{"http://a.example"}})
+	defer cleanup()
+	if err != nil {
+		t.Fatalf("buildArgs: %v", err)
+	}
+	if !slices.Contains(args, "-auto-req-limit=false") {
+		t.Fatalf("expected -auto-req-limit=false, got %v", args)
+	}
+	if slices.Contains(args, "-auto-req-limit") {
+		t.Fatalf("should not enable adaptive limit by default: %v", args)
 	}
 }

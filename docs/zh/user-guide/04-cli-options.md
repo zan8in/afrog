@@ -372,10 +372,14 @@ afrog -T targets.txt -mt
 
 ### `-auto-req-limit`
 
-自动按单目标动态限速，适合“既想扫得快，又不想把单个目标打挂”的场景。
+**默认开启**。按单目标（`host:port`）动态限速：起始速率与 `-rl` 挂钩并按并发做保守收敛，运行期用双向 AIMD 依据失败率与响应时延升降——健康目标会一路加性提速（上限与 `-rl` 同量级，基本不受限），劣化目标会被乘性压低。这样“既想扫得快，又不想把单个目标打挂”无需额外配置。
 
 ```bash
-afrog -T targets.txt -c 50 -auto-req-limit
+# 默认即启用，无需显式指定
+afrog -T targets.txt -c 50
+
+# 显式关闭，恢复完全依赖 -rl 的旧行为
+afrog -T targets.txt -auto-req-limit=false
 ```
 
 ### `-polite` / `-balanced` / `-aggressive`
@@ -386,7 +390,7 @@ afrog -T targets.txt -c 50 -auto-req-limit
 - `-balanced`：平衡型
 - `-aggressive`：更激进
 
-这几类单目标限速策略与 `-rlt`、`-auto-req-limit` 一样，都更适合在批量扫描时保护单个目标不被压垮。
+这几个档位与 `-rlt`、`-auto-req-limit` 互斥（最多生效一个），都更适合在批量扫描时保护单个目标不被压垮。不指定任何档位与 `-rlt` 时，默认走 `-auto-req-limit` 的自适应策略。
 
 档位同时决定端口预扫描的连接速率上限（见 `-pcps`）：`-polite` 为 `200/20`，`-balanced`（默认）为 `1000/100`，`-aggressive` 不限速。
 

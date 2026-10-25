@@ -59,13 +59,13 @@ afrog -pd ssh-weak-login       # 查看单条 PoC 详情
 ## 批量扫描时保护目标
 
 ```bash
-afrog -T targets.txt -c 50 -auto-req-limit
-afrog -T targets.txt -rl 80 -rlt 5
+afrog -T targets.txt -c 50            # 单目标自适应限速已默认开启
+afrog -T targets.txt -rl 80 -rlt 5    # 或改用固定单目标速率
 afrog -T targets.txt -mt -balanced
 ```
 
 - `-c` 并发数，`-rl` 全局每秒请求数（默认 150），`-rlt` 单目标每秒请求数
-- `-auto-req-limit` 或 `-polite` / `-balanced` / `-aggressive` 按单目标动态限速
+- 单目标限速默认走 `-auto-req-limit` 自适应；`-rlt` 固定速率，`-polite` / `-balanced` / `-aggressive` 为预设档位，三者互斥
 - `-mt` 监控目标存活状态，适合公网或网络波动明显的场景
 
 经验上不建议只靠把 `-c` 调大来提速，更稳妥的做法是并发与限速一起调。

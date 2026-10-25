@@ -59,13 +59,13 @@ afrog -pd ssh-weak-login       # inspect a single PoC
 ## Protect targets during bulk scans
 
 ```bash
-afrog -T targets.txt -c 50 -auto-req-limit
-afrog -T targets.txt -rl 80 -rlt 5
+afrog -T targets.txt -c 50            # per-target adaptive limiting is on by default
+afrog -T targets.txt -rl 80 -rlt 5    # or pin a fixed per-target rate instead
 afrog -T targets.txt -mt -balanced
 ```
 
 - `-c` concurrency, `-rl` global requests per second (default 150), `-rlt` requests per second per target
-- `-auto-req-limit`, or `-polite` / `-balanced` / `-aggressive`, applies per-target adaptive limiting
+- Per-target limiting is adaptive by default via `-auto-req-limit`; `-rlt` pins a fixed rate, `-polite` / `-balanced` / `-aggressive` pick a preset, and these are mutually exclusive
 - `-mt` monitors target liveness, useful on the public internet or unstable networks
 
 In practice, do not speed things up by only raising `-c`; tune concurrency and rate limits together.

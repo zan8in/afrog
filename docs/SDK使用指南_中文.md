@@ -599,13 +599,16 @@ sdk.WithTargetPreProbe()
 | `WithRetries(n)` | `1` |
 | `WithMaxHostError(n)` | `3` |
 | `WithMaxRespBodySize(mb)` | `2` |
-| `WithRequestLimitPerTarget(n)` | `0` |
+| `WithRequestLimitPerTarget(n)` | 不设置；传 `0` 表示不限速 |
 | `WithPolite()` / `WithBalanced()` / `WithAggressive()` | — |
-| `WithAutoRequestLimit()` | — |
+| `WithAutoRequestLimit()` | **默认开启**（与 CLI 的 `-auto-req-limit` 一致） |
+| `WithoutAutoRequestLimit()` | 关闭上述默认自适应限速 |
 | `WithSmartConcurrency()` | — |
 | `WithStopOnFirstMatch()` | — |
 
 `WithRequestLimitPerTarget`、`WithAutoRequestLimit`、`WithPolite`、`WithBalanced`、`WithAggressive` 五者互斥，同时设置多个会返回 `ErrInvalidOptions`。
+
+单目标（`host:port`）自适应限速默认开启：起始速率由 `RateLimit` 推导并按 `Concurrency` 收敛，运行期健康目标会被加性提速到约 `RateLimit`，劣化目标才被压低。需要完全关闭时用 `WithoutAutoRequestLimit()`（等价于 CLI 的 `-auto-req-limit=false`）。
 
 ### 指纹与探测
 

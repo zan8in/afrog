@@ -90,6 +90,10 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		args = append(args, "-aggressive")
 	case spec.AutoReqLimit:
 		args = append(args, "-auto-req-limit")
+	default:
+		// CLI 现在默认开启自适应限速。这里显式关闭，让 Web 端保持「未选择任何档位
+		// 即不限速」的既有语义，不随 CLI 默认值的变化而漂移。
+		args = append(args, "-auto-req-limit=false")
 	}
 
 	if spec.TaskSmartTimeout {

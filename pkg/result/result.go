@@ -275,6 +275,11 @@ func quoteExtractorValue(s string) string {
 func (r *Result) Debug() {
 
 	for k, v := range r.AllPocResult {
+		// 请求在捕获前就失败时（例如被熔断跳过），没有任何内容可 dump，
+		// 打一对「Dumped Request / unavailable」纯属噪音。
+		if v == nil || (v.ResultRequest == nil && v.ResultResponse == nil) {
+			continue
+		}
 		k++
 		gologger.Info().Msgf("\r\n[%d][%s] Dumped Request\n", k, r.PocInfo.Id)
 		gologger.Print().Msgf("%s\n", DebugDumpRequestText(v))

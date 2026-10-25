@@ -597,13 +597,16 @@ Despite the CLI flag being named monitor-targets, it does **not** watch the targ
 | `WithRetries(n)` | `1` |
 | `WithMaxHostError(n)` | `3` |
 | `WithMaxRespBodySize(mb)` | `2` |
-| `WithRequestLimitPerTarget(n)` | `0` |
+| `WithRequestLimitPerTarget(n)` | unset; pass `0` for no limit |
 | `WithPolite()` / `WithBalanced()` / `WithAggressive()` | — |
-| `WithAutoRequestLimit()` | — |
+| `WithAutoRequestLimit()` | **on by default** (matches the CLI's `-auto-req-limit`) |
+| `WithoutAutoRequestLimit()` | turns the default adaptive limiter off |
 | `WithSmartConcurrency()` | — |
 | `WithStopOnFirstMatch()` | — |
 
 `WithRequestLimitPerTarget`, `WithAutoRequestLimit`, `WithPolite`, `WithBalanced` and `WithAggressive` are mutually exclusive; setting more than one returns `ErrInvalidOptions`.
+
+Adaptive per-target (`host:port`) limiting is on by default: the start rate is derived from `RateLimit` and clamped by `Concurrency`, and at runtime healthy targets climb additively up to roughly `RateLimit` while only degrading targets get backed off. Use `WithoutAutoRequestLimit()` to disable it entirely (equivalent to the CLI's `-auto-req-limit=false`).
 
 ### Fingerprinting and probing
 

@@ -372,15 +372,19 @@ afrog -T targets.txt -mt
 
 ### `-auto-req-limit`
 
-Automatically apply per-target throttling so you can scan fast without overwhelming a single target.
+**On by default.** Applies adaptive per-target (`host:port`) throttling: the start rate is derived from `-rl` and clamped by concurrency, then a bidirectional AIMD loop raises or lowers it at runtime based on failure rate and latency. Healthy targets climb additively up to roughly `-rl` (so they are effectively unthrottled), while degrading targets get backed off multiplicatively. That gives you "scan fast without overwhelming a single target" with no extra configuration.
 
 ```bash
-afrog -T targets.txt -c 50 -auto-req-limit
+# Enabled by default, nothing to add
+afrog -T targets.txt -c 50
+
+# Explicitly disable it to go back to relying on -rl alone
+afrog -T targets.txt -auto-req-limit=false
 ```
 
 ### `-polite` / `-balanced` / `-aggressive`
 
-These are preset per-target throttling strategies:
+These presets are mutually exclusive with `-rlt` and `-auto-req-limit` (at most one takes effect). When neither a preset nor `-rlt` is given, the default is `-auto-req-limit`'s adaptive strategy. They are preset per-target throttling strategies:
 
 - `-polite`: more conservative
 - `-balanced`: a middle ground

@@ -261,67 +261,6 @@ func SetReqLimitPerTarget(rate int) {
 	reqLimiter.SetRate(rate)
 }
 
-func StartAutoReqLimit(stop <-chan struct{}, minRate int, maxRate int) {
-	if reqLimiter == nil {
-		return
-	}
-	if minRate <= 0 {
-		minRate = 1
-	}
-	if maxRate < minRate {
-		maxRate = minRate
-	}
-
-	go func() {
-		ticker := time.NewTicker(2 * time.Second)
-		defer ticker.Stop()
-
-		prev := GetLiveMetrics()
-		for {
-			select {
-			case <-stop:
-				return
-			case <-ticker.C:
-			}
-
-			cur := GetLiveMetrics()
-			deltaWaitCount := cur.ReqLimitWaitCount - prev.ReqLimitWaitCount
-			deltaWaitNs := cur.ReqLimitWaitNs - prev.ReqLimitWaitNs
-			prev = cur
-
-			if deltaWaitCount <= 0 || deltaWaitNs <= 0 {
-				continue
-			}
-
-			avgWaitMs := (deltaWaitNs / int64(time.Millisecond)) / deltaWaitCount
-			if avgWaitMs < 250 {
-				continue
-			}
-
-			currentRate := GetReqLimitPerTarget()
-			if currentRate <= 0 {
-				continue
-			}
-			if currentRate >= maxRate {
-				continue
-			}
-
-			step := currentRate / 5
-			if step < 1 {
-				step = 1
-			}
-			newRate := currentRate + step
-			if newRate > maxRate {
-				newRate = maxRate
-			}
-			if newRate < minRate {
-				newRate = minRate
-			}
-			SetReqLimitPerTarget(newRate)
-		}
-	}()
-}
-
 type hostPortLimiter struct {
 	rate int
 
@@ -453,9 +392,26 @@ func (t *reqLimitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 			atomic.AddInt64(&reqLimitWaitCount, 1)
 		}
 	}
+
+	// 熔断检查放在最外层：被熔断的 host:port 连不上响应，早退能省掉建连、重试
+	// 与整个 -timeout 的等待。
+	breakerKey := ""
+	if req != nil && req.URL != nil {
+		breakerKey = urlHostPortKey(req.URL)
+	}
+	if err := reqBreaker.wait(breakerKey); err != nil {
+		return nil, err
+	}
+
 	atomic.AddInt64(&httpInflight, 1)
 	defer atomic.AddInt64(&httpInflight, -1)
-	return t.base.RoundTrip(req)
+	rtStart := time.Now()
+	resp, err := t.base.RoundTrip(req)
+	observeRoundTrip(breakerKey, resp, req)
+	// 真实网络往返的时延与成败，供自适应限速判定。熔断跳过的请求在此之前就返回了，
+	// 没有任何网络行为，不该污染信号。
+	observeHTTPAttempt(req, resp, time.Since(rtStart))
+	return resp, err
 }
 
 func applyReqLimitTransport(c *retryablehttp.Client) {
@@ -523,6 +479,11 @@ type LiveMetrics struct {
 	ReqLimitWaitCount int64
 	TaskGateWaitNs    int64
 	TaskGateWaitCount int64
+	// HTTPAttempts / HTTPFailures / HTTPLatencyNs 描述真实网络往返：
+	// 有多少次、其中多少次没拿到响应、累计耗时多少，是自适应限速的判定依据。
+	HTTPAttempts  int64
+	HTTPFailures  int64
+	HTTPLatencyNs int64
 }
 
 func GetLiveMetrics() LiveMetrics {
@@ -534,6 +495,9 @@ func GetLiveMetrics() LiveMetrics {
 		ReqLimitWaitCount: atomic.LoadInt64(&reqLimitWaitCount),
 		TaskGateWaitNs:    atomic.LoadInt64(&taskGateWaitNs),
 		TaskGateWaitCount: atomic.LoadInt64(&taskGateWaitCount),
+		HTTPAttempts:      atomic.LoadInt64(&httpAttemptTotal),
+		HTTPFailures:      atomic.LoadInt64(&httpAttemptFailure),
+		HTTPLatencyNs:     atomic.LoadInt64(&httpLatencyNs),
 	}
 }
 

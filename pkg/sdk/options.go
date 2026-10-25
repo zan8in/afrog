@@ -99,11 +99,14 @@ type Options struct {
 	MaxRespBodySize   int
 	BruteMaxRequests  int
 	ReqLimitPerTarget int
-	AutoReqLimit      bool
-	Polite            bool
-	Balanced          bool
-	Aggressive        bool
-	Smart             bool
+	// AutoReqLimit 开启单目标（host:port）自适应限速。NewOptions 默认置为 true，
+	// 与 CLI 的 -auto-req-limit 默认开启保持一致；置 false 且 ReqLimitPerTarget
+	// 为 0 时表示完全不限速。
+	AutoReqLimit bool
+	Polite       bool
+	Balanced     bool
+	Aggressive   bool
+	Smart        bool
 
 	// --- fingerprinting and probing ---
 
@@ -358,13 +361,16 @@ type handlers struct {
 // NewOptions returns Options populated with the SDK defaults.
 func NewOptions() *Options {
 	return &Options{
-		RateLimit:              DefaultRateLimit,
-		Concurrency:            DefaultConcurrency,
-		Retries:                DefaultRetries,
-		Timeout:                DefaultTimeout,
-		MaxHostError:           DefaultMaxHostError,
-		MaxRespBodySize:        DefaultMaxRespBodySize,
-		BruteMaxRequests:       DefaultBruteMaxRequests,
+		RateLimit:        DefaultRateLimit,
+		Concurrency:      DefaultConcurrency,
+		Retries:          DefaultRetries,
+		Timeout:          DefaultTimeout,
+		MaxHostError:     DefaultMaxHostError,
+		MaxRespBodySize:  DefaultMaxRespBodySize,
+		BruteMaxRequests: DefaultBruteMaxRequests,
+		// 单目标自适应限速默认开启，与 CLI 的 -auto-req-limit 默认值一致：
+		// 健康目标会被加性提速到与 RateLimit 同量级，劣化目标才被压低。
+		AutoReqLimit:           true,
 		DefaultAccept:          true,
 		FingerprintFilterMode:  FingerprintStrict,
 		IncludeRequestResponse: true,
@@ -406,6 +412,16 @@ func (o *Options) validate() error {
 		o.Checkpoint.SaveInterval = DefaultCheckpointSaveInterval
 	}
 
+	if o.ReqLimitPerTarget < 0 {
+		return fmt.Errorf("%w: ReqLimitPerTarget must be >= 0", ErrInvalidOptions)
+	}
+
+	// AutoReqLimit 在 NewOptions 里默认开启，所以先让调用方显式选定的其它档位
+	// 覆盖掉这个默认值，再判互斥；否则「默认值 + 用户选择」会被误判成冲突。
+	if o.ReqLimitPerTarget > 0 || o.Polite || o.Balanced || o.Aggressive {
+		o.AutoReqLimit = false
+	}
+
 	limitModes := 0
 	for _, on := range []bool{o.ReqLimitPerTarget > 0, o.AutoReqLimit, o.Polite, o.Balanced, o.Aggressive} {
 		if on {
@@ -414,9 +430,6 @@ func (o *Options) validate() error {
 	}
 	if limitModes > 1 {
 		return fmt.Errorf("%w: only one of ReqLimitPerTarget, AutoReqLimit, Polite, Balanced and Aggressive may be set", ErrInvalidOptions)
-	}
-	if o.ReqLimitPerTarget < 0 {
-		return fmt.Errorf("%w: ReqLimitPerTarget must be >= 0", ErrInvalidOptions)
 	}
 
 	if o.MaxRespBodySize <= 0 {
@@ -758,11 +771,16 @@ func WithDefaultAccept(enabled bool) Option {
 	}
 }
 
-// WithRequestLimitPerTarget caps concurrent requests per target.
+// WithRequestLimitPerTarget pins a fixed per-target request rate. Passing 0
+// means "no per-target limit", which also turns off the adaptive limiter that
+// NewOptions enables by default — same as the CLI's -rlt 0.
 func WithRequestLimitPerTarget(n int) Option {
 	return func(o *Options) error {
 		if n < 0 {
 			return fmt.Errorf("%w: request limit per target must be >= 0, got %d", ErrInvalidOptions, n)
+		}
+		if n == 0 {
+			o.AutoReqLimit = false
 		}
 		o.ReqLimitPerTarget = n
 		return nil
@@ -785,9 +803,16 @@ func WithAggressive() Option {
 }
 
 // WithAutoRequestLimit derives the per-target request limit from the rate
-// limit and concurrency.
+// limit and concurrency. This is already the default; the option exists so the
+// choice can be stated explicitly.
 func WithAutoRequestLimit() Option {
 	return func(o *Options) error { o.AutoReqLimit = true; return nil }
+}
+
+// WithoutAutoRequestLimit turns off the adaptive per-target limiter that
+// NewOptions enables by default, leaving only the global RateLimit cap.
+func WithoutAutoRequestLimit() Option {
+	return func(o *Options) error { o.AutoReqLimit = false; return nil }
 }
 
 // WithSmartConcurrency adjusts concurrency based on the target count.
