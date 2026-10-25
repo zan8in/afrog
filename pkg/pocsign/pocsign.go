@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 // SignaturePattern 是签名行的前缀。签名行必须是文件最后一行。
@@ -118,7 +120,9 @@ func SignFile(path string, priv ed25519.PrivateKey) error {
 	if fi, statErr := os.Stat(path); statErr == nil {
 		mode = fi.Mode()
 	}
-	return os.WriteFile(path, buf.Bytes(), mode)
+	// 就地在 POC 文件末尾追加签名行。扫描进程会并发读取同一批 PoC yaml，
+	// 用原子写避免读方拿到「已截断但还没写完」的半截文件。
+	return utils.WriteFileAtomic(path, buf.Bytes(), mode)
 }
 
 // SignPath 对文件或目录下的所有 .yaml/.yml 就地签名，返回处理的文件数。
@@ -233,10 +237,10 @@ func LoadOrCreateSigningKey() (ed25519.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, signingKeyName), encodeBase64Key(priv), 0o600); err != nil {
+	if err := utils.WriteFileAtomic(filepath.Join(dir, signingKeyName), encodeBase64Key(priv), 0o600); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, verifyKeyName), encodeBase64Key(pub), 0o644); err != nil {
+	if err := utils.WriteFileAtomic(filepath.Join(dir, verifyKeyName), encodeBase64Key(pub), 0o644); err != nil {
 		return nil, err
 	}
 	return priv, nil

@@ -364,12 +364,7 @@ func persistRemoteTasks() {
 		gologger.Debug().Msgf("远程任务序列化失败: %v", err)
 		return
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		gologger.Debug().Msgf("远程任务落盘失败: %v", err)
-		return
-	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := utils.WriteFileAtomic(path, data, 0o600); err != nil {
 		gologger.Debug().Msgf("远程任务落盘失败: %v", err)
 	}
 }

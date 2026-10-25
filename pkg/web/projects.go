@@ -123,11 +123,7 @@ func saveProjects(store *projectStore) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return utils.WriteFileAtomic(path, data, 0o600)
 }
 
 // normalizeProjectTargets 归一化目标：去空白、丢弃非法、按序去重。

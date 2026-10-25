@@ -5,12 +5,12 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	fileutil "github.com/zan8in/pins/file"
 )
 
@@ -292,14 +292,12 @@ func (p *ScanProgress) AtomicSave(filename string, doneTasks, totalTasks uint32)
 	p.saveMutex.Lock()
 	defer p.saveMutex.Unlock()
 
-	// 使用临时文件保证原子性
-	tmpFile := filename + ".tmp"
-	if err := os.WriteFile(tmpFile, buf.Bytes(), 0666); err != nil {
-		return err
-	}
-
-	// 原子替换文件
-	return os.Rename(tmpFile, filename)
+	// 同目录临时文件 + rename 保证原子性。
+	//
+	// 这里原先用固定的 filename+".tmp"：同一份断点文件被多个进程/协程同时保存时，
+	// 写者之间会共用同一个临时路径、互相截断，后 rename 者拿到 ENOENT 而静默丢一次
+	// 保存。WriteFileAtomic 用 CreateTemp 让每个写者独占临时文件。
+	return utils.WriteFileAtomic(filename, buf.Bytes(), 0666)
 }
 
 // ---- legacy (kept for compatibility) ----

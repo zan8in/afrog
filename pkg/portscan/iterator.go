@@ -1882,6 +1882,10 @@ func (pi *PortIterator) Total() int {
 type HostIterator struct {
 	hosts []string
 	index int
+	// explicit 记录「用户直接书写、未经 CIDR/range 展开」的目标。展开出来的地址可以按
+	// 存活探测结论剔除（大网段里沉默地址太多），但用户点名的目标不行——探测沉默只说明
+	// 它挡掉了探测包，不代表它没有资产。
+	explicit map[string]struct{}
 }
 
 func (hi *HostIterator) Reset() {
@@ -1890,6 +1894,7 @@ func (hi *HostIterator) Reset() {
 
 // NewHostIterator creates a new iterator from a list of targets
 func NewHostIterator(targets []string) *HostIterator {
+	explicit := make(map[string]struct{}, len(targets))
 	var expandedHosts []string
 	for _, t := range targets {
 		// CIDR expansion
@@ -1913,13 +1918,20 @@ func NewHostIterator(targets []string) *HostIterator {
 				continue
 			}
 		}
+		explicit[t] = struct{}{}
 		expandedHosts = append(expandedHosts, t)
 	}
 
 	// Remove duplicates
 	expandedHosts = removeDuplicateStr(expandedHosts)
 
-	return &HostIterator{hosts: expandedHosts}
+	return &HostIterator{hosts: expandedHosts, explicit: explicit}
+}
+
+// ExplicitHosts 返回用户直接书写（未经 CIDR/range 展开）的目标集合。发现阶段用它区分
+// 「必须保留的点名目标」与「可剔除的展开地址」。
+func (hi *HostIterator) ExplicitHosts() map[string]struct{} {
+	return hi.explicit
 }
 
 func (hi *HostIterator) Next() (string, bool) {

@@ -514,12 +514,37 @@ func shuffledInts(in []int) []int {
 }
 
 const (
-	// tcpDiscoveryFanout 是单台主机在发现阶段同时打开的探测连接数。给一点并发是为了让
-	// 「目标只开一个非顶层端口」能在一个预算内被找到，同时不至于让一台主机吃掉整个额度。
-	tcpDiscoveryFanout = 8
+	// tcpDiscoveryFanout 是单台主机在发现阶段同时打开的探测连接数。发现阶段必须保证探测
+	// 列表里每个端口都拿到一次机会（这是准确率的前提），并发只是把这若干轮折成可接受的
+	// 时间，不参与「探几个端口」的取舍。
+	tcpDiscoveryFanout = 16
 	// tcpDiscoveryMinSockets 是发现阶段套接字闸门的地板，保证预算被压得极低时仍能推进。
-	tcpDiscoveryMinSockets = 16
+	tcpDiscoveryMinSockets = 32
+	// tcpDiscoveryMaxBudget 是单台主机 TCP 探测的硬上限，防止用户给出超长端口列表时把
+	// 主机级预算撑成分钟级。
+	tcpDiscoveryMaxBudget = 20 * time.Second
 )
+
+// tcpDiscoveryBudget 计算一台主机的 TCP 探测总预算。
+//
+// 预算按「端口数 / fanout」折算轮数，再加一轮余量：每个探测端口都拿到完整的 perPort
+// 机会，所以准确率不低于「逐端口串行试完整个列表」；并发只把这些轮重叠起来，最坏耗时
+// 从 N×perPort 降到 ceil(N/fanout)×perPort。这才是速度与准确率的正确交换方式——把整机
+// 预算压成一个 perPort 等于只探了前 fanout 个端口，是靠砍覆盖面换速度。
+func tcpDiscoveryBudget(portCount int, perPort time.Duration) time.Duration {
+	if perPort <= 0 {
+		perPort = time.Second
+	}
+	if portCount <= 0 {
+		return perPort
+	}
+	rounds := (portCount + tcpDiscoveryFanout - 1) / tcpDiscoveryFanout
+	d := time.Duration(rounds+1) * perPort
+	if d > tcpDiscoveryMaxBudget {
+		d = tcpDiscoveryMaxBudget
+	}
+	return d
+}
 
 // tcpDiscoverySocketLimit 收敛发现阶段的在飞套接字数：既尊重用户/档位配置，也不越过
 // 本机 fd 预算。发现阶段跑在正式扫描之前，同样占用套接字，不能只让端口扫描去守预算。
@@ -555,9 +580,13 @@ func dialProvesAlive(ctx context.Context, host string, port int) bool {
 
 // probePorts 用最多 tcpDiscoveryFanout 个 worker 并发探测 ports，任一探测证明主机在线
 // 就立即取消其余探测返回 true。所有连接都从 sem 取额度，保证全局在飞套接字不超预算。
-func probePorts(ctx context.Context, host string, ports []int, sem chan struct{}) bool {
+// 每个端口各自拿到完整的 perPort 机会，轮与轮之间互不挤占。
+func probePorts(ctx context.Context, host string, ports []int, sem chan struct{}, perPort time.Duration) bool {
 	if len(ports) == 0 {
 		return false
+	}
+	if perPort <= 0 {
+		perPort = time.Second
 	}
 	pctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -587,12 +616,19 @@ func probePorts(ctx context.Context, host string, ports []int, sem chan struct{}
 		go func() {
 			defer wg.Done()
 			for p := range work {
+				// 已取消时不再取额度、不再拨号：select 里两个 case 同时就绪会随机选，
+				// 单靠 select 不足以在取消后立即停下。
+				if pctx.Err() != nil {
+					return
+				}
 				select {
 				case sem <- struct{}{}:
 				case <-pctx.Done():
 					return
 				}
-				proved := discoveryDial(pctx, host, p)
+				dctx, dcancel := context.WithTimeout(pctx, perPort)
+				proved := discoveryDial(dctx, host, p)
+				dcancel()
 				<-sem
 				if proved {
 					alive.Store(true)
@@ -606,22 +642,29 @@ func probePorts(ctx context.Context, host string, ports []int, sem chan struct{}
 	return alive.Load()
 }
 
-// tcpHostAlive 在一个 opt.Timeout 的预算内判断主机是否在线：先试 primary 端口，仍有
-// 余量且开启回退时再试 fallback 端口。
+// tcpHostAlive 判断主机是否在线：先试 primary 端口，无结论且开启回退时再试 fallback。
 //
-// 预算按「主机」而非「端口」计。原实现对每台主机顺序试 40 个 primary + 20 个 fallback
-// 端口，每个都用完整 opt.Timeout，一台不回包的主机就要耗掉几十秒——既让发现阶段漫长得
-// 不可接受，也把出口设备的 NAT/conntrack 表当成了压力测试靶。
+// 预算按「端口数」折算（见 tcpDiscoveryBudget），保证探测列表里每个端口都拿到完整的
+// opt.Timeout 机会——发现阶段的价值全在「探到那个开放的端口」，为了快而少探端口是拿
+// 准确率换时间，得不偿失（真实案例：探测列表第 34 位的 5000 端口上跑着 Web 服务，整机
+// 预算被压成一个 opt.Timeout 后 1 秒内只轮询到第 8 个端口，主机因此被判死）。
 func tcpHostAlive(ctx context.Context, host string, primary, fallback []int, opt *Options, sem chan struct{}) bool {
-	hctx, cancel := context.WithTimeout(ctx, opt.Timeout)
-	defer cancel()
-	if probePorts(hctx, host, primary, sem) {
+	perPort := opt.Timeout
+	if perPort <= 0 {
+		perPort = time.Second
+	}
+	pctx, pcancel := context.WithTimeout(ctx, tcpDiscoveryBudget(len(primary), perPort))
+	ok := probePorts(pctx, host, primary, sem, perPort)
+	pcancel()
+	if ok {
 		return true
 	}
-	if !opt.DiscoveryFallback || hctx.Err() != nil {
+	if !opt.DiscoveryFallback || ctx.Err() != nil {
 		return false
 	}
-	return probePorts(hctx, host, fallback, sem)
+	fctx, fcancel := context.WithTimeout(ctx, tcpDiscoveryBudget(len(fallback), perPort))
+	defer fcancel()
+	return probePorts(fctx, host, fallback, sem, perPort)
 }
 
 func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phaseProgress) []string {
@@ -683,20 +726,21 @@ func runTCPDiscovery(ctx context.Context, opt *Options, hosts []string, pp *phas
 	return alive
 }
 
-// icmpProbeTimeout 把原生 ICMP 的等待时间对齐到用户的 -timeout：ICMP 比 TCP connect
-// 更容易被限速丢弃，给 2 倍余量，并把结果收敛到 [2s, 6s]。原来的固定 6s 与用户配置
-// 无关，在大网段上是白等。
+// icmpProbeTimeout 决定原生 ICMP 单主机的等待时间：给 -timeout 两倍余量，并收敛到
+// [6s, 10s]。地板取 6s 是对齐历史行为——ICMP 常被限速或丢进低优先级队列，比 TCP connect
+// 更容易「慢一拍」；把地板压到 2s 会把响应稍慢但确实在线的主机判死，省下的几秒远不值
+// 丢掉的资产。
 func icmpProbeTimeout(opt *Options) time.Duration {
 	base := opt.Timeout
 	if base <= 0 {
 		base = time.Second
 	}
 	d := base * 2
-	if d < 2*time.Second {
-		d = 2 * time.Second
-	}
-	if d > 6*time.Second {
+	if d < 6*time.Second {
 		d = 6 * time.Second
+	}
+	if d > 10*time.Second {
+		d = 10 * time.Second
 	}
 	return d
 }

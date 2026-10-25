@@ -138,11 +138,7 @@ func saveSchedules(store *scheduleStore) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return utils.WriteFileAtomic(path, data, 0o600)
 }
 
 // findScheduleIndex 返回指定计划的索引，找不到返回 -1。调用方需持有 scheduleMu。

@@ -168,11 +168,7 @@ func Save(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return utils.WriteFileAtomic(path, raw, 0o600)
 }
 
 // normalize 清洗配置：补齐缺失字段、丢弃无效渠道、收敛数值范围。

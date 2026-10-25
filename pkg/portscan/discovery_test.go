@@ -5,6 +5,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -181,18 +182,19 @@ func TestBuildICMPTargetsSkipsUnresolvable(t *testing.T) {
 	}
 }
 
-// 原生 ICMP 的等待时间跟随 -timeout，并收敛到 [2s, 6s]。
+// 原生 ICMP 的等待时间跟随 -timeout，并收敛到 [6s, 10s]：地板必须够宽，否则 ICMP
+// 被限速的主机会被误判为 down。
 func TestICMPProbeTimeoutFollowsUserBudget(t *testing.T) {
 	cases := []struct {
 		in   time.Duration
 		want time.Duration
 	}{
-		{0, 2 * time.Second},
-		{300 * time.Millisecond, 2 * time.Second},
-		{time.Second, 2 * time.Second},
-		{2 * time.Second, 4 * time.Second},
-		{5 * time.Second, 6 * time.Second},
-		{30 * time.Second, 6 * time.Second},
+		{0, 6 * time.Second},
+		{300 * time.Millisecond, 6 * time.Second},
+		{time.Second, 6 * time.Second},
+		{2 * time.Second, 6 * time.Second},
+		{5 * time.Second, 10 * time.Second},
+		{30 * time.Second, 10 * time.Second},
 	}
 	for _, tc := range cases {
 		if got := icmpProbeTimeout(&Options{Timeout: tc.in}); got != tc.want {
@@ -215,7 +217,7 @@ func TestTCPDiscoverySocketLimitRespectsFDBudget(t *testing.T) {
 	}
 }
 
-// 探测预算按「主机」而非「端口」计：一台不回包的主机不该耗掉几十个超时。
+// 探测预算按端口数折算：每个探测端口都要拿到完整机会，总耗时随之有界。
 // 用 RFC 5737 文档网段（192.0.2.0/24）作为不会响应的目标。
 func TestTCPDiscoveryBudgetBoundedPerHost(t *testing.T) {
 	opts := DefaultOptions()
@@ -234,7 +236,8 @@ func TestTCPDiscoveryBudgetBoundedPerHost(t *testing.T) {
 	if len(alive) != 0 {
 		t.Fatalf("文档网段不该被判存活，实际 %v", alive)
 	}
-	// primary + fallback 各一个预算，留足调度余量；原来的逐端口串行会是 60 倍预算。
+	// primary + fallback 两个预算，单个预算 = ceil(端口数/fanout)+1 轮；60 个顺序超时
+	// 折算后是 8 轮，留足调度余量取 10 轮。
 	if limit := 10 * opts.Timeout; elapsed > limit {
 		t.Fatalf("单主机探测耗时 %s，超出预算上限 %s", elapsed, limit)
 	}
@@ -246,7 +249,7 @@ func TestProbePortsStopsOnCanceledContext(t *testing.T) {
 	cancel()
 
 	start := time.Now()
-	if probePorts(ctx, "127.0.0.1", []int{1, 2, 3, 4}, make(chan struct{}, 4)) {
+	if probePorts(ctx, "127.0.0.1", []int{1, 2, 3, 4}, make(chan struct{}, 4), 200*time.Millisecond) {
 		t.Fatalf("已取消的上下文不该判定存活")
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
@@ -254,9 +257,52 @@ func TestProbePortsStopsOnCanceledContext(t *testing.T) {
 	}
 }
 
-// 核心不变量：一台「连得上却不回包」的 filtered 主机只该吃掉一个主机预算（primary +
-// fallback 各一次），而不是 40+20 个端口各自的超时。用注入的阻塞式探测模拟黑洞目标。
-func TestTCPDiscoveryFilteredHostCostsOneBudget(t *testing.T) {
+// 回归测试：探测列表末尾的端口也必须拿到探测机会。
+//
+// 之前的实现把整机预算压成一个 opt.Timeout，1 秒内只轮询得到前 tcpDiscoveryFanout 个
+// 端口，列表深处的开放端口被永久漏掉——真实案例是探测列表第 34 位的 5000 端口上跑着
+// Web 服务，主机却因为探不到它被判死。
+func TestTCPDiscoveryReachesPortsBeyondFirstFanout(t *testing.T) {
+	ports := make([]int, 0, 40)
+	for i := 1; i <= 40; i++ {
+		ports = append(ports, 40000+i)
+	}
+	target := ports[len(ports)-1] // 列表最末一个端口，远超第一轮 fanout 覆盖范围
+
+	orig := discoveryDial
+	discoveryDial = func(ctx context.Context, host string, port int) bool {
+		if port == target {
+			return true
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(30 * time.Second):
+		}
+		return false
+	}
+	t.Cleanup(func() { discoveryDial = orig })
+
+	opts := DefaultOptions()
+	opts.Timeout = 200 * time.Millisecond
+	opts.RateLimit = 64
+	opts.Quiet = true
+	opts.LogDiscoveredHosts = false
+	opts.DiscoveryPorts = ports
+	opts.DiscoveryFallbackPorts = ports
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	alive := runTCPDiscovery(ctx, opts, []string{"10.11.12.13"}, nil)
+	if len(alive) != 1 {
+		t.Fatalf("末尾端口 %d 开放的主机应被判存活，实际 %v", target, alive)
+	}
+}
+
+// 黑洞目标（连得上却不回包）的探测次数正好等于探测列表全量：预算按端口数折算的意义
+// 就是「列表里每个端口都被探到一次」。既不能漏（漏 = 准确率损失，见
+// TestTCPDiscoveryReachesPortsBeyondFirstFanout），也不该重复（重复 = 白白冲击 NAT 表）。
+func TestTCPDiscoveryProbesEveryPortOnce(t *testing.T) {
 	orig := discoveryDial
 	var calls int32
 	discoveryDial = func(ctx context.Context, host string, port int) bool {
@@ -285,11 +331,99 @@ func TestTCPDiscoveryFilteredHostCostsOneBudget(t *testing.T) {
 	if len(alive) != 0 {
 		t.Fatalf("黑洞目标不该被判存活，实际 %v", alive)
 	}
-	if limit := 4 * opts.Timeout; elapsed > limit {
-		t.Fatalf("单台 filtered 主机耗时 %s，超出 %s（预算未按主机计）", elapsed, limit)
+	// primary(40) + fallback(20) 各折算一次预算：ceil(40/16)+1=4 轮、ceil(20/16)+1=3 轮，
+	// 合计 7 轮；逐端口串行则是 60 次串行超时。留足调度余量取 10 轮。
+	if limit := 10 * opts.Timeout; elapsed > limit {
+		t.Fatalf("单台 filtered 主机耗时 %s，超出 %s（预算未按端口数折算）", elapsed, limit)
 	}
-	// 每个阶段最多 fanout 个 worker 各卡在一次探测上，两阶段合计不超过 2×fanout。
-	if max := int32(2 * tcpDiscoveryFanout); calls > max {
-		t.Fatalf("发起了 %d 次探测，超出上限 %d（在逐端口串行尝试）", calls, max)
+	want := int32(len(defaultDiscoveryPrimaryPorts()) + len(defaultDiscoveryFallbackPorts()))
+	if calls != want {
+		t.Fatalf("探测次数 %d，期望 %d（每个端口恰好一次）", calls, want)
+	}
+}
+
+// 显式点名的目标不因探测沉默被剔除：探测只能证明「活着」，不能证明「死了」——目标往往只是
+// 挡掉了 ICMP 与探测端口。用户手写的目标一律保留（与 web-probe 同口径），只有 CIDR/range
+// 展开出来的地址才接受探测结论的剔除。否则像「10 个手写目标、探测只认下 6 台」的场景会
+// 平白丢掉 4 台资产。
+func TestExplicitTargetsSurviveDiscoveryFiltering(t *testing.T) {
+	// 显式目标 127.0.0.1 与网段 127.0.0.0/28 展开出的地址重叠：显式点名的必须留下，
+	// 只在展开里出现的必须按探测结论剔除。监听该端口是为了证明显式目标确实进了扫描。
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	_, portStr, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatalf("SplitHostPort: %v", err)
+	}
+
+	// 所有探测一律判死，模拟目标挡掉全部探测包。
+	orig := discoveryDial
+	discoveryDial = func(ctx context.Context, host string, port int) bool { return false }
+	t.Cleanup(func() { discoveryDial = orig })
+
+	opts := DefaultOptions()
+	opts.Targets = []string{"127.0.0.1", "127.0.0.0/28"} // 显式 1 个 + 展开 14 个
+	opts.Ports = portStr
+	opts.Timeout = 200 * time.Millisecond
+	opts.Retries = 0
+	opts.RateLimit = 64
+	opts.SkipDiscovery = false
+	opts.DiscoveryMethod = "tcp"
+	opts.Quiet = true
+	opts.LogDiscoveredHosts = false
+
+	var mu sync.Mutex
+	scanned := make(map[string]struct{})
+	opts.OnResult = func(r *ScanResult) {
+		mu.Lock()
+		scanned[r.Host] = struct{}{}
+		mu.Unlock()
+	}
+	// portscan 阶段的 total = 扫描主机数 × 端口数，是「目标是否被剔除」的直接证据。
+	var portTotal atomic.Int32
+	opts.OnProgress = func(phase, status string, finished, total, percent int) {
+		if phase == "portscan" && total > 0 {
+			portTotal.Store(int32(total))
+		}
+	}
+
+	sc, err := NewScanner(opts)
+	if err != nil {
+		t.Fatalf("NewScanner: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := sc.Scan(ctx); err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+
+	mu.Lock()
+	_, keptExplicit := scanned["127.0.0.1"]
+	mu.Unlock()
+	if !keptExplicit {
+		t.Fatalf("显式目标 127.0.0.1 不该被剔除，实际扫描到 %v", scanned)
+	}
+	if got := portTotal.Load(); got != 1 {
+		t.Fatalf("端口扫描 total=%d，期望 1（1 个显式目标 × 1 个端口：展开出来的 14 个地址应被剔除）", got)
+	}
+}
+
+// ExplicitHosts 只认「未经展开」的目标：CIDR/range 与它们展开出的地址都不算显式。
+func TestHostIteratorExplicitHosts(t *testing.T) {
+	hi := NewHostIterator([]string{"127.0.0.20", "example.com", "10.0.0.0/30", "10.1.1.1-10.1.1.3"})
+	explicit := hi.ExplicitHosts()
+
+	for _, want := range []string{"127.0.0.20", "example.com"} {
+		if _, ok := explicit[want]; !ok {
+			t.Fatalf("显式目标 %q 应被记录，实际 %v", want, explicit)
+		}
+	}
+	for _, unwanted := range []string{"10.0.0.0/30", "10.1.1.1-10.1.1.3", "10.0.0.1", "10.1.1.2"} {
+		if _, ok := explicit[unwanted]; ok {
+			t.Fatalf("%q 不是显式目标，不该被记录，实际 %v", unwanted, explicit)
+		}
 	}
 }

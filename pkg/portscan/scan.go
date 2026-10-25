@@ -167,6 +167,7 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// for large target sets.
 	if hostIter.Total() > discoveryMinHosts && !s.options.SkipDiscovery {
 		origHosts := hostIter.GetHosts()
+		explicit := hostIter.ExplicitHosts()
 		discCtx, discStop := signal.NotifyContext(ctx, os.Interrupt)
 		discStart := time.Now()
 		if stageLog && !s.options.Quiet {
@@ -187,6 +188,21 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			}
 		}
 		discStop()
+
+		// 显式点名的目标不因探测沉默被剔除：探测只能证明「活着」，不能证明「死了」——
+		// 目标往往只是挡掉了 ICMP 与探测端口。web-probe 对所有原始目标都发探针、从不按
+		// 存活结论裁剪，端口扫描这里对齐同一口径；只有 CIDR/range 展开出来的地址才按探测
+		// 结论剔除（大网段里沉默地址太多，全量保留会把扫描时间拖成天文数字）。
+		kept := make([]string, 0, len(aliveHosts)+len(explicit))
+		kept = append(kept, aliveHosts...)
+		for _, h := range origHosts {
+			if _, ok := explicit[h]; ok {
+				kept = append(kept, h)
+			}
+		}
+		hostIter = NewHostIterator(kept)
+		down := len(origHosts) - hostIter.Total()
+
 		// 收尾汇总默认可见，与 port-scan 的 completed、web-probe 的资产汇总对齐：
 		// 存活行逐条回答「哪台机器活着」，汇总行回答「这批目标整体活了多少」。
 		// started / method 这类阶段边界行仍由 StageLog（-debug）控制。
@@ -197,17 +213,15 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),
 				time.Since(discStart).Truncate(time.Second).String(),
 			))
-			// 被判 down 的主机会被静默移出扫描范围（与 nmap 同语义），但「沉默地丢掉目标」
-			// 是最容易被误解的失败模式：目标常常只是挡掉了 ICMP 与探测端口。这里补一行
-			// 数量与逃生口，免得用户以为目标真的是死的。
-			if down := len(origHosts) - len(aliveHosts); down > 0 {
+			// 只有展开出来的地址会被静默移出扫描范围（显式目标恒保留）。「沉默地丢掉目标」
+			// 是最容易被误解的失败模式，这里补一行真实剔除数与逃生口，免得用户以为目标真死了。
+			if down > 0 {
 				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageHostDiscovery,
 					fmt.Sprintf("down=%d", down),
 					"not scanned, use -Pn to scan anyway",
 				))
 			}
 		}
-		hostIter = NewHostIterator(aliveHosts)
 	} else if s.options.OnProgress != nil {
 		s.options.OnProgress("host_discovery", "skipped", 0, 0, 0)
 	}
@@ -473,8 +487,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	scanStop()
 
 	if progressDone != nil {
+		// 只 close 不再置 nil：置 nil 是对 progressDone 变量的写，而进度协程正在
+		// 读这个变量做 select，会构成数据竞争（-race 可复现）。
 		close(progressDone)
-		progressDone = nil
 	}
 	if printEnabled || callbackEnabled {
 		renderProgress(true)
