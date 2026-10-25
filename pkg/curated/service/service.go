@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/curated/api"
 	"github.com/zan8in/afrog/v3/pkg/curated/manifest"
 	"github.com/zan8in/afrog/v3/pkg/curated/pack"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 )
 
 type Config struct {
@@ -335,7 +336,7 @@ func (s *Service) updateRuntimeCheck(dir string, manifestID string, msg string) 
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return utils.WriteFileAtomic(path, data, 0644)
 }
 
 // updateRuntimeFailed 记录一次失败的检查：写入 last_error，但**不推进 last_check_at**。
@@ -362,7 +363,7 @@ func (s *Service) updateRuntimeFailed(dir string, manifestID string, msg string)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return utils.WriteFileAtomic(path, data, 0644)
 }
 
 func (s *Service) updateRuntimeUpdated(dir string, manifestID string) error {
@@ -388,7 +389,7 @@ func (s *Service) updateRuntimeUpdated(dir string, manifestID string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return utils.WriteFileAtomic(path, data, 0644)
 }
 
 func (s *Service) updateRuntimeCurrentDir(dir string, manifestID string, msg string) error {
@@ -411,7 +412,7 @@ func (s *Service) updateRuntimeCurrentDir(dir string, manifestID string, msg str
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return utils.WriteFileAtomic(path, data, 0644)
 }
 
 func dirHasCuratedPocs(dir string) bool {
@@ -894,7 +895,7 @@ func writeAuth(path string, as *authState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0600)
+	return utils.WriteFileAtomic(path, data, 0600)
 }
 
 func loadOrCreateDeviceFingerprint(path string) string {
@@ -921,7 +922,7 @@ func loadOrCreateDeviceFingerprint(path string) string {
 	sum := sha256.Sum256([]byte(data))
 	fp := base64.RawURLEncoding.EncodeToString(sum[:])
 	_ = os.MkdirAll(filepath.Dir(path), 0755)
-	_ = os.WriteFile(path, []byte(fmt.Sprintf("{\"fingerprint\":\"%s\"}", fp)), 0600)
+	_ = utils.WriteFileAtomic(path, []byte(fmt.Sprintf("{\"fingerprint\":\"%s\"}", fp)), 0600)
 	return fp
 }
 

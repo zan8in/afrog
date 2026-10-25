@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/validator"
 	"github.com/zan8in/gologger"
 	"gopkg.in/yaml.v2"
@@ -1249,7 +1250,7 @@ func pocsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	filePath := filepath.Join(myDir, pocID+".yaml")
 
 	// 写入新文件
-	if err := os.WriteFile(filePath, []byte(req.YamlContent), 0o644); err != nil {
+	if err := utils.WriteFileAtomic(filePath, []byte(req.YamlContent), 0o644); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
 		return
@@ -1409,7 +1410,7 @@ func pocsUpdateHandler(w http.ResponseWriter, r *http.Request) {
 			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("重命名文件失败: %v", err)})
 			return
 		}
-		if err := os.WriteFile(newFullPath, []byte(req.YamlContent), 0644); err != nil {
+		if err := utils.WriteFileAtomic(newFullPath, []byte(req.YamlContent), 0644); err != nil {
 			// 写入失败，尝试回滚到旧文件名
 			_ = os.Rename(newFullPath, oldFullPath)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1420,7 +1421,7 @@ func pocsUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		fullPath = newFullPath
 	} else {
 		// id 未变，直接覆盖写入旧路径
-		if err := os.WriteFile(oldFullPath, []byte(req.YamlContent), 0644); err != nil {
+		if err := utils.WriteFileAtomic(oldFullPath, []byte(req.YamlContent), 0644); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: fmt.Sprintf("写入文件失败: %v", err)})
 			return

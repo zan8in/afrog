@@ -81,6 +81,46 @@ func WriteFile(filename string, data []byte) error {
 	return os.WriteFile(filename, data, 0655)
 }
 
+// WriteFileAtomic 原子写文件：先写同目录临时文件，再 rename 覆盖目标。
+//
+// os.WriteFile 的语义是「先截断、再写入」。同一台机器上并发启动的多个 afrog 进程会
+// 共读共写 ~/.config/afrog/ 下的小文件（curated-auth.json 还要过 checksum 校验，读到
+// 半截内容就直接判「未登录」），读方落进截断窗口就会拿到 0 字节或半截文件。
+//
+// rename 在同一文件系统内是原子的：读方要么看到旧内容、要么看到新内容。因此临时文件
+// 必须建在目标文件的同目录，跨设备 rename 会直接失败。CreateTemp 建出来是 0600，
+// 需要 chmod 还原成调用方给的权限。
+func WriteFileAtomic(filename string, data []byte, perm os.FileMode) error {
+	parent := filepath.Dir(filename)
+	if err := os.MkdirAll(parent, os.ModePerm); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(parent, ".afrog-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, filename); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	return nil
+}
+
 func BufferWriteAppend(filename string, param string) error {
 	fileHandle, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0660)
 	if err != nil {

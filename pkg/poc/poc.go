@@ -829,7 +829,7 @@ func migrateFile(path string) (changed bool, changes int, err error) {
 	if s == orig {
 		return false, 0, nil
 	}
-	if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
+	if err := utils.WriteFileAtomic(path, []byte(s), 0o644); err != nil {
 		return false, 0, err
 	}
 	return true, changes, nil
