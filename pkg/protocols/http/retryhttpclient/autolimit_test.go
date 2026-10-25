@@ -133,6 +133,54 @@ func TestAutoReqLimitSkipsWhenSamplesInsufficient(t *testing.T) {
 	}
 }
 
+// 判定门槛随速率折算：2s 窗口内可产生的样本数少于固定上限 20。
+func TestEffectiveMinSamples(t *testing.T) {
+	cases := []struct {
+		rate int
+		want int64
+	}{
+		{1, 2},   // 2s×1=2
+		{6, 12},  // 2s×6=12 < 20
+		{10, 20}, // 2s×10=20，等于上限
+		{30, 20}, // 2s×30=60，被上限 20 截断
+		{0, 20},  // 非法速率回落到固定上限
+	}
+	for _, tc := range cases {
+		if got := effectiveMinSamples(tc.rate); got != tc.want {
+			t.Fatalf("effectiveMinSamples(%d)=%d，期望 %d", tc.rate, got, tc.want)
+		}
+	}
+}
+
+// 低速（6/s）时窗口只有约 12 个样本，低于旧的固定门槛 20；按新语义仍应能升速，
+// 否则降速后永远凑不齐门槛、卡死无法回升。
+func TestAutoReqLimitLowRateIncreases(t *testing.T) {
+	withAutoReqLimiter(t, 6)
+	resetAutoReqLimitSignals(t)
+	c := primeController(5, 30)
+
+	feed(12, 0, 10*time.Millisecond, 300*time.Millisecond)
+	c.tick()
+
+	if got := GetReqLimitPerTarget(); got != 7 {
+		t.Fatalf("低速健康且排队时应升到 7，实际 %d", got)
+	}
+}
+
+// 低速时样本仍明显不足（远低于折算门槛）应继续跳过，保持起步阶段稳定。
+func TestAutoReqLimitLowRateSkipsWhenFarBelowThreshold(t *testing.T) {
+	withAutoReqLimiter(t, 6)
+	resetAutoReqLimitSignals(t)
+	c := primeController(5, 30)
+
+	feed(4, 4, 10*time.Millisecond, 0) // 门槛 12，只有 4 个样本
+	c.tick()
+
+	if got := GetReqLimitPerTarget(); got != 6 {
+		t.Fatalf("样本远低于折算门槛时不该调速，实际 %d", got)
+	}
+}
+
 // 降速不得击穿地板。
 func TestAutoReqLimitClampsToMinRate(t *testing.T) {
 	withAutoReqLimiter(t, 6)

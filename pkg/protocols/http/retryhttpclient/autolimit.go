@@ -14,7 +14,9 @@ const (
 	autoReqLimitWindow = 2 * time.Second
 	// autoReqLimitWarmup 让扫描先跑起来再判定，避免起步阶段的样本带偏。
 	autoReqLimitWarmup = 3 * time.Second
-	// autoReqLimitMinSamples 是窗口内参与判定的最少请求数：样本太少时比率噪声极大。
+	// autoReqLimitMinSamples 是窗口内参与判定的最少请求数上限：样本太少时比率噪声极大。
+	// 实际门槛按「本窗口在当前速率下最多能产生多少样本」折算（见 effectiveMinSamples），
+	// 否则低于 10 req/s 时窗口内凑不齐 20 个样本，判定会永久失效、降速后再也升不回来。
 	autoReqLimitMinSamples = 20
 	// 失败率高低水位：过半请求拿不到响应才算目标劣化，回到 5% 以下才算恢复。
 	autoReqLimitFailHigh = 0.5
@@ -164,6 +166,9 @@ func (c *autoReqLimitController) tick() {
 	if current <= 0 {
 		return
 	}
+	// 判定门槛随当前速率折算：2s 窗口在速率 r 下最多产生约 2r 个样本。固定门槛 20 等价于
+	// 要求 ≥10 req/s，低速时永远凑不齐，降速后就会卡死无法回升。
+	minSamples := effectiveMinSamples(current)
 
 	failRate := 0.0
 	failPct := 0
@@ -186,7 +191,7 @@ func (c *autoReqLimitController) tick() {
 
 	// 降速信号：要么大面积拿不到响应，要么响应时延明显高于空载基线。
 	reason := ""
-	if dAttempts >= autoReqLimitMinSamples {
+	if dAttempts >= minSamples {
 		if failRate >= autoReqLimitFailHigh {
 			reason = "no-response"
 		} else if latencyRatio >= autoReqLimitLatencyHigh {
@@ -218,7 +223,7 @@ func (c *autoReqLimitController) tick() {
 		return
 	}
 	// 只有目标健康、且限速器确实在排队时才提额度。
-	if dAttempts < autoReqLimitMinSamples || failRate >= autoReqLimitFailLow || latencyRatio >= autoReqLimitLatencyLow {
+	if dAttempts < minSamples || failRate >= autoReqLimitFailLow || latencyRatio >= autoReqLimitLatencyLow {
 		return
 	}
 	if avgWait < autoReqLimitQueueWaitMs*time.Millisecond {
@@ -243,6 +248,22 @@ func (c *autoReqLimitController) tick() {
 		})
 	}
 	c.lastDir = 1
+}
+
+// effectiveMinSamples 按当前速率折算窗口内的最少样本数：2s 窗口在速率 r 下最多产生约
+// 2r 个样本，取它与固定上限 20 的较小值，并保证至少 1。这样低速时也能凑齐判定门槛。
+func effectiveMinSamples(rate int) int64 {
+	if rate <= 0 {
+		return autoReqLimitMinSamples
+	}
+	n := int(float64(rate) * autoReqLimitWindow.Seconds())
+	if n > autoReqLimitMinSamples {
+		n = autoReqLimitMinSamples
+	}
+	if n < 1 {
+		n = 1
+	}
+	return int64(n)
 }
 
 // observeBaseline 维护「空载基线时延」：取观测到的最小平均时延，并给一个下限。
