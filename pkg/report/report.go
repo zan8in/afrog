@@ -22,6 +22,9 @@ type Report struct {
 	of         *os.File
 	ReportFile string
 	Template   TemplateStyle
+	// autoName 表示 ReportFile 是自动生成的时间戳名（而非 -o 指定）。
+	// 自动名需要在首次写入时用 O_EXCL 抢占，避免同秒内多个进程算出同一个名字。
+	autoName bool
 }
 
 type WebProbeEntry struct {
@@ -101,11 +104,13 @@ func (report *Report) check(fileName string) error {
 		if !fileutil.FolderExists(OutputDirectory) {
 			fileutil.CreateFolder(OutputDirectory)
 		}
-		name, err := createUniqueReportName(OutputDirectory, ".html")
-		if err != nil {
+		if err := probeWritableDir(OutputDirectory); err != nil {
 			return err
 		}
-		report.ReportFile = name
+		// 这里只记下候选名，真正的文件名留到首次写入时抢占：默认名是秒级时间戳，
+		// 同一秒内多个进程会算出同一个候选名，必须用 O_EXCL 决出唯一赢家。
+		report.ReportFile = filepath.Join(OutputDirectory, timeutil.Format(timeutil.Format_1)+".html")
+		report.autoName = true
 		return nil
 	}
 
@@ -137,24 +142,39 @@ func (report *Report) check(fileName string) error {
 	return nil
 }
 
-// createUniqueReportName 在 dir 下为本次扫描独占一个报告文件名。
+// probeWritableDir 确认 dir 下能落文件。
 //
-// 默认报告名是秒级精度的时间戳（MMDD-HHMMSS），同一秒内并发启动的多个 afrog
-// 进程会算出同一个名字：彼此覆盖内容，先删的一方还会让另一方拿到 ENOENT。
-// 这里用 O_EXCL 原子抢占占位文件，冲突时追加自增序号，既保证跨进程唯一，
-// 又让无冲突（绝大多数）情况下的文件名保持原样。
+// 默认报告名改成「首次写入时才抢占」后，构造 Report 时不再产生任何文件；目录不可写
+// 就只能等首次写入才报错，而写入错误在上层是被忽略的。这里用临时探针提前把错误暴露
+// 出来，探针随即删除。
+func probeWritableDir(dir string) error {
+	f, err := os.CreateTemp(dir, ".afrog-report-*.tmp")
+	if err != nil {
+		return fmt.Errorf("unable to create output file: %v", err)
+	}
+	name := f.Name()
+	f.Close()
+	_ = os.Remove(name)
+	return nil
+}
+
+// reserveReportName 用 O_EXCL 原子抢占 candidate，返回本次扫描独占的报告文件名。
 //
-// 返回的占位文件已被删除，实际文件由后续 Write 创建。
-func createUniqueReportName(dir, ext string) (string, error) {
-	base := timeutil.Format(timeutil.Format_1)
+// 默认报告名是秒级时间戳（MMDD-HHMMSS），同一秒内并发启动的多个 afrog 进程会算出
+// 同一个候选名。O_EXCL 让文件系统原子地决出唯一赢家，抢不到的一方按 -1、-2 依次追加
+// 序号重试，无冲突（绝大多数）时名字保持原样。
+//
+// 抢占必须发生在真正要写入的那一刻，且占位文件必须一直留着：若提前抢占、随即删掉
+// 占位文件，保护窗口只剩几微秒，同秒内的后来者照样能抢到同一个名字。
+func reserveReportName(candidate string) (string, error) {
+	ext := filepath.Ext(candidate)
+	base := strings.TrimSuffix(candidate, ext)
 	for i := 0; i < 1000; i++ {
-		name := base + ext
+		name := candidate
 		if i > 0 {
 			name = fmt.Sprintf("%s-%d%s", base, i, ext)
 		}
-		fileName := filepath.Join(dir, name)
-
-		file, err := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
+		file, err := os.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0666)
 		if err != nil {
 			if os.IsExist(err) {
 				continue
@@ -162,10 +182,9 @@ func createUniqueReportName(dir, ext string) (string, error) {
 			return "", fmt.Errorf("unable to create output file: %v", err)
 		}
 		file.Close()
-		_ = os.Remove(fileName)
-		return fileName, nil
+		return name, nil
 	}
-	return "", fmt.Errorf("unable to create output file: too many reports share the name %q", base)
+	return "", fmt.Errorf("unable to create output file: too many reports share the name %q", candidate)
 }
 
 func (report *Report) SetResult(result *result.Result) {
@@ -194,6 +213,14 @@ func (report *Report) Write(data string) error {
 
 	report.Lock()
 	defer report.Unlock()
+
+	if report.of == nil && report.autoName {
+		name, rerr := reserveReportName(report.ReportFile)
+		if rerr != nil {
+			return rerr
+		}
+		report.ReportFile = name
+	}
 
 	flag := os.O_WRONLY | os.O_CREATE
 	if report.of == nil {

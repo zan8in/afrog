@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	fileutil "github.com/zan8in/pins/file"
+	timeutil "github.com/zan8in/pins/time"
 	"gopkg.in/yaml.v2"
 )
 
@@ -22,6 +24,9 @@ type JsonReport struct {
 	of         *os.File
 	ReportFile string
 	JsonAll    bool
+	// autoName 表示 ReportFile 是自动生成的时间戳名（而非 -json 指定）。
+	// 自动名需要在首次写入时用 O_EXCL 抢占，避免同秒内多个进程算出同一个名字。
+	autoName bool
 }
 
 type JsonResult struct {
@@ -90,11 +95,13 @@ func (report *JsonReport) checkJson(fileName string) error {
 		if !fileutil.FolderExists(OutputDirectory) {
 			fileutil.CreateFolder(OutputDirectory)
 		}
-		name, err := createUniqueReportName(OutputDirectory, ".json")
-		if err != nil {
+		if err := probeWritableDir(OutputDirectory); err != nil {
 			return err
 		}
-		report.ReportFile = name
+		// 这里只记下候选名，真正的文件名留到首次写入时抢占：默认名是秒级时间戳，
+		// 同一秒内多个进程会算出同一个候选名，必须用 O_EXCL 决出唯一赢家。
+		report.ReportFile = filepath.Join(OutputDirectory, timeutil.Format(timeutil.Format_1)+".json")
+		report.autoName = true
 		return nil
 	}
 
@@ -140,6 +147,14 @@ func (jr *JsonReport) Append() error {
 	var err error
 	var isFirst bool
 	if jr.of == nil {
+		if jr.autoName {
+			name, rerr := reserveReportName(jr.ReportFile)
+			if rerr != nil {
+				return rerr
+			}
+			jr.ReportFile = name
+		}
+
 		jr.of, err = os.OpenFile(jr.ReportFile, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 		if err != nil {
 			return err
