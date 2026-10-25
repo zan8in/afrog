@@ -601,6 +601,7 @@ func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
 	return config.PortScanInfo{
 		Host:       r.Host,
 		Port:       r.Port,
+		State:      r.State.String(),
 		Service:    r.Service,
 		Product:    r.Product,
 		Version:    r.Version,
@@ -618,6 +619,8 @@ func toPortScanInfo(r *portscan.ScanResult) config.PortScanInfo {
 
 // formatPortResult 渲染一行端口结果：`序号 [open] host:port  [service] [tls] [verified]`。
 // 与 Web / 漏洞结果行共用同一套语法：序号 + 徽标 + 目标 + 方括号属性。
+// 徽标取端口实际状态（open / closed / filtered），默认只有 open，开启 -ps-states 后
+// 才有 closed / filtered 行。
 func formatPortResult(r *portscan.ScanResult, seq int) string {
 	// net.JoinHostPort 保证 IPv6 写成 [::1]:80，而不是拼接出无法解析的 ::1:80。
 	target := net.JoinHostPort(r.Host, strconv.Itoa(r.Port))
@@ -637,7 +640,7 @@ func formatPortResult(r *portscan.ScanResult, seq int) string {
 	case portscan.ConfidenceProbable:
 		attrs = append(attrs, log.Dim("likely"))
 	}
-	return log.ResNum(seq, log.KindBadge("open"), target, attrs...)
+	return log.ResNum(seq, log.KindBadge(r.State.String()), target, attrs...)
 }
 
 func extractTitle(body []byte) string {
@@ -2014,6 +2017,7 @@ func (runner *Runner) Execute() {
 			}
 			psOpts.ServiceProbes = options.PSServiceProbe
 			psOpts.FingerprintDir = options.PSFingerprintDir
+			psOpts.ReportStates = options.PSReportStates
 			collector := newOpenPortsCollector()
 			portFacts = collector
 			psOpts.OnResult = func(r *portscan.ScanResult) {
@@ -2027,7 +2031,12 @@ func (runner *Runner) Execute() {
 					runner.clearProgressLine()
 					gologger.Print().Msgf("%s", formatPortResult(r, int(atomic.AddUint32(&runner.portSeq, 1))))
 				}
-				collector.AddResult(r)
+				// 只有开放端口才进入后续扫描目标与 webProbe 的指纹复用集合。
+				// closed / filtered 行（-ps-states）只描述状态，若一并收集会把关不上的
+				// 端口当成资产追加为扫描目标。
+				if r.State == portscan.PortStateOpen {
+					collector.AddResult(r)
+				}
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
 				baseCtx := runner.ctx

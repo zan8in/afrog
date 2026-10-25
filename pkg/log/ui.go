@@ -154,11 +154,17 @@ func SeverityBadge(severity string) string {
 	}
 }
 
-// KindBadge 返回固定语义徽标：端口开放（open）/ Web 资产（web）/ 存活主机（alive）。
+// KindBadge 返回固定语义徽标：端口开放（open）/ 端口关闭（closed）/ 被过滤（filtered）/
+// Web 资产（web）/ 存活主机（alive）。closed 用暗灰、filtered 用黄色，以区别
+// 「确实关闭」与「被防火墙静默丢弃（结果可能不完整）」。
 func KindBadge(kind string) string {
 	switch strings.ToLower(strings.TrimSpace(kind)) {
 	case "open":
 		return badge("open", LogColor.Green)
+	case "closed":
+		return badge("closed", LogColor.DarkGray)
+	case "filtered":
+		return badge("filtered", LogColor.Midium)
 	case "web":
 		return badge("web", LogColor.Info)
 	case "alive":

@@ -53,6 +53,13 @@ type Options struct {
 	DiscoveryRetries        int
 	LogDiscoveredHosts      bool
 
+	// ReportStates 控制是否把非开放端口（closed / filtered）也作为结果上报。默认关闭：
+	// 全端口扫描下一次 filtered 判定可能命中成千上万个端口，默认全量输出会淹没开放端口
+	// 行与后续阶段的结果。开启后用户才能区分「被防火墙静默丢弃」(filtered) 与「端口确实
+	// 关闭」(closed)——这两者在故障排查里的含义完全不同。这些行只用于展示端口状态分布，
+	// 不会进入开放端口集合或后续扫描目标。
+	ReportStates bool
+
 	// aliveSeq 是存活主机结果行的序号计数器，按本次扫描递增。放在 Options 上是因为
 	// 打印发生在 portscan 内部，而发现过程会跨 icmp / ping / tcp 多个阶段，需要一个
 	// 生命周期覆盖整轮发现的共享计数（各阶段的 phaseProgress 是相互独立的）。

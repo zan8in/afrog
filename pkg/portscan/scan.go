@@ -32,10 +32,14 @@ type Scanner struct {
 	fdWarned        uint32
 	currentProgress uint64
 	resultsCount    uint64
-	adaptiveDelay   int32 // Current delay in milliseconds
-	hostStats       sync.Map
-	hostSems        sync.Map // host -> chan struct{} (per-target concurrency gate)
-	scanPortTotal   uint64
+	// closedCount / filteredCount 统计非开放端口的判定结果，仅在 ReportStates 打开时
+	// 随汇总行输出，用来说明「这一轮到底有多少端口是被防火墙丢弃、多少是确实关闭」。
+	closedCount   uint64
+	filteredCount uint64
+	adaptiveDelay int32 // Current delay in milliseconds
+	hostStats     sync.Map
+	hostSems      sync.Map // host -> chan struct{} (per-target concurrency gate)
+	scanPortTotal uint64
 
 	fingerprinter *Fingerprinter
 	grabber       *Grabber
@@ -503,13 +507,22 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	if !s.options.Quiet && !s.options.LiveStats {
 		// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
 		fmt.Fprint(os.Stderr, "\r\033[2K\r")
-		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
-			"completed",
+		facts := []string{
 			fmt.Sprintf("hosts=%d", hostIter.Total()),
 			fmt.Sprintf("tasks=%d", total),
 			fmt.Sprintf("open=%d", atomic.LoadUint64(&s.resultsCount)),
-			time.Since(startTime).Truncate(time.Second).String(),
-		))
+		}
+		// 只有 ReportStates 打开时结果集里才含非开放端口，汇总也必须与之对齐，
+		// 否则「open 数」对不上用户实际看到的行数，反倒制造困惑。
+		if s.options.ReportStates {
+			facts = append(facts,
+				fmt.Sprintf("closed=%d", atomic.LoadUint64(&s.closedCount)),
+				fmt.Sprintf("filtered=%d", atomic.LoadUint64(&s.filteredCount)),
+			)
+		}
+		facts = append(facts, time.Since(startTime).Truncate(time.Second).String())
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+			append([]string{"completed"}, facts...)...))
 	}
 
 	return nil
@@ -857,6 +870,7 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			isTimeout = true
 		}
+		state := PortStateUnknown
 		switch {
 		case isTimeout:
 			// A timeout usually means the port is filtered (packet dropped by a
@@ -867,16 +881,19 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 			// 拥塞控制器看的正是这一路信号：回包与否按窗口统计，一个被过滤的目标
 			// 只能把窗口丢包率推高，是否降速由控制器按阈值决定（见 congestion.go）。
 			s.congestion.observe(false)
+			state = PortStateFiltered
 		case isConnRefused(err):
-			// 收到 RST 说明对端回了话，路径是通的。
+			// 收到 RST 说明对端回了话，路径是通的，端口确实关闭。
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
 			s.congestion.observe(true)
+			state = PortStateClosed
 		default:
 			atomic.AddInt32(&s.consecutiveErrors, 1)
 			s.congestion.observe(false)
 		}
 		s.maybeDecideHost(ctx, host, st, scanned)
 		s.maybeWarnFiltered(host, st, scanned)
+		s.maybeReportState(host, port, state)
 		return
 	}
 
@@ -1082,6 +1099,28 @@ func (s *Scanner) emitResult(res *ScanResult) {
 		}
 		s.options.OnResult(res)
 	}
+}
+
+// maybeReportState 在 ReportStates 打开时把非开放端口（closed / filtered / unknown）
+// 也作为结果上报，并始终累计 closed / filtered 计数供汇总行使用。
+//
+// 这些行只描述端口状态，不携带服务指纹，也绝不进入开放端口集合——端口扫描的后续
+// 用途（追加扫描目标、webProbe 复用指纹）都只应建立在「开放」这一事实上。
+func (s *Scanner) maybeReportState(host string, port int, state PortState) {
+	switch state {
+	case PortStateClosed:
+		atomic.AddUint64(&s.closedCount, 1)
+	case PortStateFiltered:
+		atomic.AddUint64(&s.filteredCount, 1)
+	}
+	if !s.options.ReportStates || s.options.OnResult == nil {
+		return
+	}
+	// 与 emitResult 的收尾口径一致：结果行走 stderr，打印前先清掉进度条所在行。
+	if s.options.Debug && !s.options.Quiet {
+		fmt.Fprint(os.Stderr, "\r\033[2K\r")
+	}
+	s.options.OnResult(&ScanResult{Host: host, Port: port, State: state})
 }
 
 func (s *Scanner) verifyAndEmit(ctx context.Context, host string, st *hostScanStat) {

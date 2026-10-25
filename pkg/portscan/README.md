@@ -80,6 +80,7 @@ func main() {
     *   `AdaptiveTimeout`: RTT 自适应连接超时，按实测往返时间收紧首次超时（重试仍用完整预算）
     *   `ServiceProbes`: 是否发送主动探针（默认 false，仅被动抓 Banner）
     *   `FingerprintDir`: 外置指纹目录，提供 `probes.yaml`/`services.yaml`/`ports.yaml` 覆盖内置指纹集
+    *   `ReportStates`: 是否把非开放端口（`closed`/`filtered`）也作为结果上报（默认 `false`，只上报 `open`；CLI 为 `-ps-states`）
     *   `ScanMode`: 扫描模式 (目前默认为 Auto/Connect)
 
 *   **`portscan.ScanResult`**:

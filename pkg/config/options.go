@@ -277,8 +277,11 @@ type Options struct {
 	PSNoAdaptiveTimeout bool
 	PSServiceProbe      bool
 	PSFingerprintDir    string
-	WebFingerprintDir   string
-	WebFavicon          bool
+	// PSReportStates 让端口预扫描把非开放端口（closed / filtered）也作为结果上报，
+	// 默认只上报开放端口。开启后才能区分「被防火墙丢弃」与「端口确实关闭」。
+	PSReportStates    bool
+	WebFingerprintDir string
+	WebFavicon        bool
 	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒），默认 30。
 	// 与全局 -timeout 解耦：信息收集阶段不该被漏洞扫描的长超时拖住。
 	WebProbeTimeout  int
@@ -312,8 +315,11 @@ type ScanInfoUpdate struct {
 // PortScanInfo 是一个开放端口的端口指纹识别结果。
 // Confidence 取值 port/probable/certain，表示识别证据的强弱。
 type PortScanInfo struct {
-	Host       string
-	Port       int
+	Host string
+	Port int
+	// State 是端口状态：open / closed / filtered / unknown。默认只上报 open，
+	// 打开 -ps-states 后才会出现 closed / filtered。
+	State      string
 	Service    string
 	Product    string
 	Version    string
@@ -406,6 +412,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
 		flagSet.BoolVar(&options.PSServiceProbe, "ps-service-probe", false, "send active service probes (application payloads) during port pre-scan to identify services more accurately"),
 		flagSet.StringVar(&options.PSFingerprintDir, "ps-fingerprint-dir", "", "directory with probes.yaml/services.yaml/ports.yaml overriding the built-in port fingerprint set"),
+		flagSet.BoolVar(&options.PSReportStates, "ps-states", false, "report closed/filtered ports as results in port pre-scan (default: report only open ports)"),
 		flagSet.BoolVar(&options.EnableWebProbe, "w", true, "collect web asset info (url/status/title/server/tech-stack fingerprint) before scanning; enabled by default, disable with -w=false"),
 		flagSet.StringVar(&options.WebFingerprintDir, "w-fingerprint-dir", "", "directory with rules.yaml overriding the built-in web fingerprint set"),
 		flagSet.BoolVar(&options.WebFavicon, "w-favicon", false, "fetch /favicon.ico during web probe to match favicon rules (adds one extra request per target)"),
