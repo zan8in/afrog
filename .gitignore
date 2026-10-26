@@ -58,6 +58,7 @@ dist
 *.afg
 
 /afrog.wiki
+pkg/web/webpath/
 docs/plan/
 
 *pocs/deleted*
