@@ -286,7 +286,11 @@ type Options struct {
 	// 与全局 -timeout 解耦：信息收集阶段不该被漏洞扫描的长超时拖住。
 	WebProbeTimeout  int
 	OnPortScanResult func(info PortScanInfo)
-	OnHostDiscovered func(host string)
+	// OnHostDiscovered 上报存活主机，proto 是判定依据（icmp / ping / tcp）。
+	OnHostDiscovered func(host, proto string)
+	// OnStageLog 上报阶段运维行（[INF]/[WRN]/[ERR] + 阶段名 + 事实），
+	// 供 JSON 事件流 / Web 诊断页复刻终端输出。
+	OnStageLog       func(level, stage string, facts []string)
 	OnPhaseProgress  func(phase string, status string, finished int64, total int64, percent int)
 	OnScanInfoUpdate func(info ScanInfoUpdate)
 	OnPedmLog        func(line string)

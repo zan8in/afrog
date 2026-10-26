@@ -210,21 +210,18 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		// 收尾汇总默认可见，与 port-scan 的 completed、web-probe 的资产汇总对齐：
 		// 存活行逐条回答「哪台机器活着」，汇总行回答「这批目标整体活了多少」。
 		// started / method 这类阶段边界行仍由 StageLog（-debug）控制。
-		if !s.options.Quiet && !s.options.LiveStats {
-			s.clearProgressLine()
-			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageHostDiscovery,
-				"completed",
-				fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),
-				time.Since(discStart).Truncate(time.Second).String(),
-			))
-			// 只有展开出来的地址会被静默移出扫描范围（显式目标恒保留）。「沉默地丢掉目标」
-			// 是最容易被误解的失败模式，这里补一行真实剔除数与逃生口，免得用户以为目标真死了。
-			if down > 0 {
-				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StageHostDiscovery,
-					fmt.Sprintf("down=%d", down),
-					"not scanned, use -Pn to scan anyway",
-				))
-			}
+		s.emitStage(log.LevelInfo, utils.StageHostDiscovery,
+			"completed",
+			fmt.Sprintf("alive=%d/%d", len(aliveHosts), len(origHosts)),
+			time.Since(discStart).Truncate(time.Second).String(),
+		)
+		// 只有展开出来的地址会被静默移出扫描范围（显式目标恒保留）。「沉默地丢掉目标」
+		// 是最容易被误解的失败模式，这里补一行真实剔除数与逃生口，免得用户以为目标真死了。
+		if down > 0 {
+			s.emitStage(log.LevelWarn, utils.StageHostDiscovery,
+				fmt.Sprintf("down=%d", down),
+				"not scanned, use -Pn to scan anyway",
+			)
 		}
 	} else if s.options.OnProgress != nil {
 		s.options.OnProgress("host_discovery", "skipped", 0, 0, 0)
@@ -504,28 +501,41 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// 收尾汇总默认可见，与 web-probe 的资产汇总、vuln-scan 的 completed 对齐：
 	// 三个阶段的「结果行」之外都留一行结论，用户不用回翻进度条也知道这一阶段扫出了什么。
 	// started / 端口排名这类阶段边界行仍由 StageLog（-debug）控制，常规输出只多这一行。
-	if !s.options.Quiet && !s.options.LiveStats {
-		// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
-		fmt.Fprint(os.Stderr, "\r\033[2K\r")
-		facts := []string{
-			fmt.Sprintf("hosts=%d", hostIter.Total()),
-			fmt.Sprintf("tasks=%d", total),
-			fmt.Sprintf("open=%d", atomic.LoadUint64(&s.resultsCount)),
-		}
-		// 只有 ReportStates 打开时结果集里才含非开放端口，汇总也必须与之对齐，
-		// 否则「open 数」对不上用户实际看到的行数，反倒制造困惑。
-		if s.options.ReportStates {
-			facts = append(facts,
-				fmt.Sprintf("closed=%d", atomic.LoadUint64(&s.closedCount)),
-				fmt.Sprintf("filtered=%d", atomic.LoadUint64(&s.filteredCount)),
-			)
-		}
-		facts = append(facts, time.Since(startTime).Truncate(time.Second).String())
-		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
-			append([]string{"completed"}, facts...)...))
+	facts := []string{
+		fmt.Sprintf("hosts=%d", hostIter.Total()),
+		fmt.Sprintf("tasks=%d", total),
+		fmt.Sprintf("open=%d", atomic.LoadUint64(&s.resultsCount)),
 	}
+	// 只有 ReportStates 打开时结果集里才含非开放端口，汇总也必须与之对齐，
+	// 否则「open 数」对不上用户实际看到的行数，反倒制造困惑。
+	if s.options.ReportStates {
+		facts = append(facts,
+			fmt.Sprintf("closed=%d", atomic.LoadUint64(&s.closedCount)),
+			fmt.Sprintf("filtered=%d", atomic.LoadUint64(&s.filteredCount)),
+		)
+	}
+	facts = append(facts, time.Since(startTime).Truncate(time.Second).String())
+	s.emitStage(log.LevelInfo, utils.StagePortScan, append([]string{"completed"}, facts...)...)
 
 	return nil
+}
+
+// emitStage 发一条阶段运维行：钩子恒发（JSON 事件流 / Web 端据此复刻终端输出），
+// 终端打印仍受 Quiet / LiveStats 控制——Quiet（-silent / SDK）只表示「不要过程」，
+// 不代表消费方（如 Web 诊断页）也该丢掉结论行。
+func (s *Scanner) emitStage(level, stage string, facts ...string) {
+	if s == nil || s.options == nil {
+		return
+	}
+	if s.options.OnStageLog != nil {
+		s.options.OnStageLog(level, stage, facts)
+	}
+	if s.options.Quiet || s.options.LiveStats {
+		return
+	}
+	// 阶段收尾行与进度条同走 stderr，先清行再打印，否则两者会拼在同一行上。
+	s.clearProgressLine()
+	gologger.Print().Msgf("%s", log.Op(level, stage, facts...))
 }
 
 // discoveryMinHosts is the minimum number of expanded targets before a host

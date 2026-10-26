@@ -123,7 +123,7 @@ func ToProtoEvent(ev *scanstream.Event) *afrogv1.ScanEvent {
 		}
 	case scanstream.TypeHost:
 		if ev.Host != nil {
-			out.Body = &afrogv1.ScanEvent_Host{Host: &afrogv1.HostEvent{Host: ev.Host.Host}}
+			out.Body = &afrogv1.ScanEvent_Host{Host: &afrogv1.HostEvent{Host: ev.Host.Host, Proto: ev.Host.Proto}}
 		}
 	case scanstream.TypeLog:
 		if ev.Log != nil {

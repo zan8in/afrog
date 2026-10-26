@@ -37,21 +37,26 @@ type Options struct {
 	FingerprintDir          string // Optional directory with probes.yaml / services.yaml / ports.yaml that overrides the built-in set
 	OnResult                func(*ScanResult)
 	OnProgress              func(phase string, status string, finished int, total int, percent int)
-	OnDiscoveredHost        func(host string)
-	Debug                   bool
-	LiveStats               bool
-	StageLog                bool // Print phase boundary lines (HOST-DISC/PORT-SCAN started/completed); off by default
-	Quiet                   bool
-	SkipDiscovery           bool // Skip host discovery phase
-	DiscoveryPorts          []int
-	DiscoveryFallback       bool
-	DiscoveryFallbackPorts  []int
-	DiscoveryMethod         string
-	IcmpConcurrency         int
-	PingConcurrency         int
-	DiscoveryTop            int
-	DiscoveryRetries        int
-	LogDiscoveredHosts      bool
+	// OnDiscoveredHost 上报一个存活主机。proto 是判定依据（icmp / ping / tcp），
+	// 与终端 `序号 [alive] host [icmp]` 行的方括号属性同源。
+	OnDiscoveredHost func(host, proto string)
+	// OnStageLog 上报阶段运维行（[INF]/[WRN] + 阶段名 + 事实），供 JSON 事件流 /
+	// Web 端复刻终端输出。终端打印受 Quiet 控制，钩子本身不受影响。
+	OnStageLog             func(level, stage string, facts []string)
+	Debug                  bool
+	LiveStats              bool
+	StageLog               bool // Print phase boundary lines (HOST-DISC/PORT-SCAN started/completed); off by default
+	Quiet                  bool
+	SkipDiscovery          bool // Skip host discovery phase
+	DiscoveryPorts         []int
+	DiscoveryFallback      bool
+	DiscoveryFallbackPorts []int
+	DiscoveryMethod        string
+	IcmpConcurrency        int
+	PingConcurrency        int
+	DiscoveryTop           int
+	DiscoveryRetries       int
+	LogDiscoveredHosts     bool
 
 	// ReportStates 控制是否把非开放端口（closed / filtered）也作为结果上报。默认关闭：
 	// 全端口扫描下一次 filtered 判定可能命中成千上万个端口，默认全量输出会淹没开放端口

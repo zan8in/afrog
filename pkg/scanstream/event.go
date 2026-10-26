@@ -92,11 +92,14 @@ type ResultEvent struct {
 	Evidence *Evidence `json:"evidence,omitempty"`
 }
 
-// PortEvent 描述一个开放端口及其指纹识别结果。
+// PortEvent 描述一个端口及其指纹识别结果。
 // confidence 取值 port/probable/certain，表示识别证据的强弱。
+// state 取值 open/closed/filtered/unknown：默认只上报 open，子进程开启 -ps-states 后
+// 才会出现 closed / filtered 行，消费方应把它们与开放端口区分对待。
 type PortEvent struct {
 	Host       string            `json:"host"`
 	Port       int               `json:"port"`
+	State      string            `json:"state,omitempty"`
 	Service    string            `json:"service,omitempty"`
 	Product    string            `json:"product,omitempty"`
 	Version    string            `json:"version,omitempty"`
@@ -156,6 +159,9 @@ type WebTLSEvent struct {
 // 协议文档第 5 节原表未列出该载荷，为与 Web 前端「资产发现」对齐而补充。
 type HostEvent struct {
 	Host string `json:"host"`
+	// Proto 是判定该主机存活的依据（icmp / ping / tcp），与终端
+	// `序号 [alive] host [icmp]` 行里的方括号属性同源；未知时为空。
+	Proto string `json:"proto,omitempty"`
 }
 
 // LogEvent 是诊断日志。

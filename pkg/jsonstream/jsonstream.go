@@ -118,6 +118,21 @@ func ShouldReportFingerprint(options *config.Options, severity string) bool {
 	return false
 }
 
+// stageLine 把阶段名与事实拼成一行纯文本，对应终端 `log.Op` 里
+// `阶段 事实 事实` 的部分（级别标签由消费方按 level 自行渲染）。
+func stageLine(stage string, facts []string) string {
+	parts := make([]string, 0, len(facts)+1)
+	if s := strings.TrimSpace(stage); s != "" {
+		parts = append(parts, s)
+	}
+	for _, f := range facts {
+		if s := strings.TrimSpace(f); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // webProbeFingerprint 返回一行指纹摘要。引擎已经算好（技术栈摘要，无命中时回落到
 // Server/PoweredBy），这里只做兜底，保证直接调用 runner 的场景也有值。
 func webProbeFingerprint(meta runner.WebMeta) string {
@@ -176,6 +191,7 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 		w.Port(&scanstream.PortEvent{
 			Host:       info.Host,
 			Port:       info.Port,
+			State:      info.State,
 			Service:    info.Service,
 			Product:    info.Product,
 			Version:    info.Version,
@@ -192,11 +208,21 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 	}
 
 	prevHost := options.OnHostDiscovered
-	options.OnHostDiscovered = func(host string) {
+	options.OnHostDiscovered = func(host, proto string) {
 		if prevHost != nil {
-			prevHost(host)
+			prevHost(host, proto)
 		}
-		w.Host(host)
+		w.Host(host, proto)
+	}
+
+	// 阶段运维行（[INF]/[WRN] + 阶段名 + 事实）在终端里由 log.Op 渲染；事件流里
+	// 拆成 level 与文本两部分，消费方按同一语法复原成 `[INF] web-probe assets=…`。
+	prevStage := options.OnStageLog
+	options.OnStageLog = func(level, stage string, facts []string) {
+		if prevStage != nil {
+			prevStage(level, stage, facts)
+		}
+		w.Log(level, stageLine(stage, facts))
 	}
 
 	prevWebProbe := r.OnWebProbe

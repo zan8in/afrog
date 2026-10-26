@@ -57,7 +57,10 @@ type Spec struct {
 	PortScan          bool
 	Ports             string
 	SkipHostDiscovery bool
-	WebFingerprint    bool
+	// ReportStates 对应 -ps-states：把 closed / filtered 端口也作为结果上报。
+	// 默认关闭，只上报开放端口；这些非开放端口仅用于展示，不会进入后续扫描目标。
+	ReportStates   bool
+	WebFingerprint bool
 	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用 CLI 默认值。
 	WebProbeTimeout int
 	// WebFavicon 开启 favicon 抓取（每个目标多一次请求）。

@@ -198,11 +198,11 @@ func (s *Scanner) installEngineHooks() {
 		})
 	}
 
-	s.internal.OnHostDiscovered = func(host string) {
+	s.internal.OnHostDiscovered = func(host, proto string) {
 		if host = strings.TrimSpace(host); host == "" {
 			return
 		}
-		s.hostEvents.emit(s.ctx, HostEvent{Host: host})
+		s.hostEvents.emit(s.ctx, HostEvent{Host: host, Proto: strings.TrimSpace(proto)})
 	}
 
 	s.internal.OnPhaseProgress = func(phase, status string, finished, total int64, percent int) {

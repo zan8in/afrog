@@ -181,6 +181,8 @@ message WebTLSInfo {
 }
 message HostEvent {
   string host = 1;
+  // proto 是存活判定依据（icmp / ping / tcp），未知时为空。
+  string proto = 2;
 }
 message LogEvent {
   string level = 1;

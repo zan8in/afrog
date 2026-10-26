@@ -111,6 +111,8 @@ type PortEvent struct {
 // HostEvent reports a live host found during host discovery.
 type HostEvent struct {
 	Host string `json:"host"`
+	// Proto is how liveness was confirmed: icmp / ping / tcp. Empty when unknown.
+	Proto string `json:"proto,omitempty"`
 }
 
 // WebTechnology is one matched web fingerprint. Confidence is one of

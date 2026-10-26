@@ -134,6 +134,9 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		if v := strings.TrimSpace(spec.Ports); v != "" {
 			args = append(args, "-p", v)
 		}
+		if spec.ReportStates {
+			args = append(args, "-ps-states")
+		}
 	}
 	if spec.SkipHostDiscovery {
 		args = append(args, "-Pn")

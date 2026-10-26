@@ -729,6 +729,22 @@ func (runner *Runner) clearProgressLine() {
 	fmt.Fprint(os.Stderr, "\r\033[2K\r")
 }
 
+// emitStage 发一条阶段运维行：钩子恒发（JSON 事件流 / Web 诊断页据此复刻终端输出），
+// 终端打印仍受 SDKMode / Silent 控制。与 portscan.Scanner.emitStage 口径一致。
+func (runner *Runner) emitStage(level, stage string, facts ...string) {
+	if runner == nil || runner.options == nil {
+		return
+	}
+	if runner.options.OnStageLog != nil {
+		runner.options.OnStageLog(level, stage, facts)
+	}
+	if runner.options.SDKMode || runner.options.Silent {
+		return
+	}
+	runner.clearProgressLine()
+	gologger.Print().Msgf("%s", log.Op(level, stage, facts...))
+}
+
 // webProbe 探测存活 Web 服务并返回可用的 URL 列表。
 //
 // facts 是端口扫描阶段的指纹结论（可为 nil，如未开启 -ps）：命中时用它跳过
@@ -1189,17 +1205,14 @@ dispatch:
 	// 资产聚合汇总：单个结果行回答「这个 URL 是什么」，汇总行回答「这批目标整体是什么」。
 	// 与 vuln-scan 的收尾汇总同一口径，属于默认可见的总结行；中断时也打印，
 	// 让用户在拿到半份结果的同时知道已经摸清了哪些资产。
-	if !runner.options.SDKMode && !runner.options.Silent {
-		probed := make([]WebMeta, 0, len(webMetaByKey))
-		for _, u := range webURLs {
-			if meta, ok := webMetaByKey[fingerprint.KeyFromTarget(u)]; ok {
-				probed = append(probed, meta)
-			}
+	probed := make([]WebMeta, 0, len(webMetaByKey))
+	for _, u := range webURLs {
+		if meta, ok := webMetaByKey[fingerprint.KeyFromTarget(u)]; ok {
+			probed = append(probed, meta)
 		}
-		if summary := webAssetSummary(probed); summary != "" {
-			runner.clearProgressLine()
-			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageWebProbe, summary))
-		}
+	}
+	if summary := webAssetSummary(probed); summary != "" {
+		runner.emitStage(log.LevelInfo, utils.StageWebProbe, summary)
 	}
 
 	runner.webMu.Lock()
@@ -1980,10 +1993,11 @@ func (runner *Runner) Execute() {
 				}
 			}
 			if options.OnHostDiscovered != nil {
-				psOpts.OnDiscoveredHost = func(host string) {
-					options.OnHostDiscovered(host)
+				psOpts.OnDiscoveredHost = func(host, proto string) {
+					options.OnHostDiscovered(host, proto)
 				}
 			}
+			psOpts.OnStageLog = options.OnStageLog
 			if options.PSPorts != "" {
 				psOpts.Ports = options.PSPorts
 			}

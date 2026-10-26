@@ -100,7 +100,7 @@ func (p *phaseProgress) markAlive(host, proto string) {
 	}
 	atomic.AddUint64(&p.alive, 1)
 	if p.opt.OnDiscoveredHost != nil && strings.TrimSpace(host) != "" {
-		p.opt.OnDiscoveredHost(host)
+		p.opt.OnDiscoveredHost(host, proto)
 	}
 	printAliveHost(host, proto, p.opt)
 }

@@ -121,10 +121,10 @@ func (w *Writer) WebProbe(ev *WebProbeEvent) {
 	})
 }
 
-// Host 发送资产发现事件。
-func (w *Writer) Host(host string) {
+// Host 发送资产发现事件。proto 是存活判定依据（icmp / ping / tcp），可为空。
+func (w *Writer) Host(host, proto string) {
 	w.emit(TypeHost, func(ev *Event) {
-		ev.Host = &HostEvent{Host: host}
+		ev.Host = &HostEvent{Host: host, Proto: proto}
 	})
 }
 

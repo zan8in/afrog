@@ -129,6 +129,9 @@ type ScanCreateRequest struct {
 	PortScanCompat  bool     `json:"port_scan,omitempty"`
 	SkipHostDisc    bool     `json:"skip_host_discovery,omitempty"`
 	Ports           string   `json:"ports,omitempty"`
+	// ReportStates 对应 -ps-states：把 closed / filtered 端口也作为结果回传。默认关闭，
+	// 只回传开放端口；开启后这些非开放端口仅用于实时展示，不会写入资产发现。
+	ReportStates bool `json:"report_states,omitempty"`
 	// 报告输出：默认关闭（结果进 sqlite 并走事件流）。开启后执行器把 -o 指向固定的
 	// 报告目录，OutputFile 只是文件名，留空自动命名。
 	OutputHTML     bool   `json:"output_html,omitempty"`

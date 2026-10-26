@@ -125,6 +125,25 @@ func TestBuildArgs(t *testing.T) {
 			},
 		},
 		{
+			name: "port scan reporting non-open states",
+			spec: &Spec{
+				Targets:      []string{"http://a.example"},
+				PortScan:     true,
+				Ports:        "80,443",
+				ReportStates: true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-ps",
+				"-p", "80,443",
+				"-ps-states",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
 			name: "web probe tuning",
 			spec: &Spec{
 				Targets:         []string{"http://a.example"},

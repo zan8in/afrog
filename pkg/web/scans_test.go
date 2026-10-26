@@ -57,13 +57,16 @@ func TestTranslateScanEvent_MapsEngineEventsForFrontend(t *testing.T) {
 		Severity: "HIGH", PocID: "poc-1", PocName: "demo", Target: "https://a.example",
 	}})
 	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypePort, Port: &scanstream.PortEvent{Host: "a.example", Port: 443}})
-	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeHost, Host: &scanstream.HostEvent{Host: "a.example"}})
+	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeHost, Host: &scanstream.HostEvent{Host: "a.example", Proto: "icmp"}})
 	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeWebProbe, WebProbe: &scanstream.WebProbeEvent{
 		URL: "https://a.example", Status: 200, Title: "home", Fingerprint: "nginx,php",
+		WAF: "Cloudflare", Redirects: []string{"https://b.example"}, FaviconHash: "12345",
+		TLS: &scanstream.WebTLSEvent{Subject: "CN=a.example", Issuer: "CN=CA", NotAfter: "2027-01-01"},
 	}})
-	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeLog, Log: &scanstream.LogEvent{Level: "info", Text: "diagnostic"}})
+	// 阶段运维行现在也要转发给前端（诊断页按 CLI 的 `[INF] 阶段 事实` 语法渲染）。
+	translateScanEvent(task, &scanstream.Event{Type: scanstream.TypeLog, Log: &scanstream.LogEvent{Level: "INF", Text: "web-probe assets=3"}})
 
-	want := []string{"scan_info", "progress", "phase_progress", "result", "port", "host", "webprobe"}
+	want := []string{"scan_info", "progress", "phase_progress", "result", "port", "host", "webprobe", "log"}
 	if got := eventTypes(drainEvents(ch)); !equalStrings(got, want) {
 		t.Fatalf("event types\n got: %v\nwant: %v", got, want)
 	}
@@ -645,6 +648,7 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 				PortScanCompat: true,
 				Ports:          "80,443",
 				SkipHostDisc:   true,
+				ReportStates:   true,
 				WebFingerprint: true,
 				EnableOOB:      true,
 				OOB:            "dnslogcn",
@@ -660,8 +664,11 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 		if spec.MaxHostError != 4 || spec.Proxy != "http://127.0.0.1:8080" || !spec.Smart {
 			t.Fatalf("network options not mapped: %+v", spec)
 		}
-		if !spec.PortScan || spec.Ports != "80,443" || !spec.SkipHostDiscovery || !spec.WebFingerprint {
+		if !spec.PortScan || spec.Ports != "80,443" || !spec.SkipHostDiscovery || !spec.ReportStates {
 			t.Fatalf("pre-scan options not mapped: %+v", spec)
+		}
+		if !spec.WebFingerprint {
+			t.Fatalf("web fingerprint not mapped: %+v", spec)
 		}
 		if !spec.EnableOOB || spec.OOBAdapter != "dnslogcn" {
 			t.Fatalf("oob options not mapped: %+v", spec)

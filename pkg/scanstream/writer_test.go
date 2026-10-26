@@ -39,7 +39,7 @@ func TestEncodeParseRoundTrip(t *testing.T) {
 	w.Result(result)
 	w.Port(&PortEvent{Host: "1.2.3.4", Port: 8080})
 	w.WebProbe(&WebProbeEvent{URL: "http://x", Status: 200, Title: "t", Fingerprint: "nginx"})
-	w.Host("1.2.3.4")
+	w.Host("1.2.3.4", "icmp")
 	w.Log("info", "hello")
 	w.Done("completed", &Summary{Executed: 100, Found: 1, BySeverity: map[string]int64{"high": 1}, ElapsedMs: 999})
 	w.Error("scan_failed", "boom")
