@@ -41,6 +41,13 @@ jobs:
           go-version: 1.24.1
           cache: true
 
+      # afrogweb 用 pnpm 管理依赖（仓库提交了 pnpm-lock.yaml）。版本与其 lockfile
+      # 保持一致，避免不同 pnpm 主版本读同一个 lockfile 时行为漂移。
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.0
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -97,17 +104,25 @@ jobs:
           if [ -d "_afrogweb_tmp" ]; then
             cd _afrogweb_tmp
             node -v
+            pnpm -v || true
             npm -v
             git rev-parse HEAD
             if [ -d "static/docs" ] && [ -d "../docs" ] && [ -z "$(ls -A static/docs 2>/dev/null)" ]; then
               cp -R ../docs/* static/docs/ || true
             fi
-            if [ -f package-lock.json ]; then
+            # afrogweb 的依赖以 pnpm-lock.yaml 为准。走 npm 是无 lockfile 的浮动安装，
+            # 且在 npm 10 的 peer 解析里会抛 "Cannot read properties of null (reading
+            # 'edgesOut')" 而中断发布；lockfile 存在时必须走 pnpm。
+            if [ -f pnpm-lock.yaml ]; then
+              pnpm install --frozen-lockfile
+              pnpm run build
+            elif [ -f package-lock.json ]; then
               npm ci
+              npm run build
             else
               npm install
+              npm run build
             fi
-            npm run build
             cd ..
 
             rm -rf _afrogweb_new
