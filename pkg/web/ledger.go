@@ -132,6 +132,69 @@ func ledgerUpdateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "已更新"})
 }
 
+// ledgerBatchRequest 是台账批量流转的请求体：每一行用 (vulid, target, fulltarget)
+// 定位，整批置为同一个状态，与台账的分组口径一致。
+type ledgerBatchRequest struct {
+	Status string `json:"status"`
+	Items  []struct {
+		VulID      string `json:"vulid"`
+		Target     string `json:"target"`
+		FullTarget string `json:"fulltarget"`
+	} `json:"items"`
+}
+
+// ledgerBatchUpdateHandler 把选中的命中批量置为同一台账状态。
+//
+// 与单条「只改状态」语义一致：只覆盖 status，不动各条已有的备注。会员专属。
+func ledgerBatchUpdateHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "仅支持POST方法"})
+		return
+	}
+
+	var req ledgerBatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的JSON格式"})
+		return
+	}
+	if len(req.Items) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少要处理的记录"})
+		return
+	}
+	status := strings.ToLower(strings.TrimSpace(req.Status))
+	if !ledgerStatusSet[status] {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "status 取值非法"})
+		return
+	}
+
+	keys := make([]sqlite.ResultKey, 0, len(req.Items))
+	for _, it := range req.Items {
+		keys = append(keys, sqlite.ResultKey{
+			VulID:      it.VulID,
+			Target:     it.Target,
+			FullTarget: it.FullTarget,
+		})
+	}
+
+	updated, err := sqlite.UpsertLedgerStatusBatch(keys, status)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "批量更新台账失败"})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: "已更新",
+		Data:    map[string]any{"updated": updated},
+	})
+}
+
 // ledgerDeleteRequest 是台账批量删除的请求体：每一行用 (vulid, target, fulltarget) 定位，
 // 与台账的分组口径一致。
 type ledgerDeleteRequest struct {

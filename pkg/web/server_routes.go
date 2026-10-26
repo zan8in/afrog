@@ -251,6 +251,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/curated/config", jwtAuthMiddleware(curatedConfigPutHandler)).Methods(http.MethodPut)
 	api.HandleFunc("/ledger", jwtAuthMiddleware(requireCurated(ledgerListHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/ledger/status", jwtAuthMiddleware(requireCurated(ledgerUpdateHandler))).Methods(http.MethodPost)
+	// 批量把选中的命中置为同一台账状态（报告页多选流转）
+	api.HandleFunc("/ledger/batch", jwtAuthMiddleware(requireCurated(ledgerBatchUpdateHandler))).Methods(http.MethodPost)
 	// 批量删除台账选中的命中记录（连同底层 result 一起移除）
 	api.HandleFunc("/ledger/delete", jwtAuthMiddleware(requireCurated(ledgerDeleteHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/projects", jwtAuthMiddleware(projectsListHandler)).Methods(http.MethodGet)

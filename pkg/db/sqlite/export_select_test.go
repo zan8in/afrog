@@ -115,7 +115,7 @@ func TestSelectAllByTaskReturnsWholeTask(t *testing.T) {
 func TestSelectAllFilteredSpansTasks(t *testing.T) {
 	withFixture(t)
 
-	rows, err := SelectAllFiltered("", "high", "", false, false)
+	rows, err := SelectAllFiltered("", "", "high", "", false, false)
 	if err != nil {
 		t.Fatalf("SelectAllFiltered: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestSelectAllFilteredSpansTasks(t *testing.T) {
 		t.Fatalf("high rows = %d, want 2 (t-1 and t-2)", len(rows))
 	}
 
-	rows, err = SelectAllFiltered("", "", "poc-c", false, false)
+	rows, err = SelectAllFiltered("", "", "", "poc-c", false, false)
 	if err != nil {
 		t.Fatalf("SelectAllFiltered(keyword): %v", err)
 	}
@@ -132,7 +132,7 @@ func TestSelectAllFilteredSpansTasks(t *testing.T) {
 	}
 
 	// 指定任务时只返回该任务的命中，供报告页「按任务筛选后导出」使用。
-	rows, err = SelectAllFiltered("t-1", "", "", false, false)
+	rows, err = SelectAllFiltered("t-1", "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("SelectAllFiltered(task): %v", err)
 	}
@@ -143,6 +143,15 @@ func TestSelectAllFilteredSpansTasks(t *testing.T) {
 		if r.TaskID != "t-1" {
 			t.Fatalf("task filter leaked other task: %+v", rows)
 		}
+	}
+
+	// 指定项目时按任务归属收窄（与报告页筛选同一口径）。
+	rows, err = SelectAllFiltered("", "p-beta", "", "", false, false)
+	if err != nil {
+		t.Fatalf("SelectAllFiltered(project): %v", err)
+	}
+	if len(rows) != 1 || rows[0].TaskID != "t-3" {
+		t.Fatalf("project rows = %+v, want t-3", rows)
 	}
 }
 

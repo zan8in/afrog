@@ -221,15 +221,16 @@ func exportTaskHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // exportReportsHandler 导出漏洞报告页当前筛选结果。
-// GET /exports/reports?format=...&severity=high&keyword=ftp&task_id=<id>
-// task_id 非空时只导出该任务，与页面上「按任务筛选」的范围保持一致。
+// GET /exports/reports?format=...&severity=high&keyword=ftp&task_id=<id>&project_id=<id>
+// task_id / project_id 非空时分别按任务、项目收窄，与页面上「按任务 / 按项目筛选」的范围保持一致。
 func exportReportsHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	severity := strings.TrimSpace(q.Get("severity"))
 	keyword := strings.TrimSpace(q.Get("keyword"))
 	taskID := strings.TrimSpace(q.Get("task_id"))
+	projectID := strings.TrimSpace(q.Get("project_id"))
 
-	rows, err := sqlite.SelectAllFiltered(taskID, severity, keyword, true, true)
+	rows, err := sqlite.SelectAllFiltered(taskID, projectID, severity, keyword, true, true)
 	if err != nil {
 		writeExportError(w, http.StatusInternalServerError, "读取报告数据失败")
 		return

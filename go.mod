@@ -11,6 +11,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/dlclark/regexp2 v1.11.5
+	github.com/dop251/goja v0.0.0-20261011122007-9b0700c7e02e
 	github.com/go-zookeeper/zk v1.0.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/cel-go v0.9.0
@@ -95,7 +96,6 @@ require (
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/dlclark/regexp2/v2 v2.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dop251/goja v0.0.0-20261011122007-9b0700c7e02e // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect

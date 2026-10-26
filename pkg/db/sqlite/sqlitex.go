@@ -545,6 +545,159 @@ func reportFilters(taskID, severity, keyword string) ([]string, []interface{}) {
 	return where, args
 }
 
+// ReportFilter 是漏洞报告列表的筛选条件：任务 / 项目 / 等级 / 关键字 + 排序。
+type ReportFilter struct {
+	TaskID    string
+	Project   string
+	Severity  string
+	Keyword   string
+	SortBy    string
+	SortOrder string
+	Page      int
+	PageSize  int
+}
+
+// reportConditions 组装漏洞报告列表的筛选条件。
+//
+// 列名一律带 r. 前缀：查询会左连 vuln_ledger，而 vulid / target / fulltarget
+// 在两表同名，不加限定会直接触发 SQLite 的 ambiguous column name。
+func reportConditions(f ReportFilter) ([]string, []interface{}) {
+	var where []string
+	var args []interface{}
+
+	if kw := strings.TrimSpace(f.Keyword); kw != "" {
+		where = append(where, "(r.vulid LIKE ? OR r.vulname LIKE ?)")
+		like := "%" + kw + "%"
+		args = append(args, like, like)
+	}
+	if sevs := normalizeList(strings.Split(f.Severity, ",")); len(sevs) > 0 && len(sevs) < 5 {
+		holders := make([]string, 0, len(sevs))
+		for _, s := range sevs {
+			holders = append(holders, "?")
+			args = append(args, s)
+		}
+		where = append(where, "LOWER(r.severity) IN ("+strings.Join(holders, ",")+")")
+	}
+	if tid := strings.TrimSpace(f.TaskID); tid != "" {
+		where = append(where, "r.taskid = ?")
+		args = append(args, tid)
+	}
+	// 项目归属由任务推导（task_project），与台账页同一套口径。
+	if pid := strings.TrimSpace(f.Project); pid != "" {
+		where = append(where, "r.taskid IN (SELECT taskid FROM task_project WHERE project_id = ?)")
+		args = append(args, pid)
+	}
+	return where, args
+}
+
+// reportOrderClause 把前端列名映射为白名单内的排序列，非法值回落 id。
+// 等级不能按字面量排序（critical 会排到 info 前面），改按严重程度取值。
+func reportOrderClause(sortBy, sortOrder string) string {
+	col := "r.id"
+	switch strings.ToLower(strings.TrimSpace(sortBy)) {
+	case "created":
+		col = "r.created"
+	case "severity":
+		col = `CASE LOWER(r.severity)
+			WHEN 'critical' THEN 4 WHEN 'high' THEN 3 WHEN 'medium' THEN 2
+			WHEN 'low' THEN 1 ELSE 0 END`
+	case "vulname":
+		col = "r.vulname"
+	case "target":
+		col = "r.target"
+	}
+	dir := "DESC"
+	if strings.EqualFold(strings.TrimSpace(sortOrder), "asc") {
+		dir = "ASC"
+	}
+	return col + " " + dir
+}
+
+// SelectReportPage 返回漏洞报告分页数据：叠加任务 / 项目 / 等级筛选与排序，
+// 并左连台账带回该命中的人工状态，供列表直接展示处置进度。
+func SelectReportPage(f ReportFilter, expandPoc, expandResult bool) ([]db2.ResultData, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	if f.Page <= 0 {
+		f.Page = 1
+	}
+	if f.PageSize <= 0 {
+		f.PageSize = 50
+	}
+	if f.PageSize > 500 {
+		f.PageSize = 500
+	}
+	offset := (f.Page - 1) * f.PageSize
+
+	where, args := reportConditions(f)
+	query := "SELECT r.*, COALESCE(l.status, '') AS ledger_status, COALESCE(l.note, '') AS ledger_note" +
+		" FROM " + db2.TableName + " r" +
+		" LEFT JOIN vuln_ledger l" +
+		"   ON l.vulid = r.vulid AND l.target = r.target AND l.fulltarget = r.fulltarget"
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " ORDER BY " + reportOrderClause(f.SortBy, f.SortOrder) +
+		" LIMIT " + strconv.Itoa(f.PageSize) + " OFFSET " + strconv.Itoa(offset)
+
+	return runResultQuery(query, args, expandPoc, expandResult)
+}
+
+// CountReport 统计筛选后的命中数，与 SelectReportPage 口径一致。
+func CountReport(f ReportFilter) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	where, args := reportConditions(f)
+	q := "SELECT COUNT(*) FROM " + db2.TableName + " r"
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var count int64
+	if err := dbx.GetContext(ctx, &count, q, args...); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// ReportSeverityStats 返回各严重级别的命中数（键为小写），供等级筛选菜单显示计数。
+// 等级筛选本身被忽略，否则选中某一级后其它级别的计数会全部清零。
+func ReportSeverityStats(f ReportFilter) (map[string]int, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	f.Severity = ""
+	where, args := reportConditions(f)
+
+	q := "SELECT LOWER(r.severity) AS severity, COUNT(*) AS n FROM " + db2.TableName + " r"
+	if len(where) > 0 {
+		q += " WHERE " + strings.Join(where, " AND ")
+	}
+	q += " GROUP BY LOWER(r.severity)"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var rows []struct {
+		Severity string `db:"severity"`
+		N        int    `db:"n"`
+	}
+	if err := dbx.SelectContext(ctx, &rows, q, args...); err != nil {
+		return nil, err
+	}
+
+	stats := make(map[string]int, len(rows))
+	for _, r := range rows {
+		stats[strings.ToLower(strings.TrimSpace(r.Severity))] = r.N
+	}
+	return stats, nil
+}
+
 // selectResultPage 是分页查询的公共实现，where/args 由调用方组装。
 func selectResultPage(where []string, args []interface{}, page, pageSize int, expandPoc, expandResult bool) ([]db2.ResultData, error) {
 	if dbx == nil {
@@ -628,15 +781,25 @@ func SelectAllByTask(taskID, severity string, expandPoc, expandResult bool) ([]d
 	return runExportQuery(db2.TableName+".* FROM "+db2.TableName, where, args, expandPoc, expandResult)
 }
 
-// SelectAllFiltered 返回按「任务 + 严重级别 + 关键字」筛选后的全部命中。
-// taskID 为空表示跨任务；非空时只导出该任务的命中，与报告页的筛选范围一致。
-func SelectAllFiltered(taskID, severity, keyword string, expandPoc, expandResult bool) ([]db2.ResultData, error) {
+// SelectAllFiltered 返回按「任务 + 项目 + 严重级别 + 关键字」筛选后的全部命中。
+// taskID / projectID 为空表示该维度不限制，与报告页的筛选范围一致。
+func SelectAllFiltered(taskID, projectID, severity, keyword string, expandPoc, expandResult bool) ([]db2.ResultData, error) {
 	where, args := severityKeywordFilters(severity, keyword)
+	// taskid 在 join task_project 后与 tp.taskid 同名，必须限定表名。
 	if tid := strings.TrimSpace(taskID); tid != "" {
-		where = append([]string{"taskid = ?"}, where...)
+		where = append([]string{db2.TableName + ".taskid = ?"}, where...)
 		args = append([]interface{}{tid}, args...)
 	}
-	return runExportQuery(db2.TableName+".* FROM "+db2.TableName, where, args, expandPoc, expandResult)
+
+	from := db2.TableName + ".* FROM " + db2.TableName
+	if pid := strings.TrimSpace(projectID); pid != "" {
+		// 项目归属由任务推导，与报告列表同一套口径。
+		where = append([]string{"tp.project_id = ?"}, where...)
+		args = append([]interface{}{pid}, args...)
+		from = db2.TableName + ".* FROM " + db2.TableName +
+			" JOIN task_project tp ON tp.taskid = " + db2.TableName + ".taskid"
+	}
+	return runExportQuery(from, where, args, expandPoc, expandResult)
 }
 
 // SelectAllByProject 返回某个项目下全部任务的命中。
@@ -1271,6 +1434,56 @@ func UpsertLedgerStatus(vulid, target, fulltarget, status string, note *string) 
 		 VALUES(?, ?, ?, ?, ?, ?)`,
 		vulid, target, fulltarget, status, *note, now)
 	return err
+}
+
+// UpsertLedgerStatusBatch 批量把若干「PoC + 目标」组合置为同一状态。
+//
+// 语义与单条「只改状态」一致：保留各自的备注，不因为批量流转而清空。
+// 返回实际写入的组合数；单个组合失败即整体回滚。
+func UpsertLedgerStatusBatch(keys []ResultKey, status string) (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	clean := make([]ResultKey, 0, len(keys))
+	for _, k := range keys {
+		vulid := strings.TrimSpace(k.VulID)
+		if vulid == "" {
+			continue
+		}
+		clean = append(clean, ResultKey{
+			VulID:      vulid,
+			Target:     strings.TrimSpace(k.Target),
+			FullTarget: strings.TrimSpace(k.FullTarget),
+		})
+	}
+	if len(clean) == 0 {
+		return 0, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	tx, err := dbx.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	const stmt = `INSERT INTO vuln_ledger(vulid, target, fulltarget, status, note, updated_at)
+		 VALUES(?, ?, ?, ?, '', ?)
+		 ON CONFLICT(vulid, target, fulltarget) DO UPDATE SET
+		   status = excluded.status,
+		   updated_at = excluded.updated_at`
+
+	var total int64
+	for _, k := range clean {
+		if _, err := tx.ExecContext(ctx, stmt, k.VulID, k.Target, k.FullTarget, status, now); err != nil {
+			return total, err
+		}
+		total++
+	}
+	return total, tx.Commit()
 }
 
 // LinkTaskProject 记录任务所属项目，供台账按项目聚合与「项目扫描历史」使用。

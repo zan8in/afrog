@@ -553,6 +553,9 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 	pageSizeStr := strings.TrimSpace(q.Get("page_size"))
 	expandRaw := strings.TrimSpace(q.Get("expand")) // 可选：pocInfo,resultList,all
 	taskID := strings.TrimSpace(q.Get("task_id"))   // 可选：只看某次扫描（含计划扫描）的命中
+	projectID := strings.TrimSpace(q.Get("project_id"))
+	sortBy := strings.TrimSpace(q.Get("sort"))
+	sortOrder := strings.TrimSpace(q.Get("order"))
 
 	// 解析分页参数
 	page := 1
@@ -607,7 +610,16 @@ func reportsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data, err := queryReportList(taskID, severityParam, keyword, severityList, page, pageSize, expandPoc, expandResult, expandExtractor)
+	data, err := queryReportList(sqlite.ReportFilter{
+		TaskID:    taskID,
+		Project:   projectID,
+		Severity:  severityParam,
+		Keyword:   keyword,
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
+		Page:      page,
+		PageSize:  pageSize,
+	}, severityList, expandPoc, expandResult, expandExtractor)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})
@@ -669,15 +681,21 @@ func reportsDeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 // queryReportList 是报告列表查询的唯一实现：既服务于本机 /reports（JWT），
 // 也服务于集群只读代理（集群令牌），两边返回完全一致的结构。
-func queryReportList(taskID, severityParam, keyword string, severityList []string, page, pageSize int, expandPoc, expandResult, expandExtractor bool) (ReportListResponse, error) {
-	itemsRaw, err := sqlite.SelectPageScoped(taskID, severityParam, keyword, page, pageSize, expandPoc, expandResult)
+func queryReportList(filter sqlite.ReportFilter, severityList []string, expandPoc, expandResult, expandExtractor bool) (ReportListResponse, error) {
+	itemsRaw, err := sqlite.SelectReportPage(filter, expandPoc, expandResult)
 	if err != nil {
 		return ReportListResponse{}, fmt.Errorf("查询失败: %w", err)
 	}
 
-	total, err := sqlite.CountScoped(taskID, severityParam, keyword)
+	total, err := sqlite.CountReport(filter)
 	if err != nil {
 		return ReportListResponse{}, fmt.Errorf("统计失败: %w", err)
+	}
+
+	// 等级分布忽略等级筛选本身，否则选中某一级后其余计数会一起归零。
+	severityStats, err := sqlite.ReportSeverityStats(filter)
+	if err != nil {
+		return ReportListResponse{}, fmt.Errorf("统计等级分布失败: %w", err)
 	}
 
 	respItems := make([]ReportItem, 0, len(itemsRaw))
@@ -694,6 +712,9 @@ func queryReportList(taskID, severityParam, keyword string, severityList []strin
 			Node:       it.Node,
 			// 抽取结果很小，列表里始终带上：历史任务的诊断视图才能还原 [k="v"]。
 			Extractors: extractorStrings(it.Extractor),
+			// 台账人工状态：无记录时为空串（omitempty 省略），前端回落为「待确认」。
+			LedgerStatus: it.LedgerStatus,
+			LedgerNote:   it.LedgerNote,
 		}
 		if expandPoc {
 			item.PocInfo = it.PocInfo
@@ -710,16 +731,17 @@ func queryReportList(taskID, severityParam, keyword string, severityList []strin
 		respItems = append(respItems, item)
 	}
 
-	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	totalPages := int((total + int64(filter.PageSize) - 1) / int64(filter.PageSize))
 	return ReportListResponse{
-		Items:      respItems,
-		Page:       page,
-		PageSize:   pageSize,
-		Total:      total,
-		TotalPages: totalPages,
-		Keyword:    keyword,
-		Severity:   severityList,
-		TaskID:     taskID,
+		Items:         respItems,
+		Page:          filter.Page,
+		PageSize:      filter.PageSize,
+		Total:         total,
+		TotalPages:    totalPages,
+		Keyword:       filter.Keyword,
+		Severity:      severityList,
+		TaskID:        filter.TaskID,
+		SeverityStats: severityStats,
 	}, nil
 }
 

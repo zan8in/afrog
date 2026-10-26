@@ -207,7 +207,13 @@ func clusterInboundTaskFindingsHandler(w http.ResponseWriter, r *http.Request) {
 		pageSize = 500
 	}
 
-	data, err := queryReportList(taskID, severityParam, keyword, splitSeverity(severityParam), page, pageSize, false, false, false)
+	data, err := queryReportList(sqlite.ReportFilter{
+		TaskID:   taskID,
+		Severity: severityParam,
+		Keyword:  keyword,
+		Page:     page,
+		PageSize: pageSize,
+	}, splitSeverity(severityParam), false, false, false)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: err.Error()})

@@ -64,6 +64,9 @@ type ReportListResponse struct {
 	Severity   []string     `json:"severity,omitempty"`
 	// TaskID 是按任务筛选时回显给前端的过滤条件（计划扫描的「查看上次结果」用它）。
 	TaskID string `json:"task_id,omitempty"`
+	// SeverityStats 是各等级命中数分布（键为小写 info/low/medium/high/critical），
+	// 忽略等级筛选本身，供等级菜单显示计数。
+	SeverityStats map[string]int `json:"severity_stats,omitempty"`
 }
 
 // POC 列表 - 单条记录
