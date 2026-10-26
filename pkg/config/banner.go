@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Version     = "3.5.8"
+	Version     = "3.5.9"
 	ProjectName = "Afrog"
 )
 
