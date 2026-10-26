@@ -50,6 +50,11 @@ type Request struct {
 	EnableOOB  bool
 	OOBAdapter string
 
+	// 结果去向
+	// NoSaveDB 为真时命中不写入 result 表：只在事件流里出现，漏洞报告与台账保持干净。
+	// 用于测试性、不重要的扫描；默认（缺省）写库。
+	NoSaveDB bool
+
 	// 任务元信息
 	TaskName     string
 	Labels       []string
@@ -125,6 +130,7 @@ func BuildSpec(req Request) (*executor.Spec, func(), error) {
 		WebFavicon:        req.WebFavicon,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOBAdapter),
+		NoSaveDB:          req.NoSaveDB,
 		TaskName:          strings.TrimSpace(req.TaskName),
 		Labels:            req.Labels,
 		NodeSelector:      strings.TrimSpace(req.NodeSelector),

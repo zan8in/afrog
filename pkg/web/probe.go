@@ -41,6 +41,16 @@ func recordProbe(taskID, kind string, ts int64, target string, port, status int,
 	}
 }
 
+// recordProbe 是 Task 上的落库入口。-no-save-db 的任务一律不留痕：资产发现明细
+// （端口 / 存活主机 / Web 探测 / 阶段行）与漏洞报告、台账保持一致，只在事件流里出现。
+func (t *Task) recordProbe(kind string, ts int64, target string, port, status int, title string, data map[string]interface{}) {
+	// spec 在任务创建后不再变更，读时无需加锁。
+	if t.spec != nil && t.spec.NoSaveDB {
+		return
+	}
+	recordProbe(t.ID, kind, ts, target, port, status, title, data)
+}
+
 // scanProbesListHandler 返回某次扫描已落库的资产发现明细（可按 kind 过滤）。
 func scanProbesListHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")

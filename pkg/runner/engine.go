@@ -2144,7 +2144,11 @@ func (runner *Runner) Execute() {
 		}
 		runner.webMu.Unlock()
 		if len(webMetas) > 0 {
-			_, _ = sqlite.InsertWebProbeSummary(db2.TaskID, "webprobe", "webprobe", "webprobe", "webprobe", webMetas)
+			// Web 探测汇总在 result 表里也是一条记录（vulid=webprobe），会出现在漏洞报告里，
+			// 所以 -no-save-db 时同样不写；命中与探测仍照常走控制台/事件流。
+			if !runner.options.NoSaveDB {
+				_, _ = sqlite.InsertWebProbeSummary(db2.TaskID, "webprobe", "webprobe", "webprobe", "webprobe", webMetas)
+			}
 			if runner.Report != nil {
 				entries := make([]report.WebProbeEntry, 0, len(webMetas))
 				for i, meta := range webMetas {

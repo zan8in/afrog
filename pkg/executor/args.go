@@ -195,6 +195,11 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		args = append(args, "-disable-output-html")
 	}
 
+	// 结果写库：子进程默认写库，故只在关闭时显式下发，语义与 CLI 的默认值一致。
+	if spec.NoSaveDB {
+		args = append(args, "-no-save-db")
+	}
+
 	return args, cleanup, nil
 }
 

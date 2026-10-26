@@ -80,6 +80,7 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		ReportStates:      req.ReportStates,
 		OutputHTML:        req.OutputHTML,
 		OutputFile:        strings.TrimSpace(req.OutputFile),
+		NoSaveDB:          req.NoSaveDB,
 		WebFingerprint:    req.WebProbe || req.WebFingerprint,
 		WebProbeTimeout:   req.WebProbeTimeout,
 		WebFavicon:        req.WebFavicon,
@@ -260,7 +261,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 		// 落库只收开放端口：closed / filtered 只是端口状态说明，写进资产发现会污染资产池。
 		// 空 state 视为开放，兼容未上报状态的旧版子进程。
 		if s := ev.Port.State; s == "" || s == "open" {
-			recordProbe(t.ID, "port", ts, ev.Port.Host, ev.Port.Port, 0, "", portData)
+			t.recordProbe("port", ts, ev.Port.Host, ev.Port.Port, 0, "", portData)
 		}
 
 	case scanstream.TypeHost:
@@ -274,7 +275,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 		}
 		publish(t, ScanEvent{Type: "host", Data: hostData})
 		// 落库，让历史任务的「资产发现」也能回看存活主机与判定依据。
-		recordProbe(t.ID, "host", ts, ev.Host.Host, 0, 0, hostData["proto"].(string), hostData)
+		t.recordProbe("host", ts, ev.Host.Host, 0, 0, hostData["proto"].(string), hostData)
 
 	case scanstream.TypeWebProbe:
 		if ev.WebProbe == nil {
@@ -317,7 +318,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 		}
 		publish(t, ScanEvent{Type: "webprobe", Data: webData})
 		// 落库，让历史任务的「资产发现」也能回看
-		recordProbe(t.ID, "webprobe", ts, ev.WebProbe.URL, 0, ev.WebProbe.Status, ev.WebProbe.Title, webData)
+		t.recordProbe("webprobe", ts, ev.WebProbe.URL, 0, ev.WebProbe.Status, ev.WebProbe.Title, webData)
 
 	case scanstream.TypeLog:
 		// 阶段运维行（[INF]/[WRN] + 阶段名 + 事实）：终端里默认可见的结论行，
@@ -331,7 +332,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 			"ts":    ts,
 		}
 		publish(t, ScanEvent{Type: "log", Data: logData})
-		recordProbe(t.ID, "stage", ts, ev.Log.Text, 0, 0, ev.Log.Level, logData)
+		t.recordProbe("stage", ts, ev.Log.Text, 0, 0, ev.Log.Level, logData)
 
 	case scanstream.TypeDone:
 		if ev.Done == nil {

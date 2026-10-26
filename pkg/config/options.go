@@ -204,6 +204,10 @@ type Options struct {
 
 	DisableOutputHtml bool
 
+	// NoSaveDB 为真时不把命中写入 result 表：结果只在控制台/事件流里出现，不进漏洞
+	// 报告与台账。用于测试性扫描或确认不重要的目标，避免污染报告。
+	NoSaveDB bool
+
 	OJ *output.OutputJson
 
 	// Cookie string
@@ -432,6 +436,7 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.Json, "json", "j", "", "write to the JSON file, but it will not include the request and response content"),
 		flagSet.StringVarP(&options.JsonAll, "json-all", "ja", "", "write to the JSON file, including all vulnerability results"),
 		flagSet.BoolVarP(&options.DisableOutputHtml, "disable-output-html", "doh", false, "disable the automatic generation of HTML reports (higher priority than the -o command)"),
+		flagSet.BoolVar(&options.NoSaveDB, "no-save-db", false, "do not write vulnerability results into the sqlite database (test scans; keeps the report and ledger clean)"),
 		flagSet.BoolVarP(&options.NoColor, "no-color", "nc", false, "disable output content coloring (ANSI escape codes)"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "only results only"),
 		flagSet.BoolVar(&options.LiveStats, "live-stats", false, "render live stats in a single-line status display"),

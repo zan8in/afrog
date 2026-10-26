@@ -72,6 +72,10 @@ type Spec struct {
 	OutputHTML bool
 	OutputFile string
 
+	// NoSaveDB 对应 -no-save-db：命中只走控制台/事件流，不写入 result 表。
+	// 默认 false（写库），用于测试性扫描时保持漏洞报告与台账干净。
+	NoSaveDB bool
+
 	// OOB
 	EnableOOB  bool
 	OOBAdapter string

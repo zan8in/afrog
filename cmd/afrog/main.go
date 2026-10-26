@@ -398,7 +398,10 @@ func main() {
 				renderProgress()
 			}
 
-			sqlite.SetResultX(rst)
+			// -no-save-db：命中照样打进控制台与事件流，但不落库，报告与台账保持干净。
+			if !options.NoSaveDB {
+				sqlite.SetResultX(rst)
+			}
 
 			if options.Dingtalk {
 				webhookWG.Add(1)
@@ -471,7 +474,10 @@ func main() {
 				renderProgress()
 			}
 
-			sqlite.SetResultX(result)
+			// -no-save-db：命中照样打进控制台与事件流，但不落库，报告与台账保持干净。
+			if !options.NoSaveDB {
+				sqlite.SetResultX(result)
+			}
 
 			if options.Dingtalk {
 				webhookWG.Add(1)

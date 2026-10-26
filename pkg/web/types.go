@@ -137,10 +137,13 @@ type ScanCreateRequest struct {
 	ReportStates bool `json:"report_states,omitempty"`
 	// 报告输出：默认关闭（结果进 sqlite 并走事件流）。开启后执行器把 -o 指向固定的
 	// 报告目录，OutputFile 只是文件名，留空自动命名。
-	OutputHTML     bool   `json:"output_html,omitempty"`
-	OutputFile     string `json:"output_file,omitempty"`
-	WebProbe       bool   `json:"webprobe,omitempty"`
-	WebFingerprint bool   `json:"web_fingerprint,omitempty"`
+	OutputHTML bool   `json:"output_html,omitempty"`
+	OutputFile string `json:"output_file,omitempty"`
+	// NoSaveDB 为真时子进程不把命中写入 result 表：只在控制台/事件流展示，
+	// 漏洞报告与台账保持干净。用于测试性、不重要的扫描；默认（缺省）写库。
+	NoSaveDB       bool `json:"no_save_db,omitempty"`
+	WebProbe       bool `json:"webprobe,omitempty"`
+	WebFingerprint bool `json:"web_fingerprint,omitempty"`
 	// WebProbeTimeout 是单次 Web 探测请求/证书获取的超时（秒）；0 表示用引擎默认值。
 	WebProbeTimeout int      `json:"web_probe_timeout,omitempty"`
 	WebFavicon      bool     `json:"web_favicon,omitempty"`

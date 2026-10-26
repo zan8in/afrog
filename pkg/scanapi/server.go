@@ -304,6 +304,7 @@ func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 		WebFavicon:        spec.GetWebFavicon(),
 		EnableOOB:         spec.GetEnableOob(),
 		OOBAdapter:        spec.GetOobAdapter(),
+		NoSaveDB:          spec.GetNoSaveDb(),
 		TaskName:          spec.GetTaskName(),
 		Labels:            spec.GetLabels(),
 		NodeSelector:      spec.GetNodeSelector(),

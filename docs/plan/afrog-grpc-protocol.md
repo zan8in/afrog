@@ -176,6 +176,11 @@ message ScanSpec {
   string task_name = 30;
   repeated string labels = 31;
   string node_selector = 32;      // 标签表达式；空表示本机执行
+
+  // 结果去向
+  // 为真时命中不写入执行节点的 result 表（CLI 对应 -no-save-db）：
+  // 只在事件流里出现，漏洞报告与台账保持干净，用于测试性、不重要的扫描。
+  bool no_save_db = 33;
 }
 
 // -------------------- 事件 --------------------
