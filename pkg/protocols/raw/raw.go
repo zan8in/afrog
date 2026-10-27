@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/zan8in/rawhttp/client"
@@ -25,6 +24,9 @@ type Request struct {
 }
 
 // Parse parses the raw request as supplied by the user
+// 注意：unsafe（raw PoC）模式下，请求行里的 path 按「相对主机根」解释，不会拼接 baseURL 的子路径。
+// 这与实际发包行为一致（rawhttp 会用请求行的 path 覆盖 base URL 的 path），
+// 因此 request.raw 里的请求行与实际发出的请求行保持一致。
 func Parse(request, baseURL string, unsafe bool) (*Request, error) {
 	rawRequest := &Request{
 		Headers: make(map[string]string),
@@ -47,11 +49,6 @@ func Parse(request, baseURL string, unsafe bool) (*Request, error) {
 	parts := strings.Split(s, " ")
 	if len(parts) < 3 && !unsafe {
 		return nil, fmt.Errorf("malformed request supplied")
-	}
-	// Check if we have also a path from the passed base URL and if yes,
-	// append that to the unsafe request as well.
-	if parsedURL.Path != "" && strings.HasPrefix(parts[1], "/") && parts[1] != parsedURL.Path {
-		rawRequest.UnsafeRawBytes = fixUnsafeRequestPath(parsedURL, parts[1], rawRequest.UnsafeRawBytes)
 	}
 	// Set the request Method
 	rawRequest.Method = parts[0]
@@ -144,12 +141,6 @@ func Parse(request, baseURL string, unsafe bool) (*Request, error) {
 		rawRequest.Headers["Content-Length"] = fmt.Sprintf("%d", len(rawRequest.Data))
 	}
 	return rawRequest, nil
-}
-
-func fixUnsafeRequestPath(baseURL *url.URL, requestPath string, request []byte) []byte {
-	fixedPath := path.Join(baseURL.Path, requestPath)
-	fixed := bytes.Replace(request, []byte(requestPath), []byte(fixedPath), 1)
-	return fixed
 }
 
 // TryFillCustomHeaders after the Host header

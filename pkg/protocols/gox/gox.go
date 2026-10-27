@@ -9,6 +9,7 @@ import (
 	"net/http/httptrace"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -163,10 +164,16 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 	}
 
 	var milliseconds int64
+	var dialAddr atomic.Value
 	start := time.Now()
 	trace := httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
 			milliseconds = time.Since(start).Nanoseconds() / 1e6
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			if info.Conn != nil {
+				dialAddr.Store(info.Conn.RemoteAddr().String())
+			}
 		},
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
@@ -204,7 +211,11 @@ func (s *defaultHTTPSender) Do(ctx context.Context, method string, target string
 	if variableMap != nil {
 		variableMap["response_text"] = responseText
 	}
-	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, respBody, milliseconds)
+	dial := ""
+	if v, ok := dialAddr.Load().(string); ok {
+		dial = v
+	}
+	retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, respBody, milliseconds, dial)
 	retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
 	if variableMap != nil {
 		if resp != nil && resp.Request != nil && resp.Request.URL != nil {
@@ -328,10 +339,16 @@ func FetchLimited(method string, target string, body []byte, headers map[string]
 	}
 
 	var milliseconds int64
+	var dialAddr atomic.Value
 	start := time.Now()
 	trace := httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
 			milliseconds = time.Since(start).Nanoseconds() / 1e6
+		},
+		GotConn: func(info httptrace.GotConnInfo) {
+			if info.Conn != nil {
+				dialAddr.Store(info.Conn.RemoteAddr().String())
+			}
 		},
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
@@ -362,7 +379,11 @@ func FetchLimited(method string, target string, body []byte, headers map[string]
 			responseText = utils.Str2UTF8(string(data))
 		}
 		variableMap["response_text"] = responseText
-		retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, data, milliseconds)
+		dial := ""
+		if v, ok := dialAddr.Load().(string); ok {
+			dial = v
+		}
+		retryhttpclient.WriteHTTPResponseToVars(variableMap, resp, data, milliseconds, dial)
 		retryhttpclient.WriteHTTPRequestToVars(variableMap, req, string(body), target, req.URL.URL)
 		if resp != nil && resp.Request != nil && resp.Request.URL != nil {
 			variableMap["fulltarget"] = resp.Request.URL.String()

@@ -6,6 +6,8 @@ import (
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -430,6 +432,46 @@ var (
 						return types.ValOrErr(value, "unexpected type '%v' passed to sha1_bytes", value.Type())
 					}
 					return types.String(fmt.Sprintf("%x", sha1.Sum(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha256_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha256_string", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha256.Sum256([]byte(v))))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha256_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha256_bytes", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha256.Sum256(v)))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha512_string",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.String)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha512_string", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha512.Sum512([]byte(v))))
+				},
+			},
+			&functions.Overload{
+				Operator: "sha512_bytes",
+				Unary: func(value ref.Val) ref.Val {
+					v, ok := value.(types.Bytes)
+					if !ok {
+						return types.ValOrErr(value, "unexpected type '%v' passed to sha512_bytes", value.Type())
+					}
+					return types.String(fmt.Sprintf("%x", sha512.Sum512(v)))
 				},
 			},
 			&functions.Overload{

@@ -631,12 +631,18 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	// 	req.Header.Set("Cookie", ck)
 	// }
 
-	// latency
+	// latency，以及实际拨号连接信息（用于回填 response.conn）
 	var milliseconds int64
+	var dialAddr atomic.Value
 	start := time.Now()
 	trace := httptrace.ClientTrace{}
 	trace.GotFirstResponseByte = func() {
 		milliseconds = time.Since(start).Nanoseconds() / 1e6
+	}
+	trace.GotConn = func(info httptrace.GotConnInfo) {
+		if info.Conn != nil {
+			dialAddr.Store(info.Conn.RemoteAddr().String())
+		}
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &trace))
 
@@ -681,7 +687,11 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	}
 
 	variableMap["response_text"] = responseText
-	writeHTTPResponseToVars(variableMap, resp, respBody, milliseconds)
+	dial := ""
+	if v, ok := dialAddr.Load().(string); ok {
+		dial = v
+	}
+	writeHTTPResponseToVars(variableMap, resp, respBody, milliseconds, dial)
 	writeHTTPRequestToVars(variableMap, req, rule.Request.Body, target, u)
 
 	if resp != nil && resp.Request != nil && resp.Request.URL != nil {
@@ -693,7 +703,7 @@ func Request(target string, header []string, rule poc.Rule, variableMap map[stri
 	return nil
 }
 
-func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
+func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64, dialAddr string) {
 	bodyOut := body
 	if resp != nil && strings.Contains(strings.ToLower(resp.Header.Get("Content-Encoding")), "gzip") {
 		if decompressed, derr := gunzip(body); derr == nil {
@@ -708,6 +718,7 @@ func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, bo
 			protoResp.Url = url2ProtoUrl(resp.Request.URL)
 		}
 	}
+	protoResp.Conn = connInfoFromRemoteAddr(dialAddr)
 
 	newRespHeader := make(map[string]string)
 	rawHeaderBuilder := strings.Builder{}
@@ -742,8 +753,24 @@ func writeHTTPResponseToVars(variableMap map[string]any, resp *http.Response, bo
 	variableMap["response_text"] = utils.Str2UTF8(string(bodyOut))
 }
 
-func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64) {
-	writeHTTPResponseToVars(variableMap, resp, body, latency)
+func WriteHTTPResponseToVars(variableMap map[string]any, resp *http.Response, body []byte, latency int64, dialAddr string) {
+	writeHTTPResponseToVars(variableMap, resp, body, latency, dialAddr)
+}
+
+// connInfoFromRemoteAddr 由拨号得到的对端地址（"ip:port"）构造 response.conn。
+// 仅填目的地址，且 addr 保留裸 IP，使其语义等价于 nuclei 的 ip 变量。
+func connInfoFromRemoteAddr(remoteAddr string) *proto.ConnInfoType {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return nil
+	}
+	host, port := remoteAddr, ""
+	if h, p, err := net.SplitHostPort(remoteAddr); err == nil {
+		host, port = h, p
+	}
+	return &proto.ConnInfoType{
+		Destination: &proto.AddrType{Transport: "tcp", Addr: host, Port: port},
+	}
 }
 
 func writeHTTPRequestToVars(variableMap map[string]any, req *retryablehttp.Request, body string, target string, u *url.URL) {

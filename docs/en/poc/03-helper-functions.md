@@ -27,7 +27,7 @@ In practice, most PoC authors only need a few helper categories:
 | Work with text in responses | `icontains`, `replaceAll`, `toUpper`, `toLower`, `trim` |
 | Work with bytes or raw packets | `bcontains`, `ibcontains`, `bstartsWith`, `toBytes` |
 | Extract one or many values | `submatch`, `submatchall`, `bsubmatch`, `bsubmatchall` |
-| Encode, decode, or hash values | `base64`, `base64Decode`, `urlencode`, `urldecode`, `hexdecode`, `md5`, `sha1` |
+| Encode, decode, or hash values | `base64`, `base64Decode`, `urlencode`, `urldecode`, `hexdecode`, `md5`, `sha1`, `sha256`, `sha512` |
 | Compare versions or use time values | `timestamp_second`, `timestamp_milli`, `year`, `month`, `day`, `versionCompare` |
 | Handle OOB / reverse checks | `wait`, `jndi`, `oobCheck`, `oobCheckToken`, `oobEvidence` |
 | Build encrypted or gadget payloads | `aesCBC`, `aesECB`, `aesECBNoPad`, `ysoserial` |
@@ -284,6 +284,10 @@ Useful for:
 ### `sha1`
 
 Compute SHA1 from strings or bytes.
+
+### `sha256` / `sha512`
+
+Compute SHA256 / SHA512 from strings or bytes, returning a lowercase hex digest.
 
 ### `aesCBC`
 

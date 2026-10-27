@@ -27,7 +27,7 @@ last_reviewed: 2026-09-16
 | 处理正文或头部文本 | `icontains`、`replaceAll`、`toUpper`、`toLower`、`trim` |
 | 处理 bytes / 原始报文 | `bcontains`、`ibcontains`、`bstartsWith`、`toBytes` |
 | 提取单值或多值 | `submatch`、`submatchall`、`bsubmatch`、`bsubmatchall` |
-| 编码 / 解码 / 摘要 | `base64`、`base64Decode`、`urlencode`、`urldecode`、`hexdecode`、`md5`、`sha1` |
+| 编码 / 解码 / 摘要 | `base64`、`base64Decode`、`urlencode`、`urldecode`、`hexdecode`、`md5`、`sha1`、`sha256`、`sha512` |
 | 处理时间或版本 | `timestamp_second`、`timestamp_milli`、`year`、`month`、`day`、`versionCompare` |
 | 处理 OOB / 反连 | `wait`、`jndi`、`oobCheck`、`oobCheckToken`、`oobEvidence` |
 | 做加密或 gadget 生成 | `aesCBC`、`aesECB`、`aesECBNoPad`、`ysoserial` |
@@ -286,6 +286,10 @@ set:
 ### `sha1`
 
 计算 SHA1，支持字符串和 bytes。
+
+### `sha256` / `sha512`
+
+计算 SHA256 / SHA512，支持字符串和 bytes，返回小写十六进制摘要。
 
 ### `aesCBC`
 
