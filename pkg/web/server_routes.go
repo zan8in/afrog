@@ -208,6 +208,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/pocs/detail/{pocId}", jwtAuthMiddleware(pocsDetailHandler)).Methods(http.MethodGet)
 	// 编辑器校验：校验一段 YAML 并回传解析后的 info（实时预览用），不落盘
 	api.HandleFunc("/pocs/validate", jwtAuthMiddleware(pocsValidateHandler)).Methods(http.MethodPost)
+	// nuclei 模板转换：只转换不落盘，前端确认结果后再走 /pocs/create 保存
+	api.HandleFunc("/pocs/convert-nuclei", jwtAuthMiddleware(pocsConvertNucleiHandler)).Methods(http.MethodPost)
 	// 新增：创建 POC
 	api.HandleFunc("/pocs/create", jwtAuthMiddleware(pocsCreateHandler)).Methods(http.MethodPost)
 	// 新增：更新指定 POC 的 YAML 内容（当前使用 POST）

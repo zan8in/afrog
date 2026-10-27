@@ -253,7 +253,7 @@ func hintForUnknownField(field, content string) string {
 		"metadata":            {},
 	}
 
-	if _, ok := nucleiKeywords[lowerField]; ok || looksLikeNucleiTemplate(content) {
+	if _, ok := nucleiKeywords[lowerField]; ok || LooksLikeNucleiTemplate(content) {
 		switch lowerField {
 		case "requests", "http", "tcp", "dns":
 			return "looks like nuclei template structure; afrog expects 'rules' + 'expression'"
@@ -271,7 +271,9 @@ func hintForUnknownField(field, content string) string {
 	return "afrog doesn't support this key"
 }
 
-func looksLikeNucleiTemplate(content string) bool {
+// LooksLikeNucleiTemplate 判断一段内容是否是 nuclei 模板语法。
+// 导出供 nuclei → afrog 转换入口复用，避免两套识别规则漂移。
+func LooksLikeNucleiTemplate(content string) bool {
 	re := regexp.MustCompile(`(?m)^\s*(requests|http|tcp|dns)\s*:\s*$`)
 	if re.MatchString(content) {
 		return true
