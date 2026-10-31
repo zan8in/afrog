@@ -444,7 +444,7 @@ For plain HTTP, a default HTTP rule is simpler and faster.
 
 ### Ignoring timeouts
 
-`isPortOpen` and module methods have default timeouts; the script-wide execution cap is controlled by `-js-script-timeout` (default 60s; set to 0 to disable the script-level cap, in which case only the task-level timeout applies). For slow targets, tune module `SetTimeout` down first, or lower `-js-script-timeout`.
+`isPortOpen` and module methods have default timeouts; the script-wide execution cap is controlled by `-js-script-timeout` (default 180s; set to 0 to disable the script-level cap, in which case only the task-level timeout applies).
 
 When the scan stops or a task times out, a running script is interrupted immediately — including scripts blocked on network reads such as `Connect` / `Recv`: afrog propagates the task context cancellation to module dialing and I/O, so the connection is torn down right away instead of waiting for the module timeout.
 

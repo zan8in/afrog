@@ -442,7 +442,7 @@ expression: detect() && versionCompare(version, "<", "15.2.3.742")
 
 ### 忘了设置超时
 
-`isPortOpen` 与各模块方法都有默认超时；脚本整体执行上限由 `-js-script-timeout` 控制（默认 60 秒，设为 0 表示不设脚本级上限，此时只跟随任务级超时）。遇到慢目标时，优先调小模块的 `SetTimeout`，或降低 `-js-script-timeout`。
+`isPortOpen` 与各模块方法都有默认超时；脚本整体执行上限由 `-js-script-timeout` 控制（默认 180 秒，设为 0 表示不设脚本级上限，此时只跟随任务级超时）。
 
 扫描停止或任务超时时，正在执行的脚本会被立即中断——包括阻塞在 `Connect` / `Recv` 等网络读写上的脚本：afrog 会把任务上下文的取消传递到模块的拨号与读写，连接会立刻被打断，而不是等模块超时。
 

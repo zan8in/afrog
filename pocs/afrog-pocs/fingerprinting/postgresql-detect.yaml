@@ -7,6 +7,7 @@ info:
   verified: true
   description: |-
     PostgreSQL service was detected.
+    fofa: protocol="postgres"
   tags: network,db,postgresql,postgres,fingerprint
   created: 2026/01/09
 

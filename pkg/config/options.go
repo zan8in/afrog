@@ -455,7 +455,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.TaskTimeoutVisibleCapSec, "task-timeout-visible-cap-sec", 300, "maximum smart timeout for regular HTTP PoCs"),
 		flagSet.IntVar(&options.TaskTimeoutNetCapSec, "task-timeout-net-cap-sec", 360, "maximum smart timeout for tcp/udp/ssl PoCs"),
 		flagSet.IntVar(&options.TaskTimeoutGoCapSec, "task-timeout-go-cap-sec", 420, "maximum smart timeout for go PoCs"),
-		flagSet.IntVar(&options.JsScriptTimeout, "js-script-timeout", 60, "maximum execution time for one javascript PoC script in seconds, 0 disables"),
+		flagSet.IntVar(&options.JsScriptTimeout, "js-script-timeout", 180, "maximum execution time for one javascript PoC script in seconds, 0 disables"),
 		flagSet.BoolVar(&options.EnableJSPoc, "enable-js-poc", true, "enable javascript PoC execution (enabled by default; set -enable-js-poc=false to disable running script code from PoC files)"),
 		flagSet.BoolVar(&options.RequireSignedJSPoc, "require-signed-js-poc", false, "skip javascript PoCs whose signature is missing or invalid (lenient by default: verify if present, warn only)"),
 	)
