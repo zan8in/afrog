@@ -946,10 +946,13 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			}
 			techSummary := webTechSummary(meta.Technologies)
 			if techSummary != "" {
+				// 指纹是信息收集阶段最有价值的结论，用亮绿色强调；可信度标签保持暗灰，
+				// 避免把「识别到什么」和「可信到什么程度」混成同一个视觉层级。
+				attr := log.LogColor.Vulner(utils.Str2UTF8(techSummary))
 				if label := webConfidenceLabel(meta.Confidence); label != "" {
-					techSummary += " " + label
+					attr += " " + log.Dim(label)
 				}
-				attrs = append(attrs, log.Dim(utils.Str2UTF8(techSummary)))
+				attrs = append(attrs, attr)
 			}
 			// 原始响应头只在指纹没认出来时才补打：认出来时再打一遍只是同义重复，
 			// 而一旦没认出来，这两行往往就是用户判断「这是什么服务」的唯一线索。
@@ -980,7 +983,8 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 					desc = joinNonEmpty(desc, "expires "+exp)
 				}
 				if desc != "" {
-					attrs = append(attrs, log.Dim("tls: "+utils.Str2UTF8(desc)))
+					// 证书签发方与到期时间同属基础资产信息，用青色与指纹、标题区分。
+					attrs = append(attrs, log.LogColor.Low("tls: "+utils.Str2UTF8(desc)))
 				}
 			}
 			// favicon 哈希是按图定位同一套站的稳定标识，抓到了就外露（未抓取时为空）。
