@@ -106,10 +106,12 @@
 - { port: 3478, service: stun }
 - { port: 3690, service: svn }
 - { port: 4000, service: http }
+- { port: 4222, service: nats }
 - { port: 4369, service: epmd }
 - { port: 4443, service: https-alt, tls: true }
 - { port: 5000, service: http }
 - { port: 5001, service: https-alt, tls: true }
+- { port: 5005, service: jdwp }
 - { port: 5044, service: logstash }
 - { port: 5060, service: sip }
 - { port: 5061, service: sips, tls: true }

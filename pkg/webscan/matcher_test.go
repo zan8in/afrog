@@ -348,3 +348,131 @@ func TestBuiltinRulesProduceMatchTokens(t *testing.T) {
 		}
 	}
 }
+
+// Confluence 页面同样带 AJS 的 ajs-version-number，不能被误判为 Jira。
+func TestJiraDoesNotMatchConfluence(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	res := m.Match(Response{
+		Headers: map[string]string{"x-confluence-request-time": "1234567890"},
+		Body: []byte(`<html><head><meta name="ajs-version-number" content="9.0.0">` +
+			`<title>Confluence</title></head></html>`),
+	})
+	var jira, confluence bool
+	for _, tech := range res.Technologies {
+		switch tech.Name {
+		case "Atlassian Jira":
+			jira = true
+		case "Atlassian Confluence":
+			confluence = true
+		}
+	}
+	if jira {
+		t.Fatalf("Confluence response was reported as Jira: %+v", res.Technologies)
+	}
+	if !confluence {
+		t.Fatalf("Confluence was not detected: %+v", res.Technologies)
+	}
+}
+
+// 标题前缀相似的产品不能被 Vault 规则误中。
+func TestVaultDoesNotMatchVaultwarden(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	res := m.Match(Response{Body: []byte("<html><title>Vaultwarden</title></html>")})
+	for _, tech := range res.Technologies {
+		if tech.RuleID == "vault" {
+			t.Fatalf("Vaultwarden was reported as Vault: %+v", tech)
+		}
+	}
+}
+
+// 新增的专属头 / Cookie / 生成器指纹必须能命中，且版本可提取。
+func TestExclusiveFingerprints(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name        string
+		resp        Response
+		wantRule    string
+		wantVersion string
+	}{
+		{"sharepoint", Response{Headers: map[string]string{"microsoftsharepointteamservices": "16.0.0.1234"}}, "sharepoint", "16.0.0.1234"},
+		{"artifactory-id", Response{Headers: map[string]string{"x-artifactory-id": "abc"}}, "artifactory", ""},
+		{"artifactory-server", Response{Headers: map[string]string{"server": "Artifactory/7.77.5"}}, "artifactory", "7.77.5"},
+		{"f5-big-ip", Response{Headers: map[string]string{"set-cookie": "BIGipServerpool=12345.6789; Path=/"}}, "f5-big-ip", ""},
+		{"netscaler", Response{Headers: map[string]string{"set-cookie": "NSC_AAAC=xyz; Path=/"}}, "citrix-netscaler", ""},
+		{"squid", Response{Headers: map[string]string{"x-squid-error": "ERR_CACHE_MISS"}}, "squid", ""},
+		{"gerrit", Response{Body: []byte("<html><title>Gerrit Code Review</title></html>")}, "gerrit", ""},
+		{"kubernetes-dashboard", Response{Body: []byte("<html><title>Kubernetes Dashboard</title></html>")}, "kubernetes-dashboard", ""},
+		{"jsf", Response{Body: []byte(`<input type="hidden" name="javax.faces.ViewState" value="x">`)}, "jsf", ""},
+		{"zabbix-web", Response{Headers: map[string]string{"set-cookie": "zbx_session=abc; Path=/"}}, "zabbix-web", ""},
+		{"jekyll", Response{Body: []byte(`<meta name="generator" content="Jekyll v4.2.2">`)}, "jekyll", "4.2.2"},
+		{"hugo", Response{Body: []byte(`<meta name="generator" content="Hugo 0.123.0">`)}, "hugo", "0.123.0"},
+		{"hexo", Response{Body: []byte(`<meta name="generator" content="Hexo 7.2.0">`)}, "hexo", "7.2.0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Version != tc.wantVersion {
+				t.Errorf("version = %q, want %q", got.Version, tc.wantVersion)
+			}
+		})
+	}
+}
+
+// 收紧后的弱判据必须落在 probable，避免以 certain 结论输出。
+func TestTightenedRulesUseProbable(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name     string
+		resp     Response
+		wantRule string
+	}{
+		{"prestashop", Response{Body: []byte("<p>prestashop</p>")}, "prestashop"},
+		{"django", Response{Headers: map[string]string{"set-cookie": "csrftoken=abc; Path=/"}}, "django"},
+		{"opencart", Response{Body: []byte("<a href=\"index.php?route=product\">x</a>")}, "opencart"},
+		{"magento", Response{Body: []byte("<script>Mage.Cookies.init()</script>")}, "magento"},
+		{"empirecms", Response{Body: []byte("<link href=\"/e/data/\">")}, "empirecms"},
+		{"phpbb", Response{Body: []byte("<p>phpBB</p>")}, "phpbb"},
+		{"vbulletin", Response{Body: []byte("<p>vBulletin</p>")}, "vbulletin"},
+		{"phpcms", Response{Body: []byte("<p>PHPCMS</p>")}, "phpcms"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Confidence != ConfidenceProbable {
+				t.Errorf("%s confidence = %s, want probable", tc.wantRule, got.Confidence)
+			}
+		})
+	}
+}

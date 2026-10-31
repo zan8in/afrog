@@ -34,6 +34,42 @@
 
 # ---------------------------- active ----------------------------
 
+# 协议专属探针放在通用 HTTP 探针之前：主动探针按文件顺序在同一条连接上执行，
+# 放在前面才能保证拿到未被通用 payload 污染的协议响应。
+
+- id: JDWPHandshake
+  desc: JDWP 调试协议握手，JVM 会原样回显这 14 字节
+  mode: active
+  ports: [5005]
+  data: "JDWP-Handshake"
+
+- id: CassandraOptions
+  desc: "Cassandra CQL native protocol v4 OPTIONS 请求（opcode 0x05）"
+  mode: active
+  ports: [9042]
+  # version=0x04, flags=0x00, stream=0x0001, opcode=0x05(OPTIONS), length=0
+  hex: "040000010500000000"
+
+- id: MSSQLPreLogin
+  desc: MSSQL TDS PRELOGIN（VERSION + ENCRYPT_OFF），用于引出认证前的 PRELOGIN 响应
+  mode: active
+  ports: [1433]
+  # TDS 头(8) + VERSION token + ENCRYPTION token + 0xFF + 选项数据
+  hex: "1201005e00000100000024000601002a000102002b000103002c0004040030000105003100240600550001ff04081252000001000001397c005363526ed6eae44faa28695c803ba6b8527b3c7cab692b4a96b0d698c7a15d890201000001"
+
+- id: OracleConnect
+  desc: Oracle TNS CONNECT（CONNECT_DATA=(COMMAND=version)），用于引出 TNS ACCEPT/REFUSE
+  mode: active
+  ports: [1521]
+  hex: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
+
+- id: NFSNull
+  desc: NFSv3 RPC NULL 调用（program 100003, proc 0），用于确认 2049 上的 NFS
+  mode: active
+  ports: [2049]
+  # TCP record marking 0x80000028 + RPC CALL(xid=0x12345678, prog=100003, vers=3, proc=0, AUTH_NULL)
+  hex: "80000028123456780000000000000002000186a3000000030000000000000000000000000000000000000000"
+
 - id: GenericLines
   desc: 发送空行，激发行式文本协议（部分 SMTP/POP3 服务端需要一次输入才回 banner）
   mode: active

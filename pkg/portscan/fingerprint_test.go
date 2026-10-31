@@ -138,6 +138,122 @@ func TestIdentifyMQTTBinary(t *testing.T) {
 	}
 }
 
+// TestIdentifyProtocolFingerprints 验证新增的协议结构指纹：命中真实响应，
+// 且不会把普通 HTTP/JSON 响应误判成专用协议。
+func TestIdentifyProtocolFingerprints(t *testing.T) {
+	fp := newTestFingerprinter(t, "")
+
+	cassandra := []byte{
+		0x84, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00, 0x18,
+		0x00, 0x01, 0x00, 0x0b,
+		'C', 'Q', 'L', '_', 'V', 'E', 'R', 'S', 'I', 'O', 'N',
+		0x00, 0x01, 0x00, 0x05, '3', '.', '4', '.', '5',
+	}
+	mssql := []byte{0x04, 0x01, 0x00, 0x38, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x15, 0x00, 0x06}
+	nfs := []byte{
+		0x80, 0x00, 0x00, 0x1c,
+		0x12, 0x34, 0x56, 0x78,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	cases := []struct {
+		name        string
+		port        int
+		obs         Observation
+		wantService string
+		wantProduct string
+		wantVersion string
+		wantRule    string
+	}{
+		{"jdwp", 5005, Observation{ProbeID: "JDWPHandshake", Data: []byte("JDWP-Handshake")},
+			"jdwp", "JDWP", "", "jdwp"},
+		{"nats", 4222, Observation{ProbeID: DefaultProbeID,
+			Data: []byte(`INFO {"server_id":"ND123","server_name":"n","version":"2.10.7","proto":1}` + "\r\n")},
+			"nats", "NATS", "2.10.7", "nats"},
+		{"cassandra", 9042, Observation{ProbeID: "CassandraOptions", Data: cassandra},
+			"cql", "Cassandra", "", "cassandra"},
+		{"mssql", 1433, Observation{ProbeID: "MSSQLPreLogin", Data: mssql},
+			"ms-sql-s", "Microsoft SQL Server", "", "mssql"},
+		{"oracle", 1521, Observation{ProbeID: "OracleConnect",
+			Data: []byte("(DESCRIPTION=(VSNNUM=0x169)(VERSION=19.3.0.0.0))")},
+			"oracle", "Oracle TNS Listener", "", "oracle"},
+		{"nfs", 2049, Observation{ProbeID: "NFSNull", Data: nfs},
+			"nfs", "NFS", "", "nfs"},
+		{"cups", 631, Observation{ProbeID: "GetRequest",
+			Data: []byte("HTTP/1.1 200 OK\r\nServer: CUPS/2.4.2 IPP/2.1\r\n\r\n")},
+			"ipp", "CUPS", "2.4.2", "cups"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			info := fp.Identify(tc.port, []Observation{tc.obs})
+			if info.Service != tc.wantService {
+				t.Errorf("Service = %q, want %q", info.Service, tc.wantService)
+			}
+			if info.Product != tc.wantProduct {
+				t.Errorf("Product = %q, want %q", info.Product, tc.wantProduct)
+			}
+			if info.Version != tc.wantVersion {
+				t.Errorf("Version = %q, want %q", info.Version, tc.wantVersion)
+			}
+			if info.Confidence != ConfidenceCertain {
+				t.Errorf("Confidence = %s, want certain", info.Confidence)
+			}
+			if info.RuleID != tc.wantRule {
+				t.Errorf("RuleID = %q, want %q", info.RuleID, tc.wantRule)
+			}
+		})
+	}
+
+	// 泛化 JSON 不能被当作 NATS：server_id 是 NATS INFO 的必填字段。
+	info := fp.Identify(4222, []Observation{{ProbeID: DefaultProbeID, Data: []byte(`INFO {"foo":1}`)}})
+	if info.RuleID != "" {
+		t.Errorf("generic INFO JSON matched rule %q", info.RuleID)
+	}
+
+	// 协议探针只能发往其专用端口，避免污染通用 HTTP 端口。
+	active80 := probeIDs(fp.Probes(80, ProbeModeActive))
+	for _, id := range []string{"JDWPHandshake", "CassandraOptions", "MSSQLPreLogin", "OracleConnect", "NFSNull"} {
+		if contains(active80, id) {
+			t.Errorf("probe %s must not be sent to port 80", id)
+		}
+	}
+	if !contains(probeIDs(fp.Probes(1433, ProbeModeActive)), "MSSQLPreLogin") {
+		t.Error("MSSQLPreLogin must be sent to port 1433")
+	}
+	if !contains(probeIDs(fp.Probes(2049, ProbeModeActive)), "NFSNull") {
+		t.Error("NFSNull must be sent to port 2049")
+	}
+}
+
+// TestTightenedPortRulesAreProbable 验证收紧后的弱判据不再以 certain 输出。
+func TestTightenedPortRulesAreProbable(t *testing.T) {
+	fp := newTestFingerprinter(t, "")
+
+	info := fp.Identify(8123, []Observation{{
+		ProbeID: "GetRequest",
+		Data:    []byte("Ok."),
+	}})
+	if info.RuleID != "clickhouse" || info.Confidence != ConfidenceProbable {
+		t.Errorf("clickhouse rule = %q/%s, want clickhouse/probable", info.RuleID, info.Confidence)
+	}
+
+	info = fp.Identify(7001, []Observation{{
+		ProbeID: "GetRequest",
+		Data:    []byte("HTTP/1.0 404 Not Found\r\n\r\n<html><title>Error 404--Not Found</title></html>"),
+	}})
+	if info.Product != "Oracle WebLogic" {
+		t.Errorf("Product = %q, want Oracle WebLogic", info.Product)
+	}
+	if info.RuleID == "weblogic" && info.Confidence == ConfidenceCertain {
+		t.Error("WebLogic 404 title must not be reported as certain")
+	}
+}
+
 // TestIdentifyPortPriorOnly 验证没有任何探针证据时只给端口惯例推测。
 func TestIdentifyPortPriorOnly(t *testing.T) {
 	fp := newTestFingerprinter(t, "")

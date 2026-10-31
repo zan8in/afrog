@@ -320,8 +320,10 @@
   probes: [GetRequest, "NULL"]
   ports: [8123, 9000]
   match:
+    # "Ok." 不是 ClickHouse 专属响应，任意极简 HTTP 服务都可能返回，降为 probable。
     - pattern: '^Ok\.$'
       info: "ClickHouse HTTP ping"
+      confidence: probable
     - pattern: '(?im)^X-ClickHouse-Server-Display-Name:[ ]*(?<product>[^\r\n]{1,64})'
       info: "ClickHouse $product"
 
@@ -630,12 +632,107 @@
   probes: [GetRequest, "NULL"]
   ports: [7001, 7002]
   match:
+    # 该 404 标题虽然常见于 WebLogic，但仅凭标题不足以认定，降为 probable；
+    # X-Weblogic-* 与 Oracle WebLogic 标题仍保持 certain。
     - pattern: '(?i)<title>\s*Error 404--Not Found'
       info: "WebLogic default 404 page"
+      confidence: probable
     - pattern: "(?im)^X-Weblogic-"
       info: "WebLogic"
     - pattern: '(?i)<title>\s*Oracle(?:®)? WebLogic'
       info: "WebLogic"
+
+# ==================== 协议结构指纹（认证前即可确认） ====================
+#
+# 这一组全部依赖协议自身的结构或专属字符串，不依赖端口号；端口只用于限制探针
+# 的发送范围，避免把通用 payload 发给专用协议端口。
+
+- id: jdwp
+  service: jdwp
+  product: JDWP
+  probes: [JDWPHandshake]
+  ports: [5005]
+  match:
+    # 客户端发 "JDWP-Handshake"，JVM 原样回显，无其它协议会这样做。
+    - pattern: '^JDWP-Handshake'
+      info: "JDWP handshake echoed"
+
+- id: nats
+  service: nats
+  product: NATS
+  probes: ["NULL"]
+  ports: [4222]
+  match:
+    # 连接建立后服务端立即下发 INFO JSON，server_id 是必填字段。
+    - pattern: '^INFO\s*\{[\s\S]{0,1024}"server_id"[\s\S]{0,1024}"version"\s*:\s*"(?<version>[^"]{1,24})"'
+      version: $version
+      info: "NATS $version"
+    - pattern: '^INFO\s*\{[\s\S]{0,1024}"server_id"'
+      info: "NATS INFO"
+
+- id: cassandra
+  service: cql
+  product: Cassandra
+  probes: [CassandraOptions]
+  ports: [9042]
+  encoding: binary
+  match:
+    # SUPPORTED 帧：响应版本 0x84/0x85 + flags + stream(0001) + opcode 0x06，
+    # 帧体是键值表，必然包含 CQL_VERSION。
+    - pattern: '^(?:\x84|\x85)[\s\S]\x00\x01\x06[\s\S]{0,2048}CQL_VERSION'
+      info: "CQL SUPPORTED frame"
+
+- id: mssql
+  service: ms-sql-s
+  product: Microsoft SQL Server
+  probes: [MSSQLPreLogin]
+  ports: [1433]
+  encoding: binary
+  match:
+    # Reply 包：type=0x04 + status + 2 字节大端长度（高位为 0）+ spid + packetID +
+    # window(0x00)，随后第一个 PRELOGIN token 为 VERSION(0x00)，其长度字段为 0x0006。
+    - pattern: '^\x04[\s\S]\x00[\s\S]{4}\x00\x00[\s\S]{2}\x00\x06'
+      info: "TDS PRELOGIN response"
+
+- id: oracle
+  service: oracle
+  product: Oracle TNS Listener
+  probes: [OracleConnect]
+  ports: [1521]
+  match:
+    # 服务端应答中必然带 TNS 结构字段；按结构而非裸关键词判定。
+    - pattern: '(?i)vsnnum'
+      info: "TNS ACCEPT with VSNNUM"
+    - pattern: '(?i)tnslsnr'
+      info: "TNS listener hostname"
+    - pattern: '(?i)\(description=[\s\S]{0,2048}\((?:version|err|error_stack)='
+      info: "TNS DESCRIPTION"
+    - pattern: '(?i)\btns-[0-9]{4,}'
+      info: "TNS error code"
+
+- id: nfs
+  service: nfs
+  product: NFS
+  probes: [NFSNull]
+  ports: [2049]
+  encoding: binary
+  match:
+    # RPC Reply：TCP record marker(0x80) + 我们固定的 xid + msg_type=REPLY(1) +
+    # reply_stat=ACCEPTED(0) + verifier + accept_stat=SUCCESS(0)。
+    - pattern: '^\x80[\s\S]{3}\x12\x34\x56\x78\x00\x00\x00\x01\x00\x00\x00\x00[\s\S]{8}\x00\x00\x00\x00'
+      info: "RPC NULL reply"
+
+- id: cups
+  service: ipp
+  product: CUPS
+  probes: [GetRequest, "NULL"]
+  ports: [631]
+  match:
+    # CUPS 的 Server 头是其专属标识（如 "CUPS/2.4.2 IPP/2.1"）。
+    - pattern: '(?im)^Server:[ ]*CUPS(?:/(?<version>[^\s\r\n]{1,16}))?'
+      version: $version
+      product: CUPS
+      info: "CUPS $version"
 
 # ================================ 通用 HTTP ================================
 

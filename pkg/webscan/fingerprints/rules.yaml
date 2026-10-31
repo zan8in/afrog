@@ -514,9 +514,11 @@
   category: framework
   cpe: cpe:/a:djangoproject:django
   match:
+    # csrftoken 是同名 Cookie 的通用写法，可能被其它框架复用。
     - source: header
       header: set-cookie
       pattern: '(?i)\bcsrftoken='
+      confidence: probable
 
 - id: rails
   name: Ruby on Rails
@@ -760,8 +762,14 @@
   category: secrets
   cpe: cpe:/a:hashicorp:vault
   match:
+    # 标题必须精确等于 "Vault" / "HashiCorp Vault"，避免误中 Vaultwarden 等
+    # 同名前缀产品；X-Vault-Request 是 Vault 自己的响应头。
     - source: body
-      pattern: '(?i)<title>\s*Vault'
+      pattern: '(?i)<title>\s*(?:HashiCorp\s+)?Vault\s*</title>'
+      confidence: probable
+    - source: header
+      header: x-vault-request
+      pattern: '\S'
 
 - id: rabbitmq-management
   name: RabbitMQ Management
@@ -907,11 +915,11 @@
   category: itsm
   cpe: cpe:/a:atlassian:jira
   match:
+    # 只用 Jira 专属响应头。AJS 的 ajs-version-number 在 Confluence 等
+    # 其它 Atlassian 产品上同样存在，不能作为 Jira 判据。
     - source: header
       header: x-arequestid
       pattern: '\S'
-    - source: body
-      pattern: "(?i)ajs-version-number"
 
 - id: confluence
   name: Atlassian Confluence
@@ -943,6 +951,7 @@
       pattern: '(?i)\becology_JSessionid='
     - source: body
       pattern: "(?i)/spa/portal/"
+      confidence: probable
 
 - id: tongda-oa
   name: Tongda OA
@@ -982,6 +991,7 @@
 - id: phpcms
   name: PHPCMS
   category: cms
+  softmatch: true
   match:
     - source: body
       pattern: '(?i)\bPHPCMS\b'
@@ -989,6 +999,8 @@
 - id: empirecms
   name: EmpireCMS
   category: cms
+  # 正文提及产品名、以及 /e/data/ 静态路径都可能出现在转载/镜像页面。
+  softmatch: true
   match:
     - source: body
       pattern: '(?i)\bEmpireCMS\b'
@@ -1020,12 +1032,15 @@
   category: ecommerce
   cpe: cpe:/a:magento:magento
   match:
+    # Mage.Cookies 是前端 JS 变量，可能被复制到非 Magento 页面。
     - source: body
       pattern: '(?i)Mage\.Cookies'
+      confidence: probable
 
 - id: prestashop
   name: PrestaShop
   category: ecommerce
+  softmatch: true
   match:
     - source: body
       pattern: '(?i)\bprestashop\b'
@@ -1034,8 +1049,10 @@
   name: OpenCart
   category: ecommerce
   match:
+    # 该路由串也可能只是页面里指向其它 OpenCart 站点的链接。
     - source: body
       pattern: '(?i)index\.php\?route='
+      confidence: probable
 
 - id: mediawiki
   name: MediaWiki
@@ -1064,6 +1081,7 @@
   name: phpBB
   category: forum
   cpe: cpe:/a:phpbb:phpbb
+  softmatch: true
   match:
     - source: body
       pattern: '(?i)\bphpBB\b'
@@ -1071,9 +1089,217 @@
 - id: vbulletin
   name: vBulletin
   category: forum
+  softmatch: true
   match:
     - source: body
       pattern: '(?i)\bvBulletin\b'
+
+# ==================== 补充：专属头 / Cookie 指纹 ====================
+#
+# 这一组全部使用产品专属的响应头、Cookie 名或生成器标记，不使用泛化关键词。
+# 仅当同名 Cookie 存在被自定义复用的可能时（Play/CodeIgniter/CakePHP/Yii）标为 probable。
+
+- id: sharepoint
+  name: Microsoft SharePoint
+  category: portal
+  cpe: cpe:/a:microsoft:sharepoint_server
+  match:
+    - source: header
+      header: microsoftsharepointteamservices
+      pattern: '(?<version>[\d.]+)'
+      version: ${version}
+    - source: header
+      header: microsoftsharepointteamservices
+      pattern: '\S'
+
+- id: artifactory
+  name: JFrog Artifactory
+  category: registry
+  match:
+    - source: header
+      header: x-artifactory-id
+      pattern: '\S'
+    - source: header
+      header: server
+      pattern: '(?i)\bartifactory(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: f5-big-ip
+  name: F5 BIG-IP
+  category: load-balancer
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bBIGipServer[^\s=]*='
+
+- id: citrix-netscaler
+  name: Citrix NetScaler
+  category: load-balancer
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bNSC_(?:AAAC|ESNS|TASS)[^\s=]*='
+
+- id: squid
+  name: Squid
+  category: proxy
+  cpe: cpe:/a:squid-cache:squid
+  match:
+    - source: header
+      header: x-squid-error
+      pattern: '\S'
+    - source: header
+      header: via
+      pattern: '(?i)\bsquid(?:/(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: gerrit
+  name: Gerrit Code Review
+  category: scm
+  match:
+    - source: title
+      pattern: '(?i)Gerrit Code Review'
+
+- id: kubernetes-dashboard
+  name: Kubernetes Dashboard
+  category: panel
+  cpe: cpe:/a:kubernetes:dashboard
+  match:
+    - source: title
+      pattern: '(?i)Kubernetes Dashboard'
+
+- id: jsf
+  name: JavaServer Faces
+  category: framework
+  cpe: cpe:/a:oracle:javaserver_faces
+  match:
+    - source: body
+      pattern: '(?i)javax\.faces\.ViewState'
+
+- id: mojarra
+  name: Mojarra
+  category: framework
+  cpe: cpe:/a:eclipse:mojarra
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)com\.sun\.faces'
+
+- id: zabbix-web
+  name: Zabbix Web
+  category: monitoring
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\b(?:zbx_session|zbx_sessionid)='
+
+- id: cacti
+  name: Cacti
+  category: monitoring
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Cacti'
+
+- id: nagios
+  name: Nagios
+  category: monitoring
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Nagios'
+
+- id: icinga
+  name: Icinga
+  category: monitoring
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Icinga'
+
+- id: netdata
+  name: Netdata
+  category: monitoring
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Netdata'
+
+- id: rancher
+  name: Rancher
+  category: panel
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Rancher'
+
+- id: argocd
+  name: Argo CD
+  category: ci
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)Argo CD'
+
+- id: play-framework
+  name: Play Framework
+  category: framework
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bPLAY_SESSION='
+
+- id: codeigniter
+  name: CodeIgniter
+  category: framework
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bci_session='
+
+- id: cakephp
+  name: CakePHP
+  category: framework
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bCAKEPHP='
+
+- id: yii
+  name: Yii
+  category: framework
+  softmatch: true
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bYII_CSRF_TOKEN='
+
+- id: jekyll
+  name: Jekyll
+  category: static-site
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Jekyll\s*(?:v?(?<version>[\d.]+))?["'']'
+      version: ${version}
+
+- id: hugo
+  name: Hugo
+  category: static-site
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Hugo\s*(?<version>[\d.]+)?["'']'
+      version: ${version}
+
+- id: hexo
+  name: Hexo
+  category: static-site
+  match:
+    - source: body
+      pattern: '(?i)<meta[^>]+name=["'']generator["''][^>]+content=["'']Hexo\s*(?<version>[\d.]+)?["'']'
+      version: ${version}
 
 # ============================== favicon 指纹 ==============================
 #
