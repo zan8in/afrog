@@ -15,15 +15,46 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：AMQP 0-9-1 协议握手。服务端在 Connection.Start 帧里返回版本、服务端属性
+  #     (product/version/platform) 和 capabilities，这一步发生在认证之前，因此
+  #     开启强制认证的 RabbitMQ 同样会响应。
+  #     判据以帧结构为主：type=1(method)、channel=0、class-id=10、method-id=10，
+  #     这样即使 product 不是 "RabbitMQ"（Qpid、Artemis 等 0-9-1 broker），或
+  #     服务端裁剪了 capabilities，也仍然可以识别为 AMQP。
+  #     版本不匹配时服务端会直接回协议头 "AMQP\x00\x00..."，同样接受。
   r0:
     request:
       type: tcp
       host: "{{host}}"
       steps:
         - write:
-            data: "AMQP\u0000\u0000\t\u0001"
+            data: "414d51500000000901"
+            data-type: hex
         - read:
             read-size: 20480
             read-timeout: 3
-    expression: response.raw.bcontains(b'publisher_confirmst') && response.raw.bcontains(b'RabbitMQ')
-expression: r0()
+            read-type: bytes
+            save-as: probe0
+    expression: |
+      (probe0.bstartsWith(b"\x01\x00\x00\x00\x00\x00") &&
+       probe0.bcontains(b"\x00\x0a\x00\x0a")) ||
+      probe0.bstartsWith(b"AMQP\x00\x00")
+  # r1：amqps（5671），TLS 之上再做同样的 AMQP 0-9-1 握手
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "414d51500000000901"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe1
+    expression: |
+      (probe1.bstartsWith(b"\x01\x00\x00\x00\x00\x00") &&
+       probe1.bcontains(b"\x00\x0a\x00\x0a")) ||
+      probe1.bstartsWith(b"AMQP\x00\x00")
+expression: r0() || r1()

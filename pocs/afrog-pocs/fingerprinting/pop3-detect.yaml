@@ -23,6 +23,11 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：POP3 服务端在连接建立、认证之前必定返回一条以 +OK 开头的问候语。
+  #     问候语文案差异很大（+OK Dovecot ready. / +OK POP3 server ready / +OK ready），
+  #     并不一定包含 "pop3" 字样，因此以 +OK 状态行作为判据，不依赖 CAPA：
+  #   - CAPA 被禁用（-ERR Capability not supported）或要求先认证时，banner 仍然有效；
+  #   - +OK 是 POP3 特有的状态行，SMTP 是 220、IMAP 是 * OK，不会互相误判。
   r0:
     request:
       type: tcp
@@ -33,14 +38,19 @@ rules:
             read-timeout: 3
             read-until: "\r\n"
             read-type: bytes
-            save-as: banner
-        - write:
-            data: "CAPA\r\n"
+            save-as: banner0
+    expression: '"(?i)^\\+OK".bmatches(banner0)'
+  # r1：POP3S（995），TLS 握手后 greeting 同样是 +OK
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
         - read:
-            read-size: 8192
+            read-size: 4096
             read-timeout: 3
-            read-until: "\r\n.\r\n"
+            read-until: "\r\n"
             read-type: bytes
-            save-as: capa
-    expression: banner.bcontains(b"+OK") && capa.bcontains(b"+OK")
-expression: r0()
+            save-as: banner1
+    expression: '"(?i)^\\+OK".bmatches(banner1)'
+expression: r0() || r1()

@@ -13,17 +13,54 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：一次投递 INFO 和 PING，再读整段回包，覆盖常见服务端形态：
+  #   - 无密码 / 已认证：INFO 批量回包里包含 redis_version、# Server、redis_mode；
+  #   - requirepass / ACL：-NOAUTH Authentication required；
+  #   - protected-mode：-DENIED Redis is running in protected mode...；
+  #   - 正在加载数据：-LOADING Redis is loading the dataset in memory；
+  #   - INFO 被 rename-command 禁用：仍可由 PING 的 +PONG 命中。
+  # 采用一次 write 批量命令 + 一次 read，避免多步 read-until 在服务端提前断开时丢证据。
   r0:
     request:
       type: tcp
       host: "{{host}}"
       steps:
         - write:
-            data: "*1\r\n$4\r\ninfo\r\n"
+            data: "*1\r\n$4\r\ninfo\r\nPING\r\n"
         - read:
-            read-size: 8192
+            read-size: 20480
             read-timeout: 3
             read-type: bytes
-            save-as: reply
-    expression: reply.bcontains(b'DENIED Redis') || reply.bcontains(b'CONFIG REWRITE') || reply.bcontains(b'NOAUTH Authentication') || reply.bcontains(b'72656469735f76657273696f6')
-expression: r0()
+            save-as: reply0
+    expression: |
+      reply0.bcontains(b"redis_version") ||
+      reply0.ibcontains(b"# Server") ||
+      reply0.ibcontains(b"redis_mode") ||
+      reply0.bcontains(b"-NOAUTH") ||
+      reply0.bcontains(b"DENIED Redis") ||
+      reply0.bcontains(b"protected mode") ||
+      reply0.bcontains(b"-LOADING") ||
+      reply0.bcontains(b"+PONG\r\n")
+  # r1：rediss（TLS 端口），同样投递 INFO + PING
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "*1\r\n$4\r\ninfo\r\nPING\r\n"
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: reply1
+    expression: |
+      reply1.bcontains(b"redis_version") ||
+      reply1.ibcontains(b"# Server") ||
+      reply1.ibcontains(b"redis_mode") ||
+      reply1.bcontains(b"-NOAUTH") ||
+      reply1.bcontains(b"DENIED Redis") ||
+      reply1.bcontains(b"protected mode") ||
+      reply1.bcontains(b"-LOADING") ||
+      reply1.bcontains(b"+PONG\r\n")
+expression: r0() || r1()

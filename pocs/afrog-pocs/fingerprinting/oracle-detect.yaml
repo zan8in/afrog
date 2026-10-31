@@ -1,0 +1,70 @@
+id: oracle-detect
+
+info:
+  name: Oracle Listener - Detect
+  author: zan8in
+  severity: info
+  verified: false
+  description: |-
+    Oracle TNS listener was detected.
+  tags: network,db,oracle,tns,fingerprint
+  created: 2026/01/09
+
+set:
+  host: request.url.host
+rules:
+  # r0：向 TNS listener 发送 CONNECT_DATA=(COMMAND=version)。
+  #     各类服务端形态的应答：
+  #   - 正常监听：结构化的 (DESCRIPTION=...(VSNNUM=...)(VERSION=...)；
+  #   - 服务/实例不可用：同样返回 (DESCRIPTION=...(ERR=...)(ERROR_STACK=...))；
+  #   - 旧版本或裁剪版：可能只回 tnslsnr 主机名或 TNS- 错误号。
+  #     因此不再要求同时出现 "oracle" 与 "version" 两个字面量，改为按 TNS 结构匹配。
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe0
+    expression: |
+      probe0.ibcontains(b"vsnnum") ||
+      probe0.ibcontains(b"tnslsnr") ||
+      probe0.ibcontains(b"tns-") ||
+      (probe0.ibcontains(b"(description=") &&
+       (probe0.ibcontains(b"(version=") ||
+        probe0.ibcontains(b"(err=") ||
+        probe0.ibcontains(b"(error_stack=")))
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)\\(VERSION=(?P<oracle>[0-9][0-9.]*)".bsubmatch(response.raw)'
+          oracle: ext["oracle"]
+  # r1：TCPS（2484），TLS 之上同样发送 version 命令
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "005a0000010000000136012c000008007fff7f08000000010020003a0000000000000000000000000000000034e600000001000000000000000028434f4e4e4543545f444154413d28434f4d4d414e443d76657273696f6e2929"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe1
+    expression: |
+      probe1.ibcontains(b"vsnnum") ||
+      probe1.ibcontains(b"tnslsnr") ||
+      probe1.ibcontains(b"tns-") ||
+      (probe1.ibcontains(b"(description=") &&
+       (probe1.ibcontains(b"(version=") ||
+        probe1.ibcontains(b"(err=") ||
+        probe1.ibcontains(b"(error_stack=")))
+expression: r0() || r1()

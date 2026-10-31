@@ -13,6 +13,8 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：ruok。正常返回 imok；只读/不可用节点返回 not currently serving requests；
+  #     命令被 4lw.commands.whitelist 拦截时可能返回 not in the whitelist。
   r0:
     request:
       type: tcp
@@ -24,18 +26,33 @@ rules:
             read-size: 4096
             read-timeout: 3
     expression: response.raw.bcontains(b"imok") || response.raw.ibcontains(b"not in the whitelist") || response.raw.ibcontains(b"not currently serving requests")
+  # r1：srvr。返回 "Zookeeper version: ..."，覆盖只放行 srvr 的白名单配置
   r1:
     request:
       type: tcp
       host: "{{host}}"
       steps:
         - write:
-            data: "stat\n"
+            data: "srvr\n"
         - read:
             read-size: 8192
             read-timeout: 3
     expression: response.raw.ibcontains(b"zookeeper version")
+  # r2：mntr。返回以 zk_version/zk_server_state 开头的指标行，
+  #     覆盖只放行 mntr 的白名单配置
   r2:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "mntr\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+    expression: response.raw.ibcontains(b"zk_version") || response.raw.ibcontains(b"zk_server_state")
+  # r3：envi。返回 zookeeper.version 等环境项，覆盖只放行 envi 的白名单配置
+  r3:
     request:
       type: tcp
       host: "{{host}}"
@@ -46,4 +63,32 @@ rules:
             read-size: 8192
             read-timeout: 3
     expression: response.raw.ibcontains(b"zookeeper.version")
-expression: r0() || r1() || r2()
+  # r4：所有 4lw 命令都被禁用时，改走客户端二进制握手。
+  #     ZooKeeper 连接包 = 4 字节长度 + ConnectRequest：
+  #       protocolVersion(4)=0, lastZxidSeen(8)=0, timeOut(4)=30000,
+  #       sessionId(8)=0, passwd(buffer: len=16 + 16 字节), readOnly(1)=0
+  #     服务端回 ConnectResponse：
+  #       长度 + protocolVersion(4)=0 + timeOut(4) + sessionId(8)
+  #       + passwd(buffer: len=16 + 16 字节) + readOnly(1)
+  #     该握手与 4lw 开关无关，认证也只发生在握手之后。
+  r4:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "0000002d000000000000000000000000000075300000000000000000000000100000000000000000000000000000000000"
+            data-type: hex
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe4
+    expression: |
+      size(probe4) >= 37 &&
+      probe4.bstartsWith(b"\x00\x00\x00") &&
+      substr(probe4, 4, 4) == b"\x00\x00\x00\x00" &&
+      substr(probe4, 8, 2) == b"\x00\x00" &&
+      substr(probe4, 10, 2) != b"\x00\x00" &&
+      substr(probe4, 20, 4) == b"\x00\x00\x00\x10"
+expression: r0() || r1() || r2() || r3() || r4()

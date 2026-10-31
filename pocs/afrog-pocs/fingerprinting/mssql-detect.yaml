@@ -13,6 +13,13 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：发送 TDS PRELOGIN 探测包，服务端在认证之前必定返回 PRELOGIN 响应：
+  #   - TDS 报文头固定为 type=0x04(Tabular Result)、status=0x01；
+  #   - 长度字段为 2 字节大端，PRELOGIN 响应 >= 9 字节；
+  #   - 报文头之后的第一个 token 是 0x00(VERSION)；
+  #   - 选项列表以 0xFF 结束。
+  # 仅凭 "包含 0x04 0x01 和 0xFF" 会把很多二进制服务误判，这里用报文头 +
+  # token 结构做校验。强制加密（ENCRYPT_REQ）的服务端同样会在 TLS 之前返回该响应。
   r0:
     request:
       type: tcp
@@ -24,5 +31,12 @@ rules:
         - read:
             read-size: 4096
             read-timeout: 3
-    expression: response.raw.bcontains(b"\x04\x01") && response.raw.bcontains(b"\xff")
+            read-type: bytes
+            save-as: probe0
+    expression: |
+      probe0.bstartsWith(b"\x04\x01") &&
+      size(probe0) >= 9 &&
+      substr(probe0, 2, 1) == b"\x00" &&
+      substr(probe0, 8, 1) == b"\x00" &&
+      probe0.bcontains(b"\xff")
 expression: r0()

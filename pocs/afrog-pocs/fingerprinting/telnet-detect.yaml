@@ -13,6 +13,11 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：连接后服务端主动发 IAC 协商或登录提示，因此读取超时降到 3 秒。
+  #   - 典型的 telnetd 问候以 IAC(WILL/WONT/DO/DONT/SB) 开头，
+  #     优先按行首 IAC 判断，避免把正文里偶然出现的 0xFF 当特征；
+  #   - 没有 IAC 的服务端（只发欢迎语和提示符）通过 login/password/username 提示识别；
+  #   - 排除 SSH（SSH- 开头）与 HTTP（HTTP/ 开头），避免误报。
   r0:
     request:
       type: tcp
@@ -20,18 +25,22 @@ rules:
       steps:
         - read:
             read-size: 4096
-            read-timeout: 10
+            read-timeout: 3
     expression: |
       !response.raw.bstartsWith(b"SSH-") &&
-      (
-        response.raw.bcontains(b"\xff\xfb") ||
-        response.raw.bcontains(b"\xff\xfd") ||
-        response.raw.bcontains(b"\xff\xfc") ||
-        response.raw.bcontains(b"\xff\xfe") ||
-        response.raw.bcontains(b"\xff\xfa") ||
-        response.raw.ibcontains(b"login:") ||
-        response.raw.ibcontains(b"password:") ||
-        response.raw.ibcontains(b"username:")
-      )
-
+      !response.raw.bstartsWith(b"HTTP/") &&
+      (response.raw.bstartsWith(b"\xff\xfb") ||
+       response.raw.bstartsWith(b"\xff\xfc") ||
+       response.raw.bstartsWith(b"\xff\xfd") ||
+       response.raw.bstartsWith(b"\xff\xfe") ||
+       response.raw.bstartsWith(b"\xff\xfa") ||
+       response.raw.bcontains(b"\xff\xfb") ||
+       response.raw.bcontains(b"\xff\xfd") ||
+       response.raw.bcontains(b"\xff\xfc") ||
+       response.raw.bcontains(b"\xff\xfe") ||
+       response.raw.bcontains(b"\xff\xfa") ||
+       response.raw.ibcontains(b"login:") ||
+       response.raw.ibcontains(b"password:") ||
+       response.raw.ibcontains(b"username:") ||
+       response.raw.ibcontains(b"telnet>"))
 expression: r0()

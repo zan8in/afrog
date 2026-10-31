@@ -1,0 +1,79 @@
+id: mongodb-detect
+
+info:
+  name: MongoDB Information - Detect
+  author: pussycat0x
+  severity: info
+  description: |-
+    MongoDB build and server information was detected.
+  reference:
+    - https://nmap.org/nsedoc/scripts/mongodb-info.html
+  tags: network,mongodb,enum,fingerprint
+  created: 2024/01/05
+
+set:
+  host: request.url.host
+rules:
+  # r0：同一连接上依次投递两条报文，再读整段回包：
+  #   - OP_QUERY admin.$cmd {buildinfo:1}：老版本 Mongo 直接返回版本信息；
+  #   - OP_MSG {hello:1, $db:"admin"}：4.4+ 返回 isWritablePrimary / maxBsonObjectSize，
+  #     hello 在开启 --auth 时同样允许未认证调用，因此认证必需的实例也能识别。
+  #   同时覆盖：
+  #   - 认证必需：buildinfo 回 "command buildInfo requires authentication"/code 13；
+  #   - 权限不足：not authorized / unauthorized + errmsg；
+  #   - 5.1+ 已移除 OP_QUERY：回 "OP_QUERY is no longer supported"，这也是 Mongo 特有错误。
+  r0:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
+            data-type: hex
+        - write:
+            data: "340000000100000000000000dd07000000000000001f0000001068656c6c6f000100000002246462000500000061646d696e0000"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe0
+    expression: |
+      (probe0.ibcontains(b"version") && probe0.ibcontains(b"maxBsonObjectSize")) ||
+      probe0.ibcontains(b"isWritablePrimary") ||
+      probe0.ibcontains(b"maxWireVersion") ||
+      probe0.ibcontains(b"requires authentication") ||
+      probe0.ibcontains(b"not authorized") ||
+      (probe0.ibcontains(b"unauthorized") && probe0.ibcontains(b"errmsg")) ||
+      probe0.ibcontains(b"op_query is no longer supported")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"version[^0-9]{0,20}(?P<mongodb>[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9]+)?)[^a-zA-Z0-9]{0,20}gitVersion".bsubmatch(response.raw)'
+          mongodb: ext["mongodb"]
+  # r1：MongoDB 开启 TLS 时，同一端口需要先完成 TLS 握手，之后再投递同样的报文
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "3b0000003c300000ffffffffd40700000000000061646d696e2e24636d640000000000ffffffff14000000106275696c64696e666f000100000000"
+            data-type: hex
+        - write:
+            data: "340000000100000000000000dd07000000000000001f0000001068656c6c6f000100000002246462000500000061646d696e0000"
+            data-type: hex
+        - read:
+            read-size: 20480
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe1
+    expression: |
+      (probe1.ibcontains(b"version") && probe1.ibcontains(b"maxBsonObjectSize")) ||
+      probe1.ibcontains(b"isWritablePrimary") ||
+      probe1.ibcontains(b"maxWireVersion") ||
+      probe1.ibcontains(b"requires authentication") ||
+      probe1.ibcontains(b"not authorized") ||
+      (probe1.ibcontains(b"unauthorized") && probe1.ibcontains(b"errmsg")) ||
+      probe1.ibcontains(b"op_query is no longer supported")
+expression: r0() || r1()

@@ -22,6 +22,13 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：先读到完整的问候语首行，再一次性投递 EHLO 和 HELO，最后读整段回包。
+  #   - 问候语不要求出现 smtp/esmtp 字样：很多服务端只回 "220 hostname ESMTP"
+  #     甚至 "220 hostname ready"，只要行首是 220 即可；
+  #   - 部分服务端禁用 EHLO 扩展（502/504），HELO 仍会回 250；
+  #   - 因此以「220 问候语 + (问候语含 smtp/esmtp 或 回包出现 250 应答行)」判定。
+  #   - 采用一次 write 投递 EHLO+HELO、一次 read 取整段回包，避免 read-until
+  #     截断后丢掉 HELO 的 250 应答。
   r0:
     request:
       type: tcp
@@ -32,6 +39,37 @@ rules:
             read-timeout: 3
             read-until: "\r\n"
             read-type: bytes
-            save-as: banner
-    expression: banner.bcontains(b"220") && (banner.ibcontains(b"smtp") || banner.ibcontains(b"esmtp"))
-expression: r0()
+            save-as: greeting0
+        - write:
+            data: "EHLO afrog.local\r\nHELO afrog.local\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+            read-type: bytes
+            save-as: reply0
+    expression: |
+      "(?i)^220[- ]".bmatches(greeting0) &&
+      (greeting0.ibcontains(b"smtp") || "(?m)^250[- ]".bmatches(reply0))
+  # r1：SMTPS（465），TLS 握手后服务端先回 220，再做同样的 EHLO/HELO 探测
+  r1:
+    request:
+      type: ssl
+      host: "{{host}}"
+      steps:
+        - read:
+            read-size: 4096
+            read-timeout: 3
+            read-until: "\r\n"
+            read-type: bytes
+            save-as: greeting1
+        - write:
+            data: "EHLO afrog.local\r\nHELO afrog.local\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+            read-type: bytes
+            save-as: reply1
+    expression: |
+      "(?i)^220[- ]".bmatches(greeting1) &&
+      (greeting1.ibcontains(b"smtp") || "(?m)^250[- ]".bmatches(reply1))
+expression: r0() || r1()

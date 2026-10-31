@@ -19,6 +19,11 @@ info:
 set:
   host: request.url.host
 rules:
+  # r0：先读问候语，再发送 CAPABILITY 探测。
+  #   - 问候语只要求 "* OK" / "* PREAUTH"，不要求包含 imap 字样
+  #     （如 "* OK Dovecot ready."）；
+  #   - CAPABILITY 应答无论是否已认证都允许，返回 "* CAPABILITY IMAP4rev1 ..."；
+  #   - 只要问候语成立，且问候语带 imap 或 CAPABILITY 应答成立即可识别。
   r0:
     request:
       type: tcp
@@ -29,8 +34,20 @@ rules:
             read-timeout: 3
             read-until: "\r\n"
             read-type: bytes
-            save-as: banner
-    expression: banner.bcontains(b"* OK") && banner.ibcontains(b"imap")
+            save-as: greeting0
+        - write:
+            data: "a1 CAPABILITY\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 2
+            read-type: bytes
+            save-as: reply0
+    expression: |
+      "(?i)^\\* (OK|PREAUTH)".bmatches(greeting0) &&
+      (greeting0.ibcontains(b"imap") ||
+       reply0.ibcontains(b"imap4") ||
+       reply0.ibcontains(b"capability"))
+  # r1：IMAPS（993），TLS 之上同样读 greeting + CAPABILITY
   r1:
     request:
       type: ssl
@@ -41,6 +58,17 @@ rules:
             read-timeout: 3
             read-until: "\r\n"
             read-type: bytes
-            save-as: banner
-    expression: banner.bcontains(b"* OK") && banner.ibcontains(b"imap")
+            save-as: greeting1
+        - write:
+            data: "a1 CAPABILITY\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 2
+            read-type: bytes
+            save-as: reply1
+    expression: |
+      "(?i)^\\* (OK|PREAUTH)".bmatches(greeting1) &&
+      (greeting1.ibcontains(b"imap") ||
+       reply1.ibcontains(b"imap4") ||
+       reply1.ibcontains(b"capability"))
 expression: r0() || r1()
