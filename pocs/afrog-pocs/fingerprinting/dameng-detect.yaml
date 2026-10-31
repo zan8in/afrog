@@ -9,6 +9,10 @@ info:
     默认端口 5236 默认密码  达梦数据库默认用户密码SYSDBA:SYSDBA
     fofa: protocol="dameng"
     zoomeye: app:"DMSQL"
+
+    判定方式：发送达梦登录包后，服务端应答以 00 00 00 00 e4 00 开头（登录应答报文头）。
+    此前用 bcontains 匹配 40 00 00 00，而该字节序列本就在发送的登录包内，
+    echo/回显类服务把请求原样返回时就会命中并被误判为达梦，故改为按应答报文头行首精确匹配。
   reference:
     - https://www.dameng.com/
   tags: network,db,dameng,fingerprint
@@ -28,7 +32,7 @@ rules:
         - read:
             read-size: 8192
             read-timeout: 3
-    expression: response.body.bcontains(b"\x00\x00\x00\x00\xe4\x00") || response.body.bcontains(b"\x40\x00\x00\x00")
+    expression: response.body.bstartsWith(b"\x00\x00\x00\x00\xe4\x00")
     extractors:
       - type: regex
         extractor:

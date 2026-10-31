@@ -6,7 +6,16 @@ info:
   severity: info
   verified: true
   description: |
-    shodan: port:8009 product:"Apache Tomcat"
+    AJP13（Apache JServ Protocol）默认端口 8009。协议报文方向可区分：
+    服务端到容器以 0x1234 开头，容器到服务端以 "AB"（0x41 0x42）开头。
+
+    探测方式：向目标端口发送 CPING 探针（0x12 0x34 0x00 0x01 0x0A），
+    仅当响应以 CPONG 应答 "AB" + 长度 0x0001 + 类型 0x09（即 AB 00 01 09）开头时
+    才判定为 AJP，避免把仅回显/普通 TCP 服务误报为 AJP。
+
+    端口取自当前扫描目标（{{Host}} / {{Port}}），不再固定探测 8009：
+    此前硬编码 8009 会把该主机上的 AJP 服务误报给同一主机下任意被扫描的端口
+    （例如把 8009 的命中记到 host:7、host:37 等目标）。目标未带端口时回退默认 8009。
   tags: js,network,detect,tomcat,ajp,fingerprint
   created: 2026/10/13
 
@@ -15,21 +24,35 @@ rules:
     request:
       type: javascript
       pre-condition: |
-        isPortOpen(Host,Port)
+        (function () {
+          var port = parseInt(Port, 10) || 8009;
+          return isPortOpen(Host, port);
+        })()
       code: |
         var net = require("afrog/net");
+        var port = parseInt(Port, 10) || 8009;
         var c = net.TCPClient();
 
         c.SetTimeout(5);
         c.SetReadSize(1024);
-        c.Connect(Host, Port);
 
-        c.Send("\x12\x34\x00\x01\x0a");
-        var resp = c.Recv(1024);
-        c.Close();
-        Export(resp);
+        if (c.Connect(Host, port)) {
+          // CPING：0x1234 魔数 + 长度 1 + 类型 0x0A
+          c.Send("\x12\x34\x00\x01\x0a");
+
+          // 读取到 CPONG 报文头（至少 4 字节）为止；部分网络下响应可能被分段。
+          var resp = "";
+          while (resp.length < 4) {
+            var chunk = c.Recv(1024);
+            if (!chunk) break;
+            resp = resp + chunk;
+          }
+          c.Close();
+          Export(resp);
+        }
       args:
         Host: "{{Host}}"
-        Port: 8009
-    expression: response_text.contains("AB\x00\x01")
+        Port: "{{Port}}"
+    # 容器到服务端的 CPONG 应答固定为 AB 00 01 09，按字节前缀精确匹配
+    expression: response.raw.bstartsWith(b"AB\x00\x01\x09")
 expression: r0()
