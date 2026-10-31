@@ -40,6 +40,12 @@ rules:
             read-type: bytes
             save-as: banner0
     expression: '"(?i)^\\+OK".bmatches(banner0)'
+    # 问候语本身就是最有价值的信息（如 `+OK Dovecot ready.`），整行提取。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)(?P<pop3_banner>^\\+OK[^\\r\\n]*)".bsubmatch(banner0)'
+          pop3_banner: ext["pop3_banner"]
   # r1：POP3S（995），TLS 握手后 greeting 同样是 +OK
   r1:
     request:
@@ -53,4 +59,9 @@ rules:
             read-type: bytes
             save-as: banner1
     expression: '"(?i)^\\+OK".bmatches(banner1)'
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)(?P<pop3_banner>^\\+OK[^\\r\\n]*)".bsubmatch(banner1)'
+          pop3_banner: ext["pop3_banner"]
 expression: r0() || r1()

@@ -39,6 +39,18 @@ rules:
       (probe0.bstartsWith(b"\x01\x00\x00\x00\x00\x00") &&
        probe0.bcontains(b"\x00\x0a\x00\x0a")) ||
       probe0.bstartsWith(b"AMQP\x00\x00")
+    # Connection.Start 的 server-properties 是 AMQP field table：
+    #   shortstr key(长度+key) + 类型 'S'(0x53) + shortstr value(长度+value)
+    # product/version/platform 均为明文，可直接提取（Qpid 等 broker 同样适用）。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"\\x07product\\x53.(?P<rabbitmq>[A-Za-z0-9][A-Za-z0-9 ._+-]*)".bsubmatch(probe0)'
+          rabbitmq: ext["rabbitmq"]
+          ext2: '"\\x07version\\x53.(?P<rabbitmq_version>[0-9][0-9.]*)".bsubmatch(probe0)'
+          rabbitmq_version: ext2["rabbitmq_version"]
+          ext3: '"\\x08platform\\x53.(?P<rabbitmq_platform>[A-Za-z0-9][A-Za-z0-9 ._+/-]*)".bsubmatch(probe0)'
+          rabbitmq_platform: ext3["rabbitmq_platform"]
   # r1：amqps（5671），TLS 之上再做同样的 AMQP 0-9-1 握手
   r1:
     request:
@@ -57,4 +69,13 @@ rules:
       (probe1.bstartsWith(b"\x01\x00\x00\x00\x00\x00") &&
        probe1.bcontains(b"\x00\x0a\x00\x0a")) ||
       probe1.bstartsWith(b"AMQP\x00\x00")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"\\x07product\\x53.(?P<rabbitmq>[A-Za-z0-9][A-Za-z0-9 ._+-]*)".bsubmatch(probe1)'
+          rabbitmq: ext["rabbitmq"]
+          ext2: '"\\x07version\\x53.(?P<rabbitmq_version>[0-9][0-9.]*)".bsubmatch(probe1)'
+          rabbitmq_version: ext2["rabbitmq_version"]
+          ext3: '"\\x08platform\\x53.(?P<rabbitmq_platform>[A-Za-z0-9][A-Za-z0-9 ._+/-]*)".bsubmatch(probe1)'
+          rabbitmq_platform: ext3["rabbitmq_platform"]
 expression: r0() || r1()

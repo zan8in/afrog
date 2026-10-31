@@ -50,6 +50,15 @@ rules:
     expression: |
       "(?i)^220[- ]".bmatches(greeting0) &&
       (greeting0.ibcontains(b"smtp") || "(?m)^250[- ]".bmatches(reply0))
+    # greeting 里通常含主机名与软件标识（如 `220 mail.local ESMTP Postfix`）；
+    # EHLO 应答的 `250-` 行是扩展能力（SIZE/STARTTLS/AUTH 等）。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)^220[- ](?P<smtp>[^\\r\\n]+)".bsubmatch(greeting0)'
+          smtp: ext["smtp"]
+          ext2: '"(?im)^250-(?P<smtp_capability>[^\\r\\n]+)".bsubmatchall(reply0)'
+          smtp_capabilities: ext2["smtp_capability"]
   # r1：SMTPS（465），TLS 握手后服务端先回 220，再做同样的 EHLO/HELO 探测
   r1:
     request:
@@ -72,4 +81,11 @@ rules:
     expression: |
       "(?i)^220[- ]".bmatches(greeting1) &&
       (greeting1.ibcontains(b"smtp") || "(?m)^250[- ]".bmatches(reply1))
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)^220[- ](?P<smtp>[^\\r\\n]+)".bsubmatch(greeting1)'
+          smtp: ext["smtp"]
+          ext2: '"(?im)^250-(?P<smtp_capability>[^\\r\\n]+)".bsubmatchall(reply1)'
+          smtp_capabilities: ext2["smtp_capability"]
 expression: r0() || r1()

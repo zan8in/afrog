@@ -41,6 +41,17 @@ rules:
       reply0.bcontains(b"protected mode") ||
       reply0.bcontains(b"-LOADING") ||
       reply0.bcontains(b"+PONG\r\n")
+    # 无密码/已认证时 INFO 回包里是明文 `redis_version:7.2.4`、`redis_mode:standalone`。
+    # NOAUTH/protected-mode 等形态提取不到字段，extractor 静默跳过，不影响判定。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)redis_version:?(?P<redis>[0-9][0-9.]*)".bsubmatch(reply0)'
+          redis: ext["redis"]
+          ext2: '"(?i)redis_mode:?(?P<redis_mode>[a-z]+)".bsubmatch(reply0)'
+          redis_mode: ext2["redis_mode"]
+          ext3: '"(?im)^os:?(?P<redis_os>[^\\r\\n]+)".bsubmatch(reply0)'
+          redis_os: ext3["redis_os"]
   # r1：rediss（TLS 端口），同样投递 INFO + PING
   r1:
     request:
@@ -63,4 +74,13 @@ rules:
       reply1.bcontains(b"protected mode") ||
       reply1.bcontains(b"-LOADING") ||
       reply1.bcontains(b"+PONG\r\n")
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)redis_version:?(?P<redis>[0-9][0-9.]*)".bsubmatch(reply1)'
+          redis: ext["redis"]
+          ext2: '"(?i)redis_mode:?(?P<redis_mode>[a-z]+)".bsubmatch(reply1)'
+          redis_mode: ext2["redis_mode"]
+          ext3: '"(?im)^os:?(?P<redis_os>[^\\r\\n]+)".bsubmatch(reply1)'
+          redis_os: ext3["redis_os"]
 expression: r0() || r1()

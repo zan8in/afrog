@@ -47,6 +47,12 @@ rules:
       (greeting0.ibcontains(b"imap") ||
        reply0.ibcontains(b"imap4") ||
        reply0.ibcontains(b"capability"))
+    # CAPABILITY 应答给出服务端支持的能力集（IMAP4rev1/IDLE/STARTTLS/AUTH=...）。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)capability (?P<imap>[^\\r\\n]+)".bsubmatch(reply0)'
+          imap: ext["imap"]
   # r1：IMAPS（993），TLS 之上同样读 greeting + CAPABILITY
   r1:
     request:
@@ -71,4 +77,9 @@ rules:
       (greeting1.ibcontains(b"imap") ||
        reply1.ibcontains(b"imap4") ||
        reply1.ibcontains(b"capability"))
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)capability (?P<imap>[^\\r\\n]+)".bsubmatch(reply1)'
+          imap: ext["imap"]
 expression: r0() || r1()

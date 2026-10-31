@@ -38,6 +38,14 @@ rules:
             read-size: 8192
             read-timeout: 3
     expression: response.raw.ibcontains(b"zookeeper version")
+    # srvr 回包是明文：`Zookeeper version: 3.5.7-...`、`Mode: standalone|leader|follower`。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"(?i)zookeeper version: (?P<zookeeper>[0-9][0-9.\\-]*)".bsubmatch(response.raw)'
+          zookeeper: ext["zookeeper"]
+          ext2: '"(?im)^Mode: (?P<zookeeper_mode>[A-Za-z]+)".bsubmatch(response.raw)'
+          zookeeper_mode: ext2["zookeeper_mode"]
   # r2：mntr。返回以 zk_version/zk_server_state 开头的指标行，
   #     覆盖只放行 mntr 的白名单配置
   r2:
@@ -51,6 +59,14 @@ rules:
             read-size: 8192
             read-timeout: 3
     expression: response.raw.ibcontains(b"zk_version") || response.raw.ibcontains(b"zk_server_state")
+    # mntr 回包为 `zk_version\t<version>`、`zk_server_state\t<state>` 的 tab 分隔指标。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"zk_version\\t(?P<zookeeper>[^\\r\\n]+)".bsubmatch(response.raw)'
+          zookeeper: ext["zookeeper"]
+          ext2: '"zk_server_state\\t(?P<zookeeper_mode>[^\\r\\n]+)".bsubmatch(response.raw)'
+          zookeeper_mode: ext2["zookeeper_mode"]
   # r3：envi。返回 zookeeper.version 等环境项，覆盖只放行 envi 的白名单配置
   r3:
     request:
@@ -63,6 +79,12 @@ rules:
             read-size: 8192
             read-timeout: 3
     expression: response.raw.ibcontains(b"zookeeper.version")
+    # envi 回包里是 jute 格式的 `zookeeper.version=<version>`。
+    extractors:
+      - type: regex
+        extractor:
+          ext: '"zookeeper\\.version=(?P<zookeeper>[^\\r\\n]+)".bsubmatch(response.raw)'
+          zookeeper: ext["zookeeper"]
   # r4：所有 4lw 命令都被禁用时，改走客户端二进制握手。
   #     ZooKeeper 连接包 = 4 字节长度 + ConnectRequest：
   #       protocolVersion(4)=0, lastZxidSeen(8)=0, timeOut(4)=30000,
