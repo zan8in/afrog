@@ -414,7 +414,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.PSCPSHost, "pcps-host", -1, "max new connections per second in port pre-scan against a single host (0 = unlimited, -1 = follow -polite/-balanced/-aggressive)"),
 		flagSet.BoolVar(&options.PSLinkProbe, "ps-link-probe", true, "measure the default gateway RTT during port pre-scan and ease off the connection rate when the local link saturates; disable with -ps-link-probe=false"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
-		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", 0, "retries per port in port pre-scan (0 = no retry, the default; raise it only on lossy targets where completeness matters more than speed)"),
+		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", -1, "retries per timeout port in port pre-scan (-1 = module default, 1 retry; 0 = no retry, fastest but a single dropped SYN is never rechecked)"),
 		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
 		flagSet.IntVar(&options.PSHostConcurrency, "ps-host-concurrency", 0, "max concurrent probes against a single host in port pre-scan (0 = module default)"),
 		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
@@ -508,7 +508,7 @@ func NewOptions() (*Options, error) {
 // 「每秒新开多少条连接」。500 并发在 1ms RTT 的内网里理论上限是 50 万连接/秒，而
 // 出口设备的 NAT/conntrack 会话表通常只有几千条；被过滤的端口不回包，表项要挂到
 // 30~120s 超时才释放，表满之后同网段所有人的新建连接都会失败。默认档（全局 1000、
-// 单目标 100）把压力压到常见家用/办公路由能承受的量级，需要打满时用 -aggressive
+// 单目标 50）把压力压到常见家用/办公路由能承受的量级，需要打满时用 -aggressive
 // 或 -pcps 0 显式放开。
 func (opt *Options) ResolvePortScanRates() {
 	if opt.PSCPS >= 0 && opt.PSCPSHost >= 0 {

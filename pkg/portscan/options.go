@@ -13,7 +13,7 @@ const (
 	PresetPoliteGlobalCPS    = 200
 	PresetPolitePerHostCPS   = 20
 	PresetBalancedGlobalCPS  = 1000
-	PresetBalancedPerHostCPS = 100
+	PresetBalancedPerHostCPS = 50
 	// DefaultGlobalCPS / DefaultPerHostCPS 是未指定档位时的默认，与 balanced 一致。
 	DefaultGlobalCPS  = PresetBalancedGlobalCPS
 	DefaultPerHostCPS = PresetBalancedPerHostCPS
@@ -80,15 +80,14 @@ func DefaultOptions() *Options {
 		ConnectRateLimit:        DefaultGlobalCPS,
 		ConnectRateLimitPerHost: DefaultPerHostCPS,
 		LinkProbe:               true,
-		MaxHostConcurrency:      100,
+		MaxHostConcurrency:      50,
 		Timeout:                 1000 * time.Millisecond,
-		// Retries 默认 0。TCP connect 扫描里「超时」无法区分「端口关闭但不回包」
-		// 与「探测包被丢弃」，对每个 filtered 端口重试会把单端口成本从一次超时
-		// 放大到 (1+Retries) 次超时外加退避睡眠：1000ms 超时 + 2 次重试（且重试
-		// 预算递增到 1.5s / 2.0s）实测单端口 4.3s，100 并发只有 23 端口/秒，
-		// 65535 端口要扫近 50 分钟 —— 扫描器再准，用户等不到结果也没有意义。
-		// 需要「宁可慢也不漏」时用 -ptries 显式开启。
-		Retries:                0,
+		// Retries 默认 1：只对「超时」重试，收到 RST（端口确实关闭）会立即返回，
+		// 因此绝大多数目标的成本不变。单次探测的漏报代价太高——首次 SYN 常因
+		// 瞬时丢包、ARP 冷启动、目标/中间设备的端口扫描防护被静默丢弃，没有第二次
+		// 机会就等于把一个真实开放端口永久记成 closed/filtered。
+		// 需要更快时可用 -ptries 0 显式关闭。
+		Retries:                1,
 		AdaptiveTimeout:        true,
 		ScanMode:               ScanModeAuto,
 		Quiet:                  false,

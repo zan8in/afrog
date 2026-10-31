@@ -505,14 +505,11 @@ func (s *Scanner) Scan(ctx context.Context) error {
 		fmt.Sprintf("hosts=%d", hostIter.Total()),
 		fmt.Sprintf("tasks=%d", total),
 		fmt.Sprintf("open=%d", atomic.LoadUint64(&s.resultsCount)),
-	}
-	// 只有 ReportStates 打开时结果集里才含非开放端口，汇总也必须与之对齐，
-	// 否则「open 数」对不上用户实际看到的行数，反倒制造困惑。
-	if s.options.ReportStates {
-		facts = append(facts,
-			fmt.Sprintf("closed=%d", atomic.LoadUint64(&s.closedCount)),
-			fmt.Sprintf("filtered=%d", atomic.LoadUint64(&s.filteredCount)),
-		)
+		// closed / filtered 恒定输出，不依赖 -ps-states：它们回答「这一轮有多少探测
+		// 是被 RST 明确拒绝、多少是完全没回包」，是判断漏报来自目标防护还是本机
+		// 限速的唯一直接依据。-ps-states 只决定要不要逐条打印这些端口行。
+		fmt.Sprintf("closed=%d", atomic.LoadUint64(&s.closedCount)),
+		fmt.Sprintf("filtered=%d", atomic.LoadUint64(&s.filteredCount)),
 	}
 	facts = append(facts, time.Since(startTime).Truncate(time.Second).String())
 	s.emitStage(log.LevelInfo, utils.StagePortScan, append([]string{"completed"}, facts...)...)
@@ -764,6 +761,12 @@ func (s *Scanner) acquireHostSlot(ctx context.Context, host string) func() {
 // so shortening the first attempt speeds up large scans; a slow host keeps
 // enough headroom that its open ports are not mistaken for closed. Retries
 // always use the full user budget (see checkPortOpen).
+//
+// 地板固定为 1s：RTT 是「按主机」采样的，只要该主机回过一次 RST，这台主机后续
+// 所有端口都会用采样值折算的预算。真实服务（NAT 端口映射、安全设备后的数据库/
+// 远程桌面、SYN 队列打满）完成三次握手的耗时与主机 RTT 不成比例，200ms 的旧地板
+// 会把它们判成 filtered，造成按端口类型分布的漏报。缩到 1s 只在用户把 -ptimeout
+// 显式调大（例如公网 3s）时才起作用，属于纯提速而非牺牲覆盖面。
 func (s *Scanner) attemptTimeoutFor(st *hostScanStat, base time.Duration) time.Duration {
 	if !s.options.AdaptiveTimeout {
 		return base
@@ -773,7 +776,7 @@ func (s *Scanner) attemptTimeoutFor(st *hostScanStat, base time.Duration) time.D
 		return base
 	}
 	t := time.Duration(srtt) * 4
-	const floor = 200 * time.Millisecond
+	const floor = time.Second
 	if t < floor {
 		t = floor
 	}

@@ -8,7 +8,8 @@ import (
 )
 
 func TestAttemptTimeoutFor(t *testing.T) {
-	base := 1000 * time.Millisecond
+	// 用一个比地板（1s）大的预算，才能观察到「按 RTT 收缩」与「地板兜底」两种行为。
+	base := 3 * time.Second
 
 	// Adaptive disabled: always the full budget.
 	s := &Scanner{options: &Options{Timeout: base, AdaptiveTimeout: false}}
@@ -23,19 +24,30 @@ func TestAttemptTimeoutFor(t *testing.T) {
 		t.Fatalf("unknown rtt: got=%s want=%s", got, base)
 	}
 
-	// Very fast host: 4x a 1ms RTT is below the floor, so the floor applies.
-	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(1 * time.Millisecond)}, base); got != 200*time.Millisecond {
-		t.Fatalf("fast host floor: got=%s want=%s", got, 200*time.Millisecond)
+	// Fast host: 4x a 1ms RTT is far below the floor, so the 1s floor applies.
+	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(1 * time.Millisecond)}, base); got != 1*time.Second {
+		t.Fatalf("fast host floor: got=%s want=%s", got, 1*time.Second)
 	}
 
-	// Mid RTT: 4x the measured RTT.
-	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(100 * time.Millisecond)}, base); got != 400*time.Millisecond {
-		t.Fatalf("mid rtt: got=%s want=%s", got, 400*time.Millisecond)
+	// Mid RTT below the floor: the floor still applies.
+	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(100 * time.Millisecond)}, base); got != 1*time.Second {
+		t.Fatalf("mid rtt floor: got=%s want=%s", got, 1*time.Second)
+	}
+
+	// RTT high enough that 4x exceeds the floor: 4x the measured RTT.
+	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(500 * time.Millisecond)}, base); got != 2*time.Second {
+		t.Fatalf("high rtt: got=%s want=%s", got, 2*time.Second)
 	}
 
 	// Slow host: never exceed the user budget.
 	if got := s.attemptTimeoutFor(&hostScanStat{srttNs: int64(1 * time.Second)}, base); got != base {
 		t.Fatalf("slow host cap: got=%s want=%s", got, base)
+	}
+
+	// 默认 1s 预算下自适应不再压缩：LAN 主机（RTT 1ms）也必须拿到完整的 1s。
+	def := &Scanner{options: &Options{Timeout: 1 * time.Second, AdaptiveTimeout: true}}
+	if got := def.attemptTimeoutFor(&hostScanStat{srttNs: int64(1 * time.Millisecond)}, 1*time.Second); got != 1*time.Second {
+		t.Fatalf("default budget must not shrink: got=%s want=%s", got, 1*time.Second)
 	}
 }
 

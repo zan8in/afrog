@@ -465,7 +465,7 @@ Concurrency (`-prate`) and rate (`-pcps`) are two orthogonal dimensions: concurr
 
 ### `-pcps-host`
 
-Connection rate cap for the port pre-scan against a single host, in new connections per second. It follows the preset by default: `100` for `-balanced`, `20` for `-polite`, and no cap for `-aggressive`. Its semantics match `-pcps`.
+Connection rate cap for the port pre-scan against a single host, in new connections per second. It follows the preset by default: `50` for `-balanced`, `20` for `-polite`, and no cap for `-aggressive`. Its semantics match `-pcps`.
 
 ### `-ps-link-probe`
 
@@ -477,7 +477,7 @@ Timeout for port pre-scan, in milliseconds. The default is `1000`.
 
 ### `-ptries`
 
-Retry count per port in port pre-scan. The default is `0` (no retry). Each extra retry makes a dropping port pay another full timeout plus backoff, so a full-port scan slows down in multiples — raise it only for lossy targets.
+Retry count per port in port pre-scan. The default is `1`, and retries only apply to ports that timed out — a RST (port genuinely closed) returns immediately, so the cost on ordinary targets is unchanged. A first SYN is often dropped silently by transient loss, a cold ARP entry, or the port-scan protection of the target or an intermediate device; without a retry a genuinely open port is recorded as closed/filtered forever. Use `-ptries 0` when speed matters more than completeness.
 
 ### `-ps-s4-chunk`
 

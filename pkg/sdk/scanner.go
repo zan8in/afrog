@@ -1137,7 +1137,7 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		PSPorts:         opts.PortScan.Ports,
 		PSRateLimit:     opts.PortScan.RateLimit,
 		PSTimeout:       opts.PortScan.TimeoutMs,
-		PSRetries:       opts.PortScan.Retries,
+		PSRetries:       resolvePortScanRetries(opts.PortScan.Retries),
 		PSSkipDiscovery: opts.PortScan.SkipDiscovery,
 		PSS4Chunk:       opts.PortScan.ChunkSize,
 		// 连接速率上限：SDK 的零值语义是「未设置」，映射到跟随 -polite/-balanced/
@@ -1237,6 +1237,21 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 // SDK 的零值是「未设置」，因此映射为「跟随档位」（保护性默认），而不是命令行里
 // 表示「不限速」的 0；负值表示调用方显式要求取消上限。
 func resolvePortScanCPS(v int) int {
+	switch {
+	case v == 0:
+		return -1
+	case v < 0:
+		return 0
+	default:
+		return v
+	}
+}
+
+// resolvePortScanRetries 把 SDK 的端口重试次数映射到引擎的三态约定：
+// >= 0 为显式值（0 = 不重试），< 0 表示跟随模块默认。SDK 的零值是「未设置」，
+// 因此映射为跟随模块默认（1 次超时重试），与 resolvePortScanCPS 的零值语义一致；
+// 负值表示调用方显式关闭重试。
+func resolvePortScanRetries(v int) int {
 	switch {
 	case v == 0:
 		return -1

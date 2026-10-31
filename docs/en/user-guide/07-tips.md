@@ -105,7 +105,7 @@ The previous section is about local resources; this one is about the network afr
 The crux is that **concurrency does not bound the rate**. `-prate 500` against the internet (a few hundred ms RTT) works out to roughly 1000 connections per second, but against a LAN (1 ms RTT) the theoretical ceiling is 500,000 per second — two orders of magnitude apart. So afrog caps the connection rate of the port pre-scan by default:
 
 ```bash
-afrog -t 10.0.0.0/24 -ps              # default: 1000/s global, 100/s per host
+afrog -t 10.0.0.0/24 -ps              # default: 1000/s global, 50/s per host
 afrog -t 10.0.0.0/24 -ps -polite      # more conservative: 200/s global, 20/s per host
 afrog -t 10.0.0.0/24 -ps -pcps 200    # tune the global rate only
 afrog -t 10.0.0.0/24 -ps -aggressive  # no cap (same as -pcps 0)
@@ -167,16 +167,17 @@ Both `-nf` and `-test` affect `requires`-based gating, so avoid using them as re
 Scanning the same target twice and getting a different port list is usually the **target rate-limiting or blocking you**, not the scanner dropping results:
 
 - A closed port answers with `RST`; a dropped probe answers with nothing. Under load the target (or the device in front of it) discards some `SYN`s, so a few ports go missing each time.
-- It gets worse with concurrency: per-host concurrency defaults to 100; pushing it into the hundreds easily trips the target's connection limit, and more ports go missing rather than fewer.
+- It gets worse with concurrency: per-host concurrency defaults to 50; pushing it into the hundreds easily trips the target's connection limit, and more ports go missing rather than fewer.
 - If a host drops nearly every probe, `-debug` prints a `[WRN] port-scan filtered host=… drop-rate=… probes=… results may be incomplete` warning that the result set may be incomplete. It is hidden by default so it never cuts into the progress bar.
+- The completion line always carries `closed=` / `filtered=`: the former were explicitly refused with `RST`, the latter never replied at all. A high `filtered` share means the target (or the device in front of it) is dropping probes rather than the ports being closed.
 
 ```bash
-afrog -t 192.0.2.10 -ps -p full -ps-host-concurrency 20   # lower per-host concurrency further (default 100)
-afrog -t 192.0.2.10 -ps -ptries 2                          # add retries when the target drops probes (default 0, no retry)
+afrog -t 192.0.2.10 -ps -p full -ps-host-concurrency 20   # lower per-host concurrency further (default 50)
+afrog -t 192.0.2.10 -ps -ptries 2                          # add one more retry on lossy targets (default 1)
 afrog -t 192.0.2.10 -ps -ptimeout 2000                     # a longer connect timeout
 ```
 
-`-ptries` defaults to 0: every extra retry costs a full timeout plus backoff on a dropping port, so a full-port scan slows down in multiples. Only enable it once you have confirmed target-side throttling.
+`-ptries` defaults to 1, and retries only apply to ports that timed out (a `RST` returns immediately, so ordinary targets are unaffected). A first `SYN` is often dropped silently by transient loss, a cold ARP entry, or the port-scan protection of the target or an intermediate device; without a retry a genuinely open port is recorded as `closed`/`filtered` forever. Use `-ptries 0` if you would rather trade completeness for speed.
 
 To confirm: scan from a machine on a different network, or at a different time. If the results become consistent, the throttling is on the target side.
 

@@ -223,9 +223,10 @@ type PortScanOptions struct {
 	DisableLinkProbe bool
 	// TimeoutMs is the per-attempt connect timeout; 0 keeps the module default.
 	TimeoutMs int
-	// Retries is the per-port retry count; 0 (the default) means no retry,
-	// which keeps lossy full-port scans fast. Raise it only when completeness
-	// on a rate-limiting target matters more than speed.
+	// Retries is the per-port retry count for ports that timed out; the zero
+	// value follows the module default (one retry), matching the CLI. A negative
+	// value disables retries, which keeps lossy full-port scans fast but records
+	// a genuinely open port as closed/filtered whenever its first SYN is dropped.
 	Retries       int
 	SkipDiscovery bool
 	ChunkSize     int

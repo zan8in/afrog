@@ -2013,7 +2013,8 @@ func (runner *Runner) Execute() {
 			if options.PSTimeout > 0 {
 				psOpts.Timeout = time.Duration(options.PSTimeout) * time.Millisecond
 			}
-			// 判定用 >= 0：0 是合法值（关闭重试），也是 CLI 与 SDK 的默认值。
+			// 判定用 >= 0：0 是合法值（关闭重试），-1 表示跟随模块默认（1 次超时重试）。
+			// SDK 侧零值仍按显式 0 处理，见 pkg/sdk/options.go。
 			if options.PSRetries >= 0 {
 				psOpts.Retries = options.PSRetries
 			}

@@ -152,7 +152,7 @@ Useful for:
 - service discovery
 - dynamically feeding `host:port` targets into later vulnerability scans
 
-`RateLimit` caps concurrency (how many connections are in flight); `ConnectRateLimit` / `ConnectRateLimitPerHost` cap the connection rate (how many new connections are opened per second, globally and per host). The two are orthogonal: a concurrency cap alone cannot stop hundreds of thousands of connection attempts per second on a low-latency LAN, which fills up the NAT/conntrack session table of the network afrog runs on. Leaving these two fields at `0` keeps the built-in protective default (1000/s global, 100/s per host); a negative value disables the cap.
+`RateLimit` caps concurrency (how many connections are in flight); `ConnectRateLimit` / `ConnectRateLimitPerHost` cap the connection rate (how many new connections are opened per second, globally and per host). The two are orthogonal: a concurrency cap alone cannot stop hundreds of thousands of connection attempts per second on a low-latency LAN, which fills up the NAT/conntrack session table of the network afrog runs on. Leaving these two fields at `0` keeps the built-in protective default (1000/s global, 50/s per host); a negative value disables the cap.
 
 ```go
 sdk.WithPortScan(sdk.PortScanOptions{
