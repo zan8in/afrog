@@ -6,25 +6,45 @@ info:
   severity: info
   verified: true
   description: |-
-    FTP 服务识别。判定不依赖 banner 文案，而用协议级交互确认：读到欢迎 banner 后
-    依次发送 RFC 959 要求服务端实现的两条命令，看响应码：
+    FTP 服务识别。不依赖 banner 文案，连接建立后一次性投递多条 FTP 核心命令，再把
+    整段回包当作证据：既确认控制通道出现过 220 应答，又确认命令应答码出现在行首。
 
-      - SYST 正常响应 215
-      - HELP 正常响应 214
+      - SYST  -> 215（命令被接受），或 530（要求先登录）
+      - FEAT  -> 211（特性列表，多行 211-... / 211 ...）
+      - USER  -> 331 / 230 / 332（用户名被接受），或 530（匿名登录被禁）
+      - TYPE  -> 200（传输类型被接受）
+      - PWD   -> 257（返回工作目录）
+      - AUTH TLS -> 234（显式 FTPS，命令被接受）
 
-    banner 以 220 开头、且 SYST / HELP 任一返回正常码，即判定为 FTP。相比旧版
-    要求 banner 字面出现 "ftp"，FileZilla Server、以及
-    "220 Service ready for new user." 这类不含产品名的 banner 不再漏报。
+    这样覆盖了各类服务端差异：
+      - 登录前允许 SYST 的服务端（215）；
+      - 登录前拒绝 SYST/HELP 的服务端（530，如 vsftpd 加固配置）；
+      - 匿名登录被禁、但 USER 仍被识别的服务端（530 / 331 / 332）；
+      - 只实现最小命令集、但对 TYPE/PWD 有正常响应的服务端（200 / 257）；
+      - FEAT 单独可用的服务端（211）；
+      - 显式 FTPS-only（明文通道上 SYST/USER 一律 530，AUTH TLS 234）；
+      - 隐式 FTPS（990，TLS 握手后同样回 220 应答）。
 
-    banner 读取以最后一行的 "220 " 结束，因此
-    "220-...\r\n220-...\r\n220 ..." 形式的多行 banner 也能对齐，不会把续行
-    误当成命令响应。
+    刻意不使用 HELP 判定：SMTP 的 HELP 同样返回 214，只看 HELP 会把 220 应答的
+    SMTP 误判成 FTP。上面这些应答码在 220 应答下不会被 SMTP 正常返回（SMTP 对
+    SYST/FEAT/USER/TYPE/PWD 一律回 500/501/502/504）。
 
-    r0 覆盖明文控制通道：显式 FTPS（AUTH TLS）在升级 TLS 前的控制通道同样是明文
-    FTP 语义，因此也被 r0 覆盖；r1 覆盖隐式 FTPS（banner 直接出现在 TLS 会话里，
+    探测采用「先投递命令、后读取整段回包」的方式：
+      - 即使服务端在某个命令后立即断开连接，已经到达的应答仍在回包里，不会因为
+        后续写/读失败而丢掉证据；
+      - 220 应答与命令应答在同一段回包里，不存在多步 read-until 造成的对齐/截断；
+      - 应答码按行首匹配，多行应答（如 FEAT 的 "211-Features:"）同样命中，也不会
+        把响应正文里偶然出现的数字误当成应答码；
+      - AUTH TLS 单独用一条规则，避免 SMTP 把 "AUTH TLS" 当成需要先 STARTTLS 的
+        AUTH 机制而返回 530，造成误报。
+
+    r0 覆盖明文控制通道（显式 FTPS 在升级 TLS 前的控制通道同样是明文 FTP 语义）；
+    r1 覆盖只放行 AUTH TLS 的服务端；r2 覆盖隐式 FTPS（应答直接出现在 TLS 会话里，
     如 990），该规则要求目标端口本身被扫描到。
   reference:
     - https://datatracker.ietf.org/doc/html/rfc959
+    - https://datatracker.ietf.org/doc/html/rfc2389
+    - https://datatracker.ietf.org/doc/html/rfc4217
   tags: network,ftp,fingerprint
   created: 2026/01/09
 
@@ -36,55 +56,38 @@ rules:
       type: tcp
       host: "{{host}}"
       steps:
+        - write:
+            data: "SYST\r\nFEAT\r\nUSER anonymous\r\nTYPE I\r\nPWD\r\n"
         - read:
-            read-size: 4096
+            read-size: 8192
             read-timeout: 3
-            read-until: "220 "
             read-type: bytes
-            save-as: banner
-        - write:
-            data: "SYST\r\n"
-        - read:
-            read-size: 4096
-            read-timeout: 2
-            read-until: "\r\n"
-            read-type: bytes
-            save-as: syst
-        - write:
-            data: "HELP\r\n"
-        - read:
-            read-size: 4096
-            read-timeout: 2
-            read-until: "\r\n"
-            read-type: bytes
-            save-as: help
-    expression: banner.bcontains(b"220") && (syst.bcontains(b"215") || help.bcontains(b"214"))
+            save-as: probe0
+    expression: '"(?m)^220\\b".bmatches(probe0) && "(?m)^(215|200|211|257|331|230|332|530)[- ]".bmatches(probe0)'
   r1:
+    request:
+      type: tcp
+      host: "{{host}}"
+      steps:
+        - write:
+            data: "AUTH TLS\r\n"
+        - read:
+            read-size: 8192
+            read-timeout: 3
+            read-type: bytes
+            save-as: probe1
+    expression: '"(?m)^220\\b".bmatches(probe1) && "(?m)^234[- ]".bmatches(probe1)'
+  r2:
     request:
       type: ssl
       host: "{{host}}"
       steps:
+        - write:
+            data: "SYST\r\nFEAT\r\nUSER anonymous\r\nTYPE I\r\nPWD\r\nAUTH TLS\r\n"
         - read:
-            read-size: 4096
+            read-size: 8192
             read-timeout: 3
-            read-until: "220 "
             read-type: bytes
-            save-as: banner
-        - write:
-            data: "SYST\r\n"
-        - read:
-            read-size: 4096
-            read-timeout: 2
-            read-until: "\r\n"
-            read-type: bytes
-            save-as: syst
-        - write:
-            data: "HELP\r\n"
-        - read:
-            read-size: 4096
-            read-timeout: 2
-            read-until: "\r\n"
-            read-type: bytes
-            save-as: help
-    expression: banner.bcontains(b"220") && (syst.bcontains(b"215") || help.bcontains(b"214"))
-expression: r0() || r1()
+            save-as: probe2
+    expression: '"(?m)^220\\b".bmatches(probe2) && "(?m)^(215|200|211|234|257|331|230|332|530)[- ]".bmatches(probe2)'
+expression: r0() || r1() || r2()

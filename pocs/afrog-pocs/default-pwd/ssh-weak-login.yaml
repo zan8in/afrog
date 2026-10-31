@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |-
-    SSH weak credentials were discovered (dictionary brute-force in go).
+    SSH weak credentials were discovered (dictionary brute-force in javascript).
     ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedAlgorithms=+ssh-rsa -p 22222 root@yourip
   tags: network,ssh,default-login,weak-login
   requires: [ssh]
@@ -15,8 +15,51 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: ssh-weak-login
+      type: javascript
+      code: |
+        var ssh = require("afrog/ssh");
+
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "22";
+        var timeout = 3;
+        // 字典遍历的时间预算：避免慢目标把整个脚本拖到 -js-script-timeout 上限
+        var budget = 60000;
+
+        var usernames = ["root", "admin", "administrator", "ubuntu", "test", "user", "pi", "git", "oracle", "postgres"];
+        var passwords = ["", "root", "admin", "123456", "12345678", "password", "toor", "1qaz2wsx", "qwer1234", "000000", "111111", "123123"];
+
+        var result = "";
+        var tried = 0;
+
+        // Connect 失败无法区分"端口不通"与"口令错误"，先做一次端口探测
+        if (!isPortOpen(Host, port, timeout)) {
+          result = "fail;reason=connect_failed;tried=0";
+        } else {
+          var deadline = Date.now() + budget;
+          for (var i = 0; i < usernames.length && result === ""; i++) {
+            for (var j = 0; j < passwords.length && result === ""; j++) {
+              if (Date.now() > deadline) {
+                result = "fail;reason=timeout;tried=" + tried;
+                break;
+              }
+              tried++;
+              var c = ssh.SSHClient();
+              c.SetTimeout(timeout);
+              var ok = c.Connect(Host, port, usernames[i], passwords[j]);
+              c.Close();
+              if (ok) {
+                result = "success;user=" + usernames[i] + ";pass=" + passwords[j];
+              }
+            }
+          }
+          if (result === "") {
+            result = "fail;reason=not_found;tried=" + tried;
+          }
+        }
+
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex

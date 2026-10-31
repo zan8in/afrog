@@ -6,7 +6,8 @@ info:
   severity: high
   verified: true
   description: |-
-    Redis weak credentials or unauthorized access were discovered (dictionary brute-force in go).
+    Redis weak password or unauthorized access was discovered (dictionary brute-force in javascript).
+    Login evidence: PING returns PONG after AUTH, and INFO server exposes the redis version.
   tags: network,redis,default-login,weak-login
   requires: [redis]
   created: 2026/01/17
@@ -14,14 +15,95 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: redis-weak-login
+      type: javascript
+      code: |
+        var net = require("afrog/net");
+
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "6379";
+        var timeout = 3;
+
+        // Redis 认证只有密码（RESP2 的 AUTH <password>），没有用户名
+        var passwords = [
+          "123456", "redis", "root", "password", "admin",
+          "12345", "12345678", "123456789", "123123", "foobared",
+          "qwer", "qwerty", "test", "admin123", "pass"
+        ];
+
+        // INFO server 中取 redis_version 作为登录成功的版本证据，失败时返回空串
+        function versionOf(c) {
+          c.Send("INFO server\r\n");
+          var head = c.RecvUntil("\r\n");
+          var body = c.Recv(4096);
+          var m = /redis_version:([^\r\n]+)/.exec(String(head) + "\n" + String(body));
+          return m ? m[1] : "";
+        }
+
+        // 未启用认证时的证据：PING 直接返回 PONG
+        function unauthEvidence(c) {
+          var ev = "PING=PONG";
+          var v = versionOf(c);
+          if (v !== "") ev += ",redis_version=" + v;
+          return ev;
+        }
+
+        // 通过 AUTH 后再 PING 一次，确认已获得认证态，并附带版本信息
+        function authEvidence(c) {
+          c.Send("PING\r\n");
+          var line = c.RecvUntil("\r\n");
+          var ev = "PING=" + (line.indexOf("PONG") >= 0 ? "PONG" : String(line).trim());
+          var v = versionOf(c);
+          if (v !== "") ev += ",redis_version=" + v;
+          return ev;
+        }
+
+        var result = "";
+        var tried = 0;
+
+        var c0 = net.TCPClient();
+        c0.SetTimeout(timeout);
+        if (!c0.Connect(Host, port)) {
+          result = "fail;reason=connect_error";
+        } else {
+          c0.Send("PING\r\n");
+          var pong = c0.RecvUntil("\r\n");
+          if (pong.indexOf("PONG") >= 0) {
+            // 未启用认证，等价于空密码即可登录
+            result = "success;pass=<empty>;evidence=" + unauthEvidence(c0);
+          }
+          c0.Close();
+
+          if (result === "") {
+            for (var i = 0; i < passwords.length && result === ""; i++) {
+              tried++;
+              var c = net.TCPClient();
+              c.SetTimeout(timeout);
+              if (!c.Connect(Host, port)) {
+                result = "fail;reason=connect_error;tried=" + tried;
+                break;
+              }
+              c.Send("*2\r\n$4\r\nAUTH\r\n$" + String(passwords[i]).length + "\r\n" + passwords[i] + "\r\n");
+              var line = c.RecvUntil("\r\n");
+              if (line.indexOf("+OK") === 0) {
+                result = "success;pass=" + passwords[i] + ";evidence=" + authEvidence(c);
+              }
+              c.Close();
+            }
+            if (result === "") {
+              result = "fail;reason=not_found;tried=" + tried;
+            }
+          }
+        }
+
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex
         extractor:
-          ext: '"user=(?P<username>[^;]*);pass=(?P<password>.*)$".bsubmatch(response.raw)'
-          username: ext["username"]
+          ext: '"pass=(?P<password>[^;]*);evidence=(?P<evidence>.*)$".bsubmatch(response.raw)'
           password: ext["password"]
+          evidence: ext["evidence"]
 
 expression: r0()

