@@ -1,0 +1,38 @@
+id: chanjet-tplus-detect
+
+info:
+  name: Chanjet T+ Panel Detect
+  author: zan8in
+  severity: info
+  verified: true
+  description: |-
+    畅捷通 T+ 登录页指纹，为 requires: [chanjet] 提供门控来源。
+  tags: chanjet,changjietong,tplus,panel,detect,fingerprint
+  created: 2026/11/01
+
+rules:
+  r0:
+    request:
+      method: GET
+      path: /tplus/
+      follow_redirects: true
+    expression: |
+      response.status == 200 &&
+      (
+        response.body.ibcontains(b'畅捷通') ||
+        response.body.ibcontains(b'T+Cloud') ||
+        response.body.ibcontains(b'UfIDA')
+      )
+  r1:
+    request:
+      method: GET
+      path: /tplus/view/login.html
+      follow_redirects: true
+    expression: |
+      response.status == 200 &&
+      (
+        response.body.ibcontains(b'畅捷通') ||
+        response.body.ibcontains(b'T+Cloud') ||
+        response.body.ibcontains(b'UfIDA')
+      )
+expression: r0() || r1()
