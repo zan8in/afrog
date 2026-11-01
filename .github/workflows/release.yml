@@ -3,7 +3,8 @@ name: Release Binary
 on:
   push:
     tags:
-      - "*"
+      # 只认版本 tag，避免非版本 tag（如 test-xxx）被当成版本号发布出去。
+      - "v*"
   workflow_dispatch:
     inputs:
       dry_run:
