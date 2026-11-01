@@ -7,7 +7,7 @@ info:
   verified: true
   description: |-
     fofa: app="用友-移动系统管理"
-  tags: yonyou
+  tags: yonyou,fingerprint
   created: 2023/07/07
 
 rules:
