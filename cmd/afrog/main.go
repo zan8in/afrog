@@ -110,6 +110,7 @@ func main() {
 			web.SetClusterConfig(cfg.Cluster, options.ConfigFile)
 			web.SetAIConfig(cfg.AI, options.ConfigFile)
 			web.SetOOBConfig(cfg.Reverse, options.ConfigFile)
+			web.SetPassiveConfig(cfg.Passive, options.ConfigFile)
 		}
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())

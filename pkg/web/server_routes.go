@@ -266,6 +266,22 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/notifications/test", jwtAuthMiddleware(requireCurated(notificationsTestHandler))).Methods(http.MethodPost)
 	api.HandleFunc("/notifications/logs", jwtAuthMiddleware(requireCurated(notificationsLogsHandler))).Methods(http.MethodGet)
 	api.HandleFunc("/notifications/logs/resend", jwtAuthMiddleware(requireCurated(notificationsResendHandler))).Methods(http.MethodPost)
+
+	// 被动扫描：内嵌 MITM 代理 + 检测器管道。默认不启动，由前端显式开关，
+	// 避免代理端口被占用或 CA 目录不可写时影响主服务。
+	// 命中统一落到 passive_finding，可单条提升进 result 表，从而与主动扫描共用台账与报告。
+	api.HandleFunc("/passive/status", jwtAuthMiddleware(passiveStatusHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/start", jwtAuthMiddleware(passiveStartHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/passive/stop", jwtAuthMiddleware(passiveStopHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/passive/config", jwtAuthMiddleware(passiveConfigGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/config", jwtAuthMiddleware(passiveConfigPutHandler)).Methods(http.MethodPut)
+	api.HandleFunc("/passive/ca", jwtAuthMiddleware(passiveCAHandler)).Methods(http.MethodGet)
+	// 观测接口：解释「捕获在涨、检测不动」，不落库、只反映最近状态。
+	api.HandleFunc("/passive/traffic", jwtAuthMiddleware(passiveTrafficHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/diagnostics", jwtAuthMiddleware(passiveDiagnosticsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/findings", jwtAuthMiddleware(passiveFindingsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/findings/{id}", jwtAuthMiddleware(passiveFindingDetailHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/findings/{id}/promote", jwtAuthMiddleware(passivePromoteHandler)).Methods(http.MethodPost)
 	// 多实例编排：/cluster/self 供同伴实例互访（走集群共享密钥，不走 JWT），
 	// /cluster/instances 是控制台自己的聚合视图，/cluster/config 用来在运行时
 	// 增删节点（会员能力，保存后写回 afrog-config.yaml 并立即生效）。

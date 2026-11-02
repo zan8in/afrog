@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,6 +21,70 @@ type Config struct {
 	Curated       Curated    `yaml:"curated"`
 	Cluster       Cluster    `yaml:"cluster"`
 	AI            AI         `yaml:"ai"`
+	Passive       Passive    `yaml:"passive"`
+}
+
+// 被动扫描的默认参数。
+const (
+	// DefaultPassiveHost 只监听回环地址：被动代理需要安装根证书，
+	// 暴露到公网等同于把任意流量的解密能力开放给他人。
+	DefaultPassiveHost = "127.0.0.1"
+	DefaultPassivePort = 16869
+	// DefaultPassiveMaxRPS 是重放请求的全局速率上限，保守取 100/s。
+	DefaultPassiveMaxRPS = 100
+	// DefaultPassiveHostConcurrency 是单目标并发上限。
+	DefaultPassiveHostConcurrency = 4
+	// DefaultPassiveDetector 是默认启用的检测器。
+	DefaultPassiveDetector = "sqli"
+)
+
+// Passive 是内嵌被动扫描（MITM 代理 + 检测器管道）的配置。
+//
+// 只暴露真正需要使用者决策的项：监听位置、上游代理、检测器开关与流量上限。
+// 其余判定参数（相似度阈值、SLEEP 秒数等）属于检测器内部策略，不在此处开放，
+// 避免把「调参」变成使用者的负担。
+type Passive struct {
+	// AutoStart 表示 afrog web 启动时自动开启被动扫描。
+	AutoStart bool `yaml:"auto_start"`
+	// Host 是监听地址。127.0.0.1 仅本机可用；0.0.0.0 允许局域网与手机接入。
+	Host string `yaml:"host"`
+	// Port 是监听端口。
+	Port int `yaml:"port"`
+	// Upstream 是上游代理（如 http://127.0.0.1:8080），为空表示直连目标。
+	Upstream string `yaml:"upstream"`
+	// Detectors 是启用的检测器列表。
+	Detectors []string `yaml:"detectors"`
+	// MaxRPS 是重放请求的全局速率上限（请求/秒）。
+	MaxRPS int `yaml:"max_rps"`
+	// HostConcurrency 是单目标并发上限。
+	HostConcurrency int `yaml:"host_concurrency"`
+}
+
+// Addr 返回 host:port 形式的监听地址。
+func (p Passive) Addr() string {
+	host := strings.TrimSpace(p.Host)
+	if host == "" {
+		host = DefaultPassiveHost
+	}
+	port := p.Port
+	if port <= 0 {
+		port = DefaultPassivePort
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port))
+}
+
+// EnabledDetectors 返回启用的检测器集合。
+func (p Passive) EnabledDetectors() []string {
+	out := make([]string, 0, len(p.Detectors))
+	for _, d := range p.Detectors {
+		if v := strings.ToLower(strings.TrimSpace(d)); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return []string{DefaultPassiveDetector}
+	}
+	return out
 }
 
 // AI 是「AI 辅助」的模型接入配置。
@@ -233,6 +298,17 @@ func NewConfig(configFile string) (*Config, error) {
 		curated.LicenseKey = ""
 		c.Curated = curated
 
+		// 被动扫描：首次生成的配置里就把默认值写全，使用者打开文件即可知道有哪些项。
+		c.Passive = Passive{
+			AutoStart:       false,
+			Host:            DefaultPassiveHost,
+			Port:            DefaultPassivePort,
+			Upstream:        "",
+			Detectors:       []string{DefaultPassiveDetector},
+			MaxRPS:          DefaultPassiveMaxRPS,
+			HostConcurrency: DefaultPassiveHostConcurrency,
+		}
+
 		WriteConfiguration(&c, configFile)
 	}
 	return ReadConfiguration(configFile)
@@ -296,6 +372,16 @@ func defaultConfig() *Config {
 	c.Curated.AutoUpdate = &autoUpdate
 	c.Curated.TimeoutSec = 10
 	c.Curated.Channel = "stable"
+
+	c.Passive = Passive{
+		AutoStart:       false,
+		Host:            DefaultPassiveHost,
+		Port:            DefaultPassivePort,
+		Upstream:        "",
+		Detectors:       []string{DefaultPassiveDetector},
+		MaxRPS:          DefaultPassiveMaxRPS,
+		HostConcurrency: DefaultPassiveHostConcurrency,
+	}
 
 	return c
 }
@@ -383,6 +469,7 @@ func ReadConfiguration(configFile string) (*Config, error) {
 	normalizeCuratedDefaults(config)
 	normalizeInteractshDefaults(config)
 	normalizeAIDefaults(config)
+	normalizePassiveDefaults(config)
 	_ = ensureCuratedSection(afrogConfigFile, config.Curated)
 	_ = ensureInteractshSection(afrogConfigFile, config.Reverse.Interactsh)
 	return config, nil
@@ -439,6 +526,33 @@ func normalizeAIDefaults(cfg *Config) {
 	}
 	if cfg.AI.MaxTokens <= 0 {
 		cfg.AI.MaxTokens = 1200
+	}
+}
+
+// normalizePassiveDefaults 为老配置文件补齐 passive 段的默认值。
+//
+// 老版本的 afrog-config.yaml 里没有这一段，解码后全是零值；如果不补，
+// 被动代理会以空地址启动并失败。
+func normalizePassiveDefaults(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	cfg.Passive.Host = strings.TrimSpace(cfg.Passive.Host)
+	if cfg.Passive.Host == "" {
+		cfg.Passive.Host = DefaultPassiveHost
+	}
+	if cfg.Passive.Port <= 0 || cfg.Passive.Port > 65535 {
+		cfg.Passive.Port = DefaultPassivePort
+	}
+	cfg.Passive.Upstream = strings.TrimRight(strings.TrimSpace(cfg.Passive.Upstream), "/")
+	if cfg.Passive.MaxRPS <= 0 {
+		cfg.Passive.MaxRPS = DefaultPassiveMaxRPS
+	}
+	if cfg.Passive.HostConcurrency <= 0 {
+		cfg.Passive.HostConcurrency = DefaultPassiveHostConcurrency
+	}
+	if len(cfg.Passive.Detectors) == 0 {
+		cfg.Passive.Detectors = []string{DefaultPassiveDetector}
 	}
 }
 
@@ -666,6 +780,11 @@ func UpdateAISection(configPath string, ai AI) error {
 	return replaceTopLevelSection(configPath, "ai", aiSectionLines(0, ai))
 }
 
+// UpdatePassiveSection 把 passive 段整体写回配置文件，其余段落原样保留。
+func UpdatePassiveSection(configPath string, passive Passive) error {
+	return replaceTopLevelSection(configPath, "passive", passiveSectionLines(0, passive))
+}
+
 // UpdateReverseSection 把 reverse（OOB 带外检测）段整体写回配置文件，
 // 其余段落原样保留。界面只编辑常见适配器的凭据，eye/jndi 等未暴露项由调用方
 // 从当前配置原样带回，避免被覆盖。
@@ -765,6 +884,49 @@ func aiSectionLines(baseIndent int, ai AI) []string {
 		prefix + "  timeout_sec: " + strconv.Itoa(ai.TimeoutSec),
 		prefix + "  max_tokens: " + strconv.Itoa(ai.MaxTokens),
 	}
+}
+
+// passiveSectionLines 生成 passive 段。
+//
+// 写回时统一按「已补齐默认值」的形态输出：使用者手工删掉某项后，下次保存
+// 仍会得到一份完整可读的配置，而不是缺项的半截文件。
+func passiveSectionLines(baseIndent int, p Passive) []string {
+	prefix := strings.Repeat(" ", baseIndent)
+	q := strconv.Quote
+
+	host := strings.TrimSpace(p.Host)
+	if host == "" {
+		host = DefaultPassiveHost
+	}
+	port := p.Port
+	if port <= 0 {
+		port = DefaultPassivePort
+	}
+	maxRPS := p.MaxRPS
+	if maxRPS <= 0 {
+		maxRPS = DefaultPassiveMaxRPS
+	}
+	conc := p.HostConcurrency
+	if conc <= 0 {
+		conc = DefaultPassiveHostConcurrency
+	}
+
+	lines := []string{
+		prefix + "passive:",
+		prefix + "  auto_start: " + strconv.FormatBool(p.AutoStart),
+		prefix + "  host: " + q(host),
+		prefix + "  port: " + strconv.Itoa(port),
+		prefix + "  upstream: " + q(strings.TrimRight(strings.TrimSpace(p.Upstream), "/")),
+		prefix + "  detectors:",
+	}
+	for _, d := range p.EnabledDetectors() {
+		lines = append(lines, prefix+"    - "+q(d))
+	}
+	lines = append(lines,
+		prefix+"  max_rps: "+strconv.Itoa(maxRPS),
+		prefix+"  host_concurrency: "+strconv.Itoa(conc),
+	)
+	return lines
 }
 
 // reverseSectionLines 按 afrog-config.yaml 的手写风格生成 reverse 段。

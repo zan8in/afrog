@@ -15,6 +15,7 @@ require (
 	github.com/go-zookeeper/zk v1.0.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/cel-go v0.9.0
+	github.com/google/martian/v3 v3.3.3
 	github.com/gookit/color v1.5.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hirochachacha/go-smb2 v1.1.0

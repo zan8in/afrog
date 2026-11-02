@@ -55,6 +55,11 @@ func StartServer(addr string) error {
 	StartCluster()
 	defer StopCluster()
 
+	// 被动扫描代理：配置里开启 auto_start 时自动启动；否则等前端显式开启。
+	// 退出时一定收尾，避免 API 启动过的代理在进程退出后仍占用端口。
+	AutoStartPassive()
+	defer StopPassive()
+
 	// 恢复上次运行落盘的远程派发镜像记录：发起端重启后任务列表不丢，
 	// 未完成的任务继续交给对账协程按远端任务号收敛。
 	remotePersistEnabled = true

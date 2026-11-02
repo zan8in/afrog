@@ -121,12 +121,24 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating scan probe table: %v", err)
 	}
 
+	if _, err = execBusyRetry(passiveFindingDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating passive finding table: %v", err)
+	}
+
 	if _, err = execBusyRetry(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
 
 	if err = ensureResultNodeColumn(); err != nil {
 		return fmt.Errorf("error migrating result table: %v", err)
+	}
+
+	if err = ensurePassiveLatencyColumn(); err != nil {
+		return fmt.Errorf("error migrating passive finding table: %v", err)
+	}
+
+	if err = ensurePassiveTracesColumn(); err != nil {
+		return fmt.Errorf("error migrating passive finding table: %v", err)
 	}
 
 	return dbx.Ping()
@@ -201,6 +213,69 @@ func hasResultNodeColumn() (bool, error) {
 			return false, err
 		}
 		if name, ok := col["name"]; ok && fmt.Sprintf("%v", name) == "node" {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
+}
+
+// ensurePassiveLatencyColumn 给已有库补上 passive_finding.latency_ms 列。
+//
+// 与 ensureResultNodeColumn 同样的原因：建表用 CREATE TABLE IF NOT EXISTS，
+// 老库不会因为改了 DDL 常量就长出新列，这里显式检查一次。
+func ensurePassiveLatencyColumn() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	hasCol, err := hasTableColumn("passive_finding", "latency_ms")
+	if err != nil {
+		return err
+	}
+	if hasCol {
+		return nil
+	}
+
+	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "latency_ms" INTEGER NOT NULL DEFAULT 0`)
+	return err
+}
+
+// ensurePassiveTracesColumn 给已有库补上 passive_finding.traces 列。
+//
+// traces 存的是证据链 JSON：老库升级后若缺这一列，详情查询会直接报 no such column。
+func ensurePassiveTracesColumn() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	hasCol, err := hasTableColumn("passive_finding", "traces")
+	if err != nil {
+		return err
+	}
+	if hasCol {
+		return nil
+	}
+
+	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "traces" TEXT NOT NULL DEFAULT '[]'`)
+	return err
+}
+
+// hasTableColumn 判断表是否已有指定列。
+//
+// 必须先把读游标读干净再返回：连接池只有一条连接（SetMaxOpenConns(1)），
+// 游标未关闭时读事务仍持有 WAL 快照，紧接着的 ALTER 会因为无法把读快照升级为写
+// 而报 SQLITE_BUSY_SNAPSHOT(261)，且无论退避重试多少次都不会好转。
+func hasTableColumn(table, column string) (bool, error) {
+	rows, err := dbx.Queryx("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		col := map[string]interface{}{}
+		if err := rows.MapScan(col); err != nil {
+			return false, err
+		}
+		if name, ok := col["name"]; ok && fmt.Sprintf("%v", name) == column {
 			return true, nil
 		}
 	}
