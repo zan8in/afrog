@@ -25,6 +25,15 @@ func TestNormalizePassiveDefaults(t *testing.T) {
 	if cfg.Passive.HostConcurrency != DefaultPassiveHostConcurrency {
 		t.Errorf("host_concurrency = %d, want %d", cfg.Passive.HostConcurrency, DefaultPassiveHostConcurrency)
 	}
+	if cfg.Passive.Workers != DefaultPassiveWorkers {
+		t.Errorf("workers = %d, want %d", cfg.Passive.Workers, DefaultPassiveWorkers)
+	}
+	if cfg.Passive.DetectWorkers != DefaultPassiveDetectWorkers {
+		t.Errorf("detect_workers = %d, want %d", cfg.Passive.DetectWorkers, DefaultPassiveDetectWorkers)
+	}
+	if cfg.Passive.QueueSize != DefaultPassiveQueueSize {
+		t.Errorf("queue_size = %d, want %d", cfg.Passive.QueueSize, DefaultPassiveQueueSize)
+	}
 	if got := cfg.Passive.EnabledDetectors(); len(got) != 1 || got[0] != DefaultPassiveDetector {
 		t.Errorf("detectors = %v, want [%s]", got, DefaultPassiveDetector)
 	}
@@ -72,6 +81,9 @@ curated:
 		Detectors:       []string{"sqli"},
 		MaxRPS:          200,
 		HostConcurrency: 8,
+		Workers:         16,
+		DetectWorkers:   24,
+		QueueSize:       1024,
 	}
 	if err := UpdatePassiveSection(path, want); err != nil {
 		t.Fatalf("update: %v", err)
@@ -101,6 +113,11 @@ curated:
 	}
 	if got.Passive.MaxRPS != 200 || got.Passive.HostConcurrency != 8 {
 		t.Errorf("rate limits mismatch: %+v", got.Passive)
+	}
+	// 调度层的并发参数必须能完整往返：界面保存 passive 段时若丢了这几项，
+	// 用户调好的吞吐参数会被静默重置回默认值。
+	if got.Passive.Workers != 16 || got.Passive.DetectWorkers != 24 || got.Passive.QueueSize != 1024 {
+		t.Errorf("scheduler concurrency mismatch: %+v", got.Passive)
 	}
 }
 

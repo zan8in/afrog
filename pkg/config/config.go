@@ -34,6 +34,21 @@ const (
 	DefaultPassiveMaxRPS = 100
 	// DefaultPassiveHostConcurrency 是单目标并发上限。
 	DefaultPassiveHostConcurrency = 4
+	// DefaultPassiveWorkers 是门控池并发处理事务的 worker 数。
+	//
+	// 门控池只负责判定「这条请求要不要检测」，纯本地计算，因此它决定的是入口吞吐，
+	// 而不是对目标的压力。
+	DefaultPassiveWorkers = 8
+	// DefaultPassiveDetectWorkers 是检测池的 worker 数。
+	//
+	// 它等于**实际重放并发度**：检测器在一个事务内是串行发请求的，所以同时在飞的
+	// 重放请求数就是检测池 worker 数。取 8 是为了不低于 DefaultPassiveHostConcurrency(4)，
+	// 否则会白白闲置 Prober 已经允许的并发额度；对目标的真实压力仍由
+	// MaxRPS / HostConcurrency 兜底，调大 worker 不等于调大攻击面。
+	DefaultPassiveDetectWorkers = 8
+	// DefaultPassiveQueueSize 是门控入口队列容量。队列满时新流量直接丢弃（不回压真实业务流量），
+	// 因此这个值决定了突发流量能被缓冲多少。
+	DefaultPassiveQueueSize = 256
 	// DefaultPassiveDetector 是默认启用的检测器。
 	DefaultPassiveDetector = "sqli"
 )
@@ -58,6 +73,24 @@ type Passive struct {
 	MaxRPS int `yaml:"max_rps"`
 	// HostConcurrency 是单目标并发上限。
 	HostConcurrency int `yaml:"host_concurrency"`
+	// Workers 是「门控池」并发处理事务的 worker 数，0 表示用默认值。
+	//
+	// 门控池只做「这条请求要不要检测」的筛选，属于纯本地计算、几乎不会成为瓶颈；
+	// 它的并发决定了入口能吞下多快的流量。
+	Workers int `yaml:"workers"`
+	// DetectWorkers 是「检测池」的 worker 数，0 表示用默认值。
+	//
+	// 这才是「检测吞吐」的真正旋钮：检测池执行昂贵且耗时不可控的重放，
+	// 一个事务内检测器是串行发请求的，所以并行重放数就等于这个 worker 数。
+	// 它同时不低于 HostConcurrency 才不会让 Prober 的并发额度闲置。
+	DetectWorkers int `yaml:"detect_workers"`
+	// QueueSize 是门控入口队列容量，0 表示用默认值。队列满即丢弃，不回压业务流量。
+	QueueSize int `yaml:"queue_size"`
+	// ProjectID 是被动命中的归属渗透项目。
+	//
+	// 命中按 (project_id, fingerprint) 聚合：同一项目内反复命中归到一条并累加次数，
+	// 不同项目之间互不去重。为空表示「未归属」——按无项目归档，仍可正常记录。
+	ProjectID string `yaml:"project_id"`
 }
 
 // Addr 返回 host:port 形式的监听地址。
@@ -85,6 +118,30 @@ func (p Passive) EnabledDetectors() []string {
 		return []string{DefaultPassiveDetector}
 	}
 	return out
+}
+
+// WorkersOrDefault 返回门控池 worker 数，未配置时退回默认值。
+func (p Passive) WorkersOrDefault() int {
+	if p.Workers > 0 {
+		return p.Workers
+	}
+	return DefaultPassiveWorkers
+}
+
+// DetectWorkersOrDefault 返回检测池 worker 数，未配置时退回默认值。
+func (p Passive) DetectWorkersOrDefault() int {
+	if p.DetectWorkers > 0 {
+		return p.DetectWorkers
+	}
+	return DefaultPassiveDetectWorkers
+}
+
+// QueueSizeOrDefault 返回待检队列容量，未配置时退回默认值。
+func (p Passive) QueueSizeOrDefault() int {
+	if p.QueueSize > 0 {
+		return p.QueueSize
+	}
+	return DefaultPassiveQueueSize
 }
 
 // AI 是「AI 辅助」的模型接入配置。
@@ -307,6 +364,10 @@ func NewConfig(configFile string) (*Config, error) {
 			Detectors:       []string{DefaultPassiveDetector},
 			MaxRPS:          DefaultPassiveMaxRPS,
 			HostConcurrency: DefaultPassiveHostConcurrency,
+			Workers:         DefaultPassiveWorkers,
+			DetectWorkers:   DefaultPassiveDetectWorkers,
+			QueueSize:       DefaultPassiveQueueSize,
+			ProjectID:       "",
 		}
 
 		WriteConfiguration(&c, configFile)
@@ -381,6 +442,10 @@ func defaultConfig() *Config {
 		Detectors:       []string{DefaultPassiveDetector},
 		MaxRPS:          DefaultPassiveMaxRPS,
 		HostConcurrency: DefaultPassiveHostConcurrency,
+		Workers:         DefaultPassiveWorkers,
+		DetectWorkers:   DefaultPassiveDetectWorkers,
+		QueueSize:       DefaultPassiveQueueSize,
+		ProjectID:       "",
 	}
 
 	return c
@@ -551,9 +616,19 @@ func normalizePassiveDefaults(cfg *Config) {
 	if cfg.Passive.HostConcurrency <= 0 {
 		cfg.Passive.HostConcurrency = DefaultPassiveHostConcurrency
 	}
+	if cfg.Passive.Workers <= 0 {
+		cfg.Passive.Workers = DefaultPassiveWorkers
+	}
+	if cfg.Passive.DetectWorkers <= 0 {
+		cfg.Passive.DetectWorkers = DefaultPassiveDetectWorkers
+	}
+	if cfg.Passive.QueueSize <= 0 {
+		cfg.Passive.QueueSize = DefaultPassiveQueueSize
+	}
 	if len(cfg.Passive.Detectors) == 0 {
 		cfg.Passive.Detectors = []string{DefaultPassiveDetector}
 	}
+	cfg.Passive.ProjectID = strings.TrimSpace(cfg.Passive.ProjectID)
 }
 
 func ensureCuratedSection(configPath string, curated Curated) error {
@@ -910,6 +985,9 @@ func passiveSectionLines(baseIndent int, p Passive) []string {
 	if conc <= 0 {
 		conc = DefaultPassiveHostConcurrency
 	}
+	workers := p.WorkersOrDefault()
+	detectWorkers := p.DetectWorkersOrDefault()
+	queueSize := p.QueueSizeOrDefault()
 
 	lines := []string{
 		prefix + "passive:",
@@ -925,6 +1003,10 @@ func passiveSectionLines(baseIndent int, p Passive) []string {
 	lines = append(lines,
 		prefix+"  max_rps: "+strconv.Itoa(maxRPS),
 		prefix+"  host_concurrency: "+strconv.Itoa(conc),
+		prefix+"  workers: "+strconv.Itoa(workers),
+		prefix+"  detect_workers: "+strconv.Itoa(detectWorkers),
+		prefix+"  queue_size: "+strconv.Itoa(queueSize),
+		prefix+"  project_id: "+q(strings.TrimSpace(p.ProjectID)),
 	)
 	return lines
 }

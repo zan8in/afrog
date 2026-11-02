@@ -101,6 +101,14 @@ const (
 	LocationBody   ParamLocation = "body"
 	LocationCookie ParamLocation = "cookie"
 	LocationHeader ParamLocation = "header"
+	// LocationJSONBody 是 JSON 请求体里的字符串型字段（含嵌套对象与数组元素）。
+	LocationJSONBody ParamLocation = "json"
+	// LocationPath 是 URL 路径段（RESTful 风格，如 /users/123/orders/456 里的 123）。
+	LocationPath ParamLocation = "path"
+	// LocationXML 是 XML / SOAP 请求体里的元素文本值。
+	LocationXML ParamLocation = "xml"
+	// LocationMultipart 是 multipart/form-data 分段里的表单字段值。
+	LocationMultipart ParamLocation = "multipart"
 )
 
 // InjectionPoint 是一个可注入点。

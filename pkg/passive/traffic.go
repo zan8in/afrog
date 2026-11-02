@@ -18,13 +18,25 @@ const (
 	// VerdictSkippedPath 无法归一化出目标地址。
 	VerdictSkippedPath TrafficVerdict = "skipped-path"
 	// VerdictDropped 待检队列已满，被主动丢弃（保护用户网络）。
+	// 它发生在**门控入口**：这些请求连「要不要检测」都还没判断过。
 	VerdictDropped TrafficVerdict = "dropped-queue"
+	// VerdictDroppedDetect 检测队列已满，未能进入检测。
+	//
+	// 与 VerdictDropped 必须分开：前者是「入口就丢了，还没筛过」，这里是
+	// 「已经确认需要检测，却因检测能力饱和而丢了」——后者是实打实的漏报风险，
+	// 混在一起会让使用者低估损失。
+	VerdictDroppedDetect TrafficVerdict = "dropped-detect"
 	// VerdictNoInterest 所有检测器都判定该请求不具备检测条件。
 	VerdictNoInterest TrafficVerdict = "no-interest"
 	// VerdictNoFinding 检测已执行，但没有发现确定成立的结论。
 	VerdictNoFinding TrafficVerdict = "no-finding"
 	// VerdictFinding 检出漏洞。
 	VerdictFinding TrafficVerdict = "finding"
+	// VerdictDuplicate 检出了漏洞，但与已上报的命中重复，被去重拦下。
+	//
+	// 必须与 VerdictNoFinding 区分开：前者是「确实检出了」，后者是「没检出」。
+	// 把去重混进 no-finding 会让界面显示「检测无结论」，抹掉真实结论。
+	VerdictDuplicate TrafficVerdict = "dup-finding"
 	// VerdictError 检测过程异常。
 	VerdictError TrafficVerdict = "error"
 )
@@ -49,6 +61,8 @@ type TrafficEvent struct {
 	Reason  string         `json:"reason,omitempty"`
 	// Findings 是这条流量检出的命中数。
 	Findings int `json:"findings"`
+	// Duplicated 是这条流量检出但被判为重复（已在别处上报过）的命中数。
+	Duplicated int `json:"duplicated,omitempty"`
 	// Error 是检测异常信息（仅 VerdictError 时有值）。
 	Error string `json:"error,omitempty"`
 	// Detectors 是本条流量实际执行过检测的检测器名。

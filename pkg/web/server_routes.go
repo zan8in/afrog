@@ -282,6 +282,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/passive/findings", jwtAuthMiddleware(passiveFindingsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/findings/{id}", jwtAuthMiddleware(passiveFindingDetailHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/findings/{id}/promote", jwtAuthMiddleware(passivePromoteHandler)).Methods(http.MethodPost)
+	// 人工流转命中状态（标记已修复 / 撤销修复）。状态机由存储层守住。
+	api.HandleFunc("/passive/findings/{id}/state", jwtAuthMiddleware(passiveFindingStateHandler)).Methods(http.MethodPost)
 	// 多实例编排：/cluster/self 供同伴实例互访（走集群共享密钥，不走 JWT），
 	// /cluster/instances 是控制台自己的聚合视图，/cluster/config 用来在运行时
 	// 增删节点（会员能力，保存后写回 afrog-config.yaml 并立即生效）。

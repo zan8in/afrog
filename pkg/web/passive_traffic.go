@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -90,11 +91,19 @@ type passiveTrafficCounts struct {
 	SkippedStatic uint64 `json:"skipped_static"`
 	SkippedMethod uint64 `json:"skipped_method"`
 	SkippedPath   uint64 `json:"skipped_path"`
-	Dropped       uint64 `json:"dropped"`
+	// Dropped 是门控入口队列满而丢弃的流量数：这些请求连「要不要检测」都还没判过。
+	Dropped uint64 `json:"dropped"`
+	// DroppedDetect 是已确认需要检测、却因检测队列满而未检测的流量数。
+	// 与 Dropped 分开：这一项直接对应漏报风险，混在一起会让使用者低估损失。
+	DroppedDetect uint64 `json:"dropped_detect"`
 	NoInterest    uint64 `json:"no_interest"`
 	NoFinding     uint64 `json:"no_finding"`
 	Finding       uint64 `json:"finding"`
-	Error         uint64 `json:"error"`
+	// Duplicate 是「检出但被去重拦下」的流量数。与 Finding 分开计数：
+	// 前者代表已经报过，后者才是本次真正新增，混在一起会让使用者误以为
+	// 命中在涨、列表却不动。
+	Duplicate uint64 `json:"duplicate"`
+	Error     uint64 `json:"error"`
 }
 
 func (l *passiveTrafficLog) snapshot(limit int, verdict string) ([]passive.TrafficEvent, passiveTrafficCounts) {
@@ -113,12 +122,16 @@ func (l *passiveTrafficLog) snapshot(limit int, verdict string) ([]passive.Traff
 			counts.SkippedPath = n
 		case passive.VerdictDropped:
 			counts.Dropped = n
+		case passive.VerdictDroppedDetect:
+			counts.DroppedDetect = n
 		case passive.VerdictNoInterest:
 			counts.NoInterest = n
 		case passive.VerdictNoFinding:
 			counts.NoFinding = n
 		case passive.VerdictFinding:
 			counts.Finding = n
+		case passive.VerdictDuplicate:
+			counts.Duplicate = n
 		case passive.VerdictError:
 			counts.Error = n
 		}
@@ -194,23 +207,28 @@ type passiveCAView struct {
 
 // passiveDiagnostics 是「一眼黑」的正面解法：把链路每一段的真实状态摊开。
 type passiveDiagnostics struct {
-	Running         bool                 `json:"running"`
-	Addr            string               `json:"addr"`
-	StartedAt       string               `json:"started_at,omitempty"`
-	UptimeSeconds   int64                `json:"uptime_seconds"`
-	Upstream        string               `json:"upstream,omitempty"`
-	Detectors       []string             `json:"detectors"`
-	Workers         int                  `json:"workers"`
-	QueueSize       int                  `json:"queue_size"`
-	MaxRPS          int                  `json:"max_rps"`
-	HostConcurrency int                  `json:"host_concurrency"`
-	Stats           passive.Stats        `json:"stats"`
-	Counts          passiveTrafficCounts `json:"counts"`
-	TrafficCap      int                  `json:"traffic_capacity"`
-	CA              passiveCAView        `json:"ca"`
-	LastError       string               `json:"last_error,omitempty"`
-	Errors          []passiveDiagError   `json:"errors"`
-	Hints           []string             `json:"hints"`
+	Running         bool          `json:"running"`
+	Addr            string        `json:"addr"`
+	StartedAt       string        `json:"started_at,omitempty"`
+	UptimeSeconds   int64         `json:"uptime_seconds"`
+	Upstream        string        `json:"upstream,omitempty"`
+	Detectors       []string      `json:"detectors"`
+	Workers         int           `json:"workers"`
+	DetectWorkers   int           `json:"detect_workers"`
+	QueueSize       int           `json:"queue_size"`
+	MaxRPS          int           `json:"max_rps"`
+	HostConcurrency int           `json:"host_concurrency"`
+	Stats           passive.Stats `json:"stats"`
+	// Drained 表示「进入调度的事务是否已全部处理完」：积压与在途都为 0。
+	// 它是判断「这一轮流量是否已检测完毕」的唯一准确信号——不能用
+	// stats.inspected 代替，那个只统计真正跑过检测器的事务。
+	Drained    bool                 `json:"drained"`
+	Counts     passiveTrafficCounts `json:"counts"`
+	TrafficCap int                  `json:"traffic_capacity"`
+	CA         passiveCAView        `json:"ca"`
+	LastError  string               `json:"last_error,omitempty"`
+	Errors     []passiveDiagError   `json:"errors"`
+	Hints      []string             `json:"hints"`
 }
 
 func passiveDiagnosticsHandler(w http.ResponseWriter, r *http.Request) {
@@ -231,8 +249,9 @@ func passiveDiagnosticsHandler(w http.ResponseWriter, r *http.Request) {
 		Addr:            cfg.Addr(),
 		Upstream:        cfg.Upstream,
 		Detectors:       cfg.EnabledDetectors(),
-		Workers:         passiveWorkers,
-		QueueSize:       passiveQueueSize,
+		Workers:         cfg.WorkersOrDefault(),
+		DetectWorkers:   cfg.DetectWorkersOrDefault(),
+		QueueSize:       cfg.QueueSizeOrDefault(),
 		MaxRPS:          cfg.MaxRPS,
 		HostConcurrency: cfg.HostConcurrency,
 		TrafficCap:      passiveTrafficLimit,
@@ -247,6 +266,7 @@ func passiveDiagnosticsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if engine != nil {
 		dg.Stats = engine.Stats()
+		dg.Drained = engine.Drained()
 	}
 	_, dg.Counts = passiveTraffic.snapshot(1, "")
 	dg.CA = passiveCAInfo(caDir)
@@ -313,7 +333,20 @@ func passiveHints(dg passiveDiagnostics) []string {
 		hints = append(hints, "检测已执行但无结论：SQLi 要求参数可注入且页面基线稳定，动态页面（带时间戳/随机 token）会被主动跳过。")
 	}
 	if dg.Counts.Dropped > 0 {
-		hints = append(hints, "存在因待检队列满被丢弃的事务：说明检测吞吐跟不上流量，可减少同时使用代理的客户端，或提高最大请求速率。")
+		hints = append(hints, "存在因门控队列满被丢弃的事务：这些请求连「要不要检测」都还没判过。可在「设置」里调大门控并发（workers）与队列容量。")
+	}
+	if dg.Counts.DroppedDetect > 0 {
+		hints = append(hints,
+			"有 "+strconv.FormatUint(dg.Counts.DroppedDetect, 10)+
+				" 条已确认需要检测、却因检测能力饱和被丢弃：这是实打实的漏报风险，请在「设置」里调大「检测并发（detect_workers）」。")
+	}
+	if dg.QueueSize > 0 && dg.Stats.QueueDepth >= dg.QueueSize {
+		hints = append(hints,
+			"门控队列已打满（"+strconv.Itoa(dg.Stats.QueueDepth)+"/"+strconv.Itoa(dg.QueueSize)+
+				"）：此刻到达的新流量会被直接丢弃，可在「设置」里调大门控并发（workers）。")
+	}
+	if !dg.Drained {
+		hints = append(hints, "待检队列仍有积压或在途检测：这一轮流量尚未跑完，等「积压 / 处理中」都归零才代表检测完毕。")
 	}
 	if !dg.CA.Exists {
 		hints = append(hints, "根证书尚未生成：启动被动扫描会自动生成，也可先下载 /api/passive/ca 安装。")

@@ -125,6 +125,16 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating passive finding table: %v", err)
 	}
 
+	// 作用域列必须在建索引之前补齐：唯一索引建立在 (project_id, fingerprint) 上，
+	// 老库缺列时直接建索引会报 no such column。
+	if err = ensurePassiveScopeColumns(); err != nil {
+		return fmt.Errorf("error migrating passive finding scope columns: %v", err)
+	}
+
+	if err = ensurePassiveScopeIndexes(); err != nil {
+		return fmt.Errorf("error migrating passive finding indexes: %v", err)
+	}
+
 	if _, err = execBusyRetry(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
@@ -255,6 +265,69 @@ func ensurePassiveTracesColumn() error {
 	}
 
 	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "traces" TEXT NOT NULL DEFAULT '[]'`)
+	return err
+}
+
+// ensurePassiveScopeColumns 给已有库补上「按项目聚合」所需的列。
+//
+// 被动命中从「全局唯一」改为「按 (project_id, fingerprint) 聚合」后，老库缺这些列：
+// 缺任何一列，upsert 与列表查询都会直接报 no such column。补列是幂等的，逐列检查。
+func ensurePassiveScopeColumns() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+
+	columns := []struct{ name, ddl string }{
+		{"project_id", `ALTER TABLE "passive_finding" ADD COLUMN "project_id" TEXT NOT NULL DEFAULT ''`},
+		{"hit_count", `ALTER TABLE "passive_finding" ADD COLUMN "hit_count" INTEGER NOT NULL DEFAULT 1`},
+		{"first_seen", `ALTER TABLE "passive_finding" ADD COLUMN "first_seen" TEXT NOT NULL DEFAULT ''`},
+		{"last_seen", `ALTER TABLE "passive_finding" ADD COLUMN "last_seen" TEXT NOT NULL DEFAULT ''`},
+		{"state", `ALTER TABLE "passive_finding" ADD COLUMN "state" TEXT NOT NULL DEFAULT 'new'`},
+	}
+
+	added := false
+	for _, col := range columns {
+		has, err := hasTableColumn("passive_finding", col.name)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := execBusyRetry(col.ddl); err != nil {
+			return err
+		}
+		added = true
+	}
+	if !added {
+		return nil
+	}
+
+	// 只在「刚补完列」这一次做数据回填：此刻表里全部是升级前的老命中，
+	// 它们没有时间线，用 created 补齐；并且都是「此前已存在」的观察，
+	// 统一标为 present，避免整屏历史记录被显示成「新增」。
+	if _, err := execBusyRetry(`UPDATE "passive_finding" SET first_seen = created, last_seen = created WHERE first_seen = ''`); err != nil {
+		return err
+	}
+	if _, err := execBusyRetry(`UPDATE "passive_finding" SET state = 'present' WHERE state = 'new'`); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ensurePassiveScopeIndexes 把命中的唯一索引从「全局指纹」迁移到「项目内指纹」。
+//
+// 旧索引 idx_passive_finding_fp 把「同一漏洞在库里只该有一条」写死：跨项目扫描时
+// 后扫到的项目会因指纹相同而被 INSERT OR IGNORE 丢掉，命中列表不再增长。新模型下
+// 唯一性只应约束在项目内部，因此显式 DROP 掉旧索引，再建 (project_id, fingerprint)。
+func ensurePassiveScopeIndexes() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	if _, err := execBusyRetry(`DROP INDEX IF EXISTS "idx_passive_finding_fp"`); err != nil {
+		return err
+	}
+	_, err := execBusyRetry(passiveFindingIndexDDL)
 	return err
 }
 
