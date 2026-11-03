@@ -210,6 +210,103 @@ func TestProxyReportsSkippedStatic(t *testing.T) {
 	}
 }
 
+// TestProxyDeniesUnsafeMethods 锁定：非幂等方法默认不重放。
+// 检测会把同一请求重放数十次，PUT/PATCH/DELETE 在真实业务流量上有破坏数据的风险，
+// 必须由使用者显式开启才做。
+func TestProxyDeniesUnsafeMethods(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "body{}")
+	}))
+	defer target.Close()
+
+	traffic := make(chan passive.TrafficEvent, 4)
+	srv, err := New(Options{
+		Addr:  "127.0.0.1:0",
+		CADir: t.TempDir(),
+		OnTraffic: func(ev passive.TrafficEvent) {
+			select {
+			case traffic <- ev:
+			default:
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	proxyURL, _ := url.Parse("http://" + srv.Addr())
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+
+	req, _ := http.NewRequest(http.MethodDelete, target.URL+"/api/order?id=1", nil)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	defer resp.Body.Close()
+
+	select {
+	case ev := <-traffic:
+		if ev.Verdict != passive.VerdictSkippedMethod {
+			t.Fatalf("verdict = %q, want %q", ev.Verdict, passive.VerdictSkippedMethod)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("非幂等方法被跳过时必须上报 TrafficEvent")
+	}
+}
+
+// TestProxyRespectsScope 锁定：范围外的流量在代理层就被放过，不进调度层。
+func TestProxyRespectsScope(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "body{}")
+	}))
+	defer target.Close()
+
+	traffic := make(chan passive.TrafficEvent, 4)
+	srv, err := New(Options{
+		Addr:  "127.0.0.1:0",
+		CADir: t.TempDir(),
+		Scope: passive.Scope{HostDeny: []string{"127.0.0.1"}},
+		OnTraffic: func(ev passive.TrafficEvent) {
+			select {
+			case traffic <- ev:
+			default:
+			}
+		},
+	})
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	if err := srv.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Stop() })
+
+	proxyURL, _ := url.Parse("http://" + srv.Addr())
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+
+	resp, err := client.Get(target.URL + "/api/user?id=1")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+
+	select {
+	case ev := <-traffic:
+		if ev.Verdict != passive.VerdictSkippedScope {
+			t.Fatalf("verdict = %q, want %q", ev.Verdict, passive.VerdictSkippedScope)
+		}
+		if ev.Reason == "" {
+			t.Fatalf("范围外跳过必须说明原因: %+v", ev)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("范围外流量被跳过时必须上报 TrafficEvent")
+	}
+}
+
 // TestProxyReportsTLSHandshakeError 锁定：客户端不信任根证书时必须上报异常。
 // 这是「HTTPS 一条都抓不到」最常见的原因，静默失败会让使用者无从下手。
 func TestProxyReportsTLSHandshakeError(t *testing.T) {

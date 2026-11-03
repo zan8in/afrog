@@ -178,6 +178,10 @@ func (rt *passiveRuntime) start() error {
 		Addr:     rt.listenAddr(cfg),
 		CADir:    rt.caDir,
 		Upstream: upstream,
+		// 范围裁剪在代理层生效：范围外的流量连队列都不占用。
+		// 这是使用者唯一能「从源头省流量」的旋钮。
+		Scope:              cfg.Scope(),
+		AllowUnsafeMethods: cfg.ScanUnsafeMethods,
 		OnTransaction: func(tx *passive.CapturedTransaction) {
 			engine.Submit(tx)
 		},
@@ -327,24 +331,34 @@ type passiveConfigView struct {
 	QueueSize int `json:"queue_size"`
 	// ProjectID 是被动命中的归属渗透项目；空表示「未归属」。
 	ProjectID string `json:"project_id"`
+	// ScopeHostAllow / ScopeHostDeny / ScopePathDeny 是代理层的范围裁剪规则。
+	ScopeHostAllow []string `json:"scope_host_allow"`
+	ScopeHostDeny  []string `json:"scope_host_deny"`
+	ScopePathDeny  []string `json:"scope_path_deny"`
+	// ScanUnsafeMethods 表示是否重放 PUT / PATCH / DELETE；默认关闭以防破坏数据。
+	ScanUnsafeMethods bool `json:"scan_unsafe_methods"`
 	// ConfigPath 回显配置实际写入的文件，便于使用者直接去编辑。
 	ConfigPath string `json:"config_path,omitempty"`
 }
 
 func passiveConfigViewFrom(cfg config.Passive, path string) passiveConfigView {
 	return passiveConfigView{
-		AutoStart:       cfg.AutoStart,
-		Host:            cfg.Host,
-		Port:            cfg.Port,
-		Upstream:        cfg.Upstream,
-		Detectors:       cfg.EnabledDetectors(),
-		MaxRPS:          cfg.MaxRPS,
-		HostConcurrency: cfg.HostConcurrency,
-		Workers:         cfg.WorkersOrDefault(),
-		DetectWorkers:   cfg.DetectWorkersOrDefault(),
-		QueueSize:       cfg.QueueSizeOrDefault(),
-		ProjectID:       cfg.ProjectID,
-		ConfigPath:      path,
+		AutoStart:         cfg.AutoStart,
+		Host:              cfg.Host,
+		Port:              cfg.Port,
+		Upstream:          cfg.Upstream,
+		Detectors:         cfg.EnabledDetectors(),
+		MaxRPS:            cfg.MaxRPS,
+		HostConcurrency:   cfg.HostConcurrency,
+		Workers:           cfg.WorkersOrDefault(),
+		DetectWorkers:     cfg.DetectWorkersOrDefault(),
+		QueueSize:         cfg.QueueSizeOrDefault(),
+		ProjectID:         cfg.ProjectID,
+		ScopeHostAllow:    cfg.ScopeHostAllow,
+		ScopeHostDeny:     cfg.ScopeHostDeny,
+		ScopePathDeny:     cfg.ScopePathDeny,
+		ScanUnsafeMethods: cfg.ScanUnsafeMethods,
+		ConfigPath:        path,
 	}
 }
 
@@ -434,17 +448,21 @@ func passiveStopHandler(w http.ResponseWriter, r *http.Request) {
 // -----------------------
 
 type passiveConfigPayload struct {
-	AutoStart       bool     `json:"auto_start"`
-	Host            string   `json:"host"`
-	Port            int      `json:"port"`
-	Upstream        string   `json:"upstream"`
-	Detectors       []string `json:"detectors"`
-	MaxRPS          int      `json:"max_rps"`
-	HostConcurrency int      `json:"host_concurrency"`
-	Workers         int      `json:"workers"`
-	DetectWorkers   int      `json:"detect_workers"`
-	QueueSize       int      `json:"queue_size"`
-	ProjectID       string   `json:"project_id"`
+	AutoStart         bool     `json:"auto_start"`
+	Host              string   `json:"host"`
+	Port              int      `json:"port"`
+	Upstream          string   `json:"upstream"`
+	Detectors         []string `json:"detectors"`
+	MaxRPS            int      `json:"max_rps"`
+	HostConcurrency   int      `json:"host_concurrency"`
+	Workers           int      `json:"workers"`
+	DetectWorkers     int      `json:"detect_workers"`
+	QueueSize         int      `json:"queue_size"`
+	ProjectID         string   `json:"project_id"`
+	ScopeHostAllow    []string `json:"scope_host_allow"`
+	ScopeHostDeny     []string `json:"scope_host_deny"`
+	ScopePathDeny     []string `json:"scope_path_deny"`
+	ScanUnsafeMethods bool     `json:"scan_unsafe_methods"`
 }
 
 func passiveConfigGetHandler(w http.ResponseWriter, r *http.Request) {
@@ -580,18 +598,36 @@ func normalizePassivePayload(req passiveConfigPayload) (config.Passive, error) {
 	}
 
 	return config.Passive{
-		AutoStart:       req.AutoStart,
-		Host:            host,
-		Port:            req.Port,
-		Upstream:        upstream,
-		Detectors:       detectors,
-		MaxRPS:          maxRPS,
-		HostConcurrency: conc,
-		Workers:         workers,
-		DetectWorkers:   detectWorkers,
-		QueueSize:       queueSize,
-		ProjectID:       projectID,
+		AutoStart:         req.AutoStart,
+		Host:              host,
+		Port:              req.Port,
+		Upstream:          upstream,
+		Detectors:         detectors,
+		MaxRPS:            maxRPS,
+		HostConcurrency:   conc,
+		Workers:           workers,
+		DetectWorkers:     detectWorkers,
+		QueueSize:         queueSize,
+		ProjectID:         projectID,
+		ScopeHostAllow:    cleanScopeList(req.ScopeHostAllow),
+		ScopeHostDeny:     cleanScopeList(req.ScopeHostDeny),
+		ScopePathDeny:     cleanScopeList(req.ScopePathDeny),
+		ScanUnsafeMethods: req.ScanUnsafeMethods,
 	}, nil
+}
+
+// cleanScopeList 去掉范围规则里的空白项，避免界面上的空行变成一条规则。
+func cleanScopeList(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // passiveCAHandler 下发根证书。

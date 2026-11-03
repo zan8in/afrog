@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/zan8in/afrog/v3/pkg/passive"
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"gopkg.in/yaml.v2"
 )
@@ -91,6 +92,20 @@ type Passive struct {
 	// 命中按 (project_id, fingerprint) 聚合：同一项目内反复命中归到一条并累加次数，
 	// 不同项目之间互不去重。为空表示「未归属」——按无项目归档，仍可正常记录。
 	ProjectID string `yaml:"project_id"`
+	// ScopeHostAllow 是扫描范围的 Host 白名单：非空时只扫描匹配的 Host。
+	//
+	// 用于把统计、CDN、地图等第三方域名挡在代理层之外——它们没有业务价值，
+	// 放进来只会白白消耗检测队列。匹配规则见 passive.Scope。
+	ScopeHostAllow []string `yaml:"scope_host_allow"`
+	// ScopeHostDeny 是永不扫描的 Host，优先级高于 ScopeHostAllow。
+	ScopeHostDeny []string `yaml:"scope_host_deny"`
+	// ScopePathDeny 是永不扫描的路径（如 /logout、/pay）。
+	ScopePathDeny []string `yaml:"scope_path_deny"`
+	// ScanUnsafeMethods 表示是否扫描 PUT / PATCH / DELETE 这类非幂等请求。
+	//
+	// 默认 false：检测器会把同一请求重放数十次，这些方法会修改或删除业务数据，
+	// 在真实业务流量上重放有实际破坏风险。仅在确认端点无副作用时才开启。
+	ScanUnsafeMethods bool `yaml:"scan_unsafe_methods"`
 }
 
 // Addr 返回 host:port 形式的监听地址。
@@ -142,6 +157,18 @@ func (p Passive) QueueSizeOrDefault() int {
 		return p.QueueSize
 	}
 	return DefaultPassiveQueueSize
+}
+
+// Scope 把范围配置整理成代理层认识的裁剪规则。
+//
+// 集中在这里转换，代理层与 SDK 就只需认识 passive.Scope 一种结构，
+// 新增范围维度时也不会漏改某一个入口。
+func (p Passive) Scope() passive.Scope {
+	return passive.Scope{
+		HostAllow: p.ScopeHostAllow,
+		HostDeny:  p.ScopeHostDeny,
+		PathDeny:  p.ScopePathDeny,
+	}
 }
 
 // AI 是「AI 辅助」的模型接入配置。
@@ -368,6 +395,9 @@ func NewConfig(configFile string) (*Config, error) {
 			DetectWorkers:   DefaultPassiveDetectWorkers,
 			QueueSize:       DefaultPassiveQueueSize,
 			ProjectID:       "",
+			ScopeHostAllow:  []string{},
+			ScopeHostDeny:   []string{},
+			ScopePathDeny:   []string{},
 		}
 
 		WriteConfiguration(&c, configFile)
@@ -629,6 +659,25 @@ func normalizePassiveDefaults(cfg *Config) {
 		cfg.Passive.Detectors = []string{DefaultPassiveDetector}
 	}
 	cfg.Passive.ProjectID = strings.TrimSpace(cfg.Passive.ProjectID)
+	cfg.Passive.ScopeHostAllow = normalizeScopeList(cfg.Passive.ScopeHostAllow)
+	cfg.Passive.ScopeHostDeny = normalizeScopeList(cfg.Passive.ScopeHostDeny)
+	cfg.Passive.ScopePathDeny = normalizeScopeList(cfg.Passive.ScopePathDeny)
+}
+
+// normalizeScopeList 去掉范围规则里的空白项。
+//
+// 界面里多敲一个空行不该变成一条规则，空列表统一归一成 nil 以便 YAML 写成 []。
+func normalizeScopeList(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func ensureCuratedSection(configPath string, curated Curated) error {
@@ -1008,6 +1057,21 @@ func passiveSectionLines(baseIndent int, p Passive) []string {
 		prefix+"  queue_size: "+strconv.Itoa(queueSize),
 		prefix+"  project_id: "+q(strings.TrimSpace(p.ProjectID)),
 	)
+	// 范围规则列表：空列表写成 [] 而不是留一个空键，避免使用者误以为配置被截断。
+	listLines := func(key string, items []string) []string {
+		if len(items) == 0 {
+			return []string{prefix + "  " + key + ": []"}
+		}
+		out := []string{prefix + "  " + key + ":"}
+		for _, it := range items {
+			out = append(out, prefix+"    - "+q(it))
+		}
+		return out
+	}
+	lines = append(lines, listLines("scope_host_allow", p.ScopeHostAllow)...)
+	lines = append(lines, listLines("scope_host_deny", p.ScopeHostDeny)...)
+	lines = append(lines, listLines("scope_path_deny", p.ScopePathDeny)...)
+	lines = append(lines, prefix+"  scan_unsafe_methods: "+strconv.FormatBool(p.ScanUnsafeMethods))
 	return lines
 }
 

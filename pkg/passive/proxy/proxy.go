@@ -31,6 +31,14 @@ type Options struct {
 	// Upstream 是上游代理：代理转发目标请求时先经过它（企业网络常见）。
 	// 为空表示直连目标。
 	Upstream *url.URL
+	// Scope 是扫描范围裁剪规则：范围外的流量在代理层就被放过，不进入调度层。
+	// 零值表示不做任何裁剪。
+	Scope passive.Scope
+	// AllowUnsafeMethods 表示是否重放 PUT / PATCH / DELETE 这类非幂等请求。
+	//
+	// 默认 false：这些方法会修改或删除业务数据，而一次检测要对同一请求重放数十次，
+	// 在真实业务流量上重放它们有实打实的破坏风险。要检测这类端点时必须显式开启。
+	AllowUnsafeMethods bool
 	// OnTransaction 是事务完成后的回调。回调应尽快返回，耗时逻辑交给调度层异步处理。
 	OnTransaction func(*passive.CapturedTransaction)
 	// OnTraffic 上报被代理层直接放过的流量（静态资源 / 方法 / 归一化失败），
@@ -106,7 +114,13 @@ func New(opts Options) (*Server, error) {
 	}
 	mp.SetMITM(cfg)
 
-	cap := &capture{onTx: opts.OnTransaction, onTraffic: opts.OnTraffic, maxBody: opts.MaxBodyBytes}
+	cap := &capture{
+		onTx:               opts.OnTransaction,
+		onTraffic:          opts.OnTraffic,
+		maxBody:            opts.MaxBodyBytes,
+		scope:              opts.Scope,
+		allowUnsafeMethods: opts.AllowUnsafeMethods,
+	}
 	mp.SetRequestModifier(cap)
 	mp.SetResponseModifier(cap)
 

@@ -19,9 +19,11 @@ const txCtxKey = "afrog.passive.tx"
 
 // capture 同时实现 martian 的请求与响应修改器，负责把流量归一化成事务对象。
 type capture struct {
-	onTx      func(*passive.CapturedTransaction)
-	onTraffic func(passive.TrafficEvent)
-	maxBody   int64
+	onTx               func(*passive.CapturedTransaction)
+	onTraffic          func(passive.TrafficEvent)
+	maxBody            int64
+	scope              passive.Scope
+	allowUnsafeMethods bool
 }
 
 // ModifyRequest 归一化请求并暂存事务。
@@ -39,7 +41,7 @@ func (c *capture) ModifyRequest(req *http.Request) error {
 	}
 	// 被放过的请求同样要上报：使用者看到「捕获数不涨」时，最需要知道的是
 	// 流量被哪条规则挡在了检测之外（静态资源 / 方法 / 无法归一化）。
-	if verdict, reason, skip := skipReason(req); skip {
+	if verdict, reason, skip := skipReason(req, c.scope, c.allowUnsafeMethods); skip {
 		c.emitSkip(req, verdict, reason)
 		return nil
 	}
@@ -197,14 +199,36 @@ var staticExts = []string{
 // skipReason 判断请求是否应该直接被放过，并给出可读原因。
 //
 // 返回值语义与 shouldSkip 一致，只是把「为什么」一并带出来供界面展示。
-func skipReason(req *http.Request) (passive.TrafficVerdict, string, bool) {
+//
+// allowUnsafeMethods 为 false 时，PUT / PATCH / DELETE 这类非幂等方法一律放过：
+// 一次检测会把同一请求重放数十次，在真实业务流量上重放它们有实际的数据破坏风险，
+// 所以必须由使用者显式开启，而不是默认就做。
+func skipReason(req *http.Request, scope passive.Scope, allowUnsafeMethods bool) (passive.TrafficVerdict, string, bool) {
 	switch req.Method {
-	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	case http.MethodGet, http.MethodPost:
+	case http.MethodPut, http.MethodPatch, http.MethodDelete:
+		if !allowUnsafeMethods {
+			return passive.VerdictSkippedMethod, req.Method + " 是非幂等方法，重放可能修改或删除业务数据，默认不检测；确认无副作用后可在设置中开启", true
+		}
 	default:
 		return passive.VerdictSkippedMethod, "请求方法 " + req.Method + " 不在检测范围内", true
 	}
 	if req.URL == nil {
 		return passive.VerdictSkippedPath, "请求缺少 URL", true
+	}
+	// MITM 隧道里的请求 URL 可能还没有 Host，需要退回从 Host 头补齐，
+	// 否则范围判断会把本该命中的目标误判成「无主机」。
+	host := req.URL.Host
+	if host == "" {
+		host = req.Host
+	}
+	if !scope.Empty() {
+		if !scope.AllowsHost(host) {
+			return passive.VerdictSkippedScope, "主机 " + host + " 在扫描范围之外", true
+		}
+		if !scope.AllowsPath(req.URL.Path) {
+			return passive.VerdictSkippedScope, "路径 " + req.URL.Path + " 在扫描范围之外", true
+		}
 	}
 	path := strings.ToLower(req.URL.Path)
 	for _, ext := range staticExts {

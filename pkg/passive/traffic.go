@@ -17,6 +17,12 @@ const (
 	VerdictSkippedMethod TrafficVerdict = "skipped-method"
 	// VerdictSkippedPath 无法归一化出目标地址。
 	VerdictSkippedPath TrafficVerdict = "skipped-path"
+	// VerdictSkippedScope 落在使用者设定的扫描范围之外。
+	//
+	// 与静态资源跳过不同：这些请求本身是可注入的，只是被范围规则（域名白名单 /
+	// 路径排除）挡在了外面。单独成一类，使用者才能确认「是我不让它扫的」，
+	// 而不是误以为工具漏扫了。
+	VerdictSkippedScope TrafficVerdict = "skipped-scope"
 	// VerdictDropped 待检队列已满，被主动丢弃（保护用户网络）。
 	// 它发生在**门控入口**：这些请求连「要不要检测」都还没判断过。
 	VerdictDropped TrafficVerdict = "dropped-queue"

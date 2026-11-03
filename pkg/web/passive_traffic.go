@@ -91,6 +91,9 @@ type passiveTrafficCounts struct {
 	SkippedStatic uint64 `json:"skipped_static"`
 	SkippedMethod uint64 `json:"skipped_method"`
 	SkippedPath   uint64 `json:"skipped_path"`
+	// SkippedScope 是被使用者设定的扫描范围（Host 白/黑名单、路径排除）挡下的流量数。
+	// 与静态资源跳过分开：这些请求本可检测，是使用者主动让它不扫的。
+	SkippedScope uint64 `json:"skipped_scope"`
 	// Dropped 是门控入口队列满而丢弃的流量数：这些请求连「要不要检测」都还没判过。
 	Dropped uint64 `json:"dropped"`
 	// DroppedDetect 是已确认需要检测、却因检测队列满而未检测的流量数。
@@ -124,6 +127,8 @@ func (l *passiveTrafficLog) snapshot(limit int, verdict string) ([]passive.Traff
 			counts.SkippedMethod = n
 		case passive.VerdictSkippedPath:
 			counts.SkippedPath = n
+		case passive.VerdictSkippedScope:
+			counts.SkippedScope = n
 		case passive.VerdictDropped:
 			counts.Dropped = n
 		case passive.VerdictDroppedDetect:
@@ -331,6 +336,11 @@ func passiveHints(dg passiveDiagnostics) []string {
 	}
 	if dg.Counts.SkippedStatic > 0 && dg.Stats.Submitted == 0 {
 		hints = append(hints, "目前只看到静态资源（js/css/图片），这类请求不参与检测；请访问带参数的接口，例如 /api/user?id=1。")
+	}
+	if dg.Counts.SkippedScope > 0 {
+		hints = append(hints,
+			"有 "+strconv.FormatUint(dg.Counts.SkippedScope, 10)+
+				" 条流量落在扫描范围之外（Host 白名单/黑名单或路径排除），已在代理层被放过；如果这些目标本该检测，请调整「设置」里的扫描范围。")
 	}
 	if dg.Stats.Submitted > 0 && dg.Stats.Inspected == 0 {
 		hints = append(hints, "流量已进入调度但没有一条通过检测条件：在「实时流量」里看「原因」列，即可知道卡在哪一步。")
