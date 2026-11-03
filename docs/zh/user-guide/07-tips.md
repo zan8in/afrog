@@ -113,10 +113,11 @@ afrog -t 10.0.0.0/24 -ps -aggressive  # 不限速（-pcps 0 等价）
 
 全端口 `65535` 在默认档位下约 65 秒扫完一个目标，日常够用；确实需要打满时再显式放开。
 
-扫描期间 afrog 还会周期性测量到默认网关的 RTT（`-ps-link-probe`，默认开启）。网关就在本机这一跳，它的 RTT 只可能因为本机出口链路或网关被压满而抬升，是干净的本地信号：一旦网关 RTT 明显高于扫描前的空载基线，或过半探测都没有回音，就乘性降速并告警；链路恢复后再逐步加回来。
+扫描期间 afrog 还会周期性测量到默认网关的 RTT（`-ps-link-probe`，默认开启）。网关就在本机这一跳，它的 RTT 只可能因为本机出口链路或网关被压满而抬升，是干净的本地信号。一旦网关 RTT 明显高于扫描前的空载基线，或连续多个采样窗口都收不到网关回音，就乘性降速并告警；链路恢复后再逐步加回来。判定只认网关信号：被防火墙静默丢弃的探测（例如丢包率恒为 100% 的公网目标）不算拥塞，不会触发降速。
 
 ```
-[WRN] port-scan throttled rate=1000->700 no-reply=100% gw-rtt=42ms baseline=3ms probes unanswered, easing off to protect the local network -pcps 0 disables
+[WRN] port-scan throttled rate=1000->700 gw-rtt=42ms baseline=3ms local link congested, easing off to protect it -pcps 0 disables
+[WRN] port-scan throttled rate=700->490 gw-no-reply=6s gateway unreachable, easing off to protect the local network -pcps 0 disables
 ```
 
 看到这行说明扫描已经自动收敛了，不需要干预；如果你确认这条链路足够健壮，也可以用 `-pcps 0` 关掉这层保护。

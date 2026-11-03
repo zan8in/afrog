@@ -27,6 +27,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
+	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/report"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -2034,6 +2035,9 @@ func (runner *Runner) Execute() {
 			if options.PSNoAdaptiveTimeout {
 				psOpts.AdaptiveTimeout = false
 			}
+			if options.PSNoSpoofCheck {
+				psOpts.SkipSpoofCheck = true
+			}
 			psOpts.ServiceProbes = options.PSServiceProbe
 			psOpts.FingerprintDir = options.PSFingerprintDir
 			psOpts.ReportStates = options.PSReportStates
@@ -2303,6 +2307,7 @@ func (runner *Runner) Execute() {
 		hasHTTP := false
 		hasNet := false
 		hasGo := false
+		goURLTarget := false
 		for _, rm := range p.Rules {
 			t := strings.ToLower(strings.TrimSpace(rm.Value.Request.Type))
 			switch t {
@@ -2312,12 +2317,19 @@ func (runner *Runner) Execute() {
 				hasNet = true
 			case poc.GO_Type:
 				hasGo = true
+				if gox.IsURLTargetFunc(rm.Value.Request.Data) {
+					goURLTarget = true
+				}
 			default:
 				hasHTTP = true
 			}
 		}
 		if hasGo {
-			return false
+			// go PoC 的目标形态由 Go 实现决定：面向完整 URL 的（shiro_key、
+			// backup-files 等）按 Web 目标调度，其余（弱口令、协议探测等）按网络
+			// 目标调度。若统一按 Web 调度，网络型 go PoC 会在非 Web 端口上拿不到
+			// host:port 目标而被静默跳过。
+			return !goURLTarget
 		}
 		return hasNet && !hasHTTP
 	}
@@ -2668,6 +2680,20 @@ func (runner *Runner) Execute() {
 				}
 			}
 			if scheduled == 0 {
+				// 一个 PoC 一件任务都没排上，必须可追溯，否则用户看到「指纹命中却
+				// 没扫」无从下手。最常见的原因是目标视图为空：网络型 PoC 没有
+				// host:port 目标，或 Web 型 PoC 没有可用 URL。
+				if options.Debug && !options.SDKMode && len(targetView) == 0 {
+					view := "web"
+					if isNetOnlyPoc(pocItem) {
+						view = "net"
+					}
+					gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageVulnScan,
+						"skipped",
+						fmt.Sprintf("poc=%s", pocItem.Id),
+						fmt.Sprintf("no %s target", view),
+					))
+				}
 				runner.ScanProgress.MarkPocDone(pocItem.Id)
 			}
 		}

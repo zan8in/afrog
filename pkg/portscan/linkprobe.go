@@ -26,10 +26,13 @@ type linkProbe struct {
 	mu       sync.Mutex
 	baseline time.Duration
 	recent   []time.Duration
+	// streak 是连续「网关无回包」的采样窗口数，成功一次即清零。它是「本机出口是否还
+	// 通」的判据，与目标是否回包无关（被过滤的公网目标不产生任何网关样本）。
+	streak int
 }
 
 // newLinkProbe 探测默认网关；发现不到（或平台不支持）时返回 nil，调用方据此禁用
-// 链路信号，拥塞控制退化为只依赖探测结果。
+// 链路信号，此时拥塞控制不再做任何降速（缺信号时保持中性，宁可不动也不误判）。
 func newLinkProbe() *linkProbe {
 	gw := defaultGateway()
 	if gw == "" {
@@ -78,24 +81,43 @@ func (p *linkProbe) takeBaseline(ctx context.Context) {
 	}
 	p.mu.Lock()
 	p.baseline = best
+	p.streak = 0
 	p.mu.Unlock()
 }
 
-// sample 记录一次负载期间的网关 RTT。
+// sample 记录一次负载期间的网关 RTT。拿不到样本（探针超时）时累加连续失败窗口数，
+// 拿到样本就清零。没有配置网关时探针是惰性的：既不采样也不计失败，避免缺失的信号
+// 被当成「链路故障」。
 func (p *linkProbe) sample(ctx context.Context) {
-	if p == nil {
+	if p == nil || p.gateway == "" {
 		return
 	}
 	rtt, ok := p.measure(ctx)
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if !ok {
+		// 只有探针确认过可达（有基线）时，连续无回包才算链路故障；否则可能是网关本身
+		// 就不响应 80/443，把它当故障会误报降速。
+		if p.baseline > 0 {
+			p.streak++
+		}
 		return
 	}
-	p.mu.Lock()
+	p.streak = 0
 	p.recent = append(p.recent, rtt)
 	if len(p.recent) > 4 {
 		p.recent = p.recent[len(p.recent)-4:]
 	}
-	p.mu.Unlock()
+}
+
+// gatewayLossStreak 返回连续「网关无回包」的窗口数。成功一次即为 0。
+func (p *linkProbe) gatewayLossStreak() int {
+	if p == nil {
+		return 0
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.streak
 }
 
 // ratio 返回「当前 RTT / 空载 RTT」。没有基线或没有样本时返回 1（中性，不触发任何

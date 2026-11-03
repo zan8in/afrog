@@ -279,8 +279,13 @@ type Options struct {
 	PSS4Chunk           int
 	PSHostConcurrency   int
 	PSNoAdaptiveTimeout bool
-	PSServiceProbe      bool
-	PSFingerprintDir    string
+	// PSNoSpoofCheck 关闭「疑似代答设备」识别。默认开启：识别到云 WAF / 高防 / 端口转发
+	// 设备时把该主机转入 verify-only（只保留真的收到服务端数据的端口），避免产出一批假开放
+	// 并浪费数小时。识别含扫描前的哨兵预探测与扫描中的开放率 / 成段开放 / banner 雷同启发式。
+	// 需要强制全量输出时打开。
+	PSNoSpoofCheck   bool
+	PSServiceProbe   bool
+	PSFingerprintDir string
 	// PSReportStates 让端口预扫描把非开放端口（closed / filtered）也作为结果上报，
 	// 默认只上报开放端口。开启后才能区分「被防火墙丢弃」与「端口确实关闭」。
 	PSReportStates    bool
@@ -418,6 +423,7 @@ func NewOptions() (*Options, error) {
 		flagSet.IntVar(&options.PSS4Chunk, "ps-s4-chunk", 1000, "port pre-scan s4 chunk size when ports=full"),
 		flagSet.IntVar(&options.PSHostConcurrency, "ps-host-concurrency", 0, "max concurrent probes against a single host in port pre-scan (0 = module default)"),
 		flagSet.BoolVar(&options.PSNoAdaptiveTimeout, "ps-no-adaptive-timeout", false, "disable RTT-adaptive connect timeout in port pre-scan"),
+		flagSet.BoolVar(&options.PSNoSpoofCheck, "ps-no-spoof-check", false, "disable spoof-device detection (pre-scan sentinel probe plus in-scan open-rate/contiguous-run/duplicate-banner heuristics) and scan everything as-is"),
 		flagSet.BoolVar(&options.PSServiceProbe, "ps-service-probe", false, "send active service probes (application payloads) during port pre-scan to identify services more accurately"),
 		flagSet.StringVar(&options.PSFingerprintDir, "ps-fingerprint-dir", "", "directory with probes.yaml/services.yaml/ports.yaml overriding the built-in port fingerprint set"),
 		flagSet.BoolVar(&options.PSReportStates, "ps-states", false, "report closed/filtered ports as results in port pre-scan (default: report only open ports)"),

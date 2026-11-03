@@ -150,16 +150,14 @@ func TestCongestionControllerSkippedWithoutCap(t *testing.T) {
 	}
 }
 
-func TestCongestionControllerEasesOffOnLoss(t *testing.T) {
+// 网关 RTT 相对空载基线抬升到 3 倍以上，说明本机出口链路吃紧：必须乘性降速。
+func TestCongestionControllerEasesOffOnLinkRTT(t *testing.T) {
 	l := newRateLimiter(1000)
+	link := &linkProbe{baseline: 10 * time.Millisecond, recent: []time.Duration{40 * time.Millisecond}}
 	var events []congestionEvent
-	c := newCongestionController(context.Background(), l, nil, 1000, func(ev congestionEvent) {
+	c := newCongestionController(context.Background(), l, link, 1000, func(ev congestionEvent) {
 		events = append(events, ev)
 	})
-
-	for i := 0; i < 100; i++ {
-		c.observe(false)
-	}
 	c.tick()
 
 	if got := l.ratePerSec(); got != 700 {
@@ -168,42 +166,60 @@ func TestCongestionControllerEasesOffOnLoss(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("events = %+v, want exactly one easing-off warning", events)
 	}
-	if events[0].Reason != "no-reply" || events[0].Recovered || events[0].LossPct != 100 {
+	if events[0].Reason != "link-rtt" || events[0].Recovered {
 		t.Fatalf("unexpected event: %+v", events[0])
 	}
 }
 
-func TestCongestionControllerIgnoresThinSamples(t *testing.T) {
+// 网关连续多个窗口无回包才算链路故障，判定门槛之前不能动速率。
+func TestCongestionControllerLinkLossThreshold(t *testing.T) {
 	l := newRateLimiter(1000)
-	c := newCongestionController(context.Background(), l, nil, 1000, func(congestionEvent) {})
-	// 样本不足 congestionMinSamples 时不判定：几百个探测里有几十个不回包是常态。
-	for i := 0; i < 10; i++ {
-		c.observe(false)
-	}
+	link := &linkProbe{baseline: 10 * time.Millisecond, streak: congestionLinkLossStreak - 1}
+	c := newCongestionController(context.Background(), l, link, 1000, func(congestionEvent) {})
+
 	c.tick()
 	if got := l.ratePerSec(); got != 1000 {
-		t.Fatalf("rate = %d, want an unchanged 1000", got)
+		t.Fatalf("rate = %d, want unchanged 1000 below the streak threshold", got)
+	}
+
+	link.streak = congestionLinkLossStreak
+	c.tick()
+	if got := l.ratePerSec(); got != 700 {
+		t.Fatalf("rate = %d, want 700 at the streak threshold", got)
+	}
+}
+
+// 目标是死的（探测全超时）不该动全局速率：被防火墙静默过滤的公网目标丢包率恒为
+// 100%，只有网关信号才能证明是本机链路的问题。控制器已不看探测结果，这里用一个
+// 没有网关的探针（nil）代表「没有本地信号」的场景，速率必须纹丝不动。
+func TestCongestionControllerIgnoresTargetNonReplies(t *testing.T) {
+	l := newRateLimiter(1000)
+	c := newCongestionController(context.Background(), l, nil, 1000, func(congestionEvent) {})
+	for i := 0; i < 50; i++ {
+		c.tick()
+	}
+	if got := l.ratePerSec(); got != 1000 {
+		t.Fatalf("rate = %d, want a calm 1000 with no link signal", got)
 	}
 }
 
 func TestCongestionControllerRecovers(t *testing.T) {
 	l := newRateLimiter(1000)
+	link := &linkProbe{baseline: 10 * time.Millisecond, recent: []time.Duration{40 * time.Millisecond}}
 	var events []congestionEvent
-	c := newCongestionController(context.Background(), l, nil, 1000, func(ev congestionEvent) {
+	c := newCongestionController(context.Background(), l, link, 1000, func(ev congestionEvent) {
 		events = append(events, ev)
 	})
 
-	for i := 0; i < 100; i++ {
-		c.observe(false)
+	c.tick() // 网关 RTT 抬升 -> 700
+	if got := l.ratePerSec(); got != 700 {
+		t.Fatalf("rate = %d, want 700 after easing off", got)
 	}
-	c.tick() // -> 700
 	events = nil
 
-	for i := 0; i < 100; i++ {
-		c.observe(true)
-	}
+	// 网关回包恢复正常（无 RTT 样本、无连续失败）后，速率应逐步加回来并提示一次恢复。
+	link.recent = nil
 	c.tick()
-
 	got := l.ratePerSec()
 	if got <= 700 || got > 1000 {
 		t.Fatalf("rate = %d, want (700, 1000] after additive increase", got)
@@ -214,12 +230,9 @@ func TestCongestionControllerRecovers(t *testing.T) {
 }
 
 func TestCongestionControllerRecoversUpToCap(t *testing.T) {
-	l := newRateLimiter(1000)
+	l := newRateLimiter(300)
 	c := newCongestionController(context.Background(), l, nil, 1000, func(congestionEvent) {})
-	for i := 0; i < 10; i++ {
-		for j := 0; j < 100; j++ {
-			c.observe(true)
-		}
+	for i := 0; i < 50; i++ {
 		c.tick()
 	}
 	if got := l.ratePerSec(); got != 1000 {
@@ -229,11 +242,9 @@ func TestCongestionControllerRecoversUpToCap(t *testing.T) {
 
 func TestCongestionControllerStopsAtFloor(t *testing.T) {
 	l := newRateLimiter(1000)
-	c := newCongestionController(context.Background(), l, nil, 1000, func(congestionEvent) {})
+	link := &linkProbe{baseline: 10 * time.Millisecond, recent: []time.Duration{40 * time.Millisecond}}
+	c := newCongestionController(context.Background(), l, link, 1000, func(congestionEvent) {})
 	for i := 0; i < 20; i++ {
-		for j := 0; j < 100; j++ {
-			c.observe(false)
-		}
 		c.tick()
 	}
 	// floor = maxRate/4，降到底也要保住可用性。
@@ -244,7 +255,19 @@ func TestCongestionControllerStopsAtFloor(t *testing.T) {
 
 func TestCongestionControllerNilSafe(t *testing.T) {
 	var c *congestionController
-	c.observe(true)
 	c.start()
 	c.close()
+
+	// 探针缺失（nil link）时 tick 也不能崩，且不产生任何调整。
+	l := newRateLimiter(1000)
+	nilLink := newCongestionController(context.Background(), l, nil, 1000, func(congestionEvent) {})
+	nilLink.tick()
+	if got := l.ratePerSec(); got != 1000 {
+		t.Fatalf("rate = %d, want an untouched 1000", got)
+	}
+	var p *linkProbe
+	if s := p.gatewayLossStreak(); s != 0 {
+		t.Fatalf("nil linkProbe streak = %d, want 0", s)
+	}
+	p.sample(context.Background())
 }

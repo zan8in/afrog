@@ -3,6 +3,7 @@ package portscan
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"net"
 	"os"
 	"os/signal"
@@ -230,6 +231,21 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// Shuffle hosts to avoid sequential scanning detection
 	hostIter.Shuffle()
 	hosts := hostIter.GetHosts()
+
+	// 哨兵预探测：大端口集扫描（含全端口）之前先花每个主机 3 次探测，把「对全端口都回
+	// SYN-ACK」的 WAF/高防/端口转发设备挑出来并剔除，避免为一批假开放白跑数小时。小规模
+	// 精扫（如 -p 80,443）本来就快，不走这一步，免得为它多花探测。
+	if s.spoofDetectionEnabled() {
+		if kept := s.dropSpoofingHosts(ctx, hosts); len(kept) != len(hosts) {
+			s.emitStage(log.LevelWarn, utils.StagePortScan,
+				fmt.Sprintf("spoofed=%d", len(hosts)-len(kept)),
+				"all-port responders skipped",
+				"use -ps-no-spoof-check to scan them anyway",
+			)
+			hostIter = NewHostIterator(kept)
+			hosts = hostIter.GetHosts()
+		}
+	}
 
 	total := hostIter.Total() * portTotal
 	startTime := time.Now()
@@ -556,24 +572,36 @@ func (s *Scanner) isHostSuspicious(host string) bool {
 }
 
 type hostScanStat struct {
-	scanned    uint64
-	open       uint64
-	timeouts   uint64
-	srttNs     int64 // smoothed round-trip time in nanoseconds (0 = unknown)
-	mode       uint32
-	verifying  uint32
-	warned     uint32
+	scanned   uint64
+	open      uint64
+	timeouts  uint64
+	srttNs    int64 // smoothed round-trip time in nanoseconds (0 = unknown)
+	mode      uint32
+	verifying uint32
+	warned    uint32
+	// retryOff 记录是否已因「该主机在策略性丢弃探测包」而关掉重试，并保证这条
+	// 行为变更只提示一次。关闭重试会影响覆盖面，必须可追溯（详见 hostDropsProbes）。
+	retryOff   uint32
 	mu         sync.Mutex
 	verified   map[int]struct{}
 	discovered map[int]struct{}
 	pending    []*ScanResult
+	// runLen / maxRun 跟踪已发现开放端口里的「连续段」：runLen 按并查集式做法记录每段
+	// 两端到整段长度的映射（O(1) 合并），maxRun 缓存当前最长的一段的长度。
+	runLen map[int]int
+	maxRun int
+	// bannerCounts 统计「逐字节相同的响应」各出现了几次，用于识别同一台设备在所有端口上
+	// 返回同一张页面（banner 雷同）的假开放形态。
+	bannerCounts map[string]int
 }
 
 func newHostScanStat() *hostScanStat {
 	return &hostScanStat{
-		verified:   make(map[int]struct{}),
-		discovered: make(map[int]struct{}),
-		pending:    make([]*ScanResult, 0, 64),
+		verified:     make(map[int]struct{}),
+		discovered:   make(map[int]struct{}),
+		pending:      make([]*ScanResult, 0, 64),
+		runLen:       make(map[int]int),
+		bannerCounts: make(map[string]int),
 	}
 }
 
@@ -674,18 +702,23 @@ func (s *Scanner) reportCongestion(ev congestionEvent) {
 	}
 	facts := []string{
 		fmt.Sprintf("rate=%d->%d", ev.OldRate, ev.NewRate),
-		fmt.Sprintf("no-reply=%d%%", ev.LossPct),
 	}
-	if ev.BaselineRT > 0 {
-		facts = append(facts,
-			fmt.Sprintf("gw-rtt=%s", ev.LinkRTT.Truncate(time.Millisecond)),
-			fmt.Sprintf("baseline=%s", ev.BaselineRT.Truncate(time.Millisecond)),
-		)
-	}
-	if ev.Reason == "link-rtt" {
+	switch ev.Reason {
+	case "link-rtt":
+		if ev.BaselineRT > 0 {
+			facts = append(facts,
+				fmt.Sprintf("gw-rtt=%s", ev.LinkRTT.Truncate(time.Millisecond)),
+				fmt.Sprintf("baseline=%s", ev.BaselineRT.Truncate(time.Millisecond)),
+			)
+		}
 		facts = append(facts, "local link congested, easing off to protect it")
-	} else {
-		facts = append(facts, "probes unanswered, easing off to protect the local network")
+	case "link-loss":
+		facts = append(facts,
+			fmt.Sprintf("gw-no-reply=%s", (time.Duration(ev.LinkLossStreak)*congestionWindow).Truncate(time.Second)),
+			"gateway unreachable, easing off to protect the local network",
+		)
+	default:
+		facts = append(facts, "local link under pressure, easing off")
 	}
 	facts = append(facts, "-pcps 0 disables")
 	gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
@@ -694,8 +727,8 @@ func (s *Scanner) reportCongestion(ev congestionEvent) {
 
 // maybeAdaptiveDelay 是针对「目标在限我们的速」的逐探测退避。注意它只统计硬错误：
 // 超时不算，因为被防火墙 drop 的端口本来就不回包，把它当错误会让每个提交都睡满
-// 1s，扫描直接废掉。链路层面的持续丢包由 congestionController 统一收敛（它有窗口
-// 统计，不会因为一个被过滤的目标就误判），两者职责不重叠。
+// 1s，扫描直接废掉。链路层面的拥塞由 congestionController 按网关信号独立收敛，
+// 两者职责不重叠：这里退让的是单个目标，那里保护的是本机出口。
 func (s *Scanner) maybeAdaptiveDelay() {
 	errCount := atomic.LoadInt32(&s.consecutiveErrors)
 	currentDelay := atomic.LoadInt32(&s.adaptiveDelay)
@@ -754,6 +787,57 @@ func (s *Scanner) acquireHostSlot(ctx context.Context, host string) func() {
 	case <-ctx.Done():
 		return nil
 	}
+}
+
+// hostDropMinSamples 是判定「该主机在策略性丢弃探测包」前必须积累的探测样本数。
+// 样本太少时丢包率的噪声极大：ARP 冷启动、首包瞬时时延都会让开头几个端口超时，
+// 此时就关掉重试会伤到真实目标，所以先让子弹飞一会儿。
+const hostDropMinSamples = 200
+
+// hostDropRatio 是关掉重试所需的丢包率门槛。TCP connect 扫描里「端口关闭」会回
+// RST，因此正常主机的丢包率接近 0；只有防火墙/安全设备按策略静默丢弃才会长期
+// 停在高位。0.9 足以把「策略过滤」与「链路抖动」分开：抖动是概率性的，不会稳定
+// 覆盖九成以上的探测。取高门槛是刻意的——宁可漏掉提速机会，也不误关真实目标的重试。
+const hostDropRatio = 0.9
+
+// hostDropsProbes 报告该主机是否正在策略性丢弃探测包。判定完全基于本机可测的
+// 窗口统计（st.timeouts / st.scanned），不依赖目标身份或端口类型。
+//
+// 它存在的意义：对这类主机，每个被丢弃的端口都要付「首探超时 + 退避 + 重试超时」
+// 三段成本（默认 ≈2.7s），而重试换来的覆盖率是零——这些端口不是随机丢包丢的，
+// 是设备在按策略不回包。关掉重试后单端口成本回到一次超时（≈1s），全端口扫描
+// 吞吐直接翻倍以上，且不减少任何「会回包的端口」的发现。
+func (s *Scanner) hostDropsProbes(st *hostScanStat) bool {
+	if st == nil {
+		return false
+	}
+	scanned := atomic.LoadUint64(&st.scanned)
+	if scanned < hostDropMinSamples {
+		return false
+	}
+	return float64(atomic.LoadUint64(&st.timeouts))/float64(scanned) >= hostDropRatio
+}
+
+// noticeRetryDisabled 在因策略性丢包而关掉重试时提示一次。关闭重试会影响覆盖面，
+// 属于「被跳过的行为」，必须让用户看得见并能预判影响，而不是静默提速。
+func (s *Scanner) noticeRetryDisabled(host string, st *hostScanStat) {
+	if !atomic.CompareAndSwapUint32(&st.retryOff, 0, 1) {
+		return
+	}
+	if s.options == nil || s.options.Quiet {
+		return
+	}
+	scanned := atomic.LoadUint64(&st.scanned)
+	timeouts := atomic.LoadUint64(&st.timeouts)
+	s.clearProgressLine()
+	gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StagePortScan,
+		"retries-off",
+		fmt.Sprintf("host=%s", host),
+		fmt.Sprintf("drop-rate=%.1f%%", float64(timeouts)/float64(scanned)*100),
+		fmt.Sprintf("probes=%d/%d", timeouts, scanned),
+		"policy-drop, retries disabled: they cannot recover dropped probes and double the cost",
+		"-ptries overrides",
+	))
 }
 
 // attemptTimeoutFor scales the connect timeout with the round trip time
@@ -819,7 +903,16 @@ func (s *Scanner) checkPortOpen(st *hostScanStat, host string, port int) (net.Co
 	var conn net.Conn
 	var err error
 
-	for i := 0; i <= s.options.Retries; i++ {
+	// 该主机若在策略性丢弃探测包，重试不可能把被丢弃的端口捞回来，只会把单端口
+	// 成本从一次超时抬成「首探 + 退避 + 重试」三段（默认 ≈2.7s）。这类主机上
+	// 关掉重试是纯提速，不损失覆盖面，见 hostDropsProbes。
+	retries := s.options.Retries
+	if retries > 0 && s.hostDropsProbes(st) {
+		retries = 0
+		s.noticeRetryDisabled(host, st)
+	}
+
+	for i := 0; i <= retries; i++ {
 		// First attempt uses the RTT-adaptive budget; retries use the full user
 		// budget and escalate, since a first-attempt timeout is often just
 		// congestion/loss and giving the retry more time recovers slow or
@@ -852,7 +945,7 @@ func (s *Scanner) checkPortOpen(st *hostScanStat, host string, port int) (net.Co
 			return nil, err // Connection refused usually means host is up but port closed
 		}
 
-		if i < s.options.Retries {
+		if i < retries {
 			time.Sleep(time.Duration(200*(i+1)) * time.Millisecond)
 		}
 	}
@@ -891,18 +984,16 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 			// never let it be mistaken for a hard error.
 			atomic.AddUint64(&st.timeouts, 1)
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
-			// 拥塞控制器看的正是这一路信号：回包与否按窗口统计，一个被过滤的目标
-			// 只能把窗口丢包率推高，是否降速由控制器按阈值决定（见 congestion.go）。
-			s.congestion.observe(false)
+			// 注意：这里不再把超时上报给拥塞控制器。目标不回包不等于本机链路堵了——
+			// 被防火墙静默过滤的公网目标丢包率恒为 100%，把它当拥塞信号会误报降速。
+			// 是否降速只由网关信号决定（见 congestion.go / linkprobe.go）。
 			state = PortStateFiltered
 		case isConnRefused(err):
 			// 收到 RST 说明对端回了话，路径是通的，端口确实关闭。
 			atomic.StoreInt32(&s.consecutiveErrors, 0)
-			s.congestion.observe(true)
 			state = PortStateClosed
 		default:
 			atomic.AddInt32(&s.consecutiveErrors, 1)
-			s.congestion.observe(false)
 		}
 		s.maybeDecideHost(ctx, host, st, scanned)
 		s.maybeWarnFiltered(host, st, scanned)
@@ -912,18 +1003,34 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 
 	// Connection successful
 	atomic.StoreInt32(&s.consecutiveErrors, 0)
-	s.congestion.observe(true)
 	defer conn.Close()
 
 	scanned := atomic.AddUint64(&st.scanned, 1)
 	atomic.AddUint64(&st.open, 1)
 
+	spoofCheck := s.spoofDetectionEnabled()
+	maxRun := 0
 	st.mu.Lock()
 	st.discovered[port] = struct{}{}
+	if spoofCheck {
+		if st.runLen == nil {
+			st.runLen = make(map[int]int)
+		}
+		if run := addPortRun(st.runLen, port); run > st.maxRun {
+			st.maxRun = run
+		}
+		maxRun = st.maxRun
+	}
 	st.mu.Unlock()
 
 	s.maybeDecideHost(ctx, host, st, scanned)
 	if atomic.LoadUint32(&st.mode) == hostModeSuspicious {
+		return
+	}
+
+	// 成段开放：一段连续端口全部开放，真实主机极少出现，更像设备按段代答。
+	if maxRun >= spoofRunMinOpen {
+		s.suspectedVerifyOnly(ctx, host, st, "segmented-open", fmt.Sprintf("run=%d", maxRun))
 		return
 	}
 
@@ -933,6 +1040,14 @@ func (s *Scanner) scanTarget(ctx context.Context, host string, port int) {
 		Port:        port,
 		State:       PortStateOpen,
 		ServiceInfo: *s.grabber.Grab(conn, host, port),
+	}
+
+	// banner 雷同：多个不同端口返回逐字节相同的响应，说明是同一台设备/应用在代答。
+	if spoofCheck {
+		if rep := s.noteBanner(st, res.ServiceInfo.Banner); rep >= spoofBannerMinRepeats {
+			s.suspectedVerifyOnly(ctx, host, st, "duplicate-banner", fmt.Sprintf("repeats=%d", rep))
+			return
+		}
 	}
 
 	if s.shouldBufferHost(st) {
@@ -975,6 +1090,202 @@ func (s *Scanner) hostHeuristicsEnabled() bool {
 	return atomic.LoadUint64(&s.scanPortTotal) >= heuristicsMinPorts
 }
 
+// spoofDetectionEnabled 表示是否启用「疑似代答设备」识别。它只在大端口集扫描时开启
+// （小规模精扫本来就没有这种问题），并可由 -ps-no-spoof-check 关闭以强制全量输出。
+func (s *Scanner) spoofDetectionEnabled() bool {
+	return s.hostHeuristicsEnabled() && !s.options.SkipSpoofCheck
+}
+
+// spoofRunMinOpen 是判定「成段开放」所需的连续开放端口数。真实主机极少出现一段连续
+// 端口全部开放；更常见的是设备（WAF/高防/端口转发/NAT 映射）按段代答。它补上了 98%
+// 全开放启发式的盲区：只代答某一段端口的设备整体开放率很低，不会被 98% 阈值命中。
+const spoofRunMinOpen = 32
+
+// spoofBannerMinRepeats 是判定「banner 雷同」所需的相同响应重复次数。多个不同端口返回
+// 逐字节相同的响应，说明是同一台设备/同一个应用在应答，而不是各自独立的服务。
+const spoofBannerMinRepeats = 8
+
+// spoofBannerMinBytes 是计入「雷同」统计的响应长度下限。极短的响应（如统一的
+// "HTTP/1.1 400" 空响应）在正常主机上也会大量重复，比较它们没有区分度。
+const spoofBannerMinBytes = 32
+
+// spoofBannerTrackLimit 限制单主机跟踪的不同响应指纹数量，避免超长扫描下无界增长。
+const spoofBannerTrackLimit = 256
+
+// addPortRun 把一个新发现的开放端口并入连续段统计，返回并入后该端口所在段的长度。
+// 采用并查集式的 O(1) 做法：p 所在段长 = 左邻段长 + 1 + 右邻段长，并把段的两端都记为
+// 整段长度。端口在整个扫描中只会被加入一次，顺序无关（探测是并发的）。
+func addPortRun(runLen map[int]int, p int) int {
+	if n, ok := runLen[p]; ok {
+		return n
+	}
+	left, right := runLen[p-1], runLen[p+1]
+	length := left + 1 + right
+	runLen[p] = length
+	runLen[p-left] = length
+	runLen[p+right] = length
+	return length
+}
+
+// markSuspicious 原子地把主机转入 suspicious 并丢弃未决缓冲，返回是否本次发生了状态
+// 转换（已是 suspicious 时返回 false）。转入后可交由 verifyAndEmit 用「必须真的收到
+// 服务端数据」的标准重新复核，从而只丢弃假开放、保住设备后面的真实服务。
+func (s *Scanner) markSuspicious(st *hostScanStat) bool {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if atomic.LoadUint32(&st.mode) == hostModeSuspicious {
+		return false
+	}
+	atomic.StoreUint32(&st.mode, hostModeSuspicious)
+	st.pending = nil
+	return true
+}
+
+// startVerify 保证每个可疑主机只启动一次 verifyAndEmit 复核。
+func (s *Scanner) startVerify(ctx context.Context, host string, st *hostScanStat) {
+	if atomic.CompareAndSwapUint32(&st.verifying, 0, 1) {
+		go s.verifyAndEmit(ctx, host, st)
+	}
+}
+
+// suspectedVerifyOnly 把主机转入 verify-only，并把判定依据讲清楚。成段开放 / banner 雷同
+// 这两种形态很容易被误读成「真的扫到了一堆服务」，所以默认（无需 -debug）也要显式告警。
+func (s *Scanner) suspectedVerifyOnly(ctx context.Context, host string, st *hostScanStat, reason, fact string) {
+	if !s.markSuspicious(st) {
+		return
+	}
+	s.emitStage(log.LevelWarn, utils.StagePortScan,
+		"suspected",
+		fmt.Sprintf("host=%s", host),
+		reason,
+		fact,
+		"verify-only",
+	)
+	s.startVerify(ctx, host, st)
+}
+
+// noteBanner 记录一次非空的响应指纹，返回该指纹当前累计出现的次数。长度过短的响应在
+// 正常主机上也会大量重复，加入统计没有区分度，直接忽略。
+func (s *Scanner) noteBanner(st *hostScanStat, banner string) int {
+	if len(banner) < spoofBannerMinBytes {
+		return 0
+	}
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.bannerCounts == nil {
+		st.bannerCounts = make(map[string]int)
+	}
+	if n, ok := st.bannerCounts[banner]; ok {
+		st.bannerCounts[banner] = n + 1
+		return n + 1
+	}
+	if len(st.bannerCounts) >= spoofBannerTrackLimit {
+		return 0
+	}
+	st.bannerCounts[banner] = 1
+	return 1
+}
+
+// spoofSentinelMinOpen 是判定「全端口代答」所需的哨兵端口开放数。哨兵端口在任何一台
+// 真实主机上都几乎必然关闭（1 是早已废弃的 tcpmux，65534 与随机超高位端口更没有服务），
+// 因此只要其中有 2 个「连接成功」，就基本排除了真实服务的可能，落到 WAF/高防/端口转发
+// 设备「对全端口都回 SYN-ACK」的行为上。取 2 而非 3 是为了容忍单次探测被限速丢弃。
+const spoofSentinelMinOpen = 2
+
+// spoofSentinelWorkers 是哨兵预探测的并发上限，避免对一大片目标瞬间灌出大量连接。
+const spoofSentinelWorkers = 64
+
+// sentinelPorts 返回用于识别「全端口代答」的哨兵端口。用变量声明以便测试注入固定集合。
+var sentinelPorts = func() []int {
+	// 随机超高位端口用于覆盖「设备只代答某一段端口」的情况，也让探测模式不那么固定。
+	return []int{1, 65534, 30000 + rand.IntN(20000)}
+}
+
+// probeSentinels 对单个主机探测哨兵端口，返回其中「连接成功」的数量与总数。单次探测
+// 预算收敛到 [timeout, 2s]：这只是一次粗略的存在性判断，不追求握手质量。
+func (s *Scanner) probeSentinels(ctx context.Context, host string) (open, total int) {
+	timeout := s.options.Timeout
+	if timeout <= 0 || timeout > 2*time.Second {
+		timeout = 2 * time.Second
+	}
+	ports := sentinelPorts()
+	total = len(ports)
+	for _, port := range ports {
+		select {
+		case <-ctx.Done():
+			return open, total
+		default:
+		}
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), timeout)
+		if err == nil {
+			conn.Close()
+			open++
+		}
+	}
+	return open, total
+}
+
+// dropSpoofingHosts 在正式扫描前用哨兵端口识别「对全端口都回 SYN-ACK」的设备，把它们
+// 从扫描目标中剔除，只保留其余主机。
+//
+// 背景：真实主机不可能开放几百上千个端口。当目标前面挂着云 WAF / 高防 / 端口转发设备时，
+// 全端口扫描会产出一大批「开放」假象（对同一个应用，还会给出一堆内容雷同的 WAF 页面），
+// 既把扫描时间拖成数小时，也让用户误判资产暴露面。哨兵端口能极早、极省地把这类目标挑出来。
+//
+// 被判为代答的主机会走一次 verifyAndEmit：只保留「真的收到服务端数据（banner / 指纹）」的
+// 端口，避免把设备后面真实存在的服务（例如 WAF 后的 443）连同假象一起丢掉。
+func (s *Scanner) dropSpoofingHosts(ctx context.Context, hosts []string) []string {
+	if len(hosts) == 0 {
+		return hosts
+	}
+	type verdict struct {
+		open  int
+		total int
+	}
+	verdicts := make([]verdict, len(hosts))
+	var wg sync.WaitGroup
+	gate := make(chan struct{}, spoofSentinelWorkers)
+	for i, host := range hosts {
+		if ctx.Err() != nil {
+			break
+		}
+		wg.Add(1)
+		gate <- struct{}{}
+		go func(idx int, h string) {
+			defer func() { <-gate; wg.Done() }()
+			open, total := s.probeSentinels(ctx, h)
+			verdicts[idx] = verdict{open: open, total: total}
+		}(i, host)
+	}
+	wg.Wait()
+
+	kept := make([]string, 0, len(hosts))
+	for i, host := range hosts {
+		v := verdicts[i]
+		if v.open < spoofSentinelMinOpen {
+			kept = append(kept, host)
+			continue
+		}
+		stAny, _ := s.hostStats.LoadOrStore(host, newHostScanStat())
+		st := stAny.(*hostScanStat)
+		if !s.markSuspicious(st) {
+			continue
+		}
+		s.emitStage(log.LevelWarn, utils.StagePortScan,
+			"suspected",
+			fmt.Sprintf("host=%s", host),
+			fmt.Sprintf("sentinel=%d/%d", v.open, v.total),
+			"all-port responder, skipping full scan",
+			"verify-only",
+		)
+		// 仍然复核常见端口：WAF/转发设备后面往往有真实服务，不能连同假象一起丢。
+		// 这里同步复核（而非扫描中那样的异步），确保正式扫描开始前真实服务已经落盘。
+		atomic.StoreUint32(&st.verifying, 1)
+		s.verifyAndEmit(ctx, host, st)
+	}
+	return kept
+}
+
 // flushPendingResults emits every result still held in a host's decision buffer
 // and marks that host decided. Results are only buffered while a host is
 // undecided, so this is a no-op for hosts that were already resolved (their
@@ -1015,29 +1326,25 @@ func (s *Scanner) maybeDecideHost(ctx context.Context, host string, st *hostScan
 
 	open := atomic.LoadUint64(&st.open)
 	openRate := float64(open) / float64(scanned)
-	if openRate >= 0.98 {
+	if s.spoofDetectionEnabled() && openRate >= 0.98 {
 		// Everything answers: almost certainly a security device/proxy instead of
 		// real listeners. Keep the state so ports already discovered are still
 		// verified below (verifyAndEmit also re-checks every discovered port),
 		// instead of silently dropping them. Buffered results are dropped here to
 		// release the banners they hold.
-		st.mu.Lock()
-		atomic.StoreUint32(&st.mode, hostModeSuspicious)
-		st.pending = nil
-		st.mu.Unlock()
-		// 与 filtered 同理：这是排查阶段的诊断，默认不打扰终端，-debug 才显示。
-		if s.verbose() {
-			s.clearProgressLine()
-			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
-				"suspected",
-				fmt.Sprintf("host=%s", host),
-				fmt.Sprintf("open-rate=%.2f%%", openRate*100),
-				fmt.Sprintf("probes=%d/%d", open, scanned),
-				"verify-only",
-			))
-		}
-		if atomic.CompareAndSwapUint32(&st.verifying, 0, 1) {
-			go s.verifyAndEmit(ctx, host, st)
+		if s.markSuspicious(st) {
+			// 与 filtered 同理：这是排查阶段的诊断，默认不打扰终端，-debug 才显示。
+			if s.verbose() {
+				s.clearProgressLine()
+				gologger.Print().Msgf("%s", log.Op(log.LevelWarn, utils.StagePortScan,
+					"suspected",
+					fmt.Sprintf("host=%s", host),
+					fmt.Sprintf("open-rate=%.2f%%", openRate*100),
+					fmt.Sprintf("probes=%d/%d", open, scanned),
+					"verify-only",
+				))
+			}
+			s.startVerify(ctx, host, st)
 		}
 		return
 	}

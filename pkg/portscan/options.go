@@ -65,6 +65,12 @@ type Options struct {
 	// 不会进入开放端口集合或后续扫描目标。
 	ReportStates bool
 
+	// SkipSpoofCheck 关闭「疑似代答设备」识别。默认关闭（即识别开启）：识别到云 WAF /
+	// 高防 / 端口转发设备时，把该主机转入 verify-only（只保留真的收到服务端数据的端口），
+	// 避免为一批假开放白跑数小时。识别包含扫描前的哨兵预探测，以及扫描过程中的开放率、
+	// 成段开放、banner 雷同三类启发式。需要强制全量输出时置真。
+	SkipSpoofCheck bool
+
 	// aliveSeq 是存活主机结果行的序号计数器，按本次扫描递增。放在 Options 上是因为
 	// 打印发生在 portscan 内部，而发现过程会跨 icmp / ping / tcp 多个阶段，需要一个
 	// 生命周期覆盖整轮发现的共享计数（各阶段的 phaseProgress 是相互独立的）。

@@ -113,10 +113,11 @@ afrog -t 10.0.0.0/24 -ps -aggressive  # no cap (same as -pcps 0)
 
 At the default rate, a full 65535-port scan of one host finishes in about 65 seconds, which is plenty for everyday use; lift the cap explicitly only when you really need to saturate.
 
-During the scan afrog also measures the RTT to the default gateway (`-ps-link-probe`, on by default). The gateway is one hop away, so its RTT can only rise because the local uplink or the gateway itself is saturated — a clean local signal. When it climbs well above the idle baseline taken before the scan, or when more than half of the probes get no reply, afrog eases the rate off multiplicatively and warns; it ramps back up once the link recovers.
+During the scan afrog also measures the RTT to the default gateway (`-ps-link-probe`, on by default). The gateway is one hop away, so its RTT can only rise because the local uplink or the gateway itself is saturated — a clean local signal. When it climbs well above the idle baseline taken before the scan, or when the gateway stays silent for several consecutive sampling windows, afrog eases the rate off multiplicatively and warns; it ramps back up once the link recovers. Only the gateway signal counts: probes silently dropped by a firewall (e.g. a public target with a constant 100% loss rate) are not treated as congestion and never trigger a slowdown.
 
 ```
-[WRN] port-scan throttled rate=1000->700 no-reply=100% gw-rtt=42ms baseline=3ms probes unanswered, easing off to protect the local network -pcps 0 disables
+[WRN] port-scan throttled rate=1000->700 gw-rtt=42ms baseline=3ms local link congested, easing off to protect it -pcps 0 disables
+[WRN] port-scan throttled rate=700->490 gw-no-reply=6s gateway unreachable, easing off to protect the local network -pcps 0 disables
 ```
 
 Seeing that line means the scan already converged on its own — no action needed. If you are confident the link is robust enough, you can turn the protection off with `-pcps 0`.

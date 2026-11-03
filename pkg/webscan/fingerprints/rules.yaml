@@ -369,6 +369,159 @@
       header: set-cookie
       pattern: '(?i)\bbtwaf[a-z_]*='
 
+# ---- 国内常见云 WAF / 主机防护 ----
+#
+# 这些厂商的显性标记常被默认关闭（只留 Cookie 或拦截页特征），因此同一规则里既有
+# 强判据（专属头 / Cookie 名，记为 certain），也有弱判据（泛化关键词，记为 probable）。
+# match 取第一条命中，故强判据必须排在弱判据之前，避免弱判据抢先降级结论。
+
+- id: huawei-cloud-waf
+  name: Huawei Cloud WAF
+  category: waf
+  match:
+    # HWWAFSESID / HWWAFSESTIME 是华为云 WAF 注入的会话 Cookie（官方文档确认）。
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bHWWAFSES(?:ID|TIME)='
+    - source: header
+      header: server
+      pattern: '(?i)\bHuaweiCloudWAF\b'
+    # Server: CW 见于华为云 WAF 前置节点（社区观测，非官方文档），记为 probable。
+    - source: header
+      header: server
+      pattern: '(?i)^\s*CW\s*$'
+      confidence: probable
+    - source: body
+      pattern: '(?i)\bhwclouds\.com\b|\bhws_security@'
+      confidence: probable
+
+- id: safedog
+  name: SafeDog
+  category: waf
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bsafedog-flow-item='
+    - source: header
+      header: server
+      pattern: '(?i)\bsafedog\b'
+    - source: body
+      pattern: '(?i)404\.safedog\.cn/'
+
+- id: yunsuo
+  name: Yunsuo
+  category: waf
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\byunsuo_session='
+    - source: body
+      pattern: '(?i)class="yunsuologo"'
+
+- id: anquanbao
+  name: Anquanbao
+  category: waf
+  match:
+    - source: header
+      header: x-powered-by-anquanbao
+      pattern: '\S'
+    - source: body
+      pattern: '(?i)\baqb_cc/error/'
+
+- id: chuangyu-shield
+  name: Chuangyu Shield
+  category: waf
+  match:
+    - source: body
+      pattern: '(?i)help\.365cyd\.com/cyd-error-help\.html'
+    - source: body
+      pattern: '(?i)\bwww\.365cyd\.com\b'
+      confidence: probable
+
+- id: eisoo-waf
+  name: Eisoo Cloud Firewall
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bEisooWAF(?:-AZURE)?\b'
+    - source: body
+      pattern: '(?i)eisoo-firewall-block\.css'
+    - source: body
+      pattern: '(?i)\beisoo\.com\b'
+      confidence: probable
+
+- id: bluedon-waf
+  name: Bluedon WAF
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bBDWAF\b'
+    - source: body
+      pattern: '(?i)bluedon web application firewall'
+
+- id: tencent-cloud-waf
+  name: Tencent Cloud WAF
+  category: waf
+  match:
+    - source: body
+      pattern: '(?i)waf\.tencent-?cloud\.com/'
+    - source: body
+      pattern: '(?i)location\.href[^;]{0,4}https?://waf\.tencent-?cloud\.com/'
+
+- id: safeline
+  name: SafeLine
+  category: waf
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)\bsafeline\b'
+
+- id: nsfocus-waf
+  name: NSFOCUS WAF
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bNSFocus\b'
+
+- id: radware-appwall
+  name: Radware AppWall
+  category: waf
+  match:
+    - source: header
+      header: x-sl-compstate
+      pattern: '\S'
+    - source: body
+      pattern: '(?i)CloudWebSec\.radware\.com'
+
+- id: wallarm
+  name: Wallarm
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bnginx[-_]wallarm\b'
+
+- id: fortiweb
+  name: FortiWeb
+  category: waf
+  match:
+    - source: header
+      header: set-cookie
+      pattern: '(?i)\bFORTIWAFSID='
+    - source: body
+      pattern: '(?i)\.fgd_icon'
+
+- id: chinacache
+  name: ChinaCache
+  category: cdn
+  match:
+    - source: header
+      header: powered-by-chinacache
+      pattern: '\S'
+
 - id: tencent-cloud-cdn
   name: Tencent Cloud CDN
   category: cdn

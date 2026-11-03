@@ -21,6 +21,28 @@ import (
 
 var funcMap = map[string]any{}
 
+// urlTargetFuncs 列出需要「带 scheme 的完整 URL」作为目标的 gox 函数；未列出的
+// （绝大多数）接受 host 或 host:port，并自行补默认端口。
+//
+// 调度层用它判断一个 type: go 的 PoC 该领 Web 目标（URL）还是网络目标（host:port）：
+// 判错会让 PoC 拿不到可用目标而被静默跳过（例如 oracle-weak-login 被当 Web PoC，
+// 而 1521 端口不在 Web 目标集里）。
+var urlTargetFuncs = map[string]struct{}{
+	"shiro_key":            {},
+	"backup-files":         {},
+	"CVE-2024-23897":       {},
+	"CVE-2023-25157":       {},
+	"demo-http-redirect":   {},
+	"demo-http-headers":    {},
+	"demo-http-post-no-ct": {},
+}
+
+// IsURLTargetFunc 报告 data 对应的 gox 函数是否面向带 scheme 的完整 URL。
+func IsURLTargetFunc(data string) bool {
+	_, ok := urlTargetFuncs[strings.TrimSpace(data)]
+	return ok
+}
+
 const httpSenderVarKey = "__gox_http_sender"
 
 func Request(target, data string, variableMap map[string]any) error {

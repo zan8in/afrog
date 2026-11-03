@@ -77,6 +77,51 @@ func TestObserveRTT(t *testing.T) {
 	}
 }
 
+func TestHostDropsProbes(t *testing.T) {
+	s := &Scanner{options: &Options{Retries: 1}}
+
+	// 样本不足时绝不动手：开头几个端口超时多来自 ARP 冷启动 / 首包抖动，
+	// 这时候关掉重试会误伤真实目标。
+	st := &hostScanStat{scanned: hostDropMinSamples - 1, timeouts: hostDropMinSamples - 1}
+	if s.hostDropsProbes(st) {
+		t.Fatal("must not decide before enough samples")
+	}
+
+	// 丢包率不足 90%：更像链路抖动（概率性），保留重试。
+	st = &hostScanStat{scanned: 1000, timeouts: 800}
+	if s.hostDropsProbes(st) {
+		t.Fatal("80% loss is link jitter, retries must stay on")
+	}
+
+	// 恰好到门槛：关闭端口会回 RST，所以长期 90% 以上不回包只可能是设备按策略
+	// 静默丢弃，此时重试换不来任何覆盖率。
+	st = &hostScanStat{scanned: 1000, timeouts: 900}
+	if !s.hostDropsProbes(st) {
+		t.Fatal("90% loss should disable retries")
+	}
+
+	// nil 保护：调用点可能拿不到主机统计。
+	if s.hostDropsProbes(nil) {
+		t.Fatal("nil stat must not disable retries")
+	}
+}
+
+func TestNoticeRetryDisabledOnce(t *testing.T) {
+	// Quiet 下不打印，但仍要置位：否则同一个主机会在非 quiet 的后续探测里反复提示。
+	s := &Scanner{options: &Options{Quiet: true}}
+	st := &hostScanStat{scanned: 1000, timeouts: 1000}
+	s.noticeRetryDisabled("10.0.0.1", st)
+	if atomic.LoadUint32(&st.retryOff) != 1 {
+		t.Fatal("notice must be flagged even in quiet mode")
+	}
+
+	// 第二次调用必须是无操作，不能重复提示。
+	s.noticeRetryDisabled("10.0.0.1", st)
+	if atomic.LoadUint32(&st.retryOff) != 1 {
+		t.Fatal("notice must only fire once")
+	}
+}
+
 func TestAcquireHostSlot(t *testing.T) {
 	s := &Scanner{options: &Options{MaxHostConcurrency: 2}}
 	ctx := context.Background()

@@ -15,6 +15,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/curated/service"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
@@ -486,21 +487,26 @@ func (s *Scanner) loadPocs() error {
 // isNetOnlyPoc reports whether a PoC only targets raw network protocols and so
 // must not be scheduled against plain HTTP targets.
 func isNetOnlyPoc(p poc.Poc) bool {
-	var hasHTTP, hasNet, hasGo bool
+	var hasHTTP, hasNet, hasGo, goURLTarget bool
 	for _, rule := range p.Rules {
 		switch strings.ToLower(strings.TrimSpace(rule.Value.Request.Type)) {
 		case "", poc.HTTP_Type, poc.HTTPS_Type:
 			hasHTTP = true
-		case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type:
+		case poc.TCP_Type, poc.UDP_Type, poc.SSL_Type, poc.JS_Type:
 			hasNet = true
 		case poc.GO_Type:
 			hasGo = true
+			if gox.IsURLTargetFunc(rule.Value.Request.Data) {
+				goURLTarget = true
+			}
 		default:
 			hasHTTP = true
 		}
 	}
 	if hasGo {
-		return false
+		// go PoC 的目标形态由 Go 实现决定：面向完整 URL 的按 Web 目标调度，
+		// 其余（弱口令、协议探测等）按网络目标调度。
+		return !goURLTarget
 	}
 	return hasNet && !hasHTTP
 }

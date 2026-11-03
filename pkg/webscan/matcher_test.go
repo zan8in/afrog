@@ -303,6 +303,80 @@ func TestMatchWAFAndCDNHeaders(t *testing.T) {
 	}
 }
 
+// 国内常见云 WAF / 主机防护：强判据（专属头 / Cookie 名）记为 certain，
+// 弱判据（泛化关键词）记为 probable，避免把普通站点误报成 WAF。
+func TestMatchCommonWAF(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	tests := []struct {
+		name     string
+		headers  map[string]string
+		body     string
+		wantName string
+		wantCat  string
+		wantConf Confidence
+	}{
+		// 用户现场：Server: CW 的前置节点（社区观测，只能作 probable）。
+		{name: "huawei-server-cw", headers: map[string]string{"server": "CW"},
+			wantName: "Huawei Cloud WAF", wantCat: "waf", wantConf: ConfidenceProbable},
+		{name: "huawei-cookie", headers: map[string]string{"set-cookie": "HWWAFSESID=abc123; Path=/"},
+			wantName: "Huawei Cloud WAF", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "huawei-server-name", headers: map[string]string{"server": "HuaweiCloudWAF"},
+			wantName: "Huawei Cloud WAF", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "huawei-body", body: `<html><a href="https://console.hwclouds.com/">x</a></html>`,
+			wantName: "Huawei Cloud WAF", wantCat: "waf", wantConf: ConfidenceProbable},
+
+		{name: "safedog", headers: map[string]string{"set-cookie": "safedog-flow-item=abc;"},
+			wantName: "SafeDog", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "yunsuo", headers: map[string]string{"set-cookie": "yunsuo_session=abc;"},
+			wantName: "Yunsuo", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "anquanbao", headers: map[string]string{"x-powered-by-anquanbao": "1"},
+			wantName: "Anquanbao", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "chuangyu", body: `<script src="https://help.365cyd.com/cyd-error-help.html"></script>`,
+			wantName: "Chuangyu Shield", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "eisoo", headers: map[string]string{"server": "EisooWAF-AZURE"},
+			wantName: "Eisoo Cloud Firewall", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "bluedon", headers: map[string]string{"server": "BDWAF"},
+			wantName: "Bluedon WAF", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "tencent", body: `<script>location.href="https://waf.tencent-cloud.com/403"</script>`,
+			wantName: "Tencent Cloud WAF", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "safeline", body: `<title>SafeLine</title><div id="safeline">x</div>`,
+			wantName: "SafeLine", wantCat: "waf", wantConf: ConfidenceProbable},
+		{name: "nsfocus", headers: map[string]string{"server": "NSFocus"},
+			wantName: "NSFOCUS WAF", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "radware", headers: map[string]string{"x-sl-compstate": "1"},
+			wantName: "Radware AppWall", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "wallarm", headers: map[string]string{"server": "nginx-wallarm"},
+			wantName: "Wallarm", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "fortiweb", headers: map[string]string{"set-cookie": "FORTIWAFSID=abc;"},
+			wantName: "FortiWeb", wantCat: "waf", wantConf: ConfidenceCertain},
+		{name: "chinacache", headers: map[string]string{"powered-by-chinacache": "1"},
+			wantName: "ChinaCache", wantCat: "cdn", wantConf: ConfidenceCertain},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := m.Match(Response{StatusCode: 200, Headers: tt.headers, Body: []byte(tt.body)})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].Name == tt.wantName {
+					got = &res.Technologies[i]
+				}
+			}
+			if got == nil {
+				t.Fatalf("expected %s, got %+v", tt.wantName, res.Technologies)
+			}
+			if got.Category != tt.wantCat {
+				t.Fatalf("%s category = %q, want %q", tt.wantName, got.Category, tt.wantCat)
+			}
+			if got.Confidence != tt.wantConf {
+				t.Fatalf("%s confidence = %v, want %v", tt.wantName, got.Confidence, tt.wantConf)
+			}
+		})
+	}
+}
+
 // requires 门控的词表必须覆盖「id / 名 / 连字符名 / 分类」，且小写去重。
 func TestTechnologyMatchTokens(t *testing.T) {
 	tests := []struct {
