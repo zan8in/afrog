@@ -278,6 +278,7 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/passive/ca", jwtAuthMiddleware(passiveCAHandler)).Methods(http.MethodGet)
 	// 观测接口：解释「捕获在涨、检测不动」，不落库、只反映最近状态。
 	api.HandleFunc("/passive/traffic", jwtAuthMiddleware(passiveTrafficHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/passive/active", jwtAuthMiddleware(passiveActiveHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/diagnostics", jwtAuthMiddleware(passiveDiagnosticsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/findings", jwtAuthMiddleware(passiveFindingsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/findings/{id}", jwtAuthMiddleware(passiveFindingDetailHandler)).Methods(http.MethodGet)

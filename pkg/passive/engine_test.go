@@ -483,6 +483,159 @@ func (n *noopProber) Mutate(context.Context, *CapturedTransaction, Mutation) (*C
 	return &CapturedResponse{Status: 200}, nil
 }
 
+// TestEngineTracksActiveJobs 锁定「检测积压 / 检测在途」能被点开看到具体请求：
+// 排队中的事务应出现在 queued，被领取后转入 detecting，跑完后从登记表消失。
+//
+// 登记表若泄漏，长时间运行的被动扫描会越用越占内存，所以「结束后必须清空」与
+// 「排队/在途都要看得见」同等重要，一并断言。
+func TestEngineTracksActiveJobs(t *testing.T) {
+	release := make(chan struct{})
+	slow := &funcDetector{
+		name:       "slow",
+		interestFn: func(*CapturedTransaction) bool { return true },
+		detectFn: func(context.Context, *CapturedTransaction, Prober) ([]Finding, error) {
+			<-release
+			return nil, nil
+		},
+	}
+	eng := NewEngine(EngineOptions{
+		Detectors:       []Detector{slow},
+		Prober:          &noopProber{},
+		Workers:         1,
+		DetectWorkers:   1,
+		DetectQueueSize: 4,
+		QueueSize:       8,
+	})
+	eng.Start(context.Background())
+	defer eng.Close()
+
+	mkTx := func(id, raw string) *CapturedTransaction {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatalf("parse url: %v", err)
+		}
+		return &CapturedTransaction{
+			ID:      id,
+			Request: &CapturedRequest{Method: http.MethodGet, URL: u, Headers: http.Header{}},
+		}
+	}
+	eng.Submit(mkTx("a", "http://example.com/a?id=1"))
+	eng.Submit(mkTx("b", "http://example.com/b?id=1"))
+
+	// 一条被检测池领走（在途），另一条排在检测队列里（积压）。
+	waitFor(t, func() bool {
+		q, d := eng.ActiveJobs()
+		return len(q) == 1 && len(d) == 1
+	})
+
+	q, d := eng.ActiveJobs()
+	if d[0].Method != http.MethodGet || d[0].URL == "" {
+		t.Fatalf("detecting job = %+v, want 已填充方法与 URL", d[0])
+	}
+	if q[0].URL == "" {
+		t.Fatalf("queued job = %+v, want 已填充 URL", q[0])
+	}
+	if d[0].State != ActiveDetecting || q[0].State != ActiveQueued {
+		t.Fatalf("states = %q/%q, want detecting/queued", d[0].State, q[0].State)
+	}
+
+	close(release)
+
+	// 检测跑完后登记表必须清空，否则就是内存泄漏。
+	waitFor(t, func() bool {
+		q, d := eng.ActiveJobs()
+		return len(q) == 0 && len(d) == 0
+	})
+}
+
+// TestEngineShortCircuitsInFlightPoints 锁定「在途指纹短路」。
+//
+// 事后短路（命中/已知干净）只有等检测跑完、结论落定后才生效，而一条全量检测要数十秒。
+// 这个窗口里并发到达的同注入点请求若不拦下，就会让同一条 URL 被多路并行重放
+// （现象就是「在途检测」列表里同一 URL 排了好几条、各自都在跑全量档）。
+//
+// 两条底线一并锁定：注入点集合不同的请求绝不能被连坐（零漏报），检测结束后在途计数
+// 必须归还干净（否则这些注入点会被永久判成「在途」而不再复测）。
+func TestEngineShortCircuitsInFlightPoints(t *testing.T) {
+	release := make(chan struct{})
+	var calls int32
+	slow := &funcDetector{
+		name:       "slow",
+		interestFn: func(*CapturedTransaction) bool { return true },
+		detectFn: func(context.Context, *CapturedTransaction, Prober) ([]Finding, error) {
+			atomic.AddInt32(&calls, 1)
+			<-release
+			return nil, nil
+		},
+	}
+	var mu sync.Mutex
+	var verdicts []TrafficVerdict
+	eng := NewEngine(EngineOptions{
+		Detectors:       []Detector{slow},
+		Prober:          &noopProber{},
+		Workers:         2,
+		DetectWorkers:   1,
+		DetectQueueSize: 4,
+		QueueSize:       8,
+		OnTraffic: func(ev TrafficEvent) {
+			mu.Lock()
+			verdicts = append(verdicts, ev.Verdict)
+			mu.Unlock()
+		},
+	})
+	eng.Start(context.Background())
+	defer eng.Close()
+
+	seq := 0
+	mkTx := func(raw string) *CapturedTransaction {
+		seq++
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatalf("parse url: %v", err)
+		}
+		return &CapturedTransaction{
+			ID:      "tx-" + string(rune('a'+seq)),
+			Request: &CapturedRequest{Method: http.MethodGet, URL: u, Headers: http.Header{}},
+		}
+	}
+
+	// 第一条同注入点请求占住检测池（数十秒级慢检测的替身）。
+	eng.Submit(mkTx("http://example.com/list?id=1"))
+	waitFor(t, func() bool { return eng.Stats().DetectInFlight == 1 })
+
+	// 同一注入点换个值并发到达：结论还没产生，但已有事务在途，必须短路。
+	eng.Submit(mkTx("http://example.com/list?id=42"))
+	waitFor(t, func() bool { return eng.Stats().SkippedInFlight == 1 })
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("Detect 调用次数 = %d, want 1（同注入点在途必须短路，不得并行重放）", got)
+	}
+
+	// 注入点集合不同（q 是新的）：不能被在途短路连坐，必须照常投递检测。
+	eng.Submit(mkTx("http://example.com/list?q=abc"))
+	waitFor(t, func() bool { return eng.Stats().Forwarded == 2 })
+
+	mu.Lock()
+	sawInFlightDup := false
+	for _, v := range verdicts {
+		if v == VerdictInFlightDup {
+			sawInFlightDup = true
+		}
+	}
+	mu.Unlock()
+	if !sawInFlightDup {
+		t.Fatalf("未观察到 in-flight-dup 结论：并发重复投递必须显式可观测")
+	}
+
+	close(release)
+
+	// 检测全部跑完后，在途计数必须归还干净——它只描述「此刻在途」，不得随运行时间累积。
+	waitFor(t, func() bool {
+		eng.mu.Lock()
+		defer eng.mu.Unlock()
+		return len(eng.inFlightPoints) == 0
+	})
+}
+
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

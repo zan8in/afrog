@@ -90,6 +90,12 @@ type Stats struct {
 	// SkippedKnown 是被门控判定「注入点已确认命中」或「短期内已判定无注入」而跳过
 	// 复测的事务数。它衡量的是这套短期记忆省下了多少昂贵重放。
 	SkippedKnown uint64 `json:"skipped_known"`
+	// SkippedInFlight 是被门控判定「该注入点已有事务在检测队列中或检测中」而跳过的
+	// 事务数。它衡量的是「在途指纹短路」省下的并发重复重放。
+	//
+	// 与 SkippedKnown 分开：后者是结论已落定后的短路，这里结论还没产生，被跳过的那份
+	// 不会补测。单独计数才能让这条口径的取舍显式可见。
+	SkippedInFlight uint64 `json:"skipped_in_flight"`
 	// DroppedDetect 是已确认需要检测、却因检测队列满而未能进入检测的事务数。
 	// 它与 Dropped 分开统计：这一项直接对应漏报风险。
 	DroppedDetect uint64 `json:"dropped_detect"`
@@ -125,6 +131,11 @@ type Engine struct {
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 
+	// activeMu / active 登记「已进入检测流水线但尚未完成」的事务，用于回答
+	// 「检测积压 / 检测在途」背后的具体请求。规模受检测队列与 worker 数约束。
+	activeMu sync.Mutex
+	active   map[string]*activeEntry
+
 	mu   sync.Mutex
 	seen map[string]struct{}
 	// hitPoints 记录本次运行内「已确认命中的注入点身份」，用于让重复流量短路，
@@ -135,21 +146,31 @@ type Engine struct {
 	//
 	// 这是被动扫描最大的一块可省流量：动态站点上同一条 URL 会以不同参数值反复出现，
 	// 每个注入点都要付约 35 次重放。没有它，结论「干净」的注入点会被无限次重测。
-	missPoints     map[string]time.Time
-	submitted      uint64
-	dropped        uint64
-	droppedDetect  uint64
-	inspected      uint64
-	handled        uint64
-	forwarded      uint64
-	skippedKnown   uint64
-	inFlight       uint64
-	detectInFlight uint64
-	detected       uint64
-	filtered       uint64
-	duplicated     uint64
-	reported       uint64
-	errs           uint64
+	missPoints map[string]time.Time
+	// inFlightPoints 记录「已在检测队列中或检测中」的注入点身份**引用计数**。
+	//
+	// 事后短路（hitPoints/missPoints）只有在检测跑完、结论落定后才生效，而一条全量
+	// 检测要数十秒——这个窗口内到达的相同请求会全部通过门控，被成倍并行重放
+	// （同一 URL 并发数条各自跑一遍）。它补的就是这个窗口。
+	//
+	// 用引用计数而非集合：同一点可能被多个不同事务同时覆盖，检测完成顺序不定，
+	// 集合会在第一个完成时误清空，把后面仍在检测的事务漏出计数。
+	inFlightPoints  map[string]int
+	submitted       uint64
+	dropped         uint64
+	droppedDetect   uint64
+	inspected       uint64
+	handled         uint64
+	forwarded       uint64
+	skippedKnown    uint64
+	skippedInFlight uint64
+	inFlight        uint64
+	detectInFlight  uint64
+	detected        uint64
+	filtered        uint64
+	duplicated      uint64
+	reported        uint64
+	errs            uint64
 }
 
 // detectJob 是一条已通过门控、等待检测池处理的事务。
@@ -181,13 +202,14 @@ func NewEngine(opts EngineOptions) *Engine {
 		prober = NewHTTPProber(DefaultProberOptions())
 	}
 	return &Engine{
-		opts:       opts,
-		prober:     prober,
-		tasks:      make(chan *CapturedTransaction, opts.QueueSize),
-		detectJobs: make(chan *detectJob, opts.DetectQueueSize),
-		seen:       make(map[string]struct{}),
-		hitPoints:  make(map[string]struct{}),
-		missPoints: make(map[string]time.Time),
+		opts:           opts,
+		prober:         prober,
+		tasks:          make(chan *CapturedTransaction, opts.QueueSize),
+		detectJobs:     make(chan *detectJob, opts.DetectQueueSize),
+		seen:           make(map[string]struct{}),
+		hitPoints:      make(map[string]struct{}),
+		missPoints:     make(map[string]time.Time),
+		inFlightPoints: make(map[string]int),
 	}
 }
 
@@ -253,6 +275,7 @@ func (e *Engine) Stats() Stats {
 		Handled:          atomic.LoadUint64(&e.handled),
 		Forwarded:        atomic.LoadUint64(&e.forwarded),
 		SkippedKnown:     atomic.LoadUint64(&e.skippedKnown),
+		SkippedInFlight:  atomic.LoadUint64(&e.skippedInFlight),
 		DroppedDetect:    atomic.LoadUint64(&e.droppedDetect),
 		QueueDepth:       len(e.tasks),
 		InFlight:         atomic.LoadUint64(&e.inFlight),
@@ -352,6 +375,13 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 			atomic.AddUint64(&e.skippedKnown, 1)
 			e.emitTraffic(tx, VerdictKnownClean, "该请求的注入点在有效期内已判定无注入，跳过重复重放", 0, 0, nil, nil)
 			return
+		case e.allPointsInFlight(points):
+			// 结论还没落定，但同注入点已有事务在检测队列中/检测中。此刻再投递只会
+			// 让同一条 URL 被并行重放一遍（全量档一条要数十秒）。跳过并显式标注，
+			// 它既不是「已确认命中」也不是「已判定干净」，必须自成一类。
+			atomic.AddUint64(&e.skippedInFlight, 1)
+			e.emitTraffic(tx, VerdictInFlightDup, "该请求的注入点已有事务正在检测中，跳过并发重复投递", 0, 0, nil, nil)
+			return
 		}
 	}
 
@@ -375,10 +405,18 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 	// 转交检测池。非阻塞投递同样是有意为之：门控池绝不能为了等检测池腾出空位而被
 	// 卡住——那等于把慢检测重新传染回入口。放不下就丢弃并明确标注，让「检测能力饱和」
 	// 这件事显式可见，而不是变成一次无声的漏报。
+	job := &detectJob{tx: tx, detectors: interested, points: points}
+	// 先登记再投递：检测池可能在投递后立刻跑完并注销，顺序反了会留下僵尸记录。
+	// 在途指纹同样要在投递前占用，否则并发到达的相同请求会在计数生效前一起挤进来。
+	e.registerActive(job)
+	e.retainInFlightPoints(points)
 	select {
-	case e.detectJobs <- &detectJob{tx: tx, detectors: interested, points: points}:
+	case e.detectJobs <- job:
 		atomic.AddUint64(&e.forwarded, 1)
 	default:
+		// 投递失败必须把在途计数还回去，否则这些注入点会被永久判成「在途」而不再复测。
+		e.releaseInFlightPoints(points)
+		e.unregisterActive(tx.ID)
 		atomic.AddUint64(&e.droppedDetect, 1)
 		e.emitTraffic(tx, VerdictDroppedDetect,
 			"检测队列已满：该请求已确认需要检测，但检测能力饱和，未能检测（存在漏报风险）", 0, 0, nil, nil)
@@ -389,6 +427,15 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 func (e *Engine) detect(job *detectJob) {
 	atomic.AddUint64(&e.detectInFlight, 1)
 	defer atomic.AddUint64(&e.detectInFlight, ^uint64(0))
+	// 同步在途登记：让「检测在途」能被点开看到具体是哪条请求。
+	if job != nil && job.tx != nil {
+		e.markActiveDetecting(job.tx.ID)
+		defer e.unregisterActive(job.tx.ID)
+	}
+	// 检测结束才归还在途占用。defer 在函数体之后执行，因此它必然晚于
+	// rememberHitPoints / rememberMissPoints——保证「在途」与「已落定」之间无缝衔接，
+	// 不会出现两者都没覆盖的窗口让重复流量钻空子。
+	defer e.releaseInFlightPoints(job.points)
 
 	tx := job.tx
 	ran := make([]string, 0, len(job.detectors))
@@ -497,6 +544,55 @@ func (e *Engine) pointsStatus(ids []string) (allHit, allSettled bool) {
 		allSettled = false
 	}
 	return allHit, allSettled
+}
+
+// allPointsInFlight 报告这些注入点是否**全部**已被在途事务覆盖。
+//
+// 与 pointsStatus 一样要求「全部」，原因相同：检测器按事务调用，只要有任一注入点
+// 没有在途覆盖，就必须整体检测，不能只补测其中一部分。因此只要有一个点是新的，
+// 这条请求就照常进入检测。
+func (e *Engine) allPointsInFlight(ids []string) bool {
+	if len(ids) == 0 {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, id := range ids {
+		if e.inFlightPoints[id] <= 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// retainInFlightPoints 为一批注入点占用在途计数，必须在投递检测队列前调用。
+func (e *Engine) retainInFlightPoints(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, id := range ids {
+		e.inFlightPoints[id]++
+	}
+}
+
+// releaseInFlightPoints 释放在途计数，在检测结束后调用（含投递失败的回滚）。
+//
+// 归零即删除键，让 map 规模始终等于「当前真正在途的注入点数」，不会随运行时间增长。
+func (e *Engine) releaseInFlightPoints(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, id := range ids {
+		if n := e.inFlightPoints[id]; n > 1 {
+			e.inFlightPoints[id] = n - 1
+			continue
+		}
+		delete(e.inFlightPoints, id)
+	}
 }
 
 // rememberHitPoints 记录已确认命中的注入点，供后续重复流量短路。

@@ -104,8 +104,11 @@ type passiveTrafficCounts struct {
 	// 它衡量的正是短期记忆省下的昂贵重放量，与 NoInterest（不具备检测条件）不同：
 	// 这些请求本可以检测，只是结论已被缓存。
 	KnownClean uint64 `json:"known_clean"`
-	NoFinding  uint64 `json:"no_finding"`
-	Finding    uint64 `json:"finding"`
+	// InFlightDup 是「该注入点已有事务在检测队列中/检测中、跳过并发重复投递」的流量数。
+	// 与 KnownClean 分开：后者结论已落定，这里结论还没产生，只是拦下了并发重复。
+	InFlightDup uint64 `json:"in_flight_dup"`
+	NoFinding   uint64 `json:"no_finding"`
+	Finding     uint64 `json:"finding"`
 	// Duplicate 是「检出但被去重拦下」的流量数。与 Finding 分开计数：
 	// 前者代表已经报过，后者才是本次真正新增，混在一起会让使用者误以为
 	// 命中在涨、列表却不动。
@@ -137,6 +140,8 @@ func (l *passiveTrafficLog) snapshot(limit int, verdict string) ([]passive.Traff
 			counts.NoInterest = n
 		case passive.VerdictKnownClean:
 			counts.KnownClean = n
+		case passive.VerdictInFlightDup:
+			counts.InFlightDup = n
 		case passive.VerdictNoFinding:
 			counts.NoFinding = n
 		case passive.VerdictFinding:
@@ -200,6 +205,34 @@ func passiveTrafficHandler(w http.ResponseWriter, r *http.Request) {
 		"items":    items,
 		"counts":   counts,
 		"capacity": passiveTrafficLimit,
+	}})
+}
+
+// passiveActiveHandler 返回「排队等待检测 / 正在检测」的实时事务明细。
+//
+// 这些请求尚未产出判定结论，因此不会出现在实时流量列表里；但它们恰恰就是
+// 「检测积压 / 检测在途」两个数字的全部含义，必须能点开看到具体是谁。
+func passiveActiveHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	passiveRT.mu.Lock()
+	engine := passiveRT.engine
+	passiveRT.mu.Unlock()
+
+	queued := []passive.ActiveJob{}
+	detecting := []passive.ActiveJob{}
+	if engine != nil {
+		if queued, detecting = engine.ActiveJobs(); queued == nil {
+			queued = []passive.ActiveJob{}
+		}
+		if detecting == nil {
+			detecting = []passive.ActiveJob{}
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]any{
+		"queued":    queued,
+		"detecting": detecting,
 	}})
 }
 
@@ -360,6 +393,11 @@ func passiveHints(dg passiveDiagnostics) []string {
 		hints = append(hints,
 			"短期记忆已跳过 "+strconv.FormatUint(dg.Stats.SkippedKnown, 10)+
 				" 条重复重放：同注入点在有效期内不再复测（命中永久、未命中 30 分钟），这是省流量的正常表现。")
+	}
+	if dg.Stats.SkippedInFlight > 0 {
+		hints = append(hints,
+			"在途去重已跳过 "+strconv.FormatUint(dg.Stats.SkippedInFlight, 10)+
+				" 条并发重复投递：同一注入点已被另一次检测覆盖，不再并行重放（结论未落定，被跳过的那份不会补测）。")
 	}
 	if dg.QueueSize > 0 && dg.Stats.QueueDepth >= dg.QueueSize {
 		hints = append(hints,

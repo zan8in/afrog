@@ -34,6 +34,13 @@ const (
 	VerdictDroppedDetect TrafficVerdict = "dropped-detect"
 	// VerdictNoInterest 所有检测器都判定该请求不具备检测条件。
 	VerdictNoInterest TrafficVerdict = "no-interest"
+	// VerdictInFlightDup 该请求的注入点已有事务正在检测队列中或检测中，本轮跳过并发重复投递。
+	//
+	// 与 VerdictKnownClean 必须分开：后者是「结论已落定（命中或短期判定无注入）」，
+	// 这里结论尚未产生，只是同一注入点已被另一次检测覆盖。事后短路只有在检测跑完
+	// （数十秒）后才生效，这个窗口内的并发重复请求正是靠它拦下，避免同一 URL 被
+	// 多路并行全量重放。
+	VerdictInFlightDup TrafficVerdict = "in-flight-dup"
 	// VerdictKnownClean 该请求的注入点在短期内已被判定「无注入」，本轮跳过复测。
 	//
 	// 与 VerdictDuplicate 分开：后者是「已确认命中，不必重测」，这里是「已判定干净，
