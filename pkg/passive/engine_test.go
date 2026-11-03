@@ -197,6 +197,38 @@ func TestEngineShortCircuitsKnownHitPoints(t *testing.T) {
 	waitFor(t, func() bool { return atomic.LoadInt32(&calls) == 2 })
 }
 
+// TestEngineShortCircuitsKnownCleanPoints 锁定「已判定无注入的注入点在有效期内不再复测」。
+//
+// 这是被动扫描最大的一块可省流量：同一条接口会被反复访问（轮询、翻页、换 id），每次都要
+// 付约 35 次重放。但未命中结论必须带有效期（见 missPointTTL）——过期后必须重新复测，
+// 否则会永久屏蔽掉站点后续才出现的漏洞。本用例覆盖 TTL 内短路与「换注入点照常检测」。
+func TestEngineShortCircuitsKnownCleanPoints(t *testing.T) {
+	var calls int32
+	det := &fakeDetector{name: "fake", interest: true, calls: &calls}
+	eng := NewEngine(EngineOptions{
+		Detectors: []Detector{det},
+		Prober:    &noopProber{},
+		Workers:   1,
+	})
+	eng.Start(context.Background())
+	defer eng.Close()
+
+	// 第一次：正常检测，无发现 -> 注入点被记为「已判定无注入」。
+	eng.Submit(txAt(t, "http://example.com/list?id=1"))
+	waitFor(t, func() bool { return atomic.LoadInt32(&calls) == 1 && eng.Stats().Inspected == 1 })
+
+	// 同一注入点换个值再来：必须短路，检测器不能再被调用。
+	eng.Submit(txAt(t, "http://example.com/list?id=42"))
+	waitFor(t, func() bool { return eng.Stats().SkippedKnown == 1 })
+	if got := atomic.LoadInt32(&calls); got != 1 {
+		t.Fatalf("Detect 调用次数 = %d, want 1（已判定干净的注入点必须短路，不得重放）", got)
+	}
+
+	// 换一个未记忆过的注入点：必须照常检测。
+	eng.Submit(txAt(t, "http://example.com/list?q=abc"))
+	waitFor(t, func() bool { return atomic.LoadInt32(&calls) == 2 })
+}
+
 // txAt 构造一条带真实 URL 的事务（注入点来自 query，因此必须有 URL）。
 func txAt(t *testing.T, raw string) *CapturedTransaction {
 	t.Helper()

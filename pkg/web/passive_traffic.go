@@ -97,8 +97,12 @@ type passiveTrafficCounts struct {
 	// 与 Dropped 分开：这一项直接对应漏报风险，混在一起会让使用者低估损失。
 	DroppedDetect uint64 `json:"dropped_detect"`
 	NoInterest    uint64 `json:"no_interest"`
-	NoFinding     uint64 `json:"no_finding"`
-	Finding       uint64 `json:"finding"`
+	// KnownClean 是「注入点在有效期内已判定无注入、跳过重复重放」的流量数。
+	// 它衡量的正是短期记忆省下的昂贵重放量，与 NoInterest（不具备检测条件）不同：
+	// 这些请求本可以检测，只是结论已被缓存。
+	KnownClean uint64 `json:"known_clean"`
+	NoFinding  uint64 `json:"no_finding"`
+	Finding    uint64 `json:"finding"`
 	// Duplicate 是「检出但被去重拦下」的流量数。与 Finding 分开计数：
 	// 前者代表已经报过，后者才是本次真正新增，混在一起会让使用者误以为
 	// 命中在涨、列表却不动。
@@ -126,6 +130,8 @@ func (l *passiveTrafficLog) snapshot(limit int, verdict string) ([]passive.Traff
 			counts.DroppedDetect = n
 		case passive.VerdictNoInterest:
 			counts.NoInterest = n
+		case passive.VerdictKnownClean:
+			counts.KnownClean = n
 		case passive.VerdictNoFinding:
 			counts.NoFinding = n
 		case passive.VerdictFinding:
@@ -339,6 +345,11 @@ func passiveHints(dg passiveDiagnostics) []string {
 		hints = append(hints,
 			"有 "+strconv.FormatUint(dg.Counts.DroppedDetect, 10)+
 				" 条已确认需要检测、却因检测能力饱和被丢弃：这是实打实的漏报风险，请在「设置」里调大「检测并发（detect_workers）」。")
+	}
+	if dg.Stats.SkippedKnown > 0 {
+		hints = append(hints,
+			"短期记忆已跳过 "+strconv.FormatUint(dg.Stats.SkippedKnown, 10)+
+				" 条重复重放：同注入点在有效期内不再复测（命中永久、未命中 30 分钟），这是省流量的正常表现。")
 	}
 	if dg.QueueSize > 0 && dg.Stats.QueueDepth >= dg.QueueSize {
 		hints = append(hints,

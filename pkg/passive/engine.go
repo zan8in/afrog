@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // EngineOptions 是调度层的配置。
@@ -47,6 +48,19 @@ const maxSeenEntries = 100000
 // maxHitPoints 限制「已确认命中的注入点」表规模，理由同上。
 const maxHitPoints = 20000
 
+// maxMissPoints 限制「已判定无注入的注入点」表规模，理由同 maxHitPoints。
+const maxMissPoints = 20000
+
+// missPointTTL 是「已判定无注入」这一结论的有效期。
+//
+// 未命中的结论必须带有效期，不能像命中那样在整个运行期内永久短路：站点可能在会话
+// 中途改配置、上线新版本或换了数据库，参数由「不能注入」变成「能注入」。给一个足够
+// 短的有效期，既省下绝大多数的重复重放，又保证同一注入点会在有效期内被重新复测。
+//
+// 未命中的代价远高于命中的代价：漏掉一个真漏洞不可挽回，而多重测一次只是多花流量，
+// 因此这个值刻意取得偏小。
+const missPointTTL = 30 * time.Minute
+
 // defaultWorkers / defaultQueueSize 是未显式配置时的调度层默认值。
 //
 // worker 数等于**实际重放并发度**——检测器在一个事务内串行发请求，所以同时在飞的
@@ -73,6 +87,9 @@ type Stats struct {
 	Handled uint64 `json:"handled"`
 	// Forwarded 是被门控判定「需要检测」并转交检测池的事务数。
 	Forwarded uint64 `json:"forwarded"`
+	// SkippedKnown 是被门控判定「注入点已确认命中」或「短期内已判定无注入」而跳过
+	// 复测的事务数。它衡量的是这套短期记忆省下了多少昂贵重放。
+	SkippedKnown uint64 `json:"skipped_known"`
 	// DroppedDetect 是已确认需要检测、却因检测队列满而未能进入检测的事务数。
 	// 它与 Dropped 分开统计：这一项直接对应漏报风险。
 	DroppedDetect uint64 `json:"dropped_detect"`
@@ -113,13 +130,19 @@ type Engine struct {
 	// hitPoints 记录本次运行内「已确认命中的注入点身份」，用于让重复流量短路，
 	// 不再重复重放。身份不含参数值，因为同一注入点换值后结论不变；也不含同名参数的
 	// 序号，?id=1&id=2 视为同一注入点族。跨运行不复用——重启即清空，保证复测价值。
-	hitPoints      map[string]struct{}
+	hitPoints map[string]struct{}
+	// missPoints 记录「已判定无注入的注入点身份」及其判定时刻，带 missPointTTL 有效期。
+	//
+	// 这是被动扫描最大的一块可省流量：动态站点上同一条 URL 会以不同参数值反复出现，
+	// 每个注入点都要付约 35 次重放。没有它，结论「干净」的注入点会被无限次重测。
+	missPoints     map[string]time.Time
 	submitted      uint64
 	dropped        uint64
 	droppedDetect  uint64
 	inspected      uint64
 	handled        uint64
 	forwarded      uint64
+	skippedKnown   uint64
 	inFlight       uint64
 	detectInFlight uint64
 	detected       uint64
@@ -164,6 +187,7 @@ func NewEngine(opts EngineOptions) *Engine {
 		detectJobs: make(chan *detectJob, opts.DetectQueueSize),
 		seen:       make(map[string]struct{}),
 		hitPoints:  make(map[string]struct{}),
+		missPoints: make(map[string]time.Time),
 	}
 }
 
@@ -228,6 +252,7 @@ func (e *Engine) Stats() Stats {
 		Inspected:        atomic.LoadUint64(&e.inspected),
 		Handled:          atomic.LoadUint64(&e.handled),
 		Forwarded:        atomic.LoadUint64(&e.forwarded),
+		SkippedKnown:     atomic.LoadUint64(&e.skippedKnown),
 		DroppedDetect:    atomic.LoadUint64(&e.droppedDetect),
 		QueueDepth:       len(e.tasks),
 		InFlight:         atomic.LoadUint64(&e.inFlight),
@@ -306,17 +331,28 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 	atomic.AddUint64(&e.inFlight, 1)
 	defer atomic.AddUint64(&e.inFlight, ^uint64(0)) // 原子减 1（-1 的补码）
 
-	// 已命中注入点短路：这条请求里的每个注入点都已在本次运行内确认命中过，
-	// 再跑一遍只会重复消耗重放流量（含最贵的 WAF 绕过分支），结论不可能变。
+	// 注入点记忆短路：本次运行内该请求的注入点结论已经明确，再跑一遍只会重复消耗
+	// 重放流量（含最贵的 WAF 绕过分支），结论不可能变。分两种情况给不同结论：
+	// 已确认命中的标 duplicate，已判定干净的标 known-clean——两者省下的流量一样，
+	// 但含义相反，混在一起会让使用者以为某处被检出过。
 	//
-	// 只对「全部注入点都已命中」的事务短路——只要还有一个未确认的注入点，
+	// 只对「全部注入点都已有明确结论」的事务短路——只要还有一个未确认的注入点，
 	// 就必须整体重测：检测器是按事务而非按注入点调用的，无法只重测其中一部分。
-	// 这条约束同时保证了「未命中的请求永远照常重测」，短路不会引入漏报。
+	// 这条约束同时保证了「结论不明的请求永远照常重测」，短路不会引入漏报。
 	points := injectionPointIDs(tx.Request)
-	if len(points) > 0 && e.allHitPointsKnown(points) {
-		atomic.AddUint64(&e.duplicated, 1)
-		e.emitTraffic(tx, VerdictDuplicate, "该请求的注入点在本次运行内均已确认命中，跳过重复重放", 0, 1, nil, nil)
-		return
+	if len(points) > 0 {
+		allHit, allSettled := e.pointsStatus(points)
+		switch {
+		case allHit:
+			atomic.AddUint64(&e.duplicated, 1)
+			atomic.AddUint64(&e.skippedKnown, 1)
+			e.emitTraffic(tx, VerdictDuplicate, "该请求的注入点在本次运行内均已确认命中，跳过重复重放", 0, 1, nil, nil)
+			return
+		case allSettled:
+			atomic.AddUint64(&e.skippedKnown, 1)
+			e.emitTraffic(tx, VerdictKnownClean, "该请求的注入点在有效期内已判定无注入，跳过重复重放", 0, 0, nil, nil)
+			return
+		}
 	}
 
 	interested := make([]Detector, 0, len(e.opts.Detectors))
@@ -359,6 +395,9 @@ func (e *Engine) detect(job *detectJob) {
 	var firstErr error
 	reported := 0
 	duplicated := 0
+	// detectedHere 是本次事务里检测器报出的发现总数（未经过零误报门控）。
+	// 它是「干净结论」的判据：一条发现都没报出来，才算真的干净。
+	detectedHere := 0
 
 	for _, d := range job.detectors {
 		if d == nil {
@@ -378,6 +417,7 @@ func (e *Engine) detect(job *detectJob) {
 		}
 		for _, f := range findings {
 			atomic.AddUint64(&e.detected, 1)
+			detectedHere++
 			// 零误报门控：非 Certain 一律拦下。
 			if f.Confidence < ConfidenceCertain {
 				atomic.AddUint64(&e.filtered, 1)
@@ -401,8 +441,15 @@ func (e *Engine) detect(job *detectJob) {
 
 	// 只有「真正上报了命中」才把注入点记为已确认：被低置信度拦下的不算命中，
 	// 必须留待下次重新检测，否则一次误判就会把该注入点永久短路掉。
-	if reported > 0 {
+	//
+	// 反过来，「干净结论」也只在真正干净时才记：必须一条发现都没报出来，且没有任何
+	// 检测器出错。有发现却被门控拦下，说明结论本身是「可疑」而非「干净」；检测器出错
+	// 说明这一轮没跑完整——把这两种情况记成干净，会在有效期内一直屏蔽掉真实漏洞。
+	switch {
+	case reported > 0:
 		e.rememberHitPoints(job.points)
+	case detectedHere == 0 && firstErr == nil:
+		e.rememberMissPoints(job.points)
 	}
 }
 
@@ -425,16 +472,31 @@ func injectionPointIDs(req *CapturedRequest) []string {
 	return ids
 }
 
-// allHitPointsKnown 报告给定的注入点身份是否全部已确认命中。
-func (e *Engine) allHitPointsKnown(ids []string) bool {
+// pointsStatus 报告给定注入点的结论状态。
+//
+// allHit 为真表示全部已确认命中；allSettled 为真表示全部已有明确结论——要么命中，
+// 要么在 missPointTTL 内被判定为干净。两者都足以整天短路，但结论相反，调用方据此
+// 给出不同 verdict，不能合并成一个布尔。
+//
+// 只对「全部已有结论」返回真：只要还有一个未确认的注入点，就必须整体重测，因为
+// 检测器是按事务调用的，无法只补测其中一部分。这同时保证了结论不明的请求永远照常重测。
+func (e *Engine) pointsStatus(ids []string) (allHit, allSettled bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	now := time.Now()
+	allHit = true
+	allSettled = true
 	for _, id := range ids {
-		if _, ok := e.hitPoints[id]; !ok {
-			return false
+		if _, ok := e.hitPoints[id]; ok {
+			continue
 		}
+		allHit = false
+		if at, ok := e.missPoints[id]; ok && now.Sub(at) < missPointTTL {
+			continue
+		}
+		allSettled = false
 	}
-	return true
+	return allHit, allSettled
 }
 
 // rememberHitPoints 记录已确认命中的注入点，供后续重复流量短路。
@@ -448,6 +510,27 @@ func (e *Engine) rememberHitPoints(ids []string) {
 			e.hitPoints = make(map[string]struct{}, maxHitPoints/4)
 		}
 		e.hitPoints[id] = struct{}{}
+	}
+}
+
+// rememberMissPoints 记录「已判定无注入」的注入点身份与时刻，供 TTL 内短路。
+//
+// 与 rememberHitPoints 的关键差别是它带有效期：干净结论可能因站点改配置/上线新版本
+// 而失效，过期后必须重新复测，否则会永久屏蔽掉此后才出现的漏洞。
+func (e *Engine) rememberMissPoints(ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := time.Now()
+	for _, id := range ids {
+		if len(e.missPoints) >= maxMissPoints {
+			// 整体清空，退化为"窗口内记忆"。清空只会让后续请求重新被检测，
+			// 是偏安全的一侧；表无限增长则是实打实的内存风险。
+			e.missPoints = make(map[string]time.Time, maxMissPoints/4)
+		}
+		e.missPoints[id] = now
 	}
 }
 

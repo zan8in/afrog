@@ -28,6 +28,13 @@ const (
 	VerdictDroppedDetect TrafficVerdict = "dropped-detect"
 	// VerdictNoInterest 所有检测器都判定该请求不具备检测条件。
 	VerdictNoInterest TrafficVerdict = "no-interest"
+	// VerdictKnownClean 该请求的注入点在短期内已被判定「无注入」，本轮跳过复测。
+	//
+	// 与 VerdictDuplicate 分开：后者是「已确认命中，不必重测」，这里是「已判定干净，
+	// 不必重测」。两者都会省下昂贵的重放，但结论完全相反，混在一起会让使用者
+	// 误以为某处被检出过。它也不是 VerdictNoInterest——那条请求确实具备检测条件，
+	// 只是结论已被缓存。
+	VerdictKnownClean TrafficVerdict = "known-clean"
 	// VerdictNoFinding 检测已执行，但没有发现确定成立的结论。
 	VerdictNoFinding TrafficVerdict = "no-finding"
 	// VerdictFinding 检出漏洞。
