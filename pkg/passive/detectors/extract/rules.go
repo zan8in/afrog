@@ -259,6 +259,6 @@ var defaultRules = []rulekit.Rule{
 		// 不定（password / Password / PASSWORD），因此不做字面锚点、直接跑正则。
 		Re:       regexp.MustCompile(`(?i)\b(?:password|passwd|pwd|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|private[_-]?key|auth[_-]?token|access[_-]?token|client[_-]?secret)["']?\s*[:=]\s*["']?([A-Za-z0-9!@#$%^&*_\-\.\+/]{6,100})`),
 		Group:    1,
-		Validate: rulekit.GenericSecret,
+		Validate: looseSecret,
 	},
 }

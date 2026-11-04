@@ -55,21 +55,6 @@ var defaultRules = []rulekit.Rule{
 		Validate: validEmail,
 	},
 	{
-		ID:       "absolute-url",
-		Category: catEndpoint,
-		Title:    "绝对 URL",
-		Severity: "info",
-		Conf:     passive.ConfidenceProbable,
-		// 只扫响应体：若连请求 URL 也扫，用户访问的每一条地址都会被当成一次「发现」，
-		// 面板立刻被自身流量淹没。响应体里的 URL 才是「页面引用了别处」的线索。
-		Sources: []rulekit.Source{rulekit.SourceBody},
-		Anchors: []string{"http://", "https://"},
-		// 上限 1000 是 RE2 的硬约束（重复次数不可超过 1000，否则 MustCompile 会 panic）。
-		Re:       regexp.MustCompile(`\b(https?://[^\s"'<>\\)\]\},;]{3,1000}[^\s"'<>\\)\]\},;.])`),
-		Group:    1,
-		Validate: validURL,
-	},
-	{
 		ID:       "api-path",
 		Category: catEndpoint,
 		Title:    "接口路径",

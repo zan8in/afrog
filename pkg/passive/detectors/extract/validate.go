@@ -152,3 +152,40 @@ func isWordByte(b byte) bool {
 	}
 	return false
 }
+
+// secretAssignmentKeywords 是「可疑的密钥赋值」的键名关键字（小写）。
+// 用于识别「值本身就是键名/变量名」的自引用误报，例如 `password: password123`。
+var secretAssignmentKeywords = []string{
+	"password", "passwd", "pwd", "passphrase",
+	"secret", "apikey", "api_key", "accesskey", "access_key",
+	"privatekey", "private_key", "clientsecret", "client_secret",
+	"token",
+}
+
+// looseSecret 是「可疑的密钥赋值」专用校验：在通用强度门槛之上，再剔除「值其实是
+// 一段代码引用，而不是字面量」的高频误报。
+//
+// 该规则没有固定前缀，只靠「键名像密钥 + 值像密钥」推断，因此在 JS bundle / 前端源码
+// 里极易把成员表达式当成密钥：
+//
+//	password: this.formData.passwordSj
+//	password: Object.assign({}, i)
+//	apiKey:   process.env.API_KEY
+//
+// 字面量密钥的字符集（base64 / hex / 前缀式）都不含点号，JWT 另有独立规则识别，
+// 因此含点号的一律判为代码引用；值里再出现键名关键字的，判为自引用或变量命名。
+func looseSecret(v string) bool {
+	if !rulekit.GenericSecret(v) {
+		return false
+	}
+	if strings.Contains(v, ".") {
+		return false
+	}
+	lv := strings.ToLower(v)
+	for _, kw := range secretAssignmentKeywords {
+		if strings.Contains(lv, kw) {
+			return false
+		}
+	}
+	return true
+}

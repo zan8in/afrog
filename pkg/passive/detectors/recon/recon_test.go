@@ -89,33 +89,6 @@ func TestReconEmailFiltersNoise(t *testing.T) {
 	}
 }
 
-// 绝对 URL 只扫响应体：用户访问的请求地址本身不得被当成一次发现。
-func TestReconAbsoluteURLBodyOnly(t *testing.T) {
-	e := New(DefaultOptions())
-	body := []byte(`{"endpoint":"https://api.corp.internal/v1/token"}`)
-	got := rulesOf(e.Extract(tx(t, "https://portal.example.com/page", body)))
-
-	urls := got["absolute-url"]
-	if len(urls) != 1 || urls[0] != "https://api.corp.internal/v1/token" {
-		t.Fatalf("absolute-url = %#v", urls)
-	}
-	for _, v := range urls {
-		if v == "https://portal.example.com/page" {
-			t.Fatal("request URL must not be reported by absolute-url")
-		}
-	}
-}
-
-// 指向静态资源的绝对 URL 没有信息收集价值，必须剔除。
-func TestReconAbsoluteURLSkipsStaticAsset(t *testing.T) {
-	e := New(DefaultOptions())
-	body := []byte(`<script src="https://cdn.corp.com/app.bundle.js"></script>`)
-	got := rulesOf(e.Extract(tx(t, "https://a.example.com/", body)))
-	if len(got["absolute-url"]) != 0 {
-		t.Fatalf("static asset url should be dropped, got %#v", got["absolute-url"])
-	}
-}
-
 // 接口路径要能提出真实路径，又不把 `/apiaries` 这类更长单词的前缀误当接口。
 func TestReconAPIPathBoundary(t *testing.T) {
 	e := New(DefaultOptions())

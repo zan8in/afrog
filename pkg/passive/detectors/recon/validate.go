@@ -1,7 +1,6 @@
 package recon
 
 import (
-	"net/url"
 	"strings"
 )
 
@@ -73,30 +72,6 @@ func validEmail(v string) bool {
 		return false
 	}
 	return true
-}
-
-// validURL 校验绝对 URL：主机合法、非噪声域名、且不指向静态资源。
-func validURL(v string) bool {
-	u, err := url.Parse(v)
-	if err != nil {
-		return false
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return false
-	}
-	host := strings.ToLower(u.Hostname())
-	if host == "" || !strings.Contains(host, ".") {
-		return false
-	}
-	if _, bad := noiseHosts[host]; bad {
-		return false
-	}
-	for _, s := range noiseHostSuffixes {
-		if strings.HasSuffix(host, s) {
-			return false
-		}
-	}
-	return !isStaticAsset(u.Path)
 }
 
 // validAPIPath 校验接口路径：不是静态资源、也不含路径穿越式的乱码。

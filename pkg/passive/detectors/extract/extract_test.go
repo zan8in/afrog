@@ -65,6 +65,33 @@ func TestExtractPlaceholderRejected(t *testing.T) {
 	}
 }
 
+// 「可疑的密钥赋值」不能把代码引用当成密钥：值含点号（成员访问）一律丢弃。
+func TestExtractSecretAssignmentRejectsCodeReference(t *testing.T) {
+	e := New(DefaultOptions())
+	body := []byte(`{key:n,phoneNumber:r,password:this.formData.passwordSj?this.formData.passwordSj:""}
+Time:!1,loading:!1,phoneCodeLoading:!1,password:Object.assign({},i),patientRules:{oldValue:[{required:!0`)
+	got := rulesOf(e.Extract(tx(t, "https://a.example.com/app.js", body, nil)))
+	if list := got["secret-assignment"]; len(list) != 0 {
+		t.Fatalf("code reference must not be reported: %#v", list)
+	}
+}
+
+// 收紧后仍要保住真正的字面量密钥；值里带键名关键字的自引用（password: password123）要丢。
+func TestExtractSecretAssignmentKeepsLiteralOnly(t *testing.T) {
+	e := New(DefaultOptions())
+	body := []byte(`{"apiKey":"aB3xY9kLm2Qz","password":"Tr0ub4dor&3x","clientSecret":"password123"}`)
+	got := rulesOf(e.Extract(tx(t, "https://a.example.com/", body, nil)))
+	values := got["secret-assignment"]
+	if len(values) != 2 {
+		t.Fatalf("want 2 literal secrets, got %#v", values)
+	}
+	for _, v := range values {
+		if v == "password123" {
+			t.Fatalf("self-referential value must be dropped: %#v", values)
+		}
+	}
+}
+
 func TestExtractJWT(t *testing.T) {
 	e := New(DefaultOptions())
 	token := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
