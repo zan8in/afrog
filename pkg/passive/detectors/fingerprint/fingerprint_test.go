@@ -70,13 +70,55 @@ func TestFingerprintInterestNeedsResponse(t *testing.T) {
 	}
 }
 
-// 文本类静态资源（.js 等）不做指纹：避免在门控池里对大体积 JS 反复跑回溯正则。
+// 文本类静态资源（.js 等）不做指纹：避免在门控池里对大体积 JS 反复跑正则。
 func TestFingerprintSkipsStaticResource(t *testing.T) {
 	e := New()
 	txStatic := newTx(t, "https://a.example.com/app.js", []byte("var jQuery=1"), nil)
 	txStatic.Static = true
 	if e.Interest(txStatic) {
 		t.Fatal("static text resource must not be of interest")
+	}
+}
+
+// 样式表要放行：Tailwind/UnoCSS/Monaco 的判据几乎只出现在 CSS 里。
+func TestFingerprintAcceptsStylesheet(t *testing.T) {
+	e := New()
+	css := newTx(t, "https://a.example.com/app.css", []byte(".a{--tw-rotate:1deg}"), http.Header{"Content-Type": {"text/css"}})
+	css.Static = true
+	if !e.Interest(css) {
+		t.Fatal("stylesheet should be of interest")
+	}
+	got := e.Extract(css)
+	var tailwind bool
+	for _, ex := range got {
+		if strings.HasPrefix(ex.Value, "Tailwind CSS") {
+			tailwind = true
+		}
+	}
+	if !tailwind {
+		t.Fatalf("Tailwind CSS not extracted from stylesheet: %#v", got)
+	}
+}
+
+// 同一 origin 的样式表只在头几个上做匹配：几十个 chunk 都跑一遍没有收益。
+func TestFingerprintLimitsStylesheetsPerOrigin(t *testing.T) {
+	e := New()
+	accepted := 0
+	for i := 0; i < maxStaticSamplesPerOrigin+5; i++ {
+		tx := newTx(t, "https://a.example.com/app.css", []byte(".a{}"), http.Header{"Content-Type": {"text/css"}})
+		tx.Static = true
+		if e.Interest(tx) {
+			accepted++
+		}
+	}
+	if accepted != maxStaticSamplesPerOrigin {
+		t.Fatalf("accepted %d stylesheets, want %d", accepted, maxStaticSamplesPerOrigin)
+	}
+	// 换一个 origin 不受影响。
+	other := newTx(t, "https://b.example.com/app.css", []byte(".a{}"), http.Header{"Content-Type": {"text/css"}})
+	other.Static = true
+	if !e.Interest(other) {
+		t.Fatal("another origin should get its own budget")
 	}
 }
 

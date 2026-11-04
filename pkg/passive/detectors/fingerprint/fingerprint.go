@@ -1,7 +1,8 @@
 // Package fingerprint 实现被动「技术栈识别」提取（等价于浏览器插件 Wappalyzer）。
 //
-// 它复用主动扫描既有的 webscan 引擎（154 条 YAML 规则、regexp2 匹配、四级可信度），
-// 把已经捕获的响应直接喂给匹配器，命中的技术栈以 info 级提取物送入提取面板。
+// 它复用主动扫描既有的 webscan 引擎（精选规则 + Wappalyzer 社区全量库、RE2 匹配、
+// 多级可信度），把已经捕获的响应直接喂给匹配器，命中的技术栈以 info 级提取物送入
+// 提取面板。
 //
 // 为什么归入「提取」而不是「漏洞检测」：
 //   - 零流量：用现成响应判定，不额外发包，因此不属于会重放的 Detector；
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/zan8in/afrog/v3/pkg/passive"
 	"github.com/zan8in/afrog/v3/pkg/passive/detectors/rulekit"
@@ -38,7 +40,19 @@ const techCategory = "tech"
 // Extractor 是技术栈识别提取器。
 type Extractor struct {
 	matcher *webscan.Matcher
+
+	// sampled 记录每个 origin 已经匹配过多少次静态资源。
+	//
+	// 静态资源（CSS）是技术栈判据的重要来源——Tailwind 的 --tw-、UnoCSS 的 --un-、
+	// Monaco 的 .monaco-editor 几乎只出现在样式表里，只看 HTML 会漏掉一大片。
+	// 但一个站点动辄几十个 chunk，每次响应都跑一遍匹配既浪费又没必要：
+	// 同一份技术栈在第一批资源里就已经暴露完了。因此按 origin 限量采样。
+	mu      sync.Mutex
+	sampled map[string]int
 }
+
+// maxStaticSamplesPerOrigin 是每个 origin 允许参与指纹匹配的静态资源数量上限。
+const maxStaticSamplesPerOrigin = 8
 
 // New 加载内置指纹规则并创建提取器。规则加载失败时降级为空匹配器（不阻断被动扫描）。
 func New() *Extractor {
@@ -47,21 +61,42 @@ func New() *Extractor {
 		gologger.Warning().Msgf("被动指纹提取器加载规则失败，已降级为空匹配器: %v", err)
 		m = webscan.NewMatcher(nil)
 	}
-	return &Extractor{matcher: m}
+	return &Extractor{matcher: m, sampled: make(map[string]int)}
 }
 
 // Name 实现 passive.Extractor。
 func (e *Extractor) Name() string { return DetectorName }
 
-// Interest 只对「有响应的文档请求」感兴趣。
+// Interest 只对「有响应的文档与样式表」感兴趣。
 //
-// 刻意排除文本类静态资源（.js / .css / .json …）。原因有二：
-//   - 性能：指纹要拿 154 条回溯型正则去匹配整段正文，实测 512KB 的 JS 约 60ms；
-//     提取器内联在门控池执行，若每个静态产物都跑一遍，会直接拖慢入口（队首阻塞）。
-//   - 准确率：文档响应（HTML 主页面）才是技术栈最集中的地方；JS bundle 里的关键字
-//     命中质量低，容易把库名当技术栈报出来。
+// 刻意排除 JS 与其它静态资源：
+//   - 性能：指纹要拿几千条正则去匹配正文，JS bundle 常有数百 KB；提取器内联在
+//     门控池执行，若每个静态产物都跑一遍，会直接拖慢入口（队首阻塞）。
+//   - 准确率：JS 里的库名（如 `axios`）与真正的技术依赖是两回事，拿来回填技术栈
+//     误报极高；而样式表里的变量名/类名是实打实的「这个框架在用」。
 func (e *Extractor) Interest(tx *passive.CapturedTransaction) bool {
-	return tx != nil && tx.Request != nil && tx.Response != nil && !tx.Static
+	if tx == nil || tx.Request == nil || tx.Response == nil {
+		return false
+	}
+	if !tx.Static {
+		return true
+	}
+	return isStylesheet(tx) && e.allowStatic(tx)
+}
+
+// allowStatic 按 origin 限量放行静态资源，超额的直接跳过。
+func (e *Extractor) allowStatic(tx *passive.CapturedTransaction) bool {
+	key := rulekit.Origin(tx.Request.URL)
+	if key == "" {
+		key = tx.Request.URL.Host
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.sampled[key] >= maxStaticSamplesPerOrigin {
+		return false
+	}
+	e.sampled[key]++
+	return true
 }
 
 // Extract 实现 passive.Extractor。
@@ -75,6 +110,10 @@ func (e *Extractor) Extract(tx *passive.CapturedTransaction) []passive.Extractio
 		StatusCode: resp.Status,
 		Headers:    headerMap(resp.Headers),
 		Body:       resp.Body,
+		Cookies:    resp.Headers.Values("Set-Cookie"),
+	}
+	if tx.Request.URL != nil {
+		mr.RequestURL = tx.Request.URL.String()
 	}
 	// 若这条响应本身就是 /favicon.ico，则交给 favicon 规则（mmh3 哈希）匹配；
 	// 同时清空 Body——二进制 favicon 丢给正文正则是纯粹的浪费与噪声来源。
@@ -163,6 +202,20 @@ func headerMap(h http.Header) map[string]string {
 		out[k] = strings.Join(vs, ", ")
 	}
 	return out
+}
+
+// isStylesheet 判断这条静态资源是不是样式表。
+//
+// 先看 Content-Type，再回落扩展名：很多 CDN 对 .css 返回 application/octet-stream，
+// 只看头部会漏；反过来只看扩展名又会被带 query 的伪静态骗到，两者互补最稳。
+func isStylesheet(tx *passive.CapturedTransaction) bool {
+	if ct := strings.ToLower(tx.Response.Headers.Get("Content-Type")); strings.Contains(ct, "text/css") {
+		return true
+	}
+	if tx.Request.URL == nil {
+		return false
+	}
+	return strings.HasSuffix(strings.ToLower(tx.Request.URL.Path), ".css")
 }
 
 // isFavicon 判断请求路径是否指向 favicon。

@@ -7,21 +7,45 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/dlclark/regexp2"
 	"github.com/spaolacci/murmur3"
 )
 
 const (
-	// matchTimeout 限制单条正则的匹配耗时，防止灾难性回溯拖慢扫描。
-	matchTimeout = 200 * time.Millisecond
-
 	// maxBodyBytes 是参与匹配的正文长度上限，避免超大响应拖慢匹配。
 	maxBodyBytes = 512 * 1024
+
+	// maxScriptURLs 是从页面里最多抽取多少个脚本地址参与匹配。
+	//
+	// 与正文上限同理：正常页面的外链脚本在几十个量级，设个上限只是防住极端页面
+	// （比如把全部资源内联了几百个 <script>）把匹配成本顶上去。
+	maxScriptURLs = 256
+
+	// maxInlineScripts 是最多收集多少段内联脚本文本。
+	maxInlineScripts = 64
 )
 
-var titleRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+var (
+	titleRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	// scriptSrcRe 抽取 <script src="...">。
+	scriptSrcRe = regexp.MustCompile(`(?is)<script[^>]*\ssrc\s*=\s*["']([^"']+)["']`)
+	// linkTagRe 抽取 <link ...>，再从中挑出模块预载脚本（SPA 打包器用它加载入口）。
+	linkTagRe = regexp.MustCompile(`(?is)<link\b[^>]*>`)
+	// scriptBlockRe 抽取完整 <script> 标签（属性 + 标签体），用于区分外部脚本与内联脚本。
+	scriptBlockRe = regexp.MustCompile(`(?is)<script\b([^>]*)>(.*?)</script\s*>`)
+	// scriptSrcAttrRe 判断 <script> 的属性里是否带 src。
+	scriptSrcAttrRe = regexp.MustCompile(`(?is)\ssrc\s*=`)
+	// hrefRe 抽取标签里的 href。
+	hrefRe = regexp.MustCompile(`(?is)\shref\s*=\s*["']([^"']+)["']`)
+	// relRe 抽取标签里的 rel。
+	relRe = regexp.MustCompile(`(?is)\srel\s*=\s*["']([^"']+)["']`)
+	// metaTagRe 抽取 <meta ...>。
+	metaTagRe = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
+	// metaNameRe 抽取 meta 的 name/property/http-equiv。
+	metaNameRe = regexp.MustCompile(`(?is)\s(?:name|property|http-equiv)\s*=\s*["']([^"']+)["']`)
+	// metaContentRe 抽取 meta 的 content。
+	metaContentRe = regexp.MustCompile(`(?is)\scontent\s*=\s*["']([^"']*)["']`)
+)
 
 // Matcher 在一份规则集上执行 Web 指纹匹配。
 type Matcher struct {
@@ -64,10 +88,24 @@ func (m *Matcher) Match(resp Response) Result {
 	mat := newMaterial(resp)
 	res.FaviconHash = mat.faviconHash
 
+	// 正文只扫一遍，得到「哪些字面量出现」的位图；后面几百条正文类模式直接查表，
+	// 不再各自扫全文。大小写不敏感那组扫的是正文的小写副本。
+	var hits, hitsCI []bool
+	if mat.body != "" {
+		if n := m.db.bodyLiteralCount; n > 0 {
+			hits = make([]bool, n)
+			m.db.bodyLiterals.scan(mat.body, hits)
+		}
+		if n := m.db.bodyLiteralCIDim; n > 0 {
+			hitsCI = make([]bool, n)
+			m.db.bodyLiteralsCI.scan(foldASCII(mat.body), hitsCI)
+		}
+	}
+
 	// 同名同版本只保留可信度最高的一条：key 为 name\x00version。
 	seen := make(map[string]int, 8)
 	for _, rule := range m.db.Rules {
-		tech, ok := m.matchRule(rule, mat)
+		tech, ok := m.matchRule(rule, mat, hits, hitsCI)
 		if !ok {
 			continue
 		}
@@ -88,22 +126,73 @@ func (m *Matcher) Match(resp Response) Result {
 	return res
 }
 
+// hitLiteral 判断某条正文类模式的字面量是否出现在正文里（任一出现即通过）。
+func hitLiteral(mr *MatchRule, hits, hitsCI []bool) bool {
+	table := hits
+	if mr.literalCI {
+		table = hitsCI
+	}
+	for _, id := range mr.bodyLiterals {
+		if int(id) < len(table) && table[id] {
+			return true
+		}
+	}
+	return false
+}
+
+// containsLiteral 在短素材（响应头、Cookie 值、脚本地址…）上判断字面量是否存在。
+func containsLiteral(text string, literals []string, ci bool) bool {
+	if ci {
+		text = foldASCII(text)
+	}
+	for _, lit := range literals {
+		if strings.Contains(text, lit) {
+			return true
+		}
+	}
+	return false
+}
+
 // matchRule 取规则里第一条命中的 match 生成技术栈条目。
-func (m *Matcher) matchRule(rule *Rule, mat material) (Technology, bool) {
+//
+// hits / hitsCI 是正文类字面量的命中位图，可为 nil（正文为空时）。
+func (m *Matcher) matchRule(rule *Rule, mat material, hits, hitsCI []bool) (Technology, bool) {
 	if rule == nil {
 		return Technology{}, false
 	}
 	for i := range rule.Match {
 		mr := &rule.Match[i]
-		text, ok := mat.source(mr.Source, mr.Header)
-		if !ok || text == "" {
+		text, ok := mat.source(mr)
+		if !ok {
 			continue
 		}
-		hit, err := mr.re.FindStringMatch(text)
-		if err != nil || hit == nil {
+		// 没有正则的模式是「存在性判据」：素材在就够了（Wappalyzer 里「只要有这个
+		// Cookie / 这个响应头」的写法）。必须在 text=="" 之前判，否则值为空的
+		// Cookie（如 TawkConnectionTime=）会被当成素材缺失而漏掉。
+		if mr.re == nil {
+			return Technology{
+				Name:       rule.Name,
+				Category:   rule.Category,
+				CPE:        rule.CPE,
+				Confidence: mr.confidenceFor(rule),
+				RuleID:     rule.ID,
+			}, true
+		}
+		if text == "" {
 			continue
 		}
-		groups := &groupRef{m: hit}
+		// 廉价预筛：模式里必然出现的字面量都不在素材里，就没必要跑正则。
+		if len(mr.bodyLiterals) > 0 {
+			if !hitLiteral(mr, hits, hitsCI) {
+				continue
+			}
+		} else if len(mr.literals) > 0 && !containsLiteral(text, mr.literals, mr.literalCI) {
+			continue
+		}
+		groups := &groupRef{match: mr.re.FindStringSubmatch(text), names: mr.names}
+		if groups.match == nil {
+			continue
+		}
 		version, _ := expandTemplate(mr.Version, groups)
 		cpe, _ := expandTemplate(mr.CPE, groups)
 		if cpe == "" {
@@ -128,10 +217,25 @@ type material struct {
 	body        string
 	title       string
 	faviconHash string
+	url         string
+	// scriptSrc 是页面引用的脚本地址，多条以换行拼接——拼成一个字符串既省一次分配，
+	// 也让「字面量预筛」只要扫一遍。
+	scriptSrc string
+	// scripts 是页面内联脚本的内容，同样按换行拼接。
+	scripts string
+	// metas 是 <meta> 的 name/property/http-equiv（小写）到 content 的映射。
+	metas map[string]string
+	// cookies 是 Set-Cookie 名到值的映射。
+	cookies map[string]string
 }
 
 func newMaterial(resp Response) material {
-	mat := material{headers: make(map[string]string, len(resp.Headers))}
+	mat := material{
+		headers: make(map[string]string, len(resp.Headers)),
+		metas:   make(map[string]string, 8),
+		cookies: make(map[string]string, 8),
+		url:     resp.RequestURL,
+	}
 
 	keys := make([]string, 0, len(resp.Headers))
 	for k := range resp.Headers {
@@ -158,9 +262,15 @@ func newMaterial(resp Response) material {
 			body = body[:maxBodyBytes]
 		}
 		mat.body = string(body)
-		if m := titleRe.FindSubmatch(body); len(m) > 1 {
-			t := html.UnescapeString(strings.TrimSpace(string(m[1])))
-			mat.title = strings.Join(strings.Fields(t), " ")
+		mat.extractHTML(body)
+	}
+	for _, c := range resp.Cookies {
+		name, value := splitCookie(c)
+		if name == "" {
+			continue
+		}
+		if _, dup := mat.cookies[name]; !dup {
+			mat.cookies[name] = value
 		}
 	}
 	if len(resp.Favicon) > 0 {
@@ -169,14 +279,115 @@ func newMaterial(resp Response) material {
 	return mat
 }
 
-// source 按 source 类型取出待匹配文本，ok 为 false 表示该类素材不存在。
-func (mat material) source(source, header string) (string, bool) {
-	switch source {
+// extractHTML 从正文里抽取标题、脚本地址与元信息。
+func (mat *material) extractHTML(body []byte) {
+	if m := titleRe.FindSubmatch(body); len(m) > 1 {
+		t := html.UnescapeString(strings.TrimSpace(string(m[1])))
+		mat.title = strings.Join(strings.Fields(t), " ")
+	}
+
+	var sb strings.Builder
+	count := 0
+	for _, m := range scriptBlockRe.FindAllSubmatch(body, -1) {
+		attrs := m[1]
+		// 带 src 的是外部脚本，归 scriptSrc 管；这里只收内联脚本。
+		if scriptSrcAttrRe.Match(attrs) {
+			continue
+		}
+		content := strings.TrimSpace(string(m[2]))
+		if content == "" {
+			continue
+		}
+		sb.WriteString(content)
+		sb.WriteByte('\n')
+		if count++; count >= maxInlineScripts {
+			break
+		}
+	}
+	mat.scripts = sb.String()
+
+	mat.scriptSrc = collectScriptSrc(body)
+
+	for _, tag := range metaTagRe.FindAll(body, -1) {
+		name := metaNameRe.FindSubmatch(tag)
+		if len(name) < 2 {
+			continue
+		}
+		content := metaContentRe.FindSubmatch(tag)
+		value := ""
+		if len(content) > 1 {
+			value = html.UnescapeString(string(content[1]))
+		}
+		key := strings.ToLower(strings.TrimSpace(string(name[1])))
+		if key == "" {
+			continue
+		}
+		if _, dup := mat.metas[key]; !dup {
+			mat.metas[key] = value
+		}
+	}
+}
+
+// collectScriptSrc 汇总页面引用的全部脚本地址。
+func collectScriptSrc(body []byte) string {
+	var sb strings.Builder
+	count := 0
+	for _, m := range scriptSrcRe.FindAllSubmatch(body, -1) {
+		sb.Write(m[1])
+		sb.WriteByte('\n')
+		if count++; count >= maxScriptURLs {
+			return sb.String()
+		}
+	}
+	// SPA 打包器（Vite/SvelteKit/Next…）用 modulepreload 加载入口脚本，不留 <script src>，
+	// 漏掉它等于漏掉了整个前端框架的判据来源。
+	for _, tag := range linkTagRe.FindAll(body, -1) {
+		if count >= maxScriptURLs {
+			break
+		}
+		rel := relRe.FindSubmatch(tag)
+		if len(rel) < 2 {
+			continue
+		}
+		r := strings.ToLower(string(rel[1]))
+		if r != "modulepreload" && r != "preload" {
+			continue
+		}
+		href := hrefRe.FindSubmatch(tag)
+		if len(href) < 2 {
+			continue
+		}
+		sb.Write(href[1])
+		sb.WriteByte('\n')
+		count++
+	}
+	return sb.String()
+}
+
+// splitCookie 从一条 Set-Cookie 里取出 Cookie 名与值。
+func splitCookie(raw string) (string, string) {
+	seg := raw
+	if i := strings.IndexByte(seg, ';'); i >= 0 {
+		seg = seg[:i]
+	}
+	seg = strings.TrimSpace(seg)
+	if seg == "" {
+		return "", ""
+	}
+	if i := strings.IndexByte(seg, '='); i >= 0 {
+		return strings.TrimSpace(seg[:i]), strings.TrimSpace(seg[i+1:])
+	}
+	return seg, ""
+}
+
+// source 按 match 的 source 取出待匹配文本，ok 为 false 表示该类素材不存在。
+func (mat material) source(mr *MatchRule) (string, bool) {
+	switch mr.Source {
 	case SourceHeader:
-		if strings.TrimSpace(header) == "" {
+		if strings.TrimSpace(mr.Header) == "" {
 			return mat.headerBlock, mat.headerBlock != ""
 		}
-		v, ok := mat.headers[strings.ToLower(strings.TrimSpace(header))]
+		v, ok := mat.headers[strings.ToLower(strings.TrimSpace(mr.Header))]
 		return v, ok
 	case SourceBody:
 		return mat.body, mat.body != ""
@@ -184,6 +395,20 @@ func (mat material) source(source, header string) (string, bool) {
 		return mat.title, mat.title != ""
 	case SourceFavicon:
 		return mat.faviconHash, mat.faviconHash != ""
+	case SourceScriptSrc:
+		return mat.scriptSrc, mat.scriptSrc != ""
+	case SourceScripts:
+		return mat.scripts, mat.scripts != ""
+	case SourceCSS, SourceHTML, SourceText:
+		return mat.body, mat.body != ""
+	case SourceURL:
+		return mat.url, mat.url != ""
+	case SourceMeta:
+		v, ok := mat.metas[strings.ToLower(strings.TrimSpace(mr.Key))]
+		return v, ok
+	case SourceCookies:
+		v, ok := mat.cookies[strings.TrimSpace(mr.Key)]
+		return v, ok
 	default:
 		return "", false
 	}
@@ -210,22 +435,28 @@ func faviconHash(data []byte) string {
 }
 
 // groupRef 提供按名字或序号读取捕获组的能力。
+//
+// match 是 regexp.FindStringSubmatch 的结果：下标 i 对应第 i 个子匹配（0 为整体匹配），
+// names 是该正则的 SubexpNames，两者下标一一对应。
 type groupRef struct {
-	m *regexp2.Match
+	match []string
+	names []string
 }
 
 func (g *groupRef) byName(name string) string {
-	if g == nil || g.m == nil || name == "" {
+	if g == nil || name == "" {
 		return ""
 	}
-	if gr := g.m.GroupByName(name); gr != nil {
-		return gr.String()
+	for i, n := range g.names {
+		if n == name && i < len(g.match) {
+			return g.match[i]
+		}
 	}
 	return ""
 }
 
 func (g *groupRef) byNumber(num string) string {
-	if g == nil || g.m == nil || num == "" {
+	if g == nil || num == "" {
 		return ""
 	}
 	n := 0
@@ -235,8 +466,8 @@ func (g *groupRef) byNumber(num string) string {
 		}
 		n = n*10 + int(num[i]-'0')
 	}
-	if gr := g.m.GroupByNumber(n); gr != nil {
-		return gr.String()
+	if n < len(g.match) {
+		return g.match[n]
 	}
 	return ""
 }

@@ -17,6 +17,8 @@ urls*
 *.txt
 */reports/*.html
 *.json
+# Web 指纹社区库是构建必需的数据文件（go:embed），必须入库。
+!pkg/webscan/fingerprints/*.json
 
 # Dependency directories (remove the comment below to include it)
 # vendor/

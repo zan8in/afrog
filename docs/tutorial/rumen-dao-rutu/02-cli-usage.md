@@ -102,9 +102,11 @@ afrog -t 192.168.1.0/24 -ps -w=false
 未开 `-ps` 时（如直接 `-t host:port`），Web 探测会先查内置端口先验：先验中登记为非 Web 的端口（如 `3306`、`6379`）直接跳过，不做无效的 HTTP 请求；其余端口仍按目标端口自行试探协议。
 
 ##### Web 指纹识别
-`-w` 会对每个存活 Web 目标做一次指纹识别（响应头 / 正文 / 标题），输出结构化的技术栈，例如 `Nginx 1.25.3, WordPress 6.4.2`。
+`-w` 会对每个存活 Web 目标做一次指纹识别（响应头 / 正文 / 标题 / 脚本地址 / 样式表 / meta / Cookie / 请求 URL），输出结构化的技术栈，例如 `Nginx 1.25.3, WordPress 6.4.2`。
 
-- **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch`）与 `certain`（强特征，如专属响应头、`meta generator`）。
+- **内置两套规则集**：人工精调的 `fingerprints/rules.yaml`（判据强，含 favicon 哈希与 CPE）与从 Wappalyzer 社区库（enthec/webappanalyzer）生成的全量 `fingerprints/wappalyzer.json`（覆盖广，近 6000 项技术、近 8000 条判据）。同名技术会合并判据，社区判据统一记为 `probable`，不会稀释精选规则的强度。
+- **只取服务端可见的判据**：Wappalyzer 浏览器版能读 `window` 上的 JS 变量（`js` 源），HTTP 侧拿不到；这部分判据已被刻意丢弃，不做子串猜测——宁可识别不到，也不误报。
+- **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch` 或社区判据）与 `certain`（强特征，如专属响应头、`meta generator`）。
 - **外置指纹库**：`-w-fingerprint-dir <dir>` 指定目录下放置 `rules.yaml` 即可覆盖/扩展内置规则；**外置规则整体排在内置之前，同 `id` 覆盖内置**，新增的 specific 规则不会被内置通用规则抢先命中。
 - **favicon 匹配按需开启**：抓 `/favicon.ico` 会额外产生一次请求，因此默认不抓；加 `-w-favicon` 即可开启，命中内置的 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）。若外置 `rules.yaml` 里出现 `source: favicon` 规则，也会自动开启抓取，无需再加开关。
 - **探测超时单独可控**：`-w-timeout <秒>` 控制探测阶段单次请求与证书获取的超时，默认 `30`；它与全局 `-timeout` 相互独立，目标响应慢时可只放宽探测阶段而不影响 PoC 扫描。

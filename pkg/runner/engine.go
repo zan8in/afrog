@@ -1011,6 +1011,8 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		status  int
 		headers map[string]string
 		body    []byte
+		// cookies 是原始 Set-Cookie 行，供指纹的 cookies 源按名字精确匹配。
+		cookies []string
 	}
 
 	// fetchResponse 请求一次目标，拿到状态码、响应头、正文、跳转链与证书。
@@ -1046,7 +1048,12 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		meta.Title = extractTitle(body)
 		meta.Redirects = trace.result()
 		meta.TLS = tlsInfoFromState(resp.TLS)
-		return meta, &webProbeFetch{status: resp.StatusCode, headers: headers, body: body}
+		return meta, &webProbeFetch{
+			status:  resp.StatusCode,
+			headers: headers,
+			body:    body,
+			cookies: resp.Header.Values("Set-Cookie"),
+		}
 	}
 
 	// fetchFavicon 额外抓取 /favicon.ico，仅在调用方判定需要时调用（-w-favicon 或外置
@@ -1145,6 +1152,8 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 						StatusCode: fetched.status,
 						Headers:    fetched.headers,
 						Body:       fetched.body,
+						Cookies:    fetched.cookies,
+						RequestURL: u,
 					}
 					// 抓 favicon 会多一次请求，因此默认不抓：只有显式开启 -w-favicon，或外置
 					// 规则集里写了 favicon 规则（用户意图明显）时才抓。

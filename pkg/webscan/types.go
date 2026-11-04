@@ -75,6 +75,14 @@ type Response struct {
 	Body []byte
 	// Favicon 是 /favicon.ico 的内容，为空表示未抓取。
 	Favicon []byte
+	// RequestURL 是本次响应对应的请求 URL，供 url 源匹配（Wappalyzer url 规则）。
+	//
+	// 主动探测与被动抓包都拿得到，缺省为空即表示 url 源不参与匹配。
+	RequestURL string
+	// Cookies 是原始的 Set-Cookie 头（每行一条），供 cookies 源匹配。
+	//
+	// 放不进 Headers：那是 map[string]string，同名的多个 Set-Cookie 会被压成一条。
+	Cookies []string
 }
 
 // Result 是一次 Web 指纹匹配的结果。

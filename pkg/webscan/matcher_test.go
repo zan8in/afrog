@@ -550,3 +550,117 @@ func TestTightenedRulesUseProbable(t *testing.T) {
 		})
 	}
 }
+
+// TestMatchCommunitySources 覆盖随社区库引入的各类素材来源。
+//
+// 这些都是「服务端可见」的判据：不需要执行页面 JS 也能拿到，正是本次扩容的依据。
+func TestMatchCommunitySources(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+
+	t.Run("scriptSrc", func(t *testing.T) {
+		body := `<html><head><script src="/static/mathjax.js"></script></head></html>`
+		if !hasTech(m.Match(Response{Body: []byte(body)}), "MathJax") {
+			t.Fatal("MathJax not detected from script src")
+		}
+	})
+
+	t.Run("modulepreload", func(t *testing.T) {
+		// SPA 打包器用 modulepreload 载入入口脚本，没有 <script src>。
+		body := `<html><head><link rel="modulepreload" href="/assets/moment.min.js"></head></html>`
+		if !hasTech(m.Match(Response{Body: []byte(body)}), "Moment.js") {
+			t.Fatal("Moment.js not detected from modulepreload")
+		}
+	})
+
+	t.Run("css", func(t *testing.T) {
+		if !hasTech(m.Match(Response{Body: []byte(`.a{--tw-rotate:1deg}`)}), "Tailwind CSS") {
+			t.Fatal("Tailwind CSS not detected from css variable")
+		}
+	})
+
+	t.Run("html", func(t *testing.T) {
+		body := `<html><body><button class="ant-btn">x</button></body></html>`
+		if !hasTech(m.Match(Response{Body: []byte(body)}), "Ant Design") {
+			t.Fatal("Ant Design not detected from class name")
+		}
+	})
+
+	t.Run("meta", func(t *testing.T) {
+		body := `<html><head><meta name="application-name" content="Tailwind CSS"></head></html>`
+		if !hasTech(m.Match(Response{Body: []byte(body)}), "Tailwind CSS") {
+			t.Fatal("Tailwind CSS not detected from meta")
+		}
+	})
+
+	t.Run("cookies", func(t *testing.T) {
+		// 上游把「只要存在这个 Cookie」写成空 pattern，这里按名字精确命中。
+		if !hasTech(m.Match(Response{Cookies: []string{"AWSALB=abc123; Path=/"}}), "Amazon ALB") {
+			t.Fatal("Amazon ALB not detected from cookie name")
+		}
+	})
+
+	t.Run("url", func(t *testing.T) {
+		if !hasTech(m.Match(Response{RequestURL: "https://staff.tumblr.com/"}), "Tumblr") {
+			t.Fatal("Tumblr not detected from request url")
+		}
+	})
+}
+
+// TestPrefilterKeepsCaseInsensitiveMatch 守住预筛的大小写语义。
+//
+// 预筛按字节比较，若把 (?i) 规则的字面量当大小写敏感来查，正文写大写时
+// 就会静默漏报——这类错在功能测试里极难暴露，必须单独钉住。
+func TestPrefilterKeepsCaseInsensitiveMatch(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	res := m.Match(Response{Headers: map[string]string{"server": "NGINX/1.25.3"}})
+	var got *Technology
+	for i := range res.Technologies {
+		if res.Technologies[i].Name == "Nginx" {
+			got = &res.Technologies[i]
+		}
+	}
+	if got == nil {
+		t.Fatalf("Nginx not detected from uppercase server header: %+v", res.Technologies)
+	}
+}
+
+// TestPrefilterSkipsWhenLiteralAbsent 确认预筛确实在拦：一条不可能命中的模式
+// 不该把正文交给正则。用「字面量不在正文里」的取材反向验证形态。
+func TestLiteralHints(t *testing.T) {
+	cases := []struct {
+		pattern string
+		want    []string
+		ci      bool
+	}{
+		// 顶层分支各自抽字面量，任一出现即放行。
+		{`(?i)\bhwclouds\.com\b|\bhws_security@`, []string{"hwclouds.com", "hws_security@"}, true},
+		// 元字符在前、长字面量在后。
+		{`<[^>]*class="ant-(?:btn|col)`, []string{`class="ant-`}, false},
+		{`\.monaco-editor`, []string{".monaco-editor"}, false},
+		// 分组的重复次数不影响它后面的字面量：bar 仍然必然出现。
+		{`(?:foo)?bar`, []string{"bar"}, false},
+		// 太短的字面量无从加快匹配，直接放弃。
+		{`\d+`, nil, false},
+	}
+	for _, tc := range cases {
+		got, ci := literalHints(tc.pattern)
+		if strings.Join(got, "|") != strings.Join(tc.want, "|") || ci != tc.ci {
+			t.Errorf("literalHints(%q) = %q ci=%v, want %q ci=%v", tc.pattern, got, ci, tc.want, tc.ci)
+		}
+	}
+}
+
+func hasTech(res Result, name string) bool {
+	for _, tech := range res.Technologies {
+		if tech.Name == name {
+			return true
+		}
+	}
+	return false
+}
