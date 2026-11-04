@@ -83,6 +83,9 @@ type TrafficEvent struct {
 	Findings int `json:"findings"`
 	// Duplicated 是这条流量检出但被判为重复（已在别处上报过）的命中数。
 	Duplicated int `json:"duplicated,omitempty"`
+	// Extractions 是这条流量中提取到的敏感信息条数（本地提取器产出，已过运行内去重）。
+	// 与 Findings 不同：提取物不是漏洞，不进台账，但同样需要让使用者看得见。
+	Extractions int `json:"extractions,omitempty"`
 	// Error 是检测异常信息（仅 VerdictError 时有值）。
 	Error string `json:"error,omitempty"`
 	// Detectors 是本条流量实际执行过检测的检测器名。

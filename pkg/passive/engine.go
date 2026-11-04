@@ -10,12 +10,22 @@ import (
 
 // EngineOptions 是调度层的配置。
 type EngineOptions struct {
-	// Detectors 是参与检测的检测器集合，按注册顺序串行执行。
+	// Detectors 是参与检测的漏洞检测器集合。
+	//
+	// 调度层在启动时按 CostClass 把它们分成两桶：本地类内联在门控池执行，
+	// 网络类按注册顺序串行进入检测池。调用方无需关心这个区分，照常一齐传入即可。
 	Detectors []Detector
+	// Extractors 是零流量敏感信息提取器集合。
+	//
+	// 它们天然属于「本地类」：内联在门控池执行，不受注入点短路，也不进检测池。
+	// 产物经 OnExtraction 回调，与漏洞台账完全隔离。
+	Extractors []Extractor
 	// Prober 是注入给检测器的受控重放器。
 	Prober Prober
 	// OnFinding 在发现通过门控与去重后回调，用于对接台账/事件流。
 	OnFinding func(Finding)
+	// OnExtraction 在提取物通过运行内去重后回调，用于对接提取面板。
+	OnExtraction func(Extraction)
 	// OnError 在检测器内部异常时回调，便于观测。
 	OnError func(detector string, err error)
 	// OnTraffic 在单个事务判定完成后回调，用于界面展示「为什么没检测」。
@@ -112,7 +122,10 @@ type Stats struct {
 	Filtered       uint64 `json:"filtered"`
 	Duplicated     uint64 `json:"duplicated"`
 	Reported       uint64 `json:"reported"`
-	Errors         uint64 `json:"errors"`
+	// Extracted 是本地提取器上报的敏感信息条数（已过运行内去重）。
+	// 它是「提取能力是否在工作」的直接指标，与漏洞命中 reported 完全隔离。
+	Extracted uint64 `json:"extracted"`
+	Errors    uint64 `json:"errors"`
 }
 
 // Engine 是被动检测的调度层：接收代理事务、分发给检测器、执行置信度门控与去重。
@@ -131,6 +144,17 @@ type Engine struct {
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 
+	// networkDetectors / localDetectors 是 opts.Detectors 按代价类别分出的两桶，
+	// 在 NewEngine 时一次性确定（运行期不可变，因此无锁读取）。
+	//
+	// 分桶是这套调度层的核心：本地类（零流量）必须内联执行且永不被短路，
+	// 网络类（会重放）必须走检测池并接受短路与队列治理。两者混在一个循环里，
+	// 就会出现「本地类被网络类的注入点短路吞掉」这类漏报。
+	networkDetectors []Detector
+	localDetectors   []Detector
+	// extractors 是零流量提取器，天然属于本地类。
+	extractors []Extractor
+
 	// activeMu / active 登记「已进入检测流水线但尚未完成」的事务，用于回答
 	// 「检测积压 / 检测在途」背后的具体请求。规模受检测队列与 worker 数约束。
 	activeMu sync.Mutex
@@ -138,6 +162,9 @@ type Engine struct {
 
 	mu   sync.Mutex
 	seen map[string]struct{}
+	// seenExtractions 提取物的运行内去重表，与漏洞命中的 seen 分开：
+	// 两者去重键的构造维度不同（提取物按 规则|值|目标），混用会互相污染。
+	seenExtractions map[string]struct{}
 	// hitPoints 记录本次运行内「已确认命中的注入点身份」，用于让重复流量短路，
 	// 不再重复重放。身份不含参数值，因为同一注入点换值后结论不变；也不含同名参数的
 	// 序号，?id=1&id=2 视为同一注入点族。跨运行不复用——重启即清空，保证复测价值。
@@ -170,17 +197,34 @@ type Engine struct {
 	filtered        uint64
 	duplicated      uint64
 	reported        uint64
-	errs            uint64
+	// extracted 是通过运行内去重后实际上报的提取物条数。
+	extracted uint64
+	errs      uint64
+}
+
+// localResult 是本地阶段（门控池内联执行）的产物统计。
+//
+// 它要随 detectJob 一起传到检测池，让「本地有发现、网络无发现」的事务在
+// 最终上报时仍能体现本地结论，而不是被网络阶段的 verdictOf 抹成 no-finding。
+type localResult struct {
+	// ran 是本阶段实际执行过的检测器名（提取器 + 本地类漏洞检测器）。
+	ran []string
+	// reported / duplicated 是漏洞发现的条数，口径与 detect() 里的同名变量一致。
+	reported   int
+	duplicated int
+	// extractions 是上报的提取物条数。
+	extractions int
 }
 
 // detectJob 是一条已通过门控、等待检测池处理的事务。
 //
-// 把「哪些检测器感兴趣」与「注入点身份」一并带过来，避免检测池重复计算——
-// 门控阶段已经解析过一遍了。
+// 把「哪些检测器感兴趣」「注入点身份」与「本地阶段产物」一并带过来，
+// 避免检测池重复计算——门控阶段已经解析过一遍了。
 type detectJob struct {
 	tx        *CapturedTransaction
 	detectors []Detector
 	points    []string
+	local     localResult
 }
 
 // NewEngine 创建调度层。未设置的 Prober 会退化为保守默认值。
@@ -201,16 +245,31 @@ func NewEngine(opts EngineOptions) *Engine {
 	if prober == nil {
 		prober = NewHTTPProber(DefaultProberOptions())
 	}
-	return &Engine{
-		opts:           opts,
-		prober:         prober,
-		tasks:          make(chan *CapturedTransaction, opts.QueueSize),
-		detectJobs:     make(chan *detectJob, opts.DetectQueueSize),
-		seen:           make(map[string]struct{}),
-		hitPoints:      make(map[string]struct{}),
-		missPoints:     make(map[string]time.Time),
-		inFlightPoints: make(map[string]int),
+
+	e := &Engine{
+		opts:            opts,
+		prober:          prober,
+		extractors:      opts.Extractors,
+		tasks:           make(chan *CapturedTransaction, opts.QueueSize),
+		detectJobs:      make(chan *detectJob, opts.DetectQueueSize),
+		seen:            make(map[string]struct{}),
+		seenExtractions: make(map[string]struct{}),
+		hitPoints:       make(map[string]struct{}),
+		missPoints:      make(map[string]time.Time),
+		inFlightPoints:  make(map[string]int),
 	}
+	// 按代价类别分桶，运行期不再变化。
+	for _, d := range opts.Detectors {
+		if d == nil {
+			continue
+		}
+		if CostClassOf(d) == CostLocal {
+			e.localDetectors = append(e.localDetectors, d)
+			continue
+		}
+		e.networkDetectors = append(e.networkDetectors, d)
+	}
+	return e
 }
 
 // Start 启动两段流水线的 worker。ctx 取消时所有 worker 退出，之后到达的事务会被丢弃。
@@ -240,7 +299,7 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 	atomic.AddUint64(&e.submitted, 1)
 	if e.cancel == nil {
 		atomic.AddUint64(&e.dropped, 1)
-		e.emitTraffic(tx, VerdictDropped, "被动扫描未启动，事务被丢弃", 0, 0, nil, nil)
+		e.emitTraffic(tx, VerdictDropped, "被动扫描未启动，事务被丢弃", 0, 0, nil, nil, 0)
 		return false
 	}
 	select {
@@ -248,11 +307,11 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 		return true
 	case <-e.ctx.Done():
 		atomic.AddUint64(&e.dropped, 1)
-		e.emitTraffic(tx, VerdictDropped, "被动扫描正在停止，事务被丢弃", 0, 0, nil, nil)
+		e.emitTraffic(tx, VerdictDropped, "被动扫描正在停止，事务被丢弃", 0, 0, nil, nil, 0)
 		return false
 	default:
 		atomic.AddUint64(&e.dropped, 1)
-		e.emitTraffic(tx, VerdictDropped, "待检队列已满，为避免反压真实流量已丢弃", 0, 0, nil, nil)
+		e.emitTraffic(tx, VerdictDropped, "待检队列已满，为避免反压真实流量已丢弃", 0, 0, nil, nil, 0)
 		return false
 	}
 }
@@ -285,6 +344,7 @@ func (e *Engine) Stats() Stats {
 		Filtered:         atomic.LoadUint64(&e.filtered),
 		Duplicated:       atomic.LoadUint64(&e.duplicated),
 		Reported:         atomic.LoadUint64(&e.reported),
+		Extracted:        atomic.LoadUint64(&e.extracted),
 		Errors:           atomic.LoadUint64(&e.errs),
 	}
 }
@@ -342,11 +402,15 @@ func (e *Engine) detectWorker() {
 	}
 }
 
-// gate 是流水线的第一段：判定这条事务要不要检测。
+// gate 是流水线的第一段：对每条事务先跑本地类、再判定网络类要不要检测。
 //
-// 它只做三件事——命中短路、逐检测器 Interest、把需要检测的转交出去。全部是纯本地
-// 计算，不产生任何网络请求，因此这段永远快。把昂贵的检测隔离在另一段之后，
-// 是「一条慢检测不再堵死整个入口」的关键。
+// 分两阶段执行，且顺序不可颠倒：
+//  1. **本地阶段（零流量）**：提取器与本地类漏洞检测器内联执行。它们不重放、极快，
+//     必须跑在**任何短路之前**——否则一条「注入点早已有结论」的事务会把本地结论
+//     一并吞掉，那是漏报，不是省流量。
+//  2. **网络阶段**：注入点短路、逐网络检测器 Interest、把需要重放的转交检测池。
+//
+// 两段都是纯本地计算，不产生网络请求，因此入口永远快；昂贵的重放被隔离在检测池。
 func (e *Engine) gate(tx *CapturedTransaction) {
 	// 计数与在途标记都放在最前：Handled 不设任何门控，才能代表「队列里的事务已取完」，
 	// 这是 Drained 用来判断排空的依据。
@@ -354,6 +418,20 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 	atomic.AddUint64(&e.inFlight, 1)
 	defer atomic.AddUint64(&e.inFlight, ^uint64(0)) // 原子减 1（-1 的补码）
 
+	// 阶段 1：本地类，永远执行、永不被短路。产物已在此刻回调出去。
+	local := e.runLocal(tx)
+
+	// 静态资源只跑本地类：它没有可注入参数，进注入检测只会白耗检测池。
+	// 这里显式标注，让使用者知道「这条 JS 被扫了敏感信息，但不会被注入检测」。
+	if tx != nil && tx.Static {
+		e.emitTraffic(tx, VerdictSkippedStatic,
+			"静态资源：跳过注入检测，已执行本地敏感信息提取与安全配置检查",
+			local.reported, local.duplicated, nil, local.ran, local.extractions)
+		return
+	}
+
+	// 阶段 2：网络类。以下所有短路都只作用于网络类，本地阶段已经跑完、不受影响。
+	//
 	// 注入点记忆短路：本次运行内该请求的注入点结论已经明确，再跑一遍只会重复消耗
 	// 重放流量（含最贵的 WAF 绕过分支），结论不可能变。分两种情况给不同结论：
 	// 已确认命中的标 duplicate，已判定干净的标 known-clean——两者省下的流量一样，
@@ -369,25 +447,28 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 		case allHit:
 			atomic.AddUint64(&e.duplicated, 1)
 			atomic.AddUint64(&e.skippedKnown, 1)
-			e.emitTraffic(tx, VerdictDuplicate, "该请求的注入点在本次运行内均已确认命中，跳过重复重放", 0, 1, nil, nil)
+			e.emitTraffic(tx, VerdictDuplicate, "该请求的注入点在本次运行内均已确认命中，跳过重复重放",
+				local.reported, local.duplicated, nil, local.ran, local.extractions)
 			return
 		case allSettled:
 			atomic.AddUint64(&e.skippedKnown, 1)
-			e.emitTraffic(tx, VerdictKnownClean, "该请求的注入点在有效期内已判定无注入，跳过重复重放", 0, 0, nil, nil)
+			e.emitTraffic(tx, VerdictKnownClean, "该请求的注入点在有效期内已判定无注入，跳过重复重放",
+				local.reported, local.duplicated, nil, local.ran, local.extractions)
 			return
 		case e.allPointsInFlight(points):
 			// 结论还没落定，但同注入点已有事务在检测队列中/检测中。此刻再投递只会
 			// 让同一条 URL 被并行重放一遍（全量档一条要数十秒）。跳过并显式标注，
 			// 它既不是「已确认命中」也不是「已判定干净」，必须自成一类。
 			atomic.AddUint64(&e.skippedInFlight, 1)
-			e.emitTraffic(tx, VerdictInFlightDup, "该请求的注入点已有事务正在检测中，跳过并发重复投递", 0, 0, nil, nil)
+			e.emitTraffic(tx, VerdictInFlightDup, "该请求的注入点已有事务正在检测中，跳过并发重复投递",
+				local.reported, local.duplicated, nil, local.ran, local.extractions)
 			return
 		}
 	}
 
-	interested := make([]Detector, 0, len(e.opts.Detectors))
-	reasons := make([]string, 0, len(e.opts.Detectors))
-	for _, d := range e.opts.Detectors {
+	interested := make([]Detector, 0, len(e.networkDetectors))
+	reasons := make([]string, 0, len(e.networkDetectors))
+	for _, d := range e.networkDetectors {
 		if d == nil {
 			continue
 		}
@@ -398,14 +479,15 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 		interested = append(interested, d)
 	}
 	if len(interested) == 0 {
-		e.emitTraffic(tx, VerdictNoInterest, joinReasons(reasons), 0, 0, nil, nil)
+		e.emitTraffic(tx, VerdictNoInterest, joinReasons(reasons),
+			local.reported, local.duplicated, nil, local.ran, local.extractions)
 		return
 	}
 
 	// 转交检测池。非阻塞投递同样是有意为之：门控池绝不能为了等检测池腾出空位而被
 	// 卡住——那等于把慢检测重新传染回入口。放不下就丢弃并明确标注，让「检测能力饱和」
 	// 这件事显式可见，而不是变成一次无声的漏报。
-	job := &detectJob{tx: tx, detectors: interested, points: points}
+	job := &detectJob{tx: tx, detectors: interested, points: points, local: local}
 	// 先登记再投递：检测池可能在投递后立刻跑完并注销，顺序反了会留下僵尸记录。
 	// 在途指纹同样要在投递前占用，否则并发到达的相同请求会在计数生效前一起挤进来。
 	e.registerActive(job)
@@ -419,8 +501,73 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 		e.unregisterActive(tx.ID)
 		atomic.AddUint64(&e.droppedDetect, 1)
 		e.emitTraffic(tx, VerdictDroppedDetect,
-			"检测队列已满：该请求已确认需要检测，但检测能力饱和，未能检测（存在漏报风险）", 0, 0, nil, nil)
+			"检测队列已满：该请求已确认需要检测，但检测能力饱和，未能检测（存在漏报风险）",
+			local.reported, local.duplicated, nil, local.ran, local.extractions)
 	}
+}
+
+// runLocal 执行本地阶段：零流量提取器 + 本地类漏洞检测器。
+//
+// 全部同步执行、即时回调。它不参与注入点短路、不进检测池，因此「本地有结论」这件事
+// 永远不会因为网络类的省流量优化而被牺牲——这是本地/网络分类最本质的意义。
+func (e *Engine) runLocal(tx *CapturedTransaction) localResult {
+	var res localResult
+	if tx == nil {
+		return res
+	}
+
+	// 提取器：产物走独立通道，不参与漏洞台账的置信度门控。
+	for _, x := range e.extractors {
+		if x == nil || !x.Interest(tx) {
+			continue
+		}
+		res.ran = append(res.ran, x.Name())
+		for _, ex := range e.safeExtract(x, tx) {
+			atomic.AddUint64(&e.detected, 1)
+			if !e.markSeenExtraction(ex) {
+				continue
+			}
+			atomic.AddUint64(&e.extracted, 1)
+			res.extractions++
+			if e.opts.OnExtraction != nil {
+				e.opts.OnExtraction(ex)
+			}
+		}
+	}
+
+	// 本地类漏洞检测器：与网络类共用「置信度门控 + 运行内去重」，但执行位置在内联。
+	for _, d := range e.localDetectors {
+		if d == nil || !d.Interest(tx) {
+			continue
+		}
+		res.ran = append(res.ran, d.Name())
+		findings, err := e.safeDetect(d, tx)
+		if err != nil {
+			atomic.AddUint64(&e.errs, 1)
+			if e.opts.OnError != nil {
+				e.opts.OnError(d.Name(), err)
+			}
+			continue
+		}
+		for _, f := range findings {
+			atomic.AddUint64(&e.detected, 1)
+			if f.Confidence < ConfidenceCertain {
+				atomic.AddUint64(&e.filtered, 1)
+				continue
+			}
+			if !e.markSeen(f) {
+				atomic.AddUint64(&e.duplicated, 1)
+				res.duplicated++
+				continue
+			}
+			atomic.AddUint64(&e.reported, 1)
+			res.reported++
+			if e.opts.OnFinding != nil {
+				e.opts.OnFinding(f)
+			}
+		}
+	}
+	return res
 }
 
 // detect 是流水线的第二段：对已确认需要检测的事务执行检测器。
@@ -483,7 +630,14 @@ func (e *Engine) detect(job *detectJob) {
 		}
 	}
 
-	e.emitTraffic(tx, verdictOf(ran, reported, duplicated, firstErr), "", reported, duplicated, firstErr, ran)
+	// 与本地阶段合并后再上报：本地类检测器（提取器 / 会话安全）已在门控池跑完，
+	// 若不并入，一条「本地有发现、网络无发现」的事务会被 verdictOf 抹成 no-finding，
+	// 界面上就再也看不到那次本地命中。
+	totalReported := job.local.reported + reported
+	totalDuplicated := job.local.duplicated + duplicated
+	runners := append(append([]string{}, job.local.ran...), ran...)
+	e.emitTraffic(tx, verdictOf(runners, totalReported, totalDuplicated, firstErr), "",
+		totalReported, totalDuplicated, firstErr, runners, job.local.extractions)
 	atomic.AddUint64(&e.inspected, 1)
 
 	// 只有「真正上报了命中」才把注入点记为已确认：被低置信度拦下的不算命中，
@@ -675,18 +829,19 @@ func interestReason(d Detector, tx *CapturedTransaction) string {
 	return d.Name() + "：不满足检测条件"
 }
 
-func (e *Engine) emitTraffic(tx *CapturedTransaction, verdict TrafficVerdict, reason string, findings, duplicated int, err error, ran []string) {
+func (e *Engine) emitTraffic(tx *CapturedTransaction, verdict TrafficVerdict, reason string, findings, duplicated int, err error, ran []string, extractions int) {
 	if e.opts.OnTraffic == nil || tx == nil {
 		return
 	}
 	ev := TrafficEvent{
-		ID:         tx.ID,
-		Time:       tx.StartAt,
-		Verdict:    verdict,
-		Reason:     reason,
-		Findings:   findings,
-		Duplicated: duplicated,
-		Detectors:  ran,
+		ID:          tx.ID,
+		Time:        tx.StartAt,
+		Verdict:     verdict,
+		Reason:      reason,
+		Findings:    findings,
+		Duplicated:  duplicated,
+		Detectors:   ran,
+		Extractions: extractions,
 	}
 	if tx.Request != nil {
 		ev.Method = tx.Request.Method
@@ -734,5 +889,39 @@ func (e *Engine) markSeen(f Finding) bool {
 		e.seen = make(map[string]struct{}, maxSeenEntries/4)
 	}
 	e.seen[key] = struct{}{}
+	return true
+}
+
+// safeExtract 隔离单个提取器的 panic，理由同 safeDetect：
+// 提取器跑在门控池内联，一次 panic 会直接拖垮入口 worker。
+func (e *Engine) safeExtract(x Extractor, tx *CapturedTransaction) (out []Extraction) {
+	defer func() {
+		if r := recover(); r != nil {
+			atomic.AddUint64(&e.errs, 1)
+			if e.opts.OnError != nil {
+				e.opts.OnError(x.Name(), fmt.Errorf("extractor %s panic: %v", x.Name(), r))
+			}
+		}
+	}()
+	return x.Extract(tx)
+}
+
+// markSeenExtraction 标记一条提取物，返回「本次运行内是否首次见到」。
+//
+// 去重键是 规则 + 值 + 目标：同一个密钥在多个 JS 里反复出现只上报一次，
+// 但换一个值、或换一个目标站点，都算新发现。与漏洞命中的 seen 分开维护，
+// 两者的键维度不同，混用会互相污染。
+func (e *Engine) markSeenExtraction(x Extraction) bool {
+	key := x.Rule + "|" + x.Value + "|" + x.Target
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if _, ok := e.seenExtractions[key]; ok {
+		return false
+	}
+	if len(e.seenExtractions) >= maxSeenEntries {
+		e.seenExtractions = make(map[string]struct{}, maxSeenEntries/4)
+	}
+	e.seenExtractions[key] = struct{}{}
 	return true
 }

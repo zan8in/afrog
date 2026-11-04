@@ -18,6 +18,11 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/passive"
+	"github.com/zan8in/afrog/v3/pkg/passive/detectors/exposure"
+	"github.com/zan8in/afrog/v3/pkg/passive/detectors/extract"
+	"github.com/zan8in/afrog/v3/pkg/passive/detectors/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/passive/detectors/misconfig"
+	"github.com/zan8in/afrog/v3/pkg/passive/detectors/recon"
 	"github.com/zan8in/afrog/v3/pkg/passive/detectors/sqli"
 	"github.com/zan8in/afrog/v3/pkg/passive/proxy"
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -45,6 +50,8 @@ type passiveRuntime struct {
 	listenOverride string
 
 	reported int64
+	// extracted 是本次运行内落库的敏感信息提取物条数。
+	extracted int64
 }
 
 // 调度层的并发参数不再硬编码：门控池/检测池的 worker 数与队列容量都由 passive
@@ -55,7 +62,7 @@ var passiveRT = &passiveRuntime{
 	cfg: config.Passive{
 		Host:            config.DefaultPassiveHost,
 		Port:            config.DefaultPassivePort,
-		Detectors:       []string{config.DefaultPassiveDetector},
+		Detectors:       append([]string(nil), config.DefaultPassiveDetectors...),
 		MaxRPS:          config.DefaultPassiveMaxRPS,
 		HostConcurrency: config.DefaultPassiveHostConcurrency,
 		Workers:         config.DefaultPassiveWorkers,
@@ -100,20 +107,76 @@ func AutoStartPassive() {
 //
 // 未识别的名字被忽略而不是报错：配置文件可能被新版本写入、又被旧版本读取，
 // 让旧版本因为一个不认识的检测器名而整体启动失败，体验很差。
+//
+// extract / fingerprint / recon 都是**提取器**不是 Detector，由 buildExtractors 单独
+// 装配，这里跳过它们。
 func buildDetectors(names []string) []passive.Detector {
 	out := make([]passive.Detector, 0, len(names))
 	for _, name := range names {
 		switch name {
 		case sqli.DetectorName:
 			out = append(out, sqli.New(sqli.DefaultOptions()))
+		case misconfig.DetectorName:
+			out = append(out, misconfig.New(misconfig.DefaultOptions()))
+		case exposure.DetectorName:
+			out = append(out, exposure.New(exposure.DefaultOptions()))
+		case extract.DetectorName, fingerprint.DetectorName, recon.DetectorName:
+			// 提取器不是 Detector，见 buildExtractors。
 		default:
 			gologger.Debug().Msgf("忽略未识别的被动检测器: %s", name)
 		}
 	}
-	if len(out) == 0 {
+	// 兜底补 sqli 的前提是「配置里根本没有检测器」，而不是「配置里只有提取器」——
+	// 后者是使用者有意只做提取，静默替他打开注入检测是越权。
+	if len(out) == 0 && !containsExtractorName(names) {
 		out = append(out, sqli.New(sqli.DefaultOptions()))
 	}
 	return out
+}
+
+// buildExtractors 按配置装配提取器（敏感信息 / 技术栈 / 信息收集）。
+//
+// 三个提取器共享同一张提取面板与同一张表，按配置逐个装配：配置里出现哪个名字就装哪个，
+// 名字不认识就忽略——与 buildDetectors 同款容忍策略。
+func buildExtractors(names []string) []passive.Extractor {
+	out := make([]passive.Extractor, 0, 3)
+	for _, name := range names {
+		switch name {
+		case extract.DetectorName:
+			out = append(out, extract.New(extract.DefaultOptions()))
+		case fingerprint.DetectorName:
+			out = append(out, fingerprint.New())
+		case recon.DetectorName:
+			out = append(out, recon.New(recon.DefaultOptions()))
+		}
+	}
+	return out
+}
+
+// containsExtractorName 判断配置里是否显式启用了至少一个提取器。
+func containsExtractorName(names []string) bool {
+	for _, name := range names {
+		switch name {
+		case extract.DetectorName, fingerprint.DetectorName, recon.DetectorName:
+			return true
+		}
+	}
+	return false
+}
+
+// availableDetectorNames 返回全部可启用的检测器名，供前端渲染可选项。
+//
+// 集中一处返回，避免「状态接口」「配置接口」两处硬编码不一致——那正是新增检测器时
+// 最容易漏改的地方。
+func availableDetectorNames() []string {
+	return []string{
+		sqli.DetectorName,
+		misconfig.DetectorName,
+		exposure.DetectorName,
+		extract.DetectorName,
+		fingerprint.DetectorName,
+		recon.DetectorName,
+	}
 }
 
 func (rt *passiveRuntime) listenAddr(cfg config.Passive) string {
@@ -160,10 +223,13 @@ func (rt *passiveRuntime) start() error {
 	projectID := cfg.ProjectID
 
 	engine := passive.NewEngine(passive.EngineOptions{
-		Detectors: buildDetectors(cfg.EnabledDetectors()),
-		Prober:    passive.NewHTTPProber(proberOpts),
-		OnFinding: func(f passive.Finding) { rt.onFinding(projectID, f) },
-		OnTraffic: passiveTraffic.add,
+		Detectors:  buildDetectors(cfg.EnabledDetectors()),
+		Extractors: buildExtractors(cfg.EnabledDetectors()),
+		Prober:     passive.NewHTTPProber(proberOpts),
+		OnFinding:  func(f passive.Finding) { rt.onFinding(projectID, f) },
+		// 提取物走独立通道落库：它不进漏洞台账，与命中在表、去重口径、面板上都分离。
+		OnExtraction: func(x passive.Extraction) { rt.onExtraction(projectID, x) },
+		OnTraffic:    passiveTraffic.add,
 		OnError: func(detector string, err error) {
 			passiveTraffic.recordError("detector:"+detector, err)
 			gologger.Debug().Msgf("被动检测异常: detector=%s err=%v", detector, err)
@@ -286,6 +352,49 @@ func passiveFingerprint(f passive.Finding) string {
 	return f.Detector + "|" + f.VulnType + "|" + f.Target + "|" + f.Location
 }
 
+// onExtraction 是敏感信息提取物的落库入口。
+//
+// 与 onFinding 的分工：提取物不是漏洞判定，不做置信度门控，落的是独立表。
+// 聚合口径与调度层的一致（规则 + 值 + 目标）：同一个密钥在多个 JS 里重复出现
+// 只算一条观察，累加 hit_count、刷新 last_seen。
+func (rt *passiveRuntime) onExtraction(projectID string, x passive.Extraction) {
+	extra := "{}"
+	if len(x.Extra) > 0 {
+		if b, err := json.Marshal(x.Extra); err == nil {
+			extra = string(b)
+		}
+	}
+
+	if _, _, err := sqlite.UpsertPassiveExtraction(sqlite.PassiveExtraction{
+		ProjectID:   projectID,
+		Fingerprint: passiveExtractionFingerprint(x),
+		Detector:    x.Detector,
+		Rule:        x.Rule,
+		Category:    x.Category,
+		Title:       x.Title,
+		Severity:    x.Severity,
+		Confidence:  x.Confidence.String(),
+		Value:       x.Value,
+		Target:      x.Target,
+		Location:    x.Location,
+		LatencyMs:   x.LatencyMs,
+		Evidence:    x.Evidence,
+		Request:     string(x.Request),
+		Response:    string(x.Response),
+		Extra:       extra,
+	}); err != nil {
+		passiveTraffic.recordError("storage", errors.New("敏感信息提取落库失败: "+err.Error()))
+		gologger.Debug().Msgf("敏感信息提取落库失败: %v", err)
+		return
+	}
+	atomic.AddInt64(&rt.extracted, 1)
+}
+
+// passiveExtractionFingerprint 与调度层的去重键保持一致（规则 + 值 + 目标）。
+func passiveExtractionFingerprint(x passive.Extraction) string {
+	return x.Rule + "|" + x.Value + "|" + x.Target
+}
+
 // -----------------------
 // HTTP 接口
 // -----------------------
@@ -308,8 +417,12 @@ type passiveStatus struct {
 	Traffic     passiveTrafficCounts `json:"traffic"`
 	Reported    int64                `json:"reported"`
 	TotalStored int64                `json:"total_stored"`
-	ProxyHint   string               `json:"proxy_hint"`
-	Config      passiveConfigView    `json:"config"`
+	// Extracted 是本次运行内落库的提取物条数（运行期实时累加）。
+	Extracted int64 `json:"extracted"`
+	// TotalExtractions 是当前项目（或全局）累计的提取物条数，供导航与面板徽标使用。
+	TotalExtractions int64             `json:"total_extractions"`
+	ProxyHint        string            `json:"proxy_hint"`
+	Config           passiveConfigView `json:"config"`
 	// AvailableDetectors 供设置面板渲染可选项，避免前端硬编码。
 	AvailableDetectors []string `json:"available_detectors"`
 }
@@ -400,9 +513,10 @@ func passiveStatusHandler(w http.ResponseWriter, r *http.Request) {
 		Detectors:          cfg.EnabledDetectors(),
 		ProjectID:          cfg.ProjectID,
 		Reported:           atomic.LoadInt64(&passiveRT.reported),
+		Extracted:          atomic.LoadInt64(&passiveRT.extracted),
 		ProxyHint:          passiveProxyHint(cfg),
 		Config:             passiveConfigViewFrom(cfg, cfgPath),
-		AvailableDetectors: []string{sqli.DetectorName},
+		AvailableDetectors: availableDetectorNames(),
 	}
 	if running {
 		st.StartedAt = startedAt.Format(time.RFC3339)
@@ -422,6 +536,14 @@ func passiveStatusHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if n, err := sqlite.CountPassiveFindings(); err == nil {
 		st.TotalStored = n
+	}
+	// 提取物与命中同口径：绑定项目时只看本项目，未绑定退回全局。
+	if projectID := strings.TrimSpace(cfg.ProjectID); projectID != "" {
+		if n, err := sqlite.CountPassiveExtractionsByProject(projectID); err == nil {
+			st.TotalExtractions = n
+		}
+	} else if n, err := sqlite.CountPassiveExtractions(); err == nil {
+		st.TotalExtractions = n
 	}
 
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: st})
@@ -475,7 +597,7 @@ func passiveConfigGetHandler(w http.ResponseWriter, r *http.Request) {
 
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]any{
 		"config":              passiveConfigViewFrom(cfg, path),
-		"available_detectors": []string{sqli.DetectorName},
+		"available_detectors": availableDetectorNames(),
 	}})
 }
 
@@ -555,7 +677,10 @@ func normalizePassivePayload(req passiveConfigPayload) (config.Passive, error) {
 		}
 	}
 
-	valid := map[string]bool{sqli.DetectorName: true}
+	valid := make(map[string]bool, 4)
+	for _, name := range availableDetectorNames() {
+		valid[name] = true
+	}
 	detectors := make([]string, 0, len(req.Detectors))
 	for _, d := range req.Detectors {
 		name := strings.ToLower(strings.TrimSpace(d))
@@ -564,7 +689,7 @@ func normalizePassivePayload(req passiveConfigPayload) (config.Passive, error) {
 		}
 	}
 	if len(detectors) == 0 {
-		detectors = []string{config.DefaultPassiveDetector}
+		detectors = append([]string(nil), config.DefaultPassiveDetectors...)
 	}
 
 	maxRPS := req.MaxRPS
@@ -705,6 +830,86 @@ func passiveFindingsHandler(w http.ResponseWriter, r *http.Request) {
 		"page":      flt.Page,
 		"page_size": flt.PageSize,
 	}})
+}
+
+// passiveExtractionDetailView 是提取详情接口的对外形态：把库里的 extra JSON 解析成对象，
+// 前端可直接渲染（如响应头名）。
+type passiveExtractionDetailView struct {
+	*sqlite.PassiveExtractionDetail
+	Extra map[string]any `json:"extra_parsed,omitempty"`
+}
+
+func newPassiveExtractionDetailView(d *sqlite.PassiveExtractionDetail) passiveExtractionDetailView {
+	view := passiveExtractionDetailView{PassiveExtractionDetail: d}
+	if d != nil && strings.TrimSpace(d.Extra) != "" {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(d.Extra), &m); err == nil {
+			view.Extra = m
+		}
+	}
+	return view
+}
+
+// passiveExtractionsHandler 分页返回敏感信息提取列表。
+func passiveExtractionsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	q := r.URL.Query()
+	page := atoiParam(q.Get("page"), 1)
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := atoiParam(q.Get("page_size"), 50)
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	flt := sqlite.PassiveExtractionFilter{
+		Detector: strings.TrimSpace(q.Get("detector")),
+		Rule:     strings.TrimSpace(q.Get("rule")),
+		Category: strings.TrimSpace(q.Get("category")),
+		Severity: strings.TrimSpace(q.Get("severity")),
+		Keyword:  strings.TrimSpace(q.Get("keyword")),
+		Page:     page,
+		PageSize: pageSize,
+	}
+	if v := strings.TrimSpace(q.Get("project_id")); v != "" {
+		flt.ProjectID = v
+	}
+
+	items, total, err := sqlite.SelectPassiveExtractions(flt)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "敏感信息查询失败"})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: map[string]any{
+		"items":     items,
+		"total":     total,
+		"page":      flt.Page,
+		"page_size": flt.PageSize,
+	}})
+}
+
+// passiveExtractionDetailHandler 返回单条提取物（含来源请求/响应原文）。
+func passiveExtractionDetailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	id, err := strconv.ParseInt(mux.Vars(r)["id"], 10, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "无效的 id"})
+		return
+	}
+
+	detail, err := sqlite.GetPassiveExtraction(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "敏感信息不存在"})
+		return
+	}
+
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: newPassiveExtractionDetailView(detail)})
 }
 
 // passiveFindingDetailView 是详情接口的对外形态：把库里的证据链 JSON 解析成数组，

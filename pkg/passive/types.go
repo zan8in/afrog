@@ -22,6 +22,13 @@ type CapturedTransaction struct {
 	Upstream *url.URL
 	// ClientIP 是发起请求的客户端地址，便于多用户场景下区分来源。
 	ClientIP string
+	// Static 标记这是一条**文本类静态资源**请求（.js / .json / .css / .map …）。
+	//
+	// 代理层对静态资源不再一律丢弃：二进制静态（图片/字体/媒体）没有可提取的信息，
+	// 仍在代理层放过；文本类静态（尤其 JS）恰恰是敏感信息的高发地，必须放行。
+	// 放行之后，调度层据本标记**只跑本地类检测器**（提取器 + 本地漏洞检测器），
+	// 不进入注入检测——静态资源没有可注入参数，网络类检测器对它毫无意义。
+	Static bool
 	// StartAt 是请求开始时间。
 	StartAt time.Time
 }
@@ -89,6 +96,7 @@ func (t *CapturedTransaction) Clone() *CapturedTransaction {
 		Response: t.Response.Clone(),
 		Upstream: cloneURL(t.Upstream),
 		ClientIP: t.ClientIP,
+		Static:   t.Static,
 		StartAt:  t.StartAt,
 	}
 }

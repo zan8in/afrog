@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,8 +35,8 @@ func TestNormalizePassiveDefaults(t *testing.T) {
 	if cfg.Passive.QueueSize != DefaultPassiveQueueSize {
 		t.Errorf("queue_size = %d, want %d", cfg.Passive.QueueSize, DefaultPassiveQueueSize)
 	}
-	if got := cfg.Passive.EnabledDetectors(); len(got) != 1 || got[0] != DefaultPassiveDetector {
-		t.Errorf("detectors = %v, want [%s]", got, DefaultPassiveDetector)
+	if got := cfg.Passive.EnabledDetectors(); !slices.Equal(got, DefaultPassiveDetectors) {
+		t.Errorf("detectors = %v, want %v", got, DefaultPassiveDetectors)
 	}
 }
 

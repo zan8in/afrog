@@ -135,6 +135,15 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error migrating passive finding indexes: %v", err)
 	}
 
+	// 敏感信息提取独立成表：它不做漏洞台账的置信度门控，聚合口径也与命中不同，
+	// 混进 passive_finding 只会让两条完全不同的数据流互相污染。
+	if _, err = execBusyRetry(passiveExtractionDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating passive extraction table: %v", err)
+	}
+	if _, err = execBusyRetry(passiveExtractionIndexDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("error creating passive extraction indexes: %v", err)
+	}
+
 	if _, err = execBusyRetry(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}

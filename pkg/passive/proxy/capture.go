@@ -103,6 +103,10 @@ func (c *capture) ModifyRequest(req *http.Request) error {
 		},
 		ClientIP: clientIP(req),
 		StartAt:  time.Now(),
+		// 文本类静态资源（.js/.map/.json…）打标记放行：调度层只对它们跑本地类
+		// 提取器，跳过 sqli 等网络类检测器。二进制静态资源在上面的 skipReason
+		// 里已被丢弃，不会走到这里。
+		Static: isTextStatic(urlCopy.Path),
 	}
 	ctx.Set(txCtxKey, tx)
 	return nil
@@ -189,11 +193,34 @@ func readAndRestoreBody(rc *io.ReadCloser, max int64) ([]byte, error) {
 	return b, nil
 }
 
-// staticExts 是不参与被动检测的静态资源后缀。
-// 这些请求没有可注入参数，放行到调度层只会白白占用队列。
-var staticExts = []string{
-	".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".bmp", ".webp",
-	".woff", ".woff2", ".ttf", ".eot", ".otf", ".map", ".mp4", ".mp3", ".zip", ".gz",
+// staticBinaryExts 是被直接丢弃的静态资源后缀。
+// 这些是二进制内容（图片 / 字体 / 音视频 / 压缩包），既没有可注入参数，
+// 也不会内嵌可读的敏感信息，放行到调度层只会白白占用队列。
+var staticBinaryExts = []string{
+	".png", ".jpg", ".jpeg", ".gif", ".ico", ".bmp", ".webp",
+	".woff", ".woff2", ".ttf", ".eot", ".otf", ".mp4", ".mp3",
+	".zip", ".gz", ".rar", ".7z", ".pdf", ".swf", ".wasm",
+}
+
+// staticTextExts 是文本类静态资源后缀。
+//
+// 它们同样没有可注入参数（因此不参与 sqli 等网络类检测），但可能内嵌敏感信息
+// （.js 里的密钥、.map 里的源码路径、.json 里的凭据），所以不再直接丢弃：
+// 这些请求会被打上 Static 标记放行到调度层，由调度层**只跑本地类提取器**，
+// 跳过一切网络类检测器。既保住了敏感信息提取能力，又不让它们空耗检测并发。
+var staticTextExts = []string{
+	".js", ".mjs", ".json", ".css", ".map", ".xml", ".svg", ".txt",
+}
+
+// isTextStatic 判断路径是否为文本类静态资源。
+func isTextStatic(path string) bool {
+	p := strings.ToLower(path)
+	for _, ext := range staticTextExts {
+		if strings.HasSuffix(p, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // skipReason 判断请求是否应该直接被放过，并给出可读原因。
@@ -231,9 +258,9 @@ func skipReason(req *http.Request, scope passive.Scope, allowUnsafeMethods bool)
 		}
 	}
 	path := strings.ToLower(req.URL.Path)
-	for _, ext := range staticExts {
+	for _, ext := range staticBinaryExts {
 		if strings.HasSuffix(path, ext) {
-			return passive.VerdictSkippedStatic, "静态资源 " + ext + "，不参与注入检测", true
+			return passive.VerdictSkippedStatic, "二进制静态资源 " + ext + "，不参与检测", true
 		}
 	}
 	return "", "", false

@@ -136,9 +136,36 @@ func TestProxyMITMCapturesHTTPS(t *testing.T) {
 	}
 }
 
-func TestProxySkipsStaticAssets(t *testing.T) {
+func TestProxySkipsBinaryStaticAssets(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "body{}")
+	}))
+	defer target.Close()
+
+	got := make(chan *passive.CapturedTransaction, 4)
+	srv := newTestServer(t, t.TempDir(), got)
+
+	proxyURL, _ := url.Parse("http://" + srv.Addr())
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
+
+	resp, err := client.Get(target.URL + "/static/logo.png")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+
+	select {
+	case tx := <-got:
+		t.Fatalf("binary static asset must be skipped, got %+v", tx.Request.URL)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
+
+// TestProxyMarksTextStatic 锁定：文本类静态资源（.js/.map…）不再被丢弃，
+// 而是打上 Static 标记放行——它们正是敏感信息提取的重点目标。
+func TestProxyMarksTextStatic(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "var a = 1;")
 	}))
 	defer target.Close()
 
@@ -156,8 +183,11 @@ func TestProxySkipsStaticAssets(t *testing.T) {
 
 	select {
 	case tx := <-got:
-		t.Fatalf("static asset must be skipped, got %+v", tx.Request.URL)
-	case <-time.After(300 * time.Millisecond):
+		if !tx.Static {
+			t.Fatalf("text static asset must carry Static=true: %+v", tx.Request.URL)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("text static asset must still be captured")
 	}
 }
 
@@ -191,7 +221,7 @@ func TestProxyReportsSkippedStatic(t *testing.T) {
 	proxyURL, _ := url.Parse("http://" + srv.Addr())
 	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
 
-	resp, err := client.Get(target.URL + "/static/app.js")
+	resp, err := client.Get(target.URL + "/static/logo.png")
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}

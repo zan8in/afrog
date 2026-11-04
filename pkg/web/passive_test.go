@@ -47,6 +47,9 @@ func TestPassiveRoutesRequireAuth(t *testing.T) {
 		// 观测接口同样属于高敏感能力：流量里可能带明文凭据。
 		{http.MethodGet, "/api/passive/traffic"},
 		{http.MethodGet, "/api/passive/diagnostics"},
+		// 敏感信息提取物（HAE 等价能力）同样可能含明文密钥，必须登录后可见。
+		{http.MethodGet, "/api/passive/extractions"},
+		{http.MethodGet, "/api/passive/extractions/1"},
 	}
 
 	for _, tc := range cases {

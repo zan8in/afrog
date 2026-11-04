@@ -54,6 +54,12 @@ const (
 	DefaultPassiveDetector = "sqli"
 )
 
+// DefaultPassiveDetectors 是默认启用的检测器集合。
+//
+// 除 SQLi 外还默认启用敏感信息提取（extract）：它是**零流量的本地类**提取器，
+// 不额外发包、不受注入点短路影响，因此默认开启只增发现能力、不增网络负担。
+var DefaultPassiveDetectors = []string{"sqli", "extract"}
+
 // Passive 是内嵌被动扫描（MITM 代理 + 检测器管道）的配置。
 //
 // 只暴露真正需要使用者决策的项：监听位置、上游代理、检测器开关与流量上限。
@@ -130,7 +136,7 @@ func (p Passive) EnabledDetectors() []string {
 		}
 	}
 	if len(out) == 0 {
-		return []string{DefaultPassiveDetector}
+		return append([]string(nil), DefaultPassiveDetectors...)
 	}
 	return out
 }
@@ -388,7 +394,7 @@ func NewConfig(configFile string) (*Config, error) {
 			Host:            DefaultPassiveHost,
 			Port:            DefaultPassivePort,
 			Upstream:        "",
-			Detectors:       []string{DefaultPassiveDetector},
+			Detectors:       append([]string(nil), DefaultPassiveDetectors...),
 			MaxRPS:          DefaultPassiveMaxRPS,
 			HostConcurrency: DefaultPassiveHostConcurrency,
 			Workers:         DefaultPassiveWorkers,
@@ -469,7 +475,7 @@ func defaultConfig() *Config {
 		Host:            DefaultPassiveHost,
 		Port:            DefaultPassivePort,
 		Upstream:        "",
-		Detectors:       []string{DefaultPassiveDetector},
+		Detectors:       append([]string(nil), DefaultPassiveDetectors...),
 		MaxRPS:          DefaultPassiveMaxRPS,
 		HostConcurrency: DefaultPassiveHostConcurrency,
 		Workers:         DefaultPassiveWorkers,
@@ -656,7 +662,7 @@ func normalizePassiveDefaults(cfg *Config) {
 		cfg.Passive.QueueSize = DefaultPassiveQueueSize
 	}
 	if len(cfg.Passive.Detectors) == 0 {
-		cfg.Passive.Detectors = []string{DefaultPassiveDetector}
+		cfg.Passive.Detectors = append([]string(nil), DefaultPassiveDetectors...)
 	}
 	cfg.Passive.ProjectID = strings.TrimSpace(cfg.Passive.ProjectID)
 	cfg.Passive.ScopeHostAllow = normalizeScopeList(cfg.Passive.ScopeHostAllow)
