@@ -85,6 +85,17 @@ func (p *linkProbe) takeBaseline(ctx context.Context) {
 	p.mu.Unlock()
 }
 
+// baselineRTT 返回扫描前测得的网关空载 RTT；没有基线时返回 0。它用于给
+// AutoRate 选档位（内网 / 城域 / 公网），与拥塞控制器的判定共用同一份基线。
+func (p *linkProbe) baselineRTT() time.Duration {
+	if p == nil {
+		return 0
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.baseline
+}
+
 // sample 记录一次负载期间的网关 RTT。拿不到样本（探针超时）时累加连续失败窗口数，
 // 拿到样本就清零。没有配置网关时探针是惰性的：既不采样也不计失败，避免缺失的信号
 // 被当成「链路故障」。

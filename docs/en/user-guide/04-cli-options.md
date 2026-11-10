@@ -392,7 +392,7 @@ These presets are mutually exclusive with `-rlt` and `-auto-req-limit` (at most 
 
 They are most useful in batch scans where you want to protect individual targets from being overwhelmed.
 
-The preset also sets the connection rate cap of the port pre-scan (see `-pcps`): `200/20` for `-polite`, `1000/100` for `-balanced` (the default), and no cap for `-aggressive`.
+The preset also sets the connection rate cap of the port pre-scan (see `-pcps`): `200/20` for `-polite`, `2000/800` for `-balanced`, and no cap for `-aggressive`. When no preset and no explicit `-pcps` / `-pcps-host` is given, the port pre-scan derives the rate automatically from the link class and the target port count (LAN full-port scans take about 2 minutes, internet targets about 5 minutes).
 
 ### `-mhe`
 
@@ -459,13 +459,13 @@ The effective value is additionally bounded by the local open-file limit: afrog 
 
 ### `-pcps`
 
-Global connection rate cap for the port pre-scan, in new connections per second. It follows the throttling preset by default: `1000` for `-balanced` (the default), `200` for `-polite`, and no cap for `-aggressive`. `-pcps 0` disables the cap explicitly; a positive value sets it explicitly.
+Global connection rate cap for the port pre-scan, in new connections per second. When omitted, it is derived automatically: private targets (or a gateway RTT ≤ 3 ms) use a LAN budget, 3–20 ms a metro budget, and public targets with a higher/unknown RTT a WAN budget. The rate is `port count / time budget`, so a full 65535-port scan takes about 2 minutes on a LAN and about 5 minutes over the internet. Explicit values win: `200` for `-polite`, `2000` for `-balanced`, no cap for `-aggressive`; `-pcps 0` disables the cap explicitly.
 
-Concurrency (`-prate`) and rate (`-pcps`) are two orthogonal dimensions: concurrency bounds how many connections are in flight, while the rate bounds how many new connections are opened per second. Concurrency alone is not enough — a few hundred concurrent probes at low RTT mean hundreds of thousands of connection attempts per second on a LAN, which exhausts the NAT/conntrack session table of the local exit device (a home or office router). Filtered ports never reply, so their entries linger for the 30–120s timeout; once the table is full, every new connection from anyone on that network fails. The default cap exists to prevent exactly that.
+Concurrency (`-prate`) and rate (`-pcps`) are two orthogonal dimensions: concurrency bounds how many connections are in flight, while the rate bounds how many new connections are opened per second. Concurrency alone is not enough — a few hundred concurrent probes at low RTT mean hundreds of thousands of connection attempts per second on a LAN, which exhausts the NAT/conntrack session table of the local exit device (a home or office router). Filtered ports never reply, so their entries linger for the 30–120s timeout; once the table is full, every new connection from anyone on that network fails. The rate cap exists to prevent exactly that, and the gateway RTT probe eases it off automatically when the link saturates.
 
 ### `-pcps-host`
 
-Connection rate cap for the port pre-scan against a single host, in new connections per second. It follows the preset by default: `50` for `-balanced`, `20` for `-polite`, and no cap for `-aggressive`. Its semantics match `-pcps`.
+Connection rate cap for the port pre-scan against a single host, in new connections per second. It follows the same automatic profile as `-pcps` when omitted. Explicit values: `20` for `-polite`, `800` for `-balanced`, and no cap for `-aggressive`. Its semantics match `-pcps`. The per-host concurrency is derived from this rate (so a fixed `-ps-host-concurrency` is only needed when you want to pin it).
 
 ### `-ps-link-probe`
 

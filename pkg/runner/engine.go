@@ -2023,6 +2023,11 @@ func (runner *Runner) Execute() {
 			// 速率管「每秒新开多少条连接」。0 表示不限速（-pcps 0 / -aggressive）。
 			psOpts.ConnectRateLimit = options.PSCPS
 			psOpts.ConnectRateLimitPerHost = options.PSCPSHost
+			// AutoRate：用户没有显式指定速率时，由 portscan 按链路档位与端口数推导，
+			// 内网全端口扫描约 2~3 分钟、公网约 5 分钟，而不是固定二十多分钟。
+			psOpts.AutoRate = options.PSAutoRate
+			// 单目标并发默认跟着速率反推；用户显式指定 -ps-host-concurrency 时以其为准。
+			psOpts.AutoHostConcurrency = options.PSHostConcurrency <= 0
 			psOpts.LinkProbe = options.PSLinkProbe
 			if options.PSTimeout > 0 {
 				psOpts.Timeout = time.Duration(options.PSTimeout) * time.Millisecond

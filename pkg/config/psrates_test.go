@@ -6,19 +6,22 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 )
 
-// -1 是 flag 的默认哨兵，表示「按档位自动」；>= 0 是用户显式给定（0 = 不限速）。
+// -1 是 flag 的默认哨兵，表示「自动」；>= 0 是用户显式给定（0 = 不限速）。
+// 未指定速率且未选固定档位时，运行时走 AutoRate（按链路与端口数推导）。
 func TestResolvePortScanRates(t *testing.T) {
 	cases := []struct {
-		name  string
-		opt   Options
-		wantG int
-		wantH int
+		name     string
+		opt      Options
+		wantG    int
+		wantH    int
+		wantAuto bool
 	}{
 		{
-			name:  "未指定档位时用保护性默认",
-			opt:   Options{PSCPS: -1, PSCPSHost: -1},
-			wantG: portscan.DefaultGlobalCPS,
-			wantH: portscan.DefaultPerHostCPS,
+			name:     "未指定档位时走自动速率",
+			opt:      Options{PSCPS: -1, PSCPSHost: -1},
+			wantG:    portscan.DefaultGlobalCPS,
+			wantH:    portscan.DefaultPerHostCPS,
+			wantAuto: true,
 		},
 		{
 			name:  "polite 档",
@@ -68,6 +71,23 @@ func TestResolvePortScanRates(t *testing.T) {
 			if opt.PSCPSHost != tc.wantH {
 				t.Errorf("PSCPSHost = %d, want %d", opt.PSCPSHost, tc.wantH)
 			}
+			if opt.PSAutoRate != tc.wantAuto {
+				t.Errorf("PSAutoRate = %v, want %v", opt.PSAutoRate, tc.wantAuto)
+			}
 		})
+	}
+}
+
+// ResolvePortScanRates 可能被重复调用（CLI 校验 + SDK 预构造）；第二次不能把
+// 已经落定的 AutoRate 翻成 false。
+func TestResolvePortScanRatesIdempotentAutoRate(t *testing.T) {
+	opt := Options{PSCPS: -1, PSCPSHost: -1}
+	opt.ResolvePortScanRates()
+	if !opt.PSAutoRate {
+		t.Fatal("first resolve should enable auto rate")
+	}
+	opt.ResolvePortScanRates()
+	if !opt.PSAutoRate {
+		t.Fatal("second resolve must keep auto rate enabled")
 	}
 }

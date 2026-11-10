@@ -270,8 +270,11 @@ type Options struct {
 	PSRateLimit int
 	// PSCPS / PSCPSHost 是端口扫描的每秒新建连接上限（全局 / 单目标），0 = 不限速。
 	// 负值表示「按 -polite/-balanced/-aggressive 档位自动」，见 ResolvePortScanRates。
-	PSCPS               int
-	PSCPSHost           int
+	PSCPS     int
+	PSCPSHost int
+	// PSAutoRate 表示用户未显式指定端口扫描速率，运行时按链路档位自动推导。
+	// 它在 ResolvePortScanRates 里根据原始 -1 哨兵与档位标志一次性确定。
+	PSAutoRate          bool
 	PSLinkProbe         bool
 	PSTimeout           int
 	PSRetries           int
@@ -415,8 +418,8 @@ func NewOptions() (*Options, error) {
 		flagSet.StringVarP(&options.PSPorts, "ports", "p", "top", "ports definition for port pre-scan, e.g. '80,443,1000-2000' or 'top' or 'full' (only the specified ports are scanned)"),
 		flagSet.BoolVarP(&options.PSSkipDiscovery, "ps-skip-discovery", "Pn", false, "skip host discovery before port pre-scan"),
 		flagSet.IntVarP(&options.PSRateLimit, "ps-rate", "prate", 0, "max concurrent probes across all hosts in port pre-scan (global worker pool size, not a per-second rate)"),
-		flagSet.IntVar(&options.PSCPS, "pcps", -1, "max new connections per second in port pre-scan, across all hosts (0 = unlimited, -1 = follow -polite/-balanced/-aggressive; default limits the rate to protect the NAT/conntrack table of the local network)"),
-		flagSet.IntVar(&options.PSCPSHost, "pcps-host", -1, "max new connections per second in port pre-scan against a single host (0 = unlimited, -1 = follow -polite/-balanced/-aggressive)"),
+		flagSet.IntVar(&options.PSCPS, "pcps", -1, "max new connections per second in port pre-scan, across all hosts (0 = unlimited, -1 = auto: derive the rate from a LAN/WAN time budget and the target port count; default is auto, so a full-port scan finishes in minutes instead of tens of minutes)"),
+		flagSet.IntVar(&options.PSCPSHost, "pcps-host", -1, "max new connections per second in port pre-scan against a single host (0 = unlimited, -1 = auto, following the same profile as -pcps)"),
 		flagSet.BoolVar(&options.PSLinkProbe, "ps-link-probe", true, "measure the default gateway RTT during port pre-scan and ease off the connection rate when the local link saturates; disable with -ps-link-probe=false"),
 		flagSet.IntVarP(&options.PSTimeout, "ps-timeout-ms", "ptimeout", 0, "port pre-scan timeout in milliseconds"),
 		flagSet.IntVarP(&options.PSRetries, "ps-retries", "ptries", -1, "retries per timeout port in port pre-scan (-1 = module default, 1 retry; 0 = no retry, fastest but a single dropped SYN is never rechecked)"),
@@ -510,13 +513,21 @@ func NewOptions() (*Options, error) {
 
 // ResolvePortScanRates 把端口扫描的限速档位落成具体数值。
 //
-// 为什么端口扫描默认要限速：并发上限约束的是「同时有多少条连接在飞」，约束不了
+// 为什么端口扫描要限速：并发上限约束的是「同时有多少条连接在飞」，约束不了
 // 「每秒新开多少条连接」。500 并发在 1ms RTT 的内网里理论上限是 50 万连接/秒，而
 // 出口设备的 NAT/conntrack 会话表通常只有几千条；被过滤的端口不回包，表项要挂到
-// 30~120s 超时才释放，表满之后同网段所有人的新建连接都会失败。默认档（全局 1000、
-// 单目标 50）把压力压到常见家用/办公路由能承受的量级，需要打满时用 -aggressive
-// 或 -pcps 0 显式放开。
+// 30~120s 超时才释放，表满之后同网段所有人的新建连接都会失败。
+//
+// 但固定速率无法同时适配内网和公网：旧默认「全局 1000、单目标 50」在全端口扫描下
+// 会稳定跑出二十多分钟。因此未显式指定速率时置 PSAutoRate，由 portscan 按目标是否
+// 私网、网关空载 RTT 与端口数推导时间预算；需要固定节奏时用 -polite/-balanced/
+// -aggressive，或用 -pcps/-pcps-host 显式指定（0 = 不限速）。
 func (opt *Options) ResolvePortScanRates() {
+	// 必须在把 -1 哨兵改写成具体数值之前判定：只要用户没有显式给出速率
+	// （-pcps / -pcps-host）也没有选固定档位，运行时就走 AutoRate。
+	if opt.PSCPS < 0 && opt.PSCPSHost < 0 {
+		opt.PSAutoRate = !opt.Polite && !opt.Balanced && !opt.Aggressive
+	}
 	if opt.PSCPS >= 0 && opt.PSCPSHost >= 0 {
 		return
 	}

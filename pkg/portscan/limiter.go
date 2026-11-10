@@ -11,23 +11,46 @@ import (
 // NAT/conntrack 会话表会被打满，同网段其他人的新建连接跟着失败。CPS 才是控制
 // 「每秒往会话表里塞多少条表项」的那把闸。
 //
-// 这里用的是最朴素的 GCRA（令牌间隔固定、突发量为 1）：每次取号把 next 往后推
-// 1/rate，取号人睡到自己的号。突发量为 1 意味着探测均匀铺开，正是限速想要的形状；
-// 池容量本来就能提供突发。rate <= 0 表示不限速。
+// 实现是带小突发的令牌桶。高 CPS 下（内网全端口扫描会到 500~4000/s）如果每个
+// 探测都 new 一个 timer 再睡几十微秒，定时器分配与调度开销本身就会成为瓶颈；
+// 允许一次消耗少量攒下的令牌，可以把「逐个睡」摊平成「攒够一小批再睡一次」，
+// 平均速率仍然严格受 rate 约束。突发量按 rate/100 取，最多 64 个探测。
 type rateLimiter struct {
-	mu   sync.Mutex
-	rate int // tokens per second, <= 0 = unlimited
-	next time.Time
+	mu     sync.Mutex
+	rate   int // tokens per second, <= 0 = unlimited
+	tokens float64
+	burst  float64
+	last   time.Time
 }
 
 func newRateLimiter(rate int) *rateLimiter {
-	return &rateLimiter{rate: rate}
+	l := &rateLimiter{rate: rate, last: time.Now()}
+	l.burst = float64(l.rate / 100)
+	if l.burst < 1 {
+		l.burst = 1
+	}
+	if l.burst > 64 {
+		l.burst = 64
+	}
+	l.tokens = l.burst
+	return l
 }
 
 // setRate 供拥塞控制器在运行时调整速率；调低立即生效（已预约的时刻不回退）。
 func (l *rateLimiter) setRate(rate int) {
 	l.mu.Lock()
 	l.rate = rate
+	burst := float64(rate / 100)
+	if burst < 1 {
+		burst = 1
+	}
+	if burst > 64 {
+		burst = 64
+	}
+	l.burst = burst
+	if l.tokens > l.burst {
+		l.tokens = l.burst
+	}
 	l.mu.Unlock()
 }
 
@@ -40,36 +63,46 @@ func (l *rateLimiter) ratePerSec() int {
 // wait 阻塞到可以再发起一个探测；ctx 结束则返回其错误。调用方是单线程的提交循环，
 // 所以这里的阻塞睡眠本身就是限速手段，不会拖慢别的提交流。
 func (l *rateLimiter) wait(ctx context.Context) error {
-	l.mu.Lock()
-	rate := l.rate
-	if rate <= 0 {
-		l.mu.Unlock()
-		return ctx.Err()
-	}
-	interval := time.Second / time.Duration(rate)
-	if interval <= 0 {
-		interval = time.Nanosecond
-	}
-	now := time.Now()
-	// next 落后于当前时刻说明闲置了一段时间，重置为 now，不给后续探测累积突发额度。
-	if l.next.Before(now) {
-		l.next = now
-	}
-	target := l.next
-	l.next = l.next.Add(interval)
-	l.mu.Unlock()
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
-	d := time.Until(target)
-	if d <= 0 {
-		return ctx.Err()
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-t.C:
-		return nil
+		l.mu.Lock()
+		rate := l.rate
+		if rate <= 0 {
+			l.mu.Unlock()
+			return ctx.Err()
+		}
+		now := time.Now()
+		if l.last.IsZero() {
+			l.last = now
+		}
+		if now.After(l.last) {
+			l.tokens += now.Sub(l.last).Seconds() * float64(rate)
+			if l.tokens > l.burst {
+				l.tokens = l.burst
+			}
+			l.last = now
+		}
+		if l.tokens >= 1 {
+			l.tokens--
+			l.mu.Unlock()
+			return nil
+		}
+		deficit := (1 - l.tokens) / float64(rate)
+		l.mu.Unlock()
+
+		if deficit <= 0 {
+			continue
+		}
+		timer := time.NewTimer(time.Duration(deficit * float64(time.Second)))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 }
 

@@ -150,17 +150,20 @@ func (s *Scanner) Scan(ctx context.Context) error {
 	// 2) 链路探针：扫描前先量一次网关空载 RTT 作基线，扫描期间周期复测。
 	// 3) 拥塞控制器：丢包或网关 RTT 抬升时乘性降速，链路恢复后加性升回。
 	// 上限为 0（-pcps 0 / -aggressive）表示用户显式要求不限速，不装配任何一环。
+	//
+	// 基线必须在任何扫描流量之前测量：主机发现阶段（ICMP/TCP ping）本身也会给出口
+	// 链路加负载，等发现跑完再测，测到的就不是空载 RTT 了。限速器与拥塞控制器则要
+	// 等目标与在飞池容量确定后再装配，见下方的自动档位推导。
 	var link *linkProbe
-	if s.options.LinkProbe && s.options.ConnectRateLimit > 0 {
+	var baseline time.Duration
+	// 显式不限速（-pcps 0 / -aggressive）时既不需要选档位，也不需要拥塞控制，
+	// 省掉最多 1.8s 的基线测量。
+	if s.options.LinkProbe && (s.options.AutoRate || s.options.ConnectRateLimit > 0) {
 		if link = newLinkProbe(); link != nil {
 			link.takeBaseline(ctx)
+			baseline = link.baselineRTT()
 		}
 	}
-	s.limiter = newRateLimiter(s.options.ConnectRateLimit)
-	s.hostLimit = newHostLimiter(s.options.ConnectRateLimitPerHost)
-	s.congestion = newCongestionController(ctx, s.limiter, link, s.options.ConnectRateLimit, s.reportCongestion)
-	s.congestion.start()
-	defer s.congestion.close()
 
 	// Parse hosts (placeholder for now, assuming options.Targets are just IPs)
 	hostIter := NewHostIterator(s.options.Targets)
@@ -272,6 +275,39 @@ func (s *Scanner) Scan(ctx context.Context) error {
 			))
 		}
 	}
+
+	// 自动档位：固定速率无法同时适配内网与公网。按「目标是否私网 / 网关空载 RTT」
+	// 选时间预算，再用端口数反推 CPS，并把单目标并发抬到能覆盖一次超时预算的量级。
+	// 历史实现固定 50/s + 50 并发，全端口扫描必然落在 20 分钟以上：关闭端口被 RST
+	// 时受 50/s 限制，被静默丢弃时受 50 并发 / 1s 超时限制，两条路都通向二十分钟。
+	if s.options.AutoRate {
+		p := deriveSpeedProfile(targetsArePrivate(hosts), baseline, portTotal, rateLimit, s.options.Timeout)
+		s.options.ConnectRateLimit = p.globalCPS
+		s.options.ConnectRateLimitPerHost = p.perHostCPS
+		s.options.MaxHostConcurrency = p.concurrency
+		if portTotal >= 100 {
+			facts := []string{
+				fmt.Sprintf("class=%s", p.class),
+				fmt.Sprintf("rate=%d/s", p.globalCPS),
+				fmt.Sprintf("concurrency=%d", p.concurrency),
+				fmt.Sprintf("target=%s", p.target),
+			}
+			if baseline > 0 {
+				facts = append(facts, fmt.Sprintf("gw-rtt=%s", baseline.Truncate(time.Millisecond)))
+			}
+			s.emitStage(log.LevelInfo, utils.StagePortScan, append([]string{"auto"}, facts...)...)
+		}
+	} else if s.options.AutoHostConcurrency {
+		// 用户显式给了速率：单目标并发仍要跟着速率走，否则固定 50 并发会把
+		// 「800/s」压成「50/s」，配置形同虚设。
+		s.options.MaxHostConcurrency = deriveHostConcurrency(s.options.ConnectRateLimitPerHost, rateLimit, s.options.Timeout)
+	}
+
+	s.limiter = newRateLimiter(s.options.ConnectRateLimit)
+	s.hostLimit = newHostLimiter(s.options.ConnectRateLimitPerHost)
+	s.congestion = newCongestionController(ctx, s.limiter, link, s.options.ConnectRateLimit, s.reportCongestion)
+	s.congestion.start()
+	defer s.congestion.close()
 
 	if stageLog && !s.options.Quiet {
 		if !s.options.LiveStats {
@@ -434,7 +470,9 @@ func (s *Scanner) Scan(ctx context.Context) error {
 				}
 			}
 
-			wg.Wait()
+			// 不在阶段/分块边界 wg.Wait：池满时 pool.Invoke 本来就阻塞，提交顺序
+			// 仍保证高优先级端口先进入池；而每块结尾等所有在飞探测（含 1s 超时、
+			// 重试退避）排空，会在 65 个 S4 分块上累积出几分钟的纯空等。
 			if scanCtx.Err() != nil {
 				break StageLoop
 			}

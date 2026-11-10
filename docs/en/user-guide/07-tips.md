@@ -102,16 +102,16 @@ In containers, pass `--ulimit nofile=65535:65535`. Windows has no fd limit to se
 
 The previous section is about local resources; this one is about the network afrog runs on. The real risk of port scanning is not bandwidth (one TCP probe round trip is under 200 bytes, so 1000/s is 1–2 Mbps), it is the NAT/conntrack session table of the exit device: closed ports answer with RST immediately and their entries are released quickly, while **filtered ports never reply, so their entries linger for the 30–120s timeout**. Once that table fills up, every new connection from anyone on the same network fails.
 
-The crux is that **concurrency does not bound the rate**. `-prate 500` against the internet (a few hundred ms RTT) works out to roughly 1000 connections per second, but against a LAN (1 ms RTT) the theoretical ceiling is 500,000 per second — two orders of magnitude apart. So afrog caps the connection rate of the port pre-scan by default:
+The crux is that **concurrency does not bound the rate**. `-prate 500` against the internet (a few hundred ms RTT) works out to roughly 1000 connections per second, but against a LAN (1 ms RTT) the theoretical ceiling is 500,000 per second — two orders of magnitude apart. So the port pre-scan derives its rate cap automatically from the link class, and keeps converging on it while the scan runs:
 
 ```bash
-afrog -t 10.0.0.0/24 -ps              # default: 1000/s global, 50/s per host
+afrog -t 10.0.0.0/24 -ps              # default: automatic (about 500/s on a LAN, 220/s over the internet)
 afrog -t 10.0.0.0/24 -ps -polite      # more conservative: 200/s global, 20/s per host
 afrog -t 10.0.0.0/24 -ps -pcps 200    # tune the global rate only
 afrog -t 10.0.0.0/24 -ps -aggressive  # no cap (same as -pcps 0)
 ```
 
-At the default rate, a full 65535-port scan of one host finishes in about 65 seconds, which is plenty for everyday use; lift the cap explicitly only when you really need to saturate.
+The automatic profile picks a time budget from the link class (private target or gateway RTT ≤ 3 ms → LAN, 3–20 ms → metro, higher/unknown → WAN), then derives the rate from the port count: a full 65535-port scan takes about 2 minutes on a LAN and about 5 minutes over the internet; a top-port scan is bounded only by the floor and usually finishes in seconds. The terminal prints `[INF] port-scan auto class=... rate=.../s` so you can see what was chosen. Pin a fixed pace with a preset or `-pcps` when you need to.
 
 During the scan afrog also measures the RTT to the default gateway (`-ps-link-probe`, on by default). The gateway is one hop away, so its RTT can only rise because the local uplink or the gateway itself is saturated — a clean local signal. When it climbs well above the idle baseline taken before the scan, or when the gateway stays silent for several consecutive sampling windows, afrog eases the rate off multiplicatively and warns; it ramps back up once the link recovers. Only the gateway signal counts: probes silently dropped by a firewall (e.g. a public target with a constant 100% loss rate) are not treated as congestion and never trigger a slowdown.
 

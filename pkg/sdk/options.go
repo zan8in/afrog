@@ -213,8 +213,8 @@ type PortScanOptions struct {
 	// the port pre-scan opens per second, globally and per single host.
 	// Concurrency (RateLimit) and rate are orthogonal: a few hundred concurrent
 	// probes are enough to exhaust the NAT/conntrack table of the local network
-	// when RTT is low. Zero keeps the built-in protective default; a negative
-	// value disables the cap.
+	// when RTT is low. Zero follows the automatic profile (derived from the
+	// link class and the target port count), a negative value disables the cap.
 	ConnectRateLimit        int
 	ConnectRateLimitPerHost int
 	// DisableLinkProbe turns off the periodic default-gateway RTT probe used to

@@ -8,13 +8,17 @@ import (
 // 限制「同时有多少条连接在飞」，CPS 限制「每秒新开多少条连接」。只限并发是不够的：
 // 500 并发在 1ms RTT 的内网里理论上限是 50 万连接/秒，会把出口设备的 NAT/conntrack
 // 会话表打满（被过滤的端口不回包，表项要挂到 30~120s 超时才释放），同一网络里其他
-// 人的新建连接就会失败。所以默认给一个保守的 CPS 天花板，需要打满时用 -aggressive。
+// 人的新建连接就会失败。
+//
+// 未显式指定速率时默认走 AutoRate（见 profile.go）：按目标是否私网、网关空载 RTT
+// 与端口数反推时间预算，内网全端口约 2~3 分钟、公网约 5 分钟量级。下列档位是用户
+// 显式选择 -polite/-balanced/-aggressive 时的固定值，不再参与自动推导。
 const (
 	PresetPoliteGlobalCPS    = 200
 	PresetPolitePerHostCPS   = 20
-	PresetBalancedGlobalCPS  = 1000
-	PresetBalancedPerHostCPS = 50
-	// DefaultGlobalCPS / DefaultPerHostCPS 是未指定档位时的默认，与 balanced 一致。
+	PresetBalancedGlobalCPS  = 2000
+	PresetBalancedPerHostCPS = 800
+	// DefaultGlobalCPS / DefaultPerHostCPS 是未显式指定档位、且关闭 AutoRate 时的兜底。
 	DefaultGlobalCPS  = PresetBalancedGlobalCPS
 	DefaultPerHostCPS = PresetBalancedPerHostCPS
 )
@@ -24,19 +28,28 @@ type Options struct {
 	Targets                 []string // List of IPs, CIDRs, or ranges
 	Ports                   string   // Port range string (e.g., "80,443,1000-2000" or "top")
 	S4ChunkSize             int
-	RateLimit               int  // 全局在飞探测上限（worker 池大小），不是每秒请求数；见 ConnectRateLimit
-	ConnectRateLimit        int  // 全局连接建立速率上限（每秒新发起的探测数，0 = 不限）
-	ConnectRateLimitPerHost int  // 单目标连接建立速率上限（每秒，0 = 不限）
-	LinkProbe               bool // 周期性测量到默认网关的 RTT，作为链路拥塞信号
-	MaxHostConcurrency      int  // Max concurrent probes per target (0 = unlimited)
-	Timeout                 time.Duration
-	Retries                 int
-	AdaptiveTimeout         bool // Scale the connect timeout with measured RTT
-	ScanMode                ScanMode
-	ServiceProbes           bool   // Send active service probes (default: passive banner grabbing only)
-	FingerprintDir          string // Optional directory with probes.yaml / services.yaml / ports.yaml that overrides the built-in set
-	OnResult                func(*ScanResult)
-	OnProgress              func(phase string, status string, finished int, total int, percent int)
+	RateLimit               int // 全局在飞探测上限（worker 池大小），不是每秒请求数；见 ConnectRateLimit
+	ConnectRateLimit        int // 全局连接建立速率上限（每秒新发起的探测数，0 = 不限）
+	ConnectRateLimitPerHost int // 单目标连接建立速率上限（每秒，0 = 不限）
+	// AutoRate 表示 ConnectRateLimit / ConnectRateLimitPerHost / MaxHostConcurrency
+	// 由 Scan 按链路档位自动推导，忽略调用方传入的速率值。用户显式指定
+	// -pcps/-pcps-host 或 -polite/-balanced/-aggressive 时置 false。
+	// 直接使用 DefaultOptions 并自行设置 ConnectRateLimit 的调用方，需要同时把
+	// AutoRate 置 false，否则固定值会被自动档位覆盖。
+	AutoRate bool
+	// AutoHostConcurrency 表示 MaxHostConcurrency 按单目标速率反推。用户显式
+	// 指定 -ps-host-concurrency 时置 false，保留其固定值。
+	AutoHostConcurrency bool
+	LinkProbe           bool // 周期性测量到默认网关的 RTT，作为链路拥塞信号
+	MaxHostConcurrency  int  // Max concurrent probes per target (0 = unlimited)
+	Timeout             time.Duration
+	Retries             int
+	AdaptiveTimeout     bool // Scale the connect timeout with measured RTT
+	ScanMode            ScanMode
+	ServiceProbes       bool   // Send active service probes (default: passive banner grabbing only)
+	FingerprintDir      string // Optional directory with probes.yaml / services.yaml / ports.yaml that overrides the built-in set
+	OnResult            func(*ScanResult)
+	OnProgress          func(phase string, status string, finished int, total int, percent int)
 	// OnDiscoveredHost 上报一个存活主机。proto 是判定依据（icmp / ping / tcp），
 	// 与终端 `序号 [alive] host [icmp]` 行的方括号属性同源。
 	OnDiscoveredHost func(host, proto string)
@@ -85,9 +98,13 @@ func DefaultOptions() *Options {
 		RateLimit:               500,
 		ConnectRateLimit:        DefaultGlobalCPS,
 		ConnectRateLimitPerHost: DefaultPerHostCPS,
-		LinkProbe:               true,
-		MaxHostConcurrency:      50,
-		Timeout:                 1000 * time.Millisecond,
+		// AutoRate / AutoHostConcurrency 默认开启：固定速率无法同时适配内网与公网，
+		// 历史上「单目标 50/s + 并发 50」会把任意全端口扫描拖到 20 分钟以上。
+		AutoRate:            true,
+		AutoHostConcurrency: true,
+		LinkProbe:           true,
+		MaxHostConcurrency:  50,
+		Timeout:             1000 * time.Millisecond,
 		// Retries 默认 1：只对「超时」重试，收到 RST（端口确实关闭）会立即返回，
 		// 因此绝大多数目标的成本不变。单次探测的漏报代价太高——首次 SYN 常因
 		// 瞬时丢包、ARP 冷启动、目标/中间设备的端口扫描防护被静默丢弃，没有第二次
