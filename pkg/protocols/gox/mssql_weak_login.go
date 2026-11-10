@@ -26,7 +26,7 @@ func mssql_weak_login(target string, variableMap map[string]any) error {
 	}
 
 	usernames := []string{"sa", "admin", "administrator", "web", "test", "mssql"}
-	passwords := []string{"123456", "password", "12345678", "sa", "admin", "mssql", "test", "12345", "Aa123456"}
+	passwords := []string{"123456", "password", "12345678", "sa", "admin", "mssql", "test", "12345", "Aa123456", "P@ssw0rd"}
 
 	maxTries := 200
 	if v := variableMap["max_tries"]; v != nil {
