@@ -21,7 +21,7 @@ func newExportFixture(t *testing.T) *sqlx.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	for _, ddl := range []string{db2.SqliteCreate, ledgerDDL, assetDDL, assetEdgeDDL, scanTaskDDL, aiDDL, probeDDL, passiveFindingDDL, passiveFindingIndexDDL, passiveExtractionDDL, passiveExtractionIndexDDL, passiveCoverageDDL} {
+	for _, ddl := range []string{db2.SqliteCreate, ledgerDDL, assetDDL, assetEdgeDDL, scanTaskDDL, aiDDL, probeDDL, passiveFindingDDL, passiveFindingIndexDDL, passiveExtractionDDL, passiveExtractionIndexDDL, passiveCoverageDDL, evidenceDDL, observationDDL, pocDraftDDL, pocReviewDDL, judgementDDL, learnSuggestionDDL} {
 		if _, err := db.Exec(ddl); err != nil {
 			t.Fatalf("create schema: %v", err)
 		}

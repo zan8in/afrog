@@ -64,6 +64,13 @@ func StartServer(addr string) error {
 		gologger.Info().Msgf("资产图补建完成: %d 条资产", n)
 	}
 
+	// 历史被动命中补建「端点 → 参数」边：同样幂等，重复启动不会产生新行。
+	if n, err := sqlite.BackfillEndpointGraph(2000); err != nil {
+		gologger.Debug().Msgf("端点图补建失败: %v", err)
+	} else if n > 0 {
+		gologger.Info().Msgf("端点图补建完成: %d 条被动命中", n)
+	}
+
 	// 初始化系统监控
 	InitMonitor()
 	defer StopMonitor() // 确保退出时停止

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/gologger"
 	snowflake "github.com/zan8in/pins/snowflake"
@@ -60,6 +61,9 @@ type ResultData struct {
 	// 其它查询不带这两列时为零值。
 	LedgerStatus string `db:"ledger_status"`
 	LedgerNote   string `db:"ledger_note"`
+	// Evidence 是命中的可重放证据链。集群回填时随命中快照一起搬运；
+	// 本地列表查询默认不填，需要时按 result id 单独读取。
+	Evidence *evidence.Evidence `json:"evidence,omitempty"`
 }
 
 // HitEvidence 是「AI 研判」要喂给模型的证据：一条命中的 PoC 元信息 + 原始请求/响应。
@@ -136,6 +140,10 @@ type LedgerRow struct {
 	UpdatedAt  string `db:"updated_at" json:"updated_at"`
 	// Node 是命中来源节点（远程派发回填的命中才有值，本机命中为空）。
 	Node string `db:"node" json:"node,omitempty"`
+	// ResultID 是这条聚合命中里最新的一条 result 主键，EvidenceID 是它的证据 id。
+	// 两者用于「先看命中、再取证据」的 Agent 流程；没有证据时 EvidenceID 为空。
+	ResultID   int64  `db:"result_id" json:"result_id,omitempty"`
+	EvidenceID string `db:"-" json:"evidence_id,omitempty"`
 }
 
 // LedgerStats 是各状态的数量分布。

@@ -73,7 +73,12 @@ func buildResultEvidence(res *result.Result) *scanstream.Evidence {
 			ev.Extractors = m
 		}
 	}
-	if len(ev.Exchanges) == 0 && len(ev.Extractors) == 0 {
+	// 原生证据随事件下发：控制面据此显示 id/digest/replay，并可直接落库。
+	// 深拷贝后再交出，避免事件消费方与引擎共享同一份对象。
+	if res.Evidence != nil {
+		ev.Native = res.Evidence.Clone()
+	}
+	if ev.Native == nil && len(ev.Exchanges) == 0 && len(ev.Extractors) == 0 {
 		return nil
 	}
 	return ev

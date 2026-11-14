@@ -582,6 +582,45 @@ Go PoC 的智能超时上限，默认值为 `420`。
 
 启动 Web 服务。
 
+### `afrog mcp`
+
+在 stdio 或 HTTP 上提供 MCP 工具服务，供 AI Agent 调用（默认只读、带策略与预算）。详见 [MCP 服务](./10-mcp.md)。
+
+```bash
+afrog mcp
+afrog mcp -listen 127.0.0.1:16870 -token your-token
+```
+
+### `afrog poc`
+
+候选 PoC 的人工终审入口：`poc.submit` 把拿到证据的草稿放进待审队列，由人在这里决定是否入库。
+
+```bash
+afrog poc pending                     # 列出待审候选（默认子命令）
+afrog poc list --status approved      # 按状态列出：pending|approved|rejected
+afrog poc show <id> --json            # 查看一条候选详情
+afrog poc approve <id>                # 批准并写入 ~/.config/afrog/pocs-my
+afrog poc reject <id> -note "误报"     # 驳回，保留草稿与原因
+afrog poc stats [--json]              # 流水线指标：自动入库率等
+```
+
+`afrog poc stats` 输出 `total / pending / approved / rejected / reviews / ingest_rate`，并按 severity 与 capability 分桶。入库率口径为 `approved / (approved + rejected)`——分母**不含 pending**（没人审不等于审不过）；没有任何决议时渲染为 `n/a`。`approve`/`reject` 每次都会追加一条不可变流水（`poc_review`），指标可随时复算。
+
+### `afrog learn`
+
+规则/阈值调优建议的人工审阅入口。模型通过 `learn.record` 提出建议（一段 diff），由人在这里决定采纳与否。
+
+```bash
+afrog learn list [--status s] [--json]    # 列出建议，默认 pending
+afrog learn show <id> [--json]            # 查看一条建议（含 diff）
+afrog learn accept <id> -note "..."       # 采纳（仅记录决策，不自动应用 diff）
+afrog learn reject <id> -note "..."       # 驳回
+```
+
+采纳**只是记录人的决策**：afrog 不解析、不自动应用 diff，真正的规则/阈值变更由人走正常代码流程完成。
+
+详见 [MCP 服务](./10-mcp.md)。
+
 ### `-dingtalk`
 
 启动钉钉 webhook 服务。

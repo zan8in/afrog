@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/proto"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -43,6 +44,12 @@ type Result struct {
 	// multi-step PoC produces several. It is empty when request/response
 	// capture is disabled via WithRequestResponse(false).
 	Exchanges []Exchange `json:"exchanges,omitempty"`
+
+	// Evidence is the replayable proof chain: stable id, digest, step roles,
+	// extracted proof and the command that reproduces it. Payloads (headers and
+	// bodies) are intentionally left to Exchanges, so enabling both does not
+	// duplicate large messages.
+	Evidence *evidence.Evidence `json:"evidence,omitempty"`
 
 	FoundAt time.Time `json:"found_at"`
 }
@@ -351,7 +358,27 @@ func newResult(r *result.Result, includeRR bool, foundAt time.Time) Result {
 		}
 	}
 
+	if r.Evidence != nil {
+		out.Evidence = r.Evidence.Clone()
+		// 原始报文统一走 Exchanges 这一份，证据里不再重复携带正文与头，
+		// 否则同一条命中在 SDK 事件里会出现两份大 payload。
+		stripEvidencePayload(out.Evidence)
+	}
+
 	return out
+}
+
+// stripEvidencePayload 去掉证据里的原始头与正文，只保留可复算的结构字段。
+func stripEvidencePayload(ev *evidence.Evidence) {
+	if ev == nil {
+		return
+	}
+	for i := range ev.Steps {
+		ev.Steps[i].Request.Headers = ""
+		ev.Steps[i].Request.Body = ""
+		ev.Steps[i].Response.Headers = ""
+		ev.Steps[i].Response.Body = ""
+	}
 }
 
 // newResultRedacted is newResult with credential-bearing headers masked.

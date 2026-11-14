@@ -12,8 +12,10 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/executor"
+	"github.com/zan8in/afrog/v3/pkg/mcp"
 	"github.com/zan8in/afrog/v3/pkg/scantask"
 	afrogv1 "github.com/zan8in/afrog/v3/proto/afrog/v1"
 	"github.com/zan8in/gologger"
@@ -91,12 +93,38 @@ func ServeCommand(args []string) error {
 	)
 	afrogv1.RegisterAfrogScannerServer(grpcSrv, srv)
 
+	// Agent 工具面（AgentService）：与 MCP / REST 共用同一份工具注册表与门控。
+	// 策略/审计来自 afrog-config.yaml 的 agent 段，留空即只读默认——控制面默认
+	// 不获得发包能力，写动作一律被拒。
+	agentCfg := config.Agent{}
+	if cfg, cerr := config.LoadConfigReadOnly(""); cerr != nil {
+		gologger.Error().Msgf("读取 afrog-config.yaml 失败，Agent 工具面沿用只读默认: %v", cerr)
+	} else if cfg != nil {
+		agentCfg = cfg.Agent
+	}
+	tools, err := mcp.NewWithPaths(agentCfg.Policy, agentCfg.Audit, mcp.ServerInfo{})
+	if err != nil {
+		return fmt.Errorf("init agent tools: %w", err)
+	}
+	agentSrv, err := NewAgentService(tools)
+	if err != nil {
+		return err
+	}
+	afrogv1.RegisterAgentServiceServer(grpcSrv, agentSrv)
+
+	agentLabel := "只读默认（未配置 agent.policy）"
+	if strings.TrimSpace(agentCfg.Policy) != "" {
+		agentLabel = agentCfg.Policy
+	}
+
 	gologger.Info().Msgf("控制面 gRPC 已启动: %s", lis.Addr().String())
 	if generated {
 		gologger.Info().Msgf("控制台 API token（本次启动有效）: %s", token)
 	}
-	gologger.Info().Msgf("节点=%s 并发上限=%d 事件窗口=%d", mgr.Node(), *maxRunning, *eventBuffer)
+	gologger.Info().Msgf("节点=%s 并发上限=%d 事件窗口=%d Agent工具面=%s", mgr.Node(), *maxRunning, *eventBuffer, agentLabel)
 	gologger.Info().Msgf("示例: grpcurl -H 'authorization: Bearer <token>' -d '{\"spec\":{\"targets\":[\"http://example.com\"]}}' %s afrog.v1.AfrogScanner/SubmitScan",
+		lis.Addr().String())
+	gologger.Info().Msgf("示例: grpcurl -H 'authorization: Bearer <token>' -d '{\"name\":\"observe.state\",\"arguments_json\":\"{\\\"subject\\\":\\\"example.com\\\"}\"}' %s afrog.v1.AgentService/Invoke",
 		lis.Addr().String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

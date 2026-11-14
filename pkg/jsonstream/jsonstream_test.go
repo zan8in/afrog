@@ -7,10 +7,37 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
+	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/result"
 	"github.com/zan8in/afrog/v3/pkg/runner"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
+
+func TestBuildResultEvidenceCarriesNative(t *testing.T) {
+	native := &evidence.Evidence{
+		ID:         "evd_x",
+		Digest:     "sha256:y",
+		PocID:      "poc-x",
+		Target:     "http://x",
+		Confidence: string(evidence.Certain),
+		Steps:      []evidence.Step{{Role: evidence.RoleConfirm, Matched: true}},
+	}
+
+	ev := buildResultEvidence(&result.Result{Evidence: native})
+	if ev == nil || ev.Native == nil || ev.Native.ID != native.ID {
+		t.Fatalf("native evidence not attached: %+v", ev)
+	}
+	// 事件拿到的是深拷贝：消费方改动不能污染引擎持有的对象。
+	ev.Native.Steps[0].Matched = false
+	if !native.Steps[0].Matched {
+		t.Fatal("event evidence must be a deep copy")
+	}
+
+	if got := buildResultEvidence(&result.Result{}); got != nil {
+		t.Fatalf("empty result must not produce evidence: %+v", got)
+	}
+}
 
 // resultPocIDs 从事件流里取出结果事件的 PoC ID。
 func resultPocIDs(t *testing.T, raw string) []string {

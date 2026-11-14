@@ -18,7 +18,7 @@ $HOME/.config/afrog/afrog-config.yaml
 
 ## 配置文件字段字典
 
-`afrog-config.yaml` 对应源码里的 `pkg/config/config.go`。顶层字段目前有 7 组：
+`afrog-config.yaml` 对应源码里的 `pkg/config/config.go`。顶层字段按用途分为下面几组：
 
 | 顶层键 | 类型 | 作用 | 默认值 / 说明 |
 | --- | --- | --- | --- |
@@ -29,6 +29,10 @@ $HOME/.config/afrog/afrog-config.yaml
 | `curated` | object | curated pocs 相关配置 | 默认 `enabled: auto` |
 | `cluster` | object | 多实例编排（Web 控制台） | 留空即单实例 |
 | `ai` | object | AI 辅助的模型接入 | 留空即未接入 |
+| `passive` | object | 内嵌被动扫描（MITM 代理 + 检测器） | 默认不自动启动 |
+| `observe` | object | 观测流（`observe.observations`）保留策略 | 默认保留 20 万行 |
+| `agent` | object | Web 端 Agent 写动作面（`/api/v1/call`）的策略与审计 | 留空即只读、不发包 |
+| `security` | object | 高危动作闸门（集群派发等） | 默认全部 allow |
 
 下面这部分可以当字段字典直接查。
 
@@ -223,6 +227,46 @@ ai:
 - 也可以直接在 Web 控制台的「设置 → AI 辅助」里填写，保存后写回本文件并立即生效，无需重启；**保存只写入配置、不会调用模型**，可用性请点同页的「测试连接」发一次极小请求确认
 - 研判是**按次点击才调用**，不会后台自动跑；同一条命中重复查看走本地缓存，不再重复请求
 - 发送前会隐藏 `Cookie`、`Authorization`、`Set-Cookie` 等敏感头并截断超长内容，但仍会把这条命中的请求/响应发给你配置的模型服务，请自行评估
+
+## `observe` 字段字典
+
+`observe` 控制观测流（`observe.observations`）的保留策略。观测流记录扫描与 Agent 动作中「看到了什么」，事件量远大于命中数，因此必须有硬上限。
+
+| 字段 | 类型 | 作用 | 默认值 |
+| --- | --- | --- | --- |
+| `max_rows` | int | 单库保留的最大观测行数；`0` 表示不限制 | `200000` |
+
+```yaml
+observe:
+  max_rows: 200000
+```
+
+要点：
+
+- 超限时由写协程每 1000 次插入检查一次，按 `seq` 分批删除最旧的 10%，不影响游标语义
+- CLI、Web 与 `afrog mcp` 共用同一份配置；未配置时沿用默认的 20 万行
+- 观测流是尽力而为的旁路证据，缓冲满时会丢弃尾部并计数，不会被当成审计日志
+
+## `agent` 字段字典
+
+`agent` 控制 Web 端 Agent 写动作面（`POST /api/v1/call`）的策略与审计来源。它与 `afrog mcp -policy/-audit` 同语义：**留空即沿用只读默认，Web 服务默认不获得发包能力**。
+
+| 字段 | 类型 | 作用 | 默认值 |
+| --- | --- | --- | --- |
+| `policy` | string | 策略 YAML 路径；格式与 `afrog mcp -policy` 一致 | 空（只读默认策略） |
+| `audit` | string | 判定审计 JSONL 路径 | 空（不记录） |
+
+```yaml
+agent:
+  policy: /path/to/agent-policy.yaml
+  audit: /path/to/audit.jsonl
+```
+
+要点：
+
+- `/api/v1/call` 与 MCP（stdio/SSE/streamable）**共用同一份策略、预算与审计**，脚本直连 REST 也不会绕过限额
+- Web 服务是长驻进程，`budget.requests` 是**整个进程的会话总预算**，跨请求累计扣减（与 `afrog mcp -listen` 一致）
+- 错误码按语义区分：策略拒绝 `403`、预算耗尽 `429`、未知工具 `404`、参数错误 `400`
 
 ## reverse 是什么
 

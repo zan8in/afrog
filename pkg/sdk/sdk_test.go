@@ -438,6 +438,20 @@ func TestScanner_StopIsIndependentOfStopOnFirstMatch(t *testing.T) {
 	}
 }
 
+// StopOnFirstMatch only decides when to stop after a hit; it must not gate the
+// scan itself. It used to be wired into the engine's scheduling gates, which
+// made the whole scan skip every task and return zero results.
+func TestScanner_StopOnFirstMatchStillFindsTheHit(t *testing.T) {
+	scanner, _ := newTestScanner(t, WithStopOnFirstMatch())
+
+	if err := scanner.Execute(context.Background()); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if results := scanner.Results(); len(results) != 1 {
+		t.Fatalf("results = %d, want 1", len(results))
+	}
+}
+
 func TestScanner_CloseIsIdempotent(t *testing.T) {
 	scanner, _ := newTestScanner(t)
 

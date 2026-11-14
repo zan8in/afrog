@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/result"
 	"gopkg.in/yaml.v2"
@@ -186,6 +188,10 @@ func (r *Runner) resolveOOBPendingsOnce() int {
 		}
 		rst.Extractor = upsertOOBEvidence(rst.Extractor, ev)
 		markResolvedOOBResult(rst)
+		// 命中在 Check 返回后才被 OOB 回调确认，必须在投递前重建证据，
+		// 否则证据链会停在「未命中」的那一次快照上。
+		rst.Evidence = buildEvidence(rst)
+		recordOOBObservation(ent, ev)
 		r.OnResult(rst)
 
 		r.oobPendingMu.Lock()
@@ -195,6 +201,33 @@ func (r *Runner) resolveOOBPendingsOnce() int {
 	}
 
 	return resolved
+}
+
+// recordOOBObservation 把一次带外回连写进观测流。
+//
+// 与漏洞命中的分工：回连是「目标确实解析/访问了反连地址」这一事实，即使下游把它
+// 判成误报或被去重，事实仍然成立。摘要做截断——观测流不承载完整回连记录。
+func recordOOBObservation(ent *oobPendingEntry, evidence string) {
+	if ent == nil {
+		return
+	}
+	pocID := ""
+	if ent.poc.Id != "" {
+		pocID = ent.poc.Id
+	}
+	obs, err := observation.New("", observation.SourceOOB, observation.KindOOBHit,
+		observation.EndpointSubject(ent.target), observation.OOBHit{
+			FilterType: ent.filterType,
+			Filter:     ent.filter,
+			Token:      ent.token,
+			Target:     ent.target,
+			PocID:      pocID,
+			Evidence:   observation.Excerpt(evidence, observation.ExcerptLimit()),
+		})
+	if err != nil {
+		return
+	}
+	sqlite.RecordObservation(obs)
 }
 
 func upsertOOBEvidence(extractor yaml.MapSlice, ev string) yaml.MapSlice {

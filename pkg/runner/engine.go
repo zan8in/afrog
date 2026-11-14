@@ -20,11 +20,13 @@ import (
 
 	"strconv"
 
+	"github.com/zan8in/afrog/v3/pkg/assetgraph"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/protocols/gox"
@@ -347,6 +349,89 @@ func applyWebFingerprint(meta *WebMeta, res webscan.Result) {
 		fingerprint = joinNonEmpty(meta.Server, meta.PoweredBy)
 	}
 	meta.Fingerprint = fingerprint
+}
+
+// recordTechObservation 把一次 Web 探测写成观测流里的一条 tech 事件。
+//
+// 与结果表的分工：结果表只回答「有没有命中」，观测流回答「看到了什么技术栈」，
+// 供 Agent 在没有命中的情况下也能继续推理。
+func recordTechObservation(meta WebMeta) {
+	urlStr := strings.TrimSpace(meta.URL)
+	if urlStr == "" {
+		return
+	}
+	// Web 探测发现的 URL 进资产图（authority → endpoint），Agent 用 observe.state
+	// 才能从主机一路看到具体端点。
+	_ = sqlite.EnsureEndpointGraph(urlStr, "")
+	// 技术栈入图：端点 → 技术栈 → 候选 PoC。失败只影响这一张派生图，不阻断观测与扫描。
+	techRefs := make([]assetgraph.TechRef, 0, len(meta.Technologies))
+	for _, t := range meta.Technologies {
+		techRefs = append(techRefs, assetgraph.TechRef{Name: t.Name, RuleID: t.RuleID, Category: t.Category})
+	}
+	if err := assetgraph.LinkTechCandidates(urlStr, techRefs); err != nil {
+		gologger.Debug().Msgf("技术栈图写入失败: url=%s err=%v", urlStr, err)
+	}
+	techs := make([]observation.Technology, 0, len(meta.Technologies))
+	var waf, cdn []string
+	for _, t := range meta.Technologies {
+		techs = append(techs, observation.Technology{
+			Name:       t.Name,
+			Version:    t.Version,
+			Category:   t.Category,
+			Confidence: t.Confidence,
+		})
+		switch strings.ToLower(strings.TrimSpace(t.Category)) {
+		case "waf":
+			waf = append(waf, t.Name)
+		case "cdn":
+			cdn = append(cdn, t.Name)
+		}
+	}
+	// 规则只给了汇总名时退回单个 WAF 名，避免整条观测丢失。
+	if len(waf) == 0 && len(cdn) == 0 {
+		if name := strings.TrimSpace(meta.WAF); name != "" {
+			waf = []string{name}
+		}
+	}
+
+	obs, err := observation.New("", observation.SourceWebscan, observation.KindTech,
+		observation.EndpointSubject(urlStr), observation.Tech{
+			URL:          urlStr,
+			Status:       meta.Status,
+			Title:        meta.Title,
+			Server:       meta.Server,
+			PoweredBy:    meta.PoweredBy,
+			Technologies: techs,
+			WAF:          waf,
+			CDN:          cdn,
+		})
+	if err != nil {
+		return
+	}
+	sqlite.RecordObservation(obs)
+	recordTLSObservation(urlStr, meta.TLS)
+}
+
+// recordTLSObservation 把一次 https 探测的证书摘要写进观测流。
+//
+// 与 tech 分成两条：证书独立于技术栈变化（续期、换 CA、换域名），合成一条会让
+// 任一字段变化都产生新事件，反而看不出「只有证书变了」。
+func recordTLSObservation(urlStr string, info *TLSInfo) {
+	if info == nil {
+		return
+	}
+	obs, err := observation.New("", observation.SourceWebscan, observation.KindTLS,
+		observation.EndpointSubject(urlStr), observation.TLSCert{
+			URL:      urlStr,
+			Subject:  info.Subject,
+			Issuer:   info.Issuer,
+			NotAfter: info.NotAfter,
+			DNSNames: append([]string(nil), info.DNSNames...),
+		})
+	if err != nil {
+		return
+	}
+	sqlite.RecordObservation(obs)
 }
 
 // webTechSummary 把识别出的技术栈渲染成一行摘要，如 "PHP 8.1, ThinkPHP 6.0"。
@@ -2073,6 +2158,23 @@ func (runner *Runner) Execute() {
 				// 端口当成资产追加为扫描目标。
 				if r.State == portscan.PortStateOpen {
 					collector.AddResult(r)
+					// 观测流只记开放端口：全端口扫描下 closed/filtered 会是上万条噪声。
+					if obs, obsErr := observation.New("", observation.SourcePortscan,
+						observation.KindPortOpen, observation.HostPortSubject(r.Host, r.Port),
+						observation.PortOpen{
+							Port:       r.Port,
+							State:      r.State.String(),
+							Service:    r.Service,
+							Product:    r.Product,
+							Version:    r.Version,
+							Device:     r.Device,
+							OS:         r.OS,
+							CPE:        r.CPE,
+							TLS:        r.TLS,
+							Confidence: r.Confidence.String(),
+						}); obsErr == nil {
+						sqlite.RecordObservation(obs)
+					}
 				}
 			}
 			if sc, err := portscan.NewScanner(psOpts); err == nil {
@@ -2171,6 +2273,9 @@ func (runner *Runner) Execute() {
 			// 所以 -no-save-db 时同样不写；命中与探测仍照常走控制台/事件流。
 			if !runner.options.NoSaveDB {
 				_, _ = sqlite.InsertWebProbeSummary(db2.TaskID, "webprobe", "webprobe", "webprobe", "webprobe", webMetas)
+				for _, meta := range webMetas {
+					recordTechObservation(meta)
+				}
 			}
 			if runner.Report != nil {
 				entries := make([]report.WebProbeEntry, 0, len(webMetas))
@@ -2564,7 +2669,7 @@ func (runner *Runner) Execute() {
 	}
 
 	runStage := func(pocs []poc.Poc, rate, concurrency int) {
-		if runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
+		if runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 {
 			return
 		}
 		if rate <= 0 {
@@ -2626,7 +2731,7 @@ func (runner *Runner) Execute() {
 						}
 						atomic.AddInt64(&runner.engine.queuedTasks, -1)
 						runner.engine.waitTick()
-						if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint {
+						if atomic.LoadUint32(&runner.engine.stopped) != 0 {
 							finish(task.pocID)
 							continue
 						}
@@ -2638,7 +2743,7 @@ func (runner *Runner) Execute() {
 		}
 
 		for _, pocItem := range pocs {
-			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.ctx.Err() != nil {
 				break
 			}
 			targetView := webScanTargets
@@ -2657,7 +2762,7 @@ func (runner *Runner) Execute() {
 
 			scheduled := 0
 			for _, t := range targetView {
-				if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+				if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.ctx.Err() != nil {
 					break
 				}
 
@@ -2727,7 +2832,7 @@ func (runner *Runner) Execute() {
 	}
 	if runner.engine != nil && len(reversePocs) > 0 && (!runner.engine.oobAlive || runner.engine.oobAdapter == nil) {
 		for _, pocItem := range reversePocs {
-			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.options.VulnerabilityScannerBreakpoint || runner.ctx.Err() != nil {
+			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.ctx.Err() != nil {
 				break
 			}
 			targetView := webScanTargets

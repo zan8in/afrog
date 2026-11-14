@@ -15,9 +15,12 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/drafter"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
 	"github.com/zan8in/afrog/v3/pkg/jsonstream"
+	"github.com/zan8in/afrog/v3/pkg/learner"
 	"github.com/zan8in/afrog/v3/pkg/log"
+	"github.com/zan8in/afrog/v3/pkg/mcp"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/progress"
 	"github.com/zan8in/afrog/v3/pkg/result"
@@ -47,10 +50,40 @@ func main() {
 		return
 	}
 
+	// `afrog mcp`：在 stdio 上提供 MCP 工具服务，供 Agent 编排调用。
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		if err := mcp.Command(os.Args[2:]); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		return
+	}
+
+	// `afrog poc`：候选 PoC 的人工终审（pending/show/approve/reject/stats）。
+	if len(os.Args) > 1 && os.Args[1] == "poc" {
+		if err := drafter.Command(os.Args[2:]); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		return
+	}
+
+	// `afrog learn`：规则/阈值调优建议的人工审阅（list/show/accept/reject）。
+	if len(os.Args) > 1 && os.Args[1] == "learn" {
+		if err := learner.Command(os.Args[2:]); err != nil {
+			gologger.Error().Msg(err.Error())
+		}
+		return
+	}
+
 	options, err := config.NewOptions()
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
+	}
+
+	// 观测流保留上限与 Web/MCP 共用 afrog-config.yaml 的 observe.max_rows；
+	// 未配置时沿用安全默认值（20 万行）。
+	if options.Config != nil && options.Config.Observe.MaxRows != nil {
+		sqlite.SetObservationMaxRows(*options.Config.Observe.MaxRows)
 	}
 
 	// -json-stream 模式：stdout 只承载 NDJSON 事件流，人类可读输出一律改道或关闭
@@ -113,6 +146,8 @@ func main() {
 			web.SetPassiveConfig(cfg.Passive, options.ConfigFile)
 			// 高危动作闸门（集群派发等）：默认全 allow，配置后才生效。
 			web.SetSecurityConfig(cfg.Security)
+			// Agent 写动作面（/api/v1/call）的策略与审计来源；默认只读、不发包。
+			web.SetAgentConfig(cfg.Agent)
 		}
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())

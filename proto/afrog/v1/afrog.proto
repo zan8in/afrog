@@ -27,6 +27,18 @@ service AfrogAgent {
   rpc Connect(stream AgentMessage) returns (stream ConsoleMessage);
 }
 
+// ==================== Agent 工具面（观测 / 执行 / 验证） ====================
+//
+// 与 MCP tools/list、tools/call 同源：同一份工具注册表、同一套策略 / 预算 / 审计门控。
+// 工具入参与返回值都用 JSON 编码（理由同 Evidence.native_json）：工具契约只在
+// pkg/mcp 维护一份，proto 不再镜像一套 schema，避免两份真相长期漂移。
+service AgentService {
+  // 列出全部可用工具及其入参 JSON Schema。
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  // 调用一个工具，返回与 MCP / REST 逐字一致的 JSON 结果。
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+}
+
 // -------------------- 扫描规格（与 CLI 参数一一对应） --------------------
 message ScanSpec {
   repeated string targets = 1;
@@ -205,6 +217,13 @@ message ErrorEvent {
 message Evidence {
   repeated Exchange exchanges = 1;
   map<string, string> extractors = 2;
+  // native_json 是原生证据对象（pkg/evidence.Evidence）的 JSON 编码。
+  //
+  // 用 JSON 而不是在 proto 里逐字段镜像：证据契约以 JSON 为准（NDJSON / REST /
+  // MCP 共用同一份定义），再镜像一套 proto schema 会变成两套真相，长期必然漂移。
+  // 老节点不认识该字段时会直接忽略，新节点解析失败时回退到 exchanges/extractors，
+  // 因此该字段是纯增量的兼容扩展。
+  string native_json = 3;
 }
 message Exchange {
   string request = 1;
@@ -282,6 +301,27 @@ message ListCapabilitiesResponse {
   bool curated = 4;
   bool pausable = 5;
   repeated string nodes = 6;
+}
+
+// -------------------- Agent 工具面消息 --------------------
+message ListToolsRequest {}
+message ToolSpec {
+  string name = 1;
+  string description = 2;
+  // input_schema_json 是工具入参 JSON Schema 的 JSON 编码；无 schema 时为空。
+  string input_schema_json = 3;
+}
+message ListToolsResponse {
+  repeated ToolSpec tools = 1;
+}
+message InvokeRequest {
+  string name = 1;
+  // arguments_json 是工具入参的 JSON 编码；空视为无参数。
+  string arguments_json = 2;
+}
+message InvokeResponse {
+  // result_json 是工具返回值的 JSON 编码，与 MCP / REST 返回体逐字一致。
+  string result_json = 1;
 }
 
 // -------------------- 内部接口消息 --------------------

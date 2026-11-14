@@ -16,6 +16,7 @@ type Task struct {
 	id       string
 	node     string
 	spec     *executor.Spec
+	batch    Batch
 	targets  []string
 	cleanup  func()
 	now      func() time.Time
@@ -43,11 +44,12 @@ type Task struct {
 	finalized atomic.Bool
 }
 
-func newTask(id, node string, spec *executor.Spec, cleanup func(), bufLimit int, now func() time.Time) *Task {
+func newTask(id, node string, spec *executor.Spec, cleanup func(), batch Batch, bufLimit int, now func() time.Time) *Task {
 	return &Task{
 		id:        id,
 		node:      node,
 		spec:      spec,
+		batch:     batch,
 		targets:   append([]string(nil), spec.Targets...),
 		cleanup:   cleanup,
 		now:       now,
@@ -67,6 +69,15 @@ func (t *Task) Node() string { return t.node }
 
 // Spec 返回任务规格（只读）。
 func (t *Task) Spec() *executor.Spec { return t.spec }
+
+// Batch 返回任务的动作批量（只读）。
+//
+// Actions 为空表示这是一次扫描式批量：动作由「目标 × PoC」在引擎里展开。
+func (t *Task) Batch() Batch {
+	out := t.batch
+	out.Actions = append([]Action(nil), t.batch.Actions...)
+	return out
+}
 
 // Status 返回当前状态。
 func (t *Task) Status() Status {
@@ -262,6 +273,9 @@ func (t *Task) snapshotLocked() *Snapshot {
 		Truncated: t.dropped > 0,
 		Pausable:  t.pausableLocked(),
 		Error:     t.errText,
+
+		ActionCount: len(t.batch.Actions),
+		ActionKinds: actionKinds(t.batch.Actions),
 	}
 	for k, v := range t.hits {
 		snap.Hits[k] = v

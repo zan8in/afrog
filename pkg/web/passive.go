@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/zan8in/afrog/v3/pkg/assetgraph"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/passive"
 	"github.com/zan8in/afrog/v3/pkg/passive/detectors/exposure"
 	"github.com/zan8in/afrog/v3/pkg/passive/detectors/extract"
@@ -228,6 +230,9 @@ func (rt *passiveRuntime) start() error {
 		Detectors:  buildDetectors(cfg.EnabledDetectors()),
 		Extractors: buildExtractors(cfg.EnabledDetectors()),
 		Prober:     passive.NewHTTPProber(proberOpts),
+		// 观测发布先于检测：这条回调在门控与短路之前触发，因此被判重复、无条件或
+		// 因队列满丢弃的流量同样会留下「看到过」的事实。
+		OnObserved: func(tx *passive.CapturedTransaction) { rt.onObserved(projectID, tx) },
 		OnFinding:  func(f passive.Finding) { rt.onFinding(projectID, f) },
 		// 提取物走独立通道落库：它不进漏洞台账，与命中在表、去重口径、面板上都分离。
 		OnExtraction: func(x passive.Extraction) { rt.onExtraction(projectID, x) },
@@ -358,10 +363,48 @@ func (rt *passiveRuntime) onFinding(projectID string, f passive.Finding) {
 	if id <= 0 {
 		return
 	}
+	// 把「端点 → 参数」补进资产图：被动命中是唯一同时持有 URL 与注入点位置的来源。
+	// 只写边、不写资产行，失败也不影响命中落库。
+	if err := sqlite.EnsureEndpointGraph(f.Target, f.Location); err != nil {
+		gologger.Debug().Msgf("端点图写入失败: target=%s err=%v", f.Target, err)
+	}
 	if state != sqlite.PassiveStateNew {
 		gologger.Debug().Msgf("被动命中已存在，累计第 %d 次: state=%s target=%s", hitCount, state, f.Target)
 	}
 	atomic.AddInt64(&rt.reported, 1)
+}
+
+// onObserved 把代理看到的一次往返写进观测流。
+//
+// 与 onFinding 的分工：这里只记「看到了什么」，不做任何判定；即使这条事务随后被
+// 门控短路、被判无兴趣或因检测队列满被丢弃，事件也已经发出。观测流按内容寻址去重
+// （方法 + URL + 状态码），同一请求反复出现只留一条，因此不需要在这里再做去重。
+func (rt *passiveRuntime) onObserved(projectID string, tx *passive.CapturedTransaction) {
+	if tx == nil || tx.Request == nil || tx.Request.URL == nil {
+		return
+	}
+	req := tx.Request
+	rawURL := req.URL.String()
+
+	payload := observation.HTTPPassive{
+		Method:       req.Method,
+		URL:          rawURL,
+		RequestBytes: len(req.Body),
+		Static:       tx.Static,
+		ClientIP:     tx.ClientIP,
+	}
+	if tx.Response != nil {
+		payload.Status = tx.Response.Status
+		payload.ResponseBytes = len(tx.Response.Body)
+		payload.ContentType = tx.Response.Headers.Get("Content-Type")
+	}
+
+	obs, err := observation.New(projectID, observation.SourcePassive,
+		observation.KindHTTPPassive, observation.EndpointSubject(rawURL), payload)
+	if err != nil {
+		return
+	}
+	sqlite.RecordObservation(obs)
 }
 
 func passiveFingerprint(f passive.Finding) string {
@@ -402,6 +445,18 @@ func (rt *passiveRuntime) onExtraction(projectID string, x passive.Extraction) {
 		passiveTraffic.recordError("storage", errors.New("敏感信息提取落库失败: "+err.Error()))
 		gologger.Debug().Msgf("敏感信息提取落库失败: %v", err)
 		return
+	}
+	// 指纹提取物同时进图：端点 → 技术栈 → 候选 PoC。被动侧是零流量事实，
+	// 它让「用户真正访问过的页面用了什么」也能被 observe.state 看到。
+	if x.Detector == fingerprint.DetectorName {
+		ref := assetgraph.TechRef{
+			Name:     x.Title,
+			RuleID:   x.Rule,
+			Category: extraString(x.Extra["tech_category"]),
+		}
+		if err := assetgraph.LinkTechCandidates(x.Target, []assetgraph.TechRef{ref}); err != nil {
+			gologger.Debug().Msgf("技术栈图写入失败: target=%s err=%v", x.Target, err)
+		}
 	}
 	atomic.AddInt64(&rt.extracted, 1)
 }

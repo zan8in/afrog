@@ -581,6 +581,45 @@ Show the afrog version.
 
 Start the web service.
 
+### `afrog mcp`
+
+Serve MCP tools over stdio or HTTP for AI agents (read-only by default, with policy and budget). See [MCP Server](./10-mcp.md).
+
+```bash
+afrog mcp
+afrog mcp -listen 127.0.0.1:16870 -token your-token
+```
+
+### `afrog poc`
+
+Human review entry point for candidate PoCs: `poc.submit` stages drafts that produced evidence, and a person decides here whether to promote them.
+
+```bash
+afrog poc pending                     # list pending candidates (default subcommand)
+afrog poc list --status approved      # list by status: pending|approved|rejected
+afrog poc show <id> --json            # inspect one candidate
+afrog poc approve <id>                # approve and write to ~/.config/afrog/pocs-my
+afrog poc reject <id> -note "false positive"   # reject, keeping the draft and reason
+afrog poc stats [--json]              # pipeline metrics: ingest rate and more
+```
+
+`afrog poc stats` prints `total / pending / approved / rejected / reviews / ingest_rate`, bucketed by severity and capability. The ingest rate is `approved / (approved + rejected)` — the denominator **excludes pending** (not reviewed is not the same as rejected); it renders as `n/a` when there are no decisions yet. Every `approve`/`reject` appends an immutable entry to `poc_review`, so the metrics can always be recomputed.
+
+### `afrog learn`
+
+Human review entry point for rule/threshold tuning suggestions. The model proposes a suggestion (a diff text) via `learn.record`, and a person decides whether to accept it.
+
+```bash
+afrog learn list [--status s] [--json]    # list suggestions, pending by default
+afrog learn show <id> [--json]            # inspect one suggestion (including its diff)
+afrog learn accept <id> -note "..."       # accept (records the decision only; does not apply the diff)
+afrog learn reject <id> -note "..."       # reject
+```
+
+Accepting **only records the human decision**: afrog never parses or applies the diff; actual rule/threshold changes go through the normal code-review flow.
+
+See [MCP Server](./10-mcp.md).
+
 ### `-dingtalk`
 
 Start the DingTalk webhook service.

@@ -119,4 +119,4 @@ last_reviewed: 2026-09-30
 - 计划是配置，可备份、可手工审阅
 - 任务是数据，命中结果长期保留
 
-> **← 上一篇：** [Web 扫描工作台](./08-web-console.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **文档首页 →：** [afrog 文档](../index.md)
+> **← 上一篇：** [Web 扫描工作台](./08-web-console.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **下一篇 →：** [MCP 服务](./10-mcp.md)

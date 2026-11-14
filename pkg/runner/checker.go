@@ -164,6 +164,11 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		if r := recover(); r != nil {
 			c.Result.IsVul = false
 		}
+		// 判定结束（含 panic 兜底）后统一生成证据：这是本次执行唯一能看到
+		// 全部步骤结果的位置，交给上层拼装会丢掉中间步骤。
+		if c.Result != nil && c.Result.IsVul {
+			c.Result.Evidence = buildEvidence(c.Result)
+		}
 	}()
 
 	if pocItem.IsHTTPType() {

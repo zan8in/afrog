@@ -48,15 +48,25 @@ func New(opts Options) (*Manager, error) {
 // Node 返回本控制面的节点名。
 func (m *Manager) Node() string { return m.node }
 
-// Submit 受理一次扫描：解析规格、登记任务、取得名额后开始执行。
-// 并发已满时任务进入排队，状态为 queued。
+// Submit 受理一次扫描：按目标与 PoC 选择展开成一个扫描式批量后提交。
+//
+// 「一次扫描」等价于「目标 × PoC」的 run_poc 批量，因此在模型上就是 SubmitBatch 的特例。
 func (m *Manager) Submit(req Request) (*Snapshot, error) {
-	spec, cleanup, err := BuildSpec(req)
+	return m.SubmitBatch(Batch{Options: req})
+}
+
+// SubmitBatch 受理一个动作批量：解析规格、登记任务、取得名额后开始执行。
+// 并发已满时任务进入排队，状态为 queued。
+//
+// 单 Action 提交就是 len(batch.Actions) == 1 的批量；批量为空则退化为按
+// batch.Options 展开的扫描式批量（与 Submit 完全同义）。
+func (m *Manager) SubmitBatch(batch Batch) (*Snapshot, error) {
+	spec, cleanup, err := batch.buildSpec()
 	if err != nil {
 		return nil, err
 	}
 
-	t := newTask(m.nextID(), m.node, spec, cleanup, m.opts.eventBuffer(), m.opts.now)
+	t := newTask(m.nextID(), m.node, spec, cleanup, batch, m.opts.eventBuffer(), m.opts.now)
 
 	m.mu.Lock()
 	m.tasks[t.id] = t
@@ -104,13 +114,13 @@ func (m *Manager) Subscribe(taskID string, fromSeq uint64) (*Subscription, *Snap
 }
 
 // Control 对任务执行暂停/继续/取消。
-func (m *Manager) Control(taskID string, action Action) error {
+func (m *Manager) Control(taskID string, action ControlAction) error {
 	t, ok := m.Get(taskID)
 	if !ok {
 		return ErrTaskNotFound
 	}
 
-	if action == ActionCancel {
+	if action == ControlCancel {
 		// 排队中的任务还没有进程：直接从队列摘掉并收尾（不占用名额）。
 		if m.cancelQueued(t) {
 			return nil
@@ -123,17 +133,17 @@ func (m *Manager) Control(taskID string, action Action) error {
 	}
 
 	switch action {
-	case ActionPause:
+	case ControlPause:
 		if err := h.Pause(); err != nil {
 			return err
 		}
 		t.setStatus(StatusPaused)
-	case ActionResume:
+	case ControlResume:
 		if err := h.Resume(); err != nil {
 			return err
 		}
 		t.setStatus(StatusRunning)
-	case ActionCancel:
+	case ControlCancel:
 		if err := h.Cancel(); err != nil && !errors.Is(err, executor.ErrAlreadyDone) {
 			return err
 		}

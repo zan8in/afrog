@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/passive"
 )
 
@@ -157,6 +159,57 @@ func TestPassiveProxyHintForLan(t *testing.T) {
 	hint = passiveProxyHint(config.Passive{Host: "127.0.0.1", Port: 16869})
 	if !strings.Contains(hint, "127.0.0.1:16869") {
 		t.Fatalf("local hint = %q", hint)
+	}
+}
+
+// 被动观测的落库路径：subject 归一化为端点、payload 只留元数据，且同一往返只留一行。
+func TestPassiveRuntimeOnObservedWritesObservation(t *testing.T) {
+	withAgentFixture(t)
+
+	u, err := url.Parse("HTTP://A.Example/item?id=1")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	tx := &passive.CapturedTransaction{
+		ID:      "tx-1",
+		Request: &passive.CapturedRequest{Method: http.MethodGet, URL: u, Body: []byte("q=1")},
+		Response: &passive.CapturedResponse{
+			Status:  200,
+			Headers: http.Header{"Content-Type": {"text/html"}},
+			Body:    []byte("<html>"),
+		},
+	}
+
+	passiveRT.onObserved("p1", tx)
+	// 同一往返再出现一次：内容寻址去重，不应新增行。
+	passiveRT.onObserved("p1", tx)
+	sqlite.FlushObservations()
+
+	page, err := sqlite.SelectObservations(sqlite.ObservationFilter{ProjectID: "p1", Limit: 10})
+	if err != nil {
+		t.Fatalf("select observations: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("items = %d, want 1（同一往返必须去重）", len(page.Items))
+	}
+	obs := page.Items[0]
+	if obs.Source != observation.SourcePassive || obs.Kind != observation.KindHTTPPassive {
+		t.Fatalf("source/kind = %s/%s, want passive/http_passive", obs.Source, obs.Kind)
+	}
+	// subject 是归一化端点：不含 query，且 host 小写。
+	if obs.Subject != "http://a.example/item" {
+		t.Fatalf("subject = %q, want http://a.example/item", obs.Subject)
+	}
+
+	var payload observation.HTTPPassive
+	if err := json.Unmarshal(obs.Payload, &payload); err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if payload.Method != http.MethodGet || payload.Status != 200 {
+		t.Fatalf("payload = %+v, want GET 200", payload)
+	}
+	if payload.ContentType != "text/html" || payload.ResponseBytes != len("<html>") {
+		t.Fatalf("payload metadata = %+v", payload)
 	}
 }
 

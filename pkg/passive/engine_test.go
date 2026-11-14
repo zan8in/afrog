@@ -636,6 +636,78 @@ func TestEngineShortCircuitsInFlightPoints(t *testing.T) {
 	})
 }
 
+// 观测发布必须早于检测，并且与检测结论解耦。
+//
+// 这一条锁定 C4 的核心约束：事务被判重复/跳过时检测会缺席，但「代理看到过这次
+// 往返」是独立事实，不能跟着一起消失。
+func TestEnginePublishesObservationBeforeDetection(t *testing.T) {
+	var observed int32
+	det := &orderRecordingDetector{observed: &observed}
+
+	eng := NewEngine(EngineOptions{
+		Detectors:  []Detector{det},
+		Prober:     &noopProber{},
+		Workers:    1,
+		OnObserved: func(*CapturedTransaction) { atomic.AddInt32(&observed, 1) },
+	})
+	eng.Start(context.Background())
+	defer eng.Close()
+
+	u, err := url.Parse("http://example.com/list?id=1")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	tx := &CapturedTransaction{
+		ID:      "tx-obs",
+		Request: &CapturedRequest{Method: http.MethodGet, URL: u, Headers: http.Header{}},
+	}
+
+	if !eng.Submit(tx) {
+		t.Fatalf("submit must succeed")
+	}
+	// 发布是同步的：Submit 返回时观测已发出，先于任何检测。
+	if got := atomic.LoadInt32(&observed); got != 1 {
+		t.Fatalf("Submit 返回时已发布观测数 = %d, want 1", got)
+	}
+
+	waitFor(t, func() bool { return eng.Drained() })
+	if got := atomic.LoadInt32(&det.seenObserved); got != 1 {
+		t.Fatalf("检测开始时已发布观测数 = %d, want 1", got)
+	}
+
+	// 同一注入点在有效期内已判定无注入：第二次被短路、不再检测，但观测仍要发出。
+	if !eng.Submit(tx) {
+		t.Fatalf("second submit must succeed")
+	}
+	if got := atomic.LoadInt32(&observed); got != 2 {
+		t.Fatalf("短路事务也必须发布观测，实际 %d 条", got)
+	}
+	waitFor(t, func() bool { return eng.Drained() })
+	if got := atomic.LoadInt32(&det.calls); got != 1 {
+		t.Fatalf("第二次应被注入点短路，实际 Detect 调用 %d 次", got)
+	}
+	if got := eng.Stats().Observed; got != 2 {
+		t.Fatalf("Stats().Observed = %d, want 2", got)
+	}
+}
+
+// orderRecordingDetector 在 Detect 里回读已发布的观测数，用来验证「先发观测、再检测」。
+type orderRecordingDetector struct {
+	observed     *int32
+	seenObserved int32
+	calls        int32
+}
+
+func (d *orderRecordingDetector) Name() string { return "order" }
+
+func (d *orderRecordingDetector) Interest(*CapturedTransaction) bool { return true }
+
+func (d *orderRecordingDetector) Detect(context.Context, *CapturedTransaction, Prober) ([]Finding, error) {
+	atomic.AddInt32(&d.calls, 1)
+	atomic.StoreInt32(&d.seenObserved, atomic.LoadInt32(d.observed))
+	return nil, nil
+}
+
 func waitFor(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

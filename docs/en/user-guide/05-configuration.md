@@ -18,7 +18,7 @@ This file is mainly used for OOB / reverse providers, notifications, and other r
 
 ## Configuration dictionary
 
-`afrog-config.yaml` maps to the structs in `pkg/config/config.go`. The top-level keys currently break down into seven groups:
+`afrog-config.yaml` maps to the structs in `pkg/config/config.go`. The top-level keys group as follows:
 
 | Top-level key | Type | Purpose | Default / note |
 | --- | --- | --- | --- |
@@ -29,6 +29,10 @@ This file is mainly used for OOB / reverse providers, notifications, and other r
 | `curated` | object | curated pocs settings | default `enabled: auto` |
 | `cluster` | object | multi-instance orchestration (web console) | empty means single instance |
 | `ai` | object | model access for AI assist | empty means not configured |
+| `passive` | object | embedded passive scan (MITM proxy + detectors) | not started automatically |
+| `observe` | object | observation stream (`observe.observations`) retention | keeps 200k rows by default |
+| `agent` | object | policy and audit for the web Agent write-action surface (`/api/v1/call`) | empty means read-only, no network sends |
+| `security` | object | high-risk action gate (cluster dispatch, etc.) | allow by default |
 
 The sections below are meant to be directly searchable like a field dictionary.
 
@@ -223,6 +227,46 @@ Key points:
 - You can also fill it in under **Settings → AI assist**, which writes this file and takes effect immediately — no restart needed; **saving only writes the config and never calls the model**, so use **Test connection** on the same page (one tiny request) to confirm it actually works
 - A verdict is only requested **when you click**, never in the background; re-opening the same finding is served from the local cache
 - Before sending, `Cookie`, `Authorization`, `Set-Cookie` and similar headers are masked and long bodies are truncated — but the request/response of that finding still goes to the model service you configure, so judge accordingly
+
+## `observe` field dictionary
+
+`observe` controls retention for the observation stream (`observe.observations`). The stream records what scans and agent actions observed, and it grows much faster than findings, so a hard cap is required.
+
+| Field | Type | Purpose | Default |
+| --- | --- | --- | --- |
+| `max_rows` | int | Maximum observation rows kept per database; `0` means unlimited | `200000` |
+
+```yaml
+observe:
+  max_rows: 200000
+```
+
+Notes:
+
+- When over the cap, the writer checks every 1000 inserts and deletes the oldest 10% in `seq` order; cursor semantics are unaffected
+- CLI, web and `afrog mcp` share the same config; when unset the 200k default applies
+- The stream is best effort: when the buffer is full the tail is dropped and counted, so it is not an audit log
+
+## `agent` field dictionary
+
+`agent` controls the policy and audit source for the web Agent write-action surface (`POST /api/v1/call`). It is synonymous with `afrog mcp -policy/-audit`: **empty means the read-only default, and the web server has no network-sending capability by default**.
+
+| Field | Type | Purpose | Default |
+| --- | --- | --- | --- |
+| `policy` | string | Path to the policy YAML; same format as `afrog mcp -policy` | empty (read-only default) |
+| `audit` | string | Path to the decision audit JSONL | empty (no logging) |
+
+```yaml
+agent:
+  policy: /path/to/agent-policy.yaml
+  audit: /path/to/audit.jsonl
+```
+
+Notes:
+
+- `/api/v1/call` **shares the same policy, budget and audit machinery** as MCP (stdio/SSE/streamable); a script hitting REST directly cannot bypass the limits
+- The web server is long-lived, so `budget.requests` is the **total session budget for the whole process**, accumulated across requests (same as `afrog mcp -listen`)
+- Errors are distinguished by semantics: policy denial `403`, budget exhaustion `429`, unknown tool `404`, bad request `400`
 
 ## What `reverse` means
 

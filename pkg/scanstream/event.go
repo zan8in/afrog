@@ -5,6 +5,8 @@
 // 同名的键下。字段名必须与协议文档及 proto 草案逐字对应，两者不得私自加字段。
 package scanstream
 
+import "github.com/zan8in/afrog/v3/pkg/evidence"
+
 // Version 是协议版本，节点与协议版本不匹配时应拒绝并提示升级。
 const Version = "1"
 
@@ -186,6 +188,9 @@ type ErrorEvent struct {
 type Evidence struct {
 	Exchanges  []Exchange        `json:"exchanges,omitempty"`
 	Extractors map[string]string `json:"extractors,omitempty"`
+	// Native 是原生证据对象（id / digest / steps / replay），与 proto 的
+	// native_json 同源。老消费方忽略该字段即可，仍能从 exchanges 取到原始报文。
+	Native *evidence.Evidence `json:"native,omitempty"`
 }
 
 // Exchange 是一次请求/响应往返。

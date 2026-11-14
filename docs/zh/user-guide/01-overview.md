@@ -36,6 +36,7 @@ last_reviewed: 2026-09-23
 6. [实战技巧](./07-tips.md)
 7. [Web 扫描工作台](./08-web-console.md)
 8. [定时与计划扫描](./09-scheduled-scans.md)
+9. [MCP 服务](./10-mcp.md)
 
 ## 最短起步
 

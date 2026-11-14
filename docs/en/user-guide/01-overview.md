@@ -36,6 +36,7 @@ The User Guide covers everything you need to put `afrog` to work: install, first
 6. [Practical Tips](./07-tips.md)
 7. [Web Scan Workspace](./08-web-console.md)
 8. [Scheduled Scans](./09-scheduled-scans.md)
+9. [MCP Server](./10-mcp.md)
 
 ## Shortest path
 

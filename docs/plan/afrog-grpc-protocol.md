@@ -132,6 +132,18 @@ service AfrogAgent {
   rpc Connect(stream AgentMessage) returns (stream ConsoleMessage);
 }
 
+// ==================== Agent 工具面（观测 / 执行 / 验证） ====================
+//
+// 与 MCP tools/list、tools/call 同源：同一份工具注册表、同一套策略 / 预算 / 审计门控。
+// 工具入参与返回值都用 JSON 编码（理由同 Evidence.native_json）：工具契约只在
+// pkg/mcp 维护一份，proto 不再镜像一套 schema，避免两份真相长期漂移。
+service AgentService {
+  // 列出全部可用工具及其入参 JSON Schema。
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+  // 调用一个工具，返回与 MCP / REST 逐字一致的 JSON 结果。
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+}
+
 // -------------------- 扫描规格（与 CLI 参数一一对应） --------------------
 message ScanSpec {
   repeated string targets = 1;
@@ -237,6 +249,8 @@ message ErrorEvent   { string code = 1; string message = 2; }
 message Evidence {
   repeated Exchange exchanges = 1;
   map<string, string> extractors = 2;
+  // 原生证据对象（pkg/evidence.Evidence）的 JSON 编码；纯增量字段，老节点忽略。
+  string native_json = 3;
 }
 message Exchange { string request = 1; string response = 2; bool matched = 3; }
 
@@ -270,6 +284,14 @@ message ListCapabilitiesRequest  {}
 message ListCapabilitiesResponse { string version = 1; string protocol_version = 2;
                                    int32 poc_count = 3; bool curated = 4;
                                    bool pausable = 5; repeated string nodes = 6; }
+
+// -------------------- Agent 工具面消息 --------------------
+message ListToolsRequest {}
+message ToolSpec { string name = 1; string description = 2;
+                   string input_schema_json = 3; }   // 入参 JSON Schema 的 JSON 编码
+message ListToolsResponse { repeated ToolSpec tools = 1; }
+message InvokeRequest  { string name = 1; string arguments_json = 2; }  // arguments_json 空视为无参数
+message InvokeResponse { string result_json = 1; }  // 与 MCP / REST 返回体逐字一致
 
 // -------------------- 内部接口消息 --------------------
 message RegisterRequest {
@@ -373,7 +395,7 @@ type ScanHandle interface {
 |---|---|
 | `proto/afrog/v1/afrog.proto` | 第 6 节 proto 的落地文件，生成 `afrog.pb.go` / `afrog_grpc.pb.go`。重新生成：`cd proto/afrog/v1 && go generate ./...`（需 protoc + protoc-gen-go + protoc-gen-go-grpc） |
 | `pkg/scantask` | 控制面任务层：受理扫描、并发排队、驱动执行器、维护带 `seq` 的事件窗口与订阅分发。不关心传输，gRPC 与 Web 共用 |
-| `pkg/scanapi` | `AfrogScanner` 的 gRPC 实现（6 个 RPC）+ 凭据拦截器 + `afrog serve` 子命令实现 |
+| `pkg/scanapi` | `AfrogScanner` 的 gRPC 实现（6 个 RPC）+ `AgentService`（工具面，委托 `pkg/mcp`）+ 凭据拦截器 + `afrog serve` 子命令实现 |
 | `cmd/afrog` | 新增 `-json-stream` 输出模式（stdout 仅承载 NDJSON，其余输出改道 stderr）；由执行器拉起时优先采用 `AFROG_TASK_ID` 作为任务 ID；新增 `serve` 子命令（在参数解析前分流，因为 goflags 不支持子命令） |
 | `pkg/scanstream` | 新增事件信封与 NDJSON 读写（`Writer`/`Parse`），字段与第 5、6 节逐字对齐 |
 | `pkg/jsonstream` | `-json-stream` 模式的钩子装配（`RedirectLogs` 把人类可读输出改道 stderr；`Attach` 把引擎回调接到 `scanstream.Writer`）。放在库包而非 `cmd/afrog` 目录下，是为了让文档里的 `go run cmd/afrog/main.go` / `go build -o afrog cmd/afrog/main.go` 这类单文件构建继续可用 |

@@ -159,6 +159,36 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
 
+	// 证据表：一条命中的「凭什么成立」，与 result 表通过 result_id 关联。
+	if err = ensureEvidence(); err != nil {
+		return fmt.Errorf("error creating evidence table: %v", err)
+	}
+
+	// 观测流：扫描过程中「看到了什么」，只追加、seq 即游标。
+	if err = ensureObservation(); err != nil {
+		return fmt.Errorf("error creating observation table: %v", err)
+	}
+
+	// 候选 PoC 待审队列：模型草稿通过沙箱实跑后进入这里，等人工终审决定是否入库。
+	if err = ensurePocDraft(); err != nil {
+		return fmt.Errorf("error creating poc draft table: %v", err)
+	}
+
+	// 终审决议流水：只追加，供「自动入库率」等指标复算与 Learner 消费。
+	if err = ensurePocReview(); err != nil {
+		return fmt.Errorf("error creating poc review table: %v", err)
+	}
+
+	// 研判意见：Judge 角色的 advisory 输出，与漏洞台账分表隔离。
+	if err = ensureJudgement(); err != nil {
+		return fmt.Errorf("error creating judgement table: %v", err)
+	}
+
+	// 调优建议：Learner 角色的 advisory 输出，供人审，不自动应用。
+	if err = ensureLearnSuggestion(); err != nil {
+		return fmt.Errorf("error creating learn suggestion table: %v", err)
+	}
+
 	if err = ensureResultNodeColumn(); err != nil {
 		return fmt.Errorf("error migrating result table: %v", err)
 	}
@@ -303,11 +333,15 @@ func ensurePassiveAssetColumn() error {
 	if err != nil {
 		return err
 	}
-	if hasCol {
-		return nil
+	if !hasCol {
+		if _, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "asset_id" TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
 	}
 
-	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "asset_id" TEXT NOT NULL DEFAULT ''`)
+	// 端点/参数的命中数按 asset_id 聚合，索引必须等列补齐之后再建。
+	_, err = execBusyRetry(`CREATE INDEX IF NOT EXISTS "idx_passive_finding_asset"
+		ON "passive_finding" ("asset_id")`)
 	return err
 }
 
@@ -399,6 +433,9 @@ func hasTableColumn(table, column string) (bool, error) {
 }
 
 func CloseX() {
+	// 先停观测流写协程并落库，再关连接：写协程自己持有 dbx。
+	stopObservationWriter()
+
 	// 安全关闭任务通道并等待 worker 退出
 	ch := insertChannel
 	if ch != nil {
@@ -458,7 +495,11 @@ func addx(r *result.Result) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := dbx.ExecContext(ctx, insertSQL, db2.SnowFlake.NextID(), db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
+	id := db2.SnowFlake.NextID()
+	_, err := dbx.ExecContext(ctx, insertSQL, id, db2.TaskID, r.PocInfo.Id, r.PocInfo.Info.Name, r.Target, r.FullTarget, r.PocInfo.Info.Severity, poc, result, createdTime, finger, extractor)
+	if err == nil {
+		insertEvidenceForResult(r, id, db2.TaskID)
+	}
 	return err
 }
 
@@ -520,6 +561,7 @@ func InsertResultAndReturnID(r *result.Result) (int64, error) {
 		break
 	}
 
+	insertEvidenceForResult(r, id, db2.TaskID)
 	return id, nil
 }
 
@@ -578,6 +620,7 @@ func InsertResultWithTaskID(r *result.Result, taskID string) (int64, error) {
 		break
 	}
 
+	insertEvidenceForResult(r, id, taskID)
 	return id, nil
 }
 
@@ -1147,6 +1190,7 @@ func runResultQuery(label, query string, args []interface{}, expandPoc, expandRe
 //
 // 与报表查询的区别：这里不做任何展示层归一化，也不清空大字段——回填要的是可原样
 // 落库的完整数据，否则本地报告会缺证据、AI 研判也拿不到请求响应。
+// 证据链一并带出：跨节点回填后，发起端的 observe.evidence 才能查得到。
 func SelectRawResultsByTask(taskID string, limit int) ([]db2.ResultData, error) {
 	if dbx == nil {
 		return nil, fmt.Errorf("sqlite not initialized")
@@ -1167,6 +1211,22 @@ func SelectRawResultsByTask(taskID string, limit int) ([]db2.ResultData, error) 
 	if err := dbx.SelectContext(ctx, &out, query, taskID, limit); err != nil {
 		return nil, err
 	}
+
+	ids := make([]int64, 0, len(out))
+	for _, r := range out {
+		ids = append(ids, r.ID)
+	}
+	evidences, err := SelectEvidenceByResultIDs(ids)
+	if err != nil {
+		// 证据是附加信息，读失败不能让整批回填失败；报告主体仍可搬运。
+		gologger.Debug().Msgf("读取任务证据失败: task=%s err=%v", taskID, err)
+		return out, nil
+	}
+	for i := range out {
+		if ev, ok := evidences[out[i].ID]; ok {
+			out[i].Evidence = ev
+		}
+	}
 	return out, nil
 }
 
@@ -1185,6 +1245,10 @@ func DeleteResultsByTask(taskID string) (int64, error) {
 
 	res, err := dbx.ExecContext(ctx, "DELETE FROM "+db2.TableName+" WHERE taskid = ?", taskID)
 	if err != nil {
+		return 0, err
+	}
+	// 证据与命中同生命周期：不清理会在回填重放时留下孤儿证据。
+	if _, err := dbx.ExecContext(ctx, `DELETE FROM "evidence" WHERE "taskid" = ?`, taskID); err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
@@ -1226,6 +1290,11 @@ func DeleteResultsByIDs(ids []int64) (int64, error) {
 		res, err := tx.ExecContext(ctx,
 			"DELETE FROM "+db2.TableName+" WHERE id IN ("+holders+")", args...)
 		if err != nil {
+			return 0, err
+		}
+		// 证据跟随命中一起删除，避免报告删掉后还能按旧 id 查到证据。
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM "evidence" WHERE "result_id" IN (`+holders+`)`, args...); err != nil {
 			return 0, err
 		}
 		n, _ := res.RowsAffected()
@@ -1335,13 +1404,19 @@ func InsertRawResults(taskID, node string, rows []db2.ResultData) (int, error) {
 		if created == "" {
 			created = fallbackCreated
 		}
-		if _, err := tx.Exec(insertSQL, db2.SnowFlake.NextID(), taskID, r.VulID, r.VulName,
+		id := db2.SnowFlake.NextID()
+		if _, err := tx.Exec(insertSQL, id, taskID, r.VulID, r.VulName,
 			r.Target, r.FullTarget, r.Severity, r.Poc, r.Result, created,
 			r.FingerPrint, r.Extractor, strings.TrimSpace(node)); err != nil {
 			return n, err
 		}
+		// 证据与命中同一个事务写入：回填要么整批带上证据，要么整批不落。
+		if err := insertEvidenceTx(tx, r.Evidence, id, taskID); err != nil {
+			return n, err
+		}
 		n++
 	}
+
 	if err := tx.Commit(); err != nil {
 		return n, err
 	}
@@ -1480,7 +1555,8 @@ var ledgerGroupedSelect = `SELECT
 	COALESCE(l.note, '') AS note,
 	MAX(COALESCE(tp.project_id, '')) AS project_id,
 	COALESCE(l.updated_at, '') AS updated_at,
-	MAX(r.node) AS node
+	MAX(r.node) AS node,
+	MAX(r.id) AS result_id
   FROM ` + db2.TableName + ` r
   LEFT JOIN vuln_ledger l
 	ON l.vulid = r.vulid AND l.target = r.target AND l.fulltarget = r.fulltarget
@@ -1504,6 +1580,23 @@ type LedgerPage struct {
 	Page     int             `json:"page"`
 	PageSize int             `json:"page_size"`
 	Stats    db2.LedgerStats `json:"stats"`
+}
+
+// ledgerResultIDs 收集台账行对应的 result 主键（去重）。
+func ledgerResultIDs(items []db2.LedgerRow) []int64 {
+	out := make([]int64, 0, len(items))
+	seen := make(map[int64]struct{}, len(items))
+	for _, it := range items {
+		if it.ResultID <= 0 {
+			continue
+		}
+		if _, ok := seen[it.ResultID]; ok {
+			continue
+		}
+		seen[it.ResultID] = struct{}{}
+		out = append(out, it.ResultID)
+	}
+	return out
 }
 
 // normalizeList 归一化筛选值：小写、去空白、丢弃空项。
@@ -1589,6 +1682,14 @@ func SelectLedgerPage(f LedgerFilter) (*LedgerPage, error) {
 	}
 	for i := range page.Items {
 		page.Items[i].Severity = strings.ToUpper(page.Items[i].Severity)
+	}
+	// 补上证据 id：Agent 拿到一条命中后可以直接取证据，不用再猜 result id。
+	if ids := ledgerResultIDs(page.Items); len(ids) > 0 {
+		if evidenceIDs, err := SelectEvidenceIDsByResultIDs(ids); err == nil {
+			for i := range page.Items {
+				page.Items[i].EvidenceID = evidenceIDs[page.Items[i].ResultID]
+			}
+		}
 	}
 	if err := dbx.GetContext(ctx, &page.Total, countSQL, args...); err != nil {
 		return nil, err

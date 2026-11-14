@@ -119,4 +119,4 @@ Schedule configuration is stored in `~/.config/afrog/schedules.json`, separate f
 - Schedules are configuration: easy to back up and review by hand
 - Tasks are data: findings are kept long term
 
-> **← Previous:** [Web Scan Workspace](./08-web-console.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Docs home →:** [afrog Docs](../index.md)
+> **← Previous:** [Web Scan Workspace](./08-web-console.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Next →:** [MCP Server](./10-mcp.md)

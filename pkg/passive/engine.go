@@ -22,6 +22,12 @@ type EngineOptions struct {
 	Extractors []Extractor
 	// Prober 是注入给检测器的受控重放器。
 	Prober Prober
+	// OnObserved 在事务进入调度层的最前面回调，先于任何门控、短路与检测。
+	//
+	// 与 OnFinding 的分工是「事实」与「结论」：事务可能被判成重复、无兴趣或因队列
+	// 满被丢弃，但「代理看到过这次往返」这个事实独立成立。把发布放在这里，检测侧
+	// 再怎么做省流量优化，都不会让观测面漏事件。
+	OnObserved func(*CapturedTransaction)
 	// OnFinding 在发现通过门控与去重后回调，用于对接台账/事件流。
 	OnFinding func(Finding)
 	// OnExtraction 在提取物通过运行内去重后回调，用于对接提取面板。
@@ -131,7 +137,11 @@ type Stats struct {
 	// Extracted 是本地提取器上报的敏感信息条数（已过运行内去重）。
 	// 它是「提取能力是否在工作」的直接指标，与漏洞命中 reported 完全隔离。
 	Extracted uint64 `json:"extracted"`
-	Errors    uint64 `json:"errors"`
+	// Observed 是交给 OnObserved 的事务数，等于「代理吞进来的事实条数」。
+	// 它先于门控累计，因此可能大于 Inspected/Forwarded——差额正是被短路或丢弃的流量，
+	// 这些事务没有结论、但仍有观测。
+	Observed uint64 `json:"observed"`
+	Errors   uint64 `json:"errors"`
 }
 
 // Engine 是被动检测的调度层：接收代理事务、分发给检测器、执行置信度门控与去重。
@@ -205,7 +215,9 @@ type Engine struct {
 	reported        uint64
 	// extracted 是通过运行内去重后实际上报的提取物条数。
 	extracted uint64
-	errs      uint64
+	// observed 是已交给 OnObserved 回调的事务数。
+	observed uint64
+	errs     uint64
 }
 
 // localResult 是本地阶段（门控池内联执行）的产物统计。
@@ -302,6 +314,9 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 	if tx == nil {
 		return false
 	}
+	// 观测发布先于投递：队列满、引擎停止都只影响「会不会被检测」，不影响
+	// 「这条流量出现过」这一事实。发布是无网络请求的本地回调，放在入口不会拖慢代理。
+	e.publishObservation(tx)
 	atomic.AddUint64(&e.submitted, 1)
 	if e.cancel == nil {
 		atomic.AddUint64(&e.dropped, 1)
@@ -323,6 +338,27 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 		e.emitAllSkipped(tx, "待检队列已满，未检测（存在漏报风险）", VerdictDropped)
 		return false
 	}
+}
+
+// publishObservation 在入口发布一条观测，先于任何门控判断。
+//
+// 回调跑在代理 goroutine 上（Submit 的调用方），必须隔离 panic：一条坏事务不能
+// 打死整个代理入口。发布失败只计数，不影响这条事务继续被检测——观测是旁路，
+// 不能让它的故障反过来阻断主链路。
+func (e *Engine) publishObservation(tx *CapturedTransaction) {
+	if e.opts.OnObserved == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			atomic.AddUint64(&e.errs, 1)
+			if e.opts.OnError != nil {
+				e.opts.OnError("observation", fmt.Errorf("观测发布 panic: %v", r))
+			}
+		}
+	}()
+	e.opts.OnObserved(tx)
+	atomic.AddUint64(&e.observed, 1)
 }
 
 // Close 停止接收并等待在途事务处理完成。
@@ -354,6 +390,7 @@ func (e *Engine) Stats() Stats {
 		Duplicated:       atomic.LoadUint64(&e.duplicated),
 		Reported:         atomic.LoadUint64(&e.reported),
 		Extracted:        atomic.LoadUint64(&e.extracted),
+		Observed:         atomic.LoadUint64(&e.observed),
 		Errors:           atomic.LoadUint64(&e.errs),
 	}
 }

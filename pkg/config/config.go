@@ -23,7 +23,38 @@ type Config struct {
 	Cluster       Cluster    `yaml:"cluster"`
 	AI            AI         `yaml:"ai"`
 	Passive       Passive    `yaml:"passive"`
+	Observe       Observe    `yaml:"observe"`
 	Security      Security   `yaml:"security"`
+	Agent         Agent      `yaml:"agent"`
+}
+
+// DefaultObserveMaxRows 是观测流的默认保留上限。
+const DefaultObserveMaxRows = 200000
+
+// Agent 是 Web 端 Agent 写动作面（/api/v1/call）的策略来源。
+//
+// 与 `afrog mcp -policy/-audit` 同语义：这里给的是路径而不是内联策略，避免把
+// 策略 schema 在配置里再抄一遍。留空即沿用只读默认——Web 服务默认不获得发包能力。
+//
+// 示例：
+//
+//	agent:
+//	  policy: /etc/afrog/policy.yaml
+//	  audit: /var/log/afrog/agent-audit.jsonl
+type Agent struct {
+	// Policy 是策略 YAML 路径；留空表示只读默认策略。
+	Policy string `yaml:"policy"`
+	// Audit 是判定审计 JSONL 路径；留空表示不记录。
+	Audit string `yaml:"audit"`
+}
+
+// Observe 是观测流（observe.observations）的保留策略配置。
+type Observe struct {
+	// MaxRows 是单库保留的最大观测行数；nil 表示默认 200000，0 表示不限制。
+	//
+	// 用指针区分「没配」与「显式配 0」：前者应沿用安全默认值，后者是使用者
+	// 明确要求不裁剪。
+	MaxRows *int `yaml:"max_rows"`
 }
 
 // Security 是高危动作的统一闸门配置。

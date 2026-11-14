@@ -326,14 +326,14 @@ func rejectUnmappableOOBCredentials(spec *afrogv1.ScanSpec) error {
 		"oob_key / oob_domain 不能通过本接口下发：请在执行该任务的节点上的 afrog-config.yaml 里配置 OOB 凭据，spec 只需给 oob_adapter")
 }
 
-func fromProtoAction(action afrogv1.ControlAction) (scantask.Action, error) {
+func fromProtoAction(action afrogv1.ControlAction) (scantask.ControlAction, error) {
 	switch action {
 	case afrogv1.ControlAction_PAUSE:
-		return scantask.ActionPause, nil
+		return scantask.ControlPause, nil
 	case afrogv1.ControlAction_RESUME:
-		return scantask.ActionResume, nil
+		return scantask.ControlResume, nil
 	case afrogv1.ControlAction_CANCEL:
-		return scantask.ActionCancel, nil
+		return scantask.ControlCancel, nil
 	default:
 		return 0, status.Errorf(codes.InvalidArgument, "unknown control action %d", int32(action))
 	}

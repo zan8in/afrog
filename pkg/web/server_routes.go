@@ -192,6 +192,9 @@ func apiMiddleware(next http.Handler) http.Handler {
 func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/health", healthCheckHandler).Methods(http.MethodGet)
 
+	// Agent 只读 REST 面（/api/v1/*）：与 MCP 工具同名同语义，旧 /api/* 保持兼容。
+	registerAgentAPIRoutes(api)
+
 	// 认证与业务 API（复用现有处理器）
 	api.HandleFunc("/login", loginRateLimitMiddleware(loginHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler)).Methods(http.MethodPost)
@@ -199,6 +202,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/reports", jwtAuthMiddleware(reportsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/reports/detail/{id}", jwtAuthMiddleware(reportsDetailHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/reports/poc/{id}", jwtAuthMiddleware(pocDetailHandler)).Methods(http.MethodGet)
+	// 命中证据：既支持 result 主键，也支持 evd_ 内容寻址 id
+	api.HandleFunc("/evidence/{id}", jwtAuthMiddleware(evidenceDetailHandler)).Methods(http.MethodGet)
 	// 批量删除命中记录（报告页多选删除）
 	api.HandleFunc("/reports/delete", jwtAuthMiddleware(reportsDeleteHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/pocs/stats", jwtAuthMiddleware(pocsStatsHandler)).Methods(http.MethodGet)

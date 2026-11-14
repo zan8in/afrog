@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/proto"
@@ -25,6 +26,9 @@ type Result struct {
 	Output       string
 	FingerResult any
 	Extractor    yaml.MapSlice
+	// Evidence 是该命中的可重放证据链，由引擎在判定时原生产出。
+	// 只有真正命中（IsVul）时才会有值；同一份证据的 ID 由内容决定。
+	Evidence *evidence.Evidence
 }
 
 type PocResult struct {
@@ -77,6 +81,7 @@ func (r *Result) Snapshot() *Result {
 		FullTarget:   r.FullTarget,
 		Output:       r.Output,
 		FingerResult: r.FingerResult,
+		Evidence:     r.Evidence.Clone(),
 	}
 	if r.PocInfo != nil {
 		pi := *r.PocInfo

@@ -596,6 +596,11 @@ func (s *Scanner) run() error {
 	s.stats.EndTime = time.Now()
 	s.statsMu.Unlock()
 
+	// 主动停止（Stop / StopOnFirstMatch / Close）不是失败：此时 ctx 也会被取消，
+	// 但不能把 context.Canceled 当成扫描错误抛给调用方。
+	if s.stopping.Load() {
+		return nil
+	}
 	return s.ctx.Err()
 }
 

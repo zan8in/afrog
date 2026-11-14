@@ -43,22 +43,23 @@ func (s Status) Terminal() bool {
 	return false
 }
 
-// Action 是控制动作。
-type Action int
+// ControlAction 是任务控制动作（暂停/继续/取消），与 proto 的 ControlAction 同名同义。
+// 与代表原子工作单元的 Action 区分开。
+type ControlAction int
 
 const (
-	ActionPause Action = iota
-	ActionResume
-	ActionCancel
+	ControlPause ControlAction = iota
+	ControlResume
+	ControlCancel
 )
 
-func (a Action) String() string {
+func (a ControlAction) String() string {
 	switch a {
-	case ActionPause:
+	case ControlPause:
 		return "pause"
-	case ActionResume:
+	case ControlResume:
 		return "resume"
-	case ActionCancel:
+	case ControlCancel:
 		return "cancel"
 	default:
 		return "unknown"
@@ -167,6 +168,11 @@ type Snapshot struct {
 	Pausable bool
 	// Error 是失败原因，正常任务为空。
 	Error string
+
+	// ActionCount 是任务显式携带的动作数；扫描式批量为 0（动作由引擎展开）。
+	ActionCount int
+	// ActionKinds 是显式动作出现过的类型（去重）；扫描式批量为空。
+	ActionKinds []string
 
 	// LastSeq 是已产生事件的最大 seq。
 	LastSeq uint64

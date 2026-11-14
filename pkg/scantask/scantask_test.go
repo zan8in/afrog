@@ -466,7 +466,7 @@ func TestControl_PauseResumeCancel(t *testing.T) {
 		t.Fatalf("Subscribe: %v", err)
 	}
 
-	if err := rig.mgr.Control(id, ActionPause); err != nil {
+	if err := rig.mgr.Control(id, ControlPause); err != nil {
 		t.Fatalf("Pause: %v", err)
 	}
 	if !rig.exec.handle(t, id).isPaused() {
@@ -477,7 +477,7 @@ func TestControl_PauseResumeCancel(t *testing.T) {
 		t.Fatalf("snapshot = %+v, want paused and pausable", paused)
 	}
 
-	if err := rig.mgr.Control(id, ActionResume); err != nil {
+	if err := rig.mgr.Control(id, ControlResume); err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
 	if rig.exec.handle(t, id).isPaused() {
@@ -487,7 +487,7 @@ func TestControl_PauseResumeCancel(t *testing.T) {
 		t.Fatalf("status = %s, want running", got)
 	}
 
-	if err := rig.mgr.Control(id, ActionCancel); err != nil {
+	if err := rig.mgr.Control(id, ControlCancel); err != nil {
 		t.Fatalf("Cancel: %v", err)
 	}
 	snap := waitTerminal(t, rig, id, 10*time.Second)
@@ -510,7 +510,7 @@ func TestControl_PauseUnsupportedPlatformIsReported(t *testing.T) {
 	id := submit(t, rig)
 	waitStatus(t, rig, id, StatusRunning, 10*time.Second)
 
-	if err := rig.mgr.Control(id, ActionPause); !errors.Is(err, executor.ErrPauseUnsupported) {
+	if err := rig.mgr.Control(id, ControlPause); !errors.Is(err, executor.ErrPauseUnsupported) {
 		t.Fatalf("err = %v, want ErrPauseUnsupported", err)
 	}
 	if got := rig.task(t, id).Snapshot().Status; got != StatusRunning {
@@ -520,7 +520,7 @@ func TestControl_PauseUnsupportedPlatformIsReported(t *testing.T) {
 
 func TestControl_UnknownTask(t *testing.T) {
 	rig := newRig(t, Options{})
-	if err := rig.mgr.Control("nope", ActionPause); !errors.Is(err, ErrTaskNotFound) {
+	if err := rig.mgr.Control("nope", ControlPause); !errors.Is(err, ErrTaskNotFound) {
 		t.Fatalf("err = %v, want ErrTaskNotFound", err)
 	}
 }
@@ -549,7 +549,7 @@ func TestControl_CancelsQueuedTaskWithoutStealingASlot(t *testing.T) {
 	waitStatus(t, rig, running, StatusRunning, 10*time.Second)
 
 	queued := submit(t, rig)
-	if err := rig.mgr.Control(queued, ActionCancel); err != nil {
+	if err := rig.mgr.Control(queued, ControlCancel); err != nil {
 		t.Fatalf("cancel queued: %v", err)
 	}
 	snap := waitTerminal(t, rig, queued, 5*time.Second)
