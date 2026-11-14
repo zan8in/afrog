@@ -58,6 +58,7 @@ The sidebar groups pages by purpose:
 | --- | --- | --- |
 | Workspace | Overview | Data summary and recent activity |
 | | Scan | Launch scans, watch running and past tasks |
+| | Passive Scan | Built-in MITM proxy: find vulnerabilities in real traffic and record coverage |
 | | Schedules | Re-run the same scan configuration on a timer |
 | | Projects | A business unit: a set of assets plus its scan history |
 | | Assets | Targets sink in automatically; tag and star them |
@@ -140,6 +141,19 @@ The Scan workbench now has an **Execution node** selector (online peers plus thi
 - **Dispatch by project**: pick a project on the initiator and dispatch. The initiator resolves it to a concrete target list locally before sending, so the executor needs no copy of that project and files the task under nothing at all; when the initiator backfills the findings it registers them under the originating project, so the project's ledger filter and project report show those remote findings too
 - **Schedules can dispatch too**: the schedule form offers the same **Execution node** field, so a recurring scan is handed to that node automatically when it fires (see [Scheduled scans](./09-scheduled-scans.md))
 - **Requirements**: both sides must share the same `cluster.token` (an instance without a token accepts no dispatches), and only Curated members can dispatch
+
+## Passive scanning (quick tour)
+
+The **Passive Scan** page turns real traffic into a detection entry point: once enabled, afrog starts a local MITM proxy (`127.0.0.1:16869` by default) and your browser or app sends traffic through it. For HTTPS, download the CA certificate on the page and import it as a trusted root first.
+
+- **Two-stage pipeline**: the gate pool decides with zero traffic whether detection is worthwhile; only the detect pool replays. "Captured grows faster than inspected" is expected.
+- **Coverage**: per "asset × detector", whether it was tested and if not why (states never downgrade; a skip cannot erase an earlier test).
+- **Evidence lineage**: a passive finding shows its asset anchor, judging technique, and a coverage snapshot for the same asset.
+- **Asset relations**: the **Relations** button on the Assets page shows a CIDR → IP → host:port → URL parent/child graph, derived programmatically.
+- **Next-step suggestions**: the Overview page derives re-scan lists and jump links with deterministic rules.
+- **Security gate**: `security.actions` sets cluster dispatch and passive sensitive-path probing to allow / deny / ask, with `allow_targets` as a hard boundary.
+
+See [Passive Scanning and Coverage](../web/11-passive.md) for the full chapter.
 
 ## Assets, projects, and the ledger
 

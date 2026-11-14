@@ -55,6 +55,7 @@ The sidebar groups pages by purpose:
 | --- | --- | --- |
 | Workspace | Overview | Data summary, recent activity, and multi-instance status |
 | | Scan | Launch scans, view running and past tasks |
+| | Passive Scan | Built-in MITM proxy: find vulnerabilities in real traffic and record coverage |
 | | Schedules | Re-run the same scan configuration on a timer or periodically (member) |
 | | Projects | An organizing unit: a set of assets plus their scan history |
 | | Assets | Scanned targets sink in automatically; tag and star them |
@@ -82,6 +83,7 @@ The sidebar groups pages by purpose:
 | [Multiple Instances and Remote Dispatch](./08-cluster.md) | Node aggregation, cross-node execution and finding backfill |
 | [AI Assist](./09-ai.md) | Finding verdicts, report summaries, parameter recommendations |
 | [Settings](./10-settings.md) | Account, notifications, OOB, AI, service info |
+| [Passive Scanning and Coverage](./11-passive.md) | Two-stage pipeline, coverage matrix, evidence lineage, asset relations, next-step suggestions, security gate |
 
 If you would like a one-page quick tour first, read [Web Scan Workspace (quick tour)](../user-guide/08-web-console.md).
 
