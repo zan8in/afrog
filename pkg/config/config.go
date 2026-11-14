@@ -23,6 +23,30 @@ type Config struct {
 	Cluster       Cluster    `yaml:"cluster"`
 	AI            AI         `yaml:"ai"`
 	Passive       Passive    `yaml:"passive"`
+	Security      Security   `yaml:"security"`
+}
+
+// Security 是高危动作的统一闸门配置。
+//
+// 默认全部 allow，保持既有行为不变；一旦配置 allow_targets，它就是硬边界：
+// 白名单外的目标一律拒绝，与 Actions 里的 mode 无关。
+//
+// 示例：
+//
+//	security:
+//	  actions:
+//	    cluster-dispatch: ask
+//	  allow_targets:
+//	    - corp.example
+//	    - "*.corp.example"
+//	    - 10.0.0.0/8
+type Security struct {
+	// Actions 按动作配置处置方式：allow / deny / ask。
+	// 未知动作名会被忽略，未知 mode 会退回 allow。
+	Actions map[string]string `yaml:"actions"`
+	// AllowTargets 是高危动作的目标白名单：精确 host、通配后缀（*.example.com）
+	// 或 CIDR。为空表示不限制目标。
+	AllowTargets []string `yaml:"allow_targets"`
 }
 
 // 被动扫描的默认参数。

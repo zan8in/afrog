@@ -24,6 +24,7 @@ import (
 const passiveFindingDDL = `CREATE TABLE IF NOT EXISTS "passive_finding" (
 	"id" INTEGER PRIMARY KEY AUTOINCREMENT,
 	"project_id" TEXT NOT NULL DEFAULT '',
+	"asset_id" TEXT NOT NULL DEFAULT '',
 	"fingerprint" TEXT NOT NULL DEFAULT '',
 	"detector" TEXT NOT NULL DEFAULT '',
 	"vuln_type" TEXT NOT NULL DEFAULT '',
@@ -85,7 +86,12 @@ const (
 type PassiveFinding struct {
 	ID int64 `db:"id" json:"id"`
 	// ProjectID 是作用域：命中的归属渗透项目。空串表示「未归属」。
-	ProjectID   string `db:"project_id" json:"project_id"`
+	ProjectID string `db:"project_id" json:"project_id"`
+	// AssetID 是血缘锚点：命中所属的资产 id（按 target 的 authority 匹配）。
+	//
+	// 空串表示未能锚定（例如目标从未进入资产库）。它不是外键——资产被删除后
+	// 命中记录仍需保留，血缘只作展示，不作为一致性约束。
+	AssetID     string `db:"asset_id" json:"asset_id"`
 	Fingerprint string `db:"fingerprint" json:"fingerprint"`
 	Detector    string `db:"detector" json:"detector"`
 	VulnType    string `db:"vuln_type" json:"vuln_type"`
@@ -195,11 +201,11 @@ func UpsertPassiveFinding(f PassiveFinding) (int64, string, int64, error) {
 
 	if err == sql.ErrNoRows {
 		res, err := tx.ExecContext(ctx, `INSERT INTO "passive_finding"
-			(project_id, fingerprint, detector, vuln_type, severity, confidence, title, target, location,
+			(project_id, asset_id, fingerprint, detector, vuln_type, severity, confidence, title, target, location,
 			 payload, evidence, latency_ms, traces, request, response, extra,
 			 hit_count, first_seen, last_seen, state, created, promoted, result_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0, '')`,
-			f.ProjectID, f.Fingerprint, f.Detector, f.VulnType, f.Severity, f.Confidence, f.Title,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, 0, '')`,
+			f.ProjectID, f.AssetID, f.Fingerprint, f.Detector, f.VulnType, f.Severity, f.Confidence, f.Title,
 			f.Target, f.Location, f.Payload, f.Evidence, f.LatencyMs, traces, f.Request, f.Response, extra,
 			now, now, PassiveStateNew, created)
 		if err != nil {
@@ -228,10 +234,12 @@ func UpsertPassiveFinding(f PassiveFinding) (int64, string, int64, error) {
 	_, err = tx.ExecContext(ctx, `UPDATE "passive_finding" SET
 		detector = ?, vuln_type = ?, severity = ?, confidence = ?, title = ?, target = ?, location = ?,
 		payload = ?, evidence = ?, latency_ms = ?, traces = ?, request = ?, response = ?, extra = ?,
+		asset_id = CASE WHEN ? <> '' THEN ? ELSE asset_id END,
 		hit_count = ?, last_seen = ?, state = ?
 		WHERE id = ?`,
 		f.Detector, f.VulnType, f.Severity, f.Confidence, f.Title, f.Target, f.Location,
 		f.Payload, f.Evidence, f.LatencyMs, traces, f.Request, f.Response, extra,
+		f.AssetID, f.AssetID,
 		nextHit, now, nextState, existing.ID)
 	if err != nil {
 		return 0, "", 0, err
@@ -310,7 +318,7 @@ func SelectPassiveFindings(flt PassiveFindingFilter) ([]PassiveFinding, int64, e
 		return nil, 0, err
 	}
 
-	listSQL := `SELECT id, project_id, fingerprint, detector, vuln_type, severity, confidence, title,
+	listSQL := `SELECT id, project_id, asset_id, fingerprint, detector, vuln_type, severity, confidence, title,
 		target, location, payload, evidence, latency_ms, extra, hit_count, first_seen, last_seen,
 		state, created, promoted, result_id
 		FROM "passive_finding"` + cond + ` ORDER BY last_seen DESC, id DESC LIMIT ? OFFSET ?`
@@ -348,7 +356,7 @@ func GetPassiveFinding(id int64) (*PassiveFindingDetail, error) {
 		Request  string `db:"request"`
 		Response string `db:"response"`
 	}
-	err := dbx.GetContext(ctx, &row, `SELECT id, project_id, fingerprint, detector, vuln_type, severity,
+	err := dbx.GetContext(ctx, &row, `SELECT id, project_id, asset_id, fingerprint, detector, vuln_type, severity,
 		confidence, title, target, location, payload, evidence, latency_ms, traces, extra, hit_count,
 		first_seen, last_seen, state, created, promoted, result_id, request, response
 		FROM "passive_finding" WHERE id = ?`, id)

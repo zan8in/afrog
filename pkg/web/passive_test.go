@@ -50,6 +50,8 @@ func TestPassiveRoutesRequireAuth(t *testing.T) {
 		// 敏感信息提取物（HAE 等价能力）同样可能含明文密钥，必须登录后可见。
 		{http.MethodGet, "/api/passive/extractions"},
 		{http.MethodGet, "/api/passive/extractions/1"},
+		// 覆盖度台账会暴露被测资产全貌，同样属于高敏感信息。
+		{http.MethodGet, "/api/passive/coverage"},
 	}
 
 	for _, tc := range cases {

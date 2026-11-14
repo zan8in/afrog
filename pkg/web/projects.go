@@ -136,6 +136,11 @@ func normalizeProjectTargets(in []string) []string {
 			continue
 		}
 		nt := normalizeAddress(ts)
+		// 与资产入库同口径：像 "21" 这类脏目标不进资产表，避免旧项目迁移
+		// 每次都把它重新灌回来（清洗后又被重建）。
+		if nt == "" || !sqlite.IsScannableAddress(nt) {
+			continue
+		}
 		if seen[nt] {
 			continue
 		}

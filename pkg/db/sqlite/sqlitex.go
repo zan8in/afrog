@@ -113,6 +113,11 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating asset table: %v", err)
 	}
 
+	// 资产图：URL → authority → IP → 网段的程序化父子关系。
+	if err = ensureAssetEdge(); err != nil {
+		return fmt.Errorf("error creating asset edge table: %v", err)
+	}
+
 	if _, err = execBusyRetry(scanTaskDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating scan task table: %v", err)
 	}
@@ -144,6 +149,12 @@ func NewWebSqliteDB() error {
 		return fmt.Errorf("error creating passive extraction indexes: %v", err)
 	}
 
+	// 覆盖度台账：按 (项目, 资产, 检测器) 聚合「测没测、没测为什么」。
+	// 它与命中表分离：命中回答「发现了什么」，覆盖度回答「还有哪里没看」。
+	if err = ensurePassiveCoverage(); err != nil {
+		return fmt.Errorf("error creating passive coverage table: %v", err)
+	}
+
 	if _, err = execBusyRetry(aiDDL); err != nil && !strings.Contains(err.Error(), "already exists") {
 		return fmt.Errorf("error creating ai tables: %v", err)
 	}
@@ -158,6 +169,10 @@ func NewWebSqliteDB() error {
 
 	if err = ensurePassiveTracesColumn(); err != nil {
 		return fmt.Errorf("error migrating passive finding table: %v", err)
+	}
+
+	if err = ensurePassiveAssetColumn(); err != nil {
+		return fmt.Errorf("error migrating passive finding asset column: %v", err)
 	}
 
 	return dbx.Ping()
@@ -274,6 +289,25 @@ func ensurePassiveTracesColumn() error {
 	}
 
 	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "traces" TEXT NOT NULL DEFAULT '[]'`)
+	return err
+}
+
+// ensurePassiveAssetColumn 给已有库补上 passive_finding.asset_id 列。
+//
+// 血缘锚点：老库缺这一列时，upsert 与详情查询都会直接报 no such column。
+func ensurePassiveAssetColumn() error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	hasCol, err := hasTableColumn("passive_finding", "asset_id")
+	if err != nil {
+		return err
+	}
+	if hasCol {
+		return nil
+	}
+
+	_, err = execBusyRetry(`ALTER TABLE "passive_finding" ADD COLUMN "asset_id" TEXT NOT NULL DEFAULT ''`)
 	return err
 }
 

@@ -43,6 +43,21 @@ func StartServer(addr string) error {
 	// 一次性升级：旧版项目里独立保存的 targets 改为对资产的引用。
 	migrateProjectsToAssets()
 
+	// 历史脏资产清洗：只删「从未扫描、未收藏/打标签/归档」的无效地址（如 "21"），
+	// 避免它们混进「一键扫描」建议。失败只记日志，不影响启动。
+	if n, err := sqlite.CleanupInvalidAssets(); err != nil {
+		gologger.Debug().Msgf("无效资产清理失败: %v", err)
+	} else if n > 0 {
+		gologger.Info().Msgf("已清理 %d 条无效资产（无法作为扫描目标的地址）", n)
+	}
+
+	// 历史资产补建图边：新库为空几乎无开销；失败只记日志，不影响启动。
+	if n, err := sqlite.BackfillAssetGraph(5000); err != nil {
+		gologger.Debug().Msgf("资产图补建失败: %v", err)
+	} else if n > 0 {
+		gologger.Info().Msgf("资产图补建完成: %d 条资产", n)
+	}
+
 	// 初始化系统监控
 	InitMonitor()
 	defer StopMonitor() // 确保退出时停止

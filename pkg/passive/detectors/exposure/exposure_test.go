@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/zan8in/afrog/v3/pkg/guard"
 	"github.com/zan8in/afrog/v3/pkg/passive"
 )
 
@@ -251,6 +252,44 @@ func TestInterestSkipsStaticAssets(t *testing.T) {
 	d := New(DefaultOptions())
 	if d.Interest(newTx(t, "https://example.com/static/app.js")) {
 		t.Fatalf("静态资源不应触发探针")
+	}
+}
+
+// TestGuardDeniesProbe 锁定闸门语义：deny/ask 与白名单硬边界都必须挡住探针，
+// 且跳过原因能直接展示（而不是笼统的「已完成探测」）。
+func TestGuardDeniesProbe(t *testing.T) {
+	t.Cleanup(func() { guard.Configure(nil, nil) })
+
+	// deny：该动作整体关闭。
+	guard.Configure(map[string]string{"exposure-probe": "deny"}, nil)
+	d := New(DefaultOptions())
+	tx := newTx(t, "https://example.com/")
+	if d.Interest(tx) {
+		t.Fatalf("deny 模式下不应认领探测权")
+	}
+	if reason := d.InterestReason(tx); !strings.Contains(reason, "安全策略") {
+		t.Fatalf("拒绝原因应指向安全策略，实际 = %q", reason)
+	}
+	// 同一 origin 的后续流量走缓存：既不重复裁决，也不能放行。
+	if d.Interest(newTx(t, "https://example.com/other")) {
+		t.Fatalf("被拒的 origin 不应在后续流量上重新认领")
+	}
+
+	// 白名单是硬边界：名单外的 origin 不探，名单内的照常探。
+	guard.Configure(nil, []string{"*.corp.example"})
+	d2 := New(DefaultOptions())
+	if d2.Interest(newTx(t, "https://evil.example/")) {
+		t.Fatalf("白名单外的 origin 不应探测")
+	}
+	if !d2.Interest(newTx(t, "https://api.corp.example/")) {
+		t.Fatalf("白名单内的 origin 应可探测")
+	}
+
+	// ask 在无人值守的服务端等价于拒绝，绝不静默放行。
+	guard.Configure(map[string]string{"exposure-probe": "ask"}, nil)
+	d3 := New(DefaultOptions())
+	if d3.Interest(newTx(t, "https://example.com/")) {
+		t.Fatalf("ask 模式下不应自动放行")
 	}
 }
 

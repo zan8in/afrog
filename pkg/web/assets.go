@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,24 +21,11 @@ import (
 // 项目、任务、后续的计划任务都只「引用」资产，不再各自存一份目标。
 
 // classifyAddress 判定归一化后地址的类型，供列表分组与图标展示。
+//
+// 实现下沉到 sqlite.ClassifyAssetAddress：资产图推导用的是同一套判定，
+// 两处各写一份必然漂移（例如新增一种类型时只改了一边）。
 func classifyAddress(addr string) string {
-	s := strings.TrimSpace(addr)
-	if s == "" {
-		return ""
-	}
-	if i := strings.Index(s, "://"); i > 0 {
-		return "url"
-	}
-	if ip := net.ParseIP(s); ip != nil {
-		return "ip"
-	}
-	if _, _, err := net.ParseCIDR(s); err == nil {
-		return "cidr"
-	}
-	if _, _, err := net.SplitHostPort(s); err == nil {
-		return "hostport"
-	}
-	return "domain"
+	return sqlite.ClassifyAssetAddress(addr)
 }
 
 // buildAssetInputs 把原始行整理成可入库的目标，返回整理后的输入与被忽略的条数。
@@ -57,7 +43,9 @@ func buildAssetInputs(raw []string) ([]sqlite.AssetInput, int) {
 			continue
 		}
 		addr := normalizeAddress(t)
-		if addr == "" {
+		// 归一化后再校验一次可执行性：像 "21" 这种把端口误当主机的条目语法上合法，
+		// 但永远扫不出结果，不该进资产库（历史数据由 CleanupInvalidAssets 清理）。
+		if addr == "" || !sqlite.IsScannableAddress(addr) {
 			invalid++
 			continue
 		}

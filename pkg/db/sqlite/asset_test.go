@@ -224,3 +224,60 @@ func TestDeleteAssetsCascadesProjectMembership(t *testing.T) {
 		t.Fatalf("仍残留 %d 条指向已删除资产的成员关系", orphans)
 	}
 }
+
+// TestIsScannableAddress 锁定「可执行目标」的判定口径。
+//
+// 规则刻意保守：只拒绝「纯数字/点且不是合法 IP」的主机，单标签内网名必须保留。
+func TestIsScannableAddress(t *testing.T) {
+	valid := []string{
+		"127.0.0.1", "10.0.0.0/24", "::1", "[::1]:8080",
+		"example.com", "jira", "21.example.com", "114.55.210.29:22",
+		"https://api.example.com/x", "https://[::1]:8443/api", "http://10.0.0.5:8080/api",
+	}
+	for _, addr := range valid {
+		if !IsScannableAddress(addr) {
+			t.Errorf("%q 应被判为可扫描", addr)
+		}
+	}
+	invalid := []string{"", "  ", "21", "1.2.3", "65535", "https://21/x", "21:80"}
+	for _, addr := range invalid {
+		if IsScannableAddress(addr) {
+			t.Errorf("%q 不应被判为可扫描", addr)
+		}
+	}
+}
+
+// TestCleanupInvalidAssets 锁定清洗范围：只删从未扫描、未收藏/打标签/归档的无效地址。
+func TestCleanupInvalidAssets(t *testing.T) {
+	withAssetFixture(t)
+
+	if _, err := CreateAssets("manual", "", nil, []AssetInput{
+		{Address: "21", Type: "domain"},
+		{Address: "1.2.3", Type: "domain"},
+		{Address: "10.0.0.0/24", Type: "cidr"},
+	}); err != nil {
+		t.Fatalf("CreateAssets: %v", err)
+	}
+	// 打过标签的脏资产附着用户意图，不在此次清洗范围内。
+	if _, err := CreateAssets("manual", "", []string{"keep"}, []AssetInput{
+		{Address: "22", Type: "domain"},
+	}); err != nil {
+		t.Fatalf("CreateAssets(tagged): %v", err)
+	}
+
+	n, err := CleanupInvalidAssets()
+	if err != nil {
+		t.Fatalf("CleanupInvalidAssets: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("清理条数 = %d, want 2", n)
+	}
+
+	page, err := ListAssets(AssetFilter{View: "all", PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListAssets: %v", err)
+	}
+	if page.Total != 2 {
+		t.Fatalf("剩余资产 = %d, want 2（网段 + 带标签脏资产）", page.Total)
+	}
+}

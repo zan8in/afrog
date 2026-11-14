@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/gologger"
 )
 
 // 多实例编排（v2：远程派发 —— 执行节点一侧）。
@@ -89,6 +90,15 @@ func clusterInboundDispatchHandler(w http.ResponseWriter, r *http.Request) {
 	if dispatchID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: "缺少 dispatch_id"})
+		return
+	}
+
+	// 安全闸门放在幂等登记之前：被拒绝的派发不能占用 dispatch_id 占位，
+	// 否则用户补上白名单后重试会被误判成「已开始」。
+	if reason := checkDispatchGuard(req.Request); reason != "" {
+		gologger.Warning().Msgf("集群派发被安全闸门拒绝: %s", reason)
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(APIResponse{Success: false, Message: reason})
 		return
 	}
 

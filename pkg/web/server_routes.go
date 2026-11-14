@@ -288,6 +288,12 @@ func registerAPIRoutes(api *mux.Router) {
 	// 敏感信息提取（HAE 等价能力）：独立于漏洞台账的产物通道。
 	api.HandleFunc("/passive/extractions", jwtAuthMiddleware(passiveExtractionsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/extractions/{id}", jwtAuthMiddleware(passiveExtractionDetailHandler)).Methods(http.MethodGet)
+	// 覆盖度台账：按 (资产, 检测器) 回答「测没测、没测为什么」，并列出从未被覆盖的资产。
+	api.HandleFunc("/passive/coverage", jwtAuthMiddleware(passiveCoverageHandler)).Methods(http.MethodGet)
+	// 安全闸门：当前策略与最近的裁决记录（只读，改策略需改配置文件）。
+	api.HandleFunc("/security/policy", jwtAuthMiddleware(securityPolicyHandler)).Methods(http.MethodGet)
+	// 下一步建议：由资产/覆盖度/命中推导的确定性规则，附闸门概览。
+	api.HandleFunc("/suggestions", jwtAuthMiddleware(suggestionsHandler)).Methods(http.MethodGet)
 	// 数据库可观测：连接池排队与慢查询。只读，不修改任何数据。
 	api.HandleFunc("/diagnostics/db", jwtAuthMiddleware(dbDiagnosticsHandler)).Methods(http.MethodGet)
 	// 多实例编排：/cluster/self 供同伴实例互访（走集群共享密钥，不走 JWT），
@@ -339,6 +345,8 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/assets", jwtAuthMiddleware(assetsListHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/assets", jwtAuthMiddleware(assetsCreateHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/assets/facets", jwtAuthMiddleware(assetsFacetsHandler)).Methods(http.MethodGet)
+	// 资产图：按程序化推导的父子关系返回上游归属与下游穿透，并附带覆盖度汇总。
+	api.HandleFunc("/assets/graph", jwtAuthMiddleware(assetsGraphHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/assets/update", jwtAuthMiddleware(assetsUpdateHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/assets/delete", jwtAuthMiddleware(assetsDeleteHandler)).Methods(http.MethodPost)
 }

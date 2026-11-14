@@ -221,6 +221,8 @@ func (rt *passiveRuntime) start() error {
 	// 归属项目在启动这一瞬固定下来：之后所有命中都记到这个项目名下。为空即「未归属」，
 	// 仍按无项目归档——不因为没选项目就丢弃命中。
 	projectID := cfg.ProjectID
+	// 覆盖度与命中同口径：项目在启动时固定，内存聚合在启动时清空。
+	passiveCoverage.reset(projectID, cfg.EnabledDetectors())
 
 	engine := passive.NewEngine(passive.EngineOptions{
 		Detectors:  buildDetectors(cfg.EnabledDetectors()),
@@ -230,6 +232,9 @@ func (rt *passiveRuntime) start() error {
 		// 提取物走独立通道落库：它不进漏洞台账，与命中在表、去重口径、面板上都分离。
 		OnExtraction: func(x passive.Extraction) { rt.onExtraction(projectID, x) },
 		OnTraffic:    passiveTraffic.add,
+		// 覆盖度按 (资产, 检测器) 累计：它回答的是「这块测没测、没测为什么」，
+		// 与逐请求的实时流量是两个维度，因此单独一条通道。
+		OnCoverage: passiveCoverage.observe,
 		OnError: func(detector string, err error) {
 			passiveTraffic.recordError("detector:"+detector, err)
 			gologger.Debug().Msgf("被动检测异常: detector=%s err=%v", detector, err)
@@ -251,7 +256,12 @@ func (rt *passiveRuntime) start() error {
 		OnTransaction: func(tx *passive.CapturedTransaction) {
 			engine.Submit(tx)
 		},
-		OnTraffic: passiveTraffic.add,
+		OnTraffic: func(ev passive.TrafficEvent) {
+			passiveTraffic.add(ev)
+			// 代理层直接放过的流量（范围外 / 非幂等方法 / 二进制静态）进不了调度层，
+			// 但「为什么没测」的答案在覆盖度台账里同样重要，这里补记一行 skipped。
+			passiveCoverage.observeProxySkip(ev)
+		},
 		OnError: func(scope string, err error) {
 			passiveTraffic.recordError(scope, err)
 		},
@@ -291,6 +301,10 @@ func (rt *passiveRuntime) stop() {
 		rt.engine.Close()
 		rt.engine = nil
 	}
+	// 停止前把内存里尚未落盘的覆盖度写出去，避免「刚跑完就停」丢掉最后一段。
+	if err := passiveCoverage.flush(); err != nil {
+		gologger.Debug().Msgf("停止时覆盖度刷盘失败: %v", err)
+	}
 	rt.startedAt = time.Time{}
 	gologger.Info().Msg("被动扫描代理已停止")
 }
@@ -317,7 +331,9 @@ func (rt *passiveRuntime) onFinding(projectID string, f passive.Finding) {
 	}
 
 	id, state, hitCount, err := sqlite.UpsertPassiveFinding(sqlite.PassiveFinding{
-		ProjectID:   projectID,
+		ProjectID: projectID,
+		// 血缘锚点：命中落在哪台资产上。匹配不到就留空，不阻断落库。
+		AssetID:     resolveAssetIDForHost(projectID, coverageHostFromURL(f.Target)),
 		Fingerprint: passiveFingerprint(f),
 		Detector:    f.Detector,
 		VulnType:    f.VulnType,
@@ -912,14 +928,48 @@ func passiveExtractionDetailHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "ok", Data: newPassiveExtractionDetailView(detail)})
 }
 
+// findingAssetRef 是血缘链上的资产节点。
+type findingAssetRef struct {
+	ID      string `json:"id"`
+	Address string `json:"address"`
+	Type    string `json:"type"`
+	Host    string `json:"host"`
+}
+
+// findingLineage 把「这条命中凭什么成立、落在哪台资产上」摊成结构化摘要。
+//
+// 它不是新的事实来源，而是对既有证据的重新组织：
+// 资产 → 检测器 → 注入点 → 判定手法 → 证据步数 → 结论。
+// 前端据此渲染血缘条，使用者不用再自己从报文里拼因果。
+type findingLineage struct {
+	Host       string           `json:"host"`
+	Asset      *findingAssetRef `json:"asset,omitempty"`
+	Detector   string           `json:"detector"`
+	VulnType   string           `json:"vuln_type"`
+	Location   string           `json:"location"`
+	Technique  string           `json:"technique,omitempty"`
+	Dialect    string           `json:"dialect,omitempty"`
+	Evasion    string           `json:"evasion,omitempty"`
+	Construct  string           `json:"construct,omitempty"`
+	TraceSteps int              `json:"trace_steps"`
+	// Source 标明结论来源：passive（被动直出）或 promoted（已提升为台账）。
+	Source string `json:"source"`
+}
+
 // passiveFindingDetailView 是详情接口的对外形态：把库里的证据链 JSON 解析成数组，
-// 前端直接渲染，不必再解析一次。
+// 前端直接渲染，不必再解析一次；并附上血缘锚点与同资产的覆盖度快照。
 type passiveFindingDetailView struct {
 	*sqlite.PassiveFindingDetail
-	Traces []passive.Trace `json:"traces"`
+	Traces   []passive.Trace          `json:"traces"`
+	Lineage  findingLineage           `json:"lineage"`
+	Coverage []sqlite.PassiveCoverage `json:"coverage"`
 }
 
 func newPassiveFindingDetailView(d *sqlite.PassiveFindingDetail) passiveFindingDetailView {
+	view := passiveFindingDetailView{Coverage: []sqlite.PassiveCoverage{}}
+	if d == nil {
+		return view
+	}
 	traces := parsePassiveTraces(d)
 	// 兼容早期只存单条请求/响应的记录：界面上永远有东西可看。
 	if len(traces) == 0 && (d.Request != "" || d.Response != "") {
@@ -931,7 +981,71 @@ func newPassiveFindingDetailView(d *sqlite.PassiveFindingDetail) passiveFindingD
 			Response:  d.Response,
 		}}
 	}
-	return passiveFindingDetailView{PassiveFindingDetail: d, Traces: traces}
+	view.PassiveFindingDetail = d
+	view.Traces = traces
+
+	host := coverageHostFromURL(d.Target)
+	lineage := findingLineage{
+		Host:       host,
+		Detector:   d.Detector,
+		VulnType:   d.VulnType,
+		Location:   d.Location,
+		TraceSteps: len(traces),
+		Source:     "passive",
+	}
+	if d.Promoted == 1 {
+		lineage.Source = "promoted"
+	}
+
+	// 资产锚点：优先用落库时记下的 id；老记录没有这一列，按 host 现算一次。
+	lineage.Asset = loadFindingAsset(d.AssetID, d.ProjectID, host, host)
+
+	// 判定手法来自检测器私有字段；缺省时留空，由前端隐藏。
+	if strings.TrimSpace(d.Extra) != "" {
+		var extra map[string]any
+		if err := json.Unmarshal([]byte(d.Extra), &extra); err == nil {
+			lineage.Technique = extraString(extra["technique"])
+			lineage.Dialect = extraString(extra["dialect"])
+			lineage.Evasion = extraString(extra["evasion"])
+			lineage.Construct = extraString(extra["construct"])
+		}
+	}
+	view.Lineage = lineage
+
+	// 同一资产的覆盖度快照：把命中放回「这块还测了什么」的上下文里。
+	if host != "" {
+		if cov, err := sqlite.SelectCoverageForHost(d.ProjectID, host); err == nil && cov != nil {
+			view.Coverage = cov
+		}
+	}
+	return view
+}
+
+// loadFindingAsset 解析血缘资产：先按 id 直取，失配时按 host 重新锚定。
+func loadFindingAsset(assetID, projectID, host, displayHost string) *findingAssetRef {
+	if id := strings.TrimSpace(assetID); id != "" {
+		if a, err := sqlite.SelectAssetByID(id); err == nil && a != nil {
+			return &findingAssetRef{ID: a.ID, Address: a.Address, Type: a.Type, Host: displayHost}
+		}
+	}
+	if strings.TrimSpace(host) == "" {
+		return nil
+	}
+	id := resolveAssetIDForHost(projectID, host)
+	if id == "" {
+		return nil
+	}
+	a, err := sqlite.SelectAssetByID(id)
+	if err != nil || a == nil {
+		return nil
+	}
+	return &findingAssetRef{ID: a.ID, Address: a.Address, Type: a.Type, Host: displayHost}
+}
+
+// extraString 从检测器私有字段里安全取字符串。
+func extraString(v any) string {
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
 }
 
 // parsePassiveTraces 解析证据链；老记录或坏数据返回空切片。

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -230,6 +232,12 @@ func upsertAssets(inputs []AssetInput, opts assetUpsertOptions) (AssetSinkResult
 		if err := touchScannedAssets(ctx, tx, ids, opts.TaskID, now); err != nil {
 			return out, err
 		}
+	}
+
+	// 补齐资产图：authority → URL、ip/domain → hostport、/24 → ip。
+	// 只写关系不写节点：推导出的 host/IP 不应改变资产库的统计口径。
+	if err := applyAssetGraph(ctx, tx, rows, now); err != nil {
+		return out, err
 	}
 
 	return out, tx.Commit()
@@ -606,6 +614,54 @@ func UpdateAssets(ids []string, addTags, removeTags []string, starred, archived 
 	return affected, tx.Commit()
 }
 
+// IsScannableAddress 判定一个已归一化的资产地址是否是可执行的扫描目标。
+//
+// 只做本机语法推导，不做 DNS 解析。资产表里偶尔会混进把端口误存成主机的条目
+// （例如 "21"），这类目标起扫必然失败，不该被「一键扫描」之类的建议带出去。
+// 判定刻意保守：只拒绝「纯数字/点且不是合法 IP」的主机，避免误伤单标签内网名
+// （jira、intranet 这类）。
+func IsScannableAddress(addr string) bool {
+	s := strings.TrimSpace(addr)
+	if s == "" {
+		return false
+	}
+	if net.ParseIP(strings.Trim(s, "[]")) != nil {
+		return true
+	}
+	if _, _, err := net.ParseCIDR(s); err == nil {
+		return true
+	}
+	if i := strings.Index(s, "://"); i > 0 {
+		u, err := url.Parse(s)
+		if err != nil {
+			return false
+		}
+		return scannableHost(u.Hostname())
+	}
+	host := s
+	if h, _, err := net.SplitHostPort(s); err == nil {
+		host = h
+	}
+	return scannableHost(host)
+}
+
+// scannableHost 判定主机部分是否可能被解析。
+func scannableHost(host string) bool {
+	host = strings.Trim(host, "[]")
+	if host == "" {
+		return false
+	}
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	for _, r := range host {
+		if (r < '0' || r > '9') && r != '.' {
+			return true
+		}
+	}
+	return false
+}
+
 // DeleteAssets 批量删除资产，同时清掉它们的扫描轨迹与项目引用，避免留下孤儿记录。
 // 按块执行，删除上万条时不会因为 IN 里的占位符过多而失败。
 func DeleteAssets(ids []string) (int64, error) {
@@ -643,6 +699,12 @@ func DeleteAssets(ids []string) (int64, error) {
 			`DELETE FROM scan_target WHERE address IN (`+holders+`)`, args...); err != nil {
 			return 0, err
 		}
+		// 图上的边同样不能指向不存在的节点；两端任一侧被删都要清理。
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM asset_edge WHERE parent_id IN (`+holders+`) OR child_id IN (`+holders+`)`,
+			append(append([]interface{}{}, args...), args...)...); err != nil {
+			return 0, err
+		}
 		res, err := tx.ExecContext(ctx,
 			`DELETE FROM asset WHERE id IN (`+holders+`)`, args...)
 		if err != nil {
@@ -652,6 +714,45 @@ func DeleteAssets(ids []string) (int64, error) {
 		total += n
 	}
 	return total, tx.Commit()
+}
+
+// CleanupInvalidAssets 清理历史上混进来的无效资产（例如把端口 "21" 误存成域名）。
+//
+// 只处理「从未扫描、未收藏、未打标签、未归档」的行：它们不可能是有效目标，
+// 也没有用户意图附着。返回删除条数，便于启动日志留痕。
+func CleanupInvalidAssets() (int64, error) {
+	if dbx == nil {
+		return 0, fmt.Errorf("sqlite not initialized")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 单连接实现：先把游标读完并关闭，再走 DeleteAssets 的事务，避免自己挡住自己。
+	rows, err := dbx.QueryxContext(ctx, `SELECT id, address FROM "asset"
+		WHERE scan_count = 0 AND last_scan_at = '' AND starred = 0 AND archived = 0 AND tags = ''`)
+	if err != nil {
+		return 0, err
+	}
+	ids := make([]string, 0, 8)
+	for rows.Next() {
+		var id, address string
+		if scanErr := rows.Scan(&id, &address); scanErr != nil {
+			_ = rows.Close()
+			return 0, scanErr
+		}
+		if !IsScannableAddress(address) {
+			ids = append(ids, id)
+		}
+	}
+	err = rows.Err()
+	_ = rows.Close()
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	return DeleteAssets(ids)
 }
 
 // CountAssets 返回资产总数（不含归档），供概览与角标使用。

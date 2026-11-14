@@ -30,6 +30,12 @@ type EngineOptions struct {
 	OnError func(detector string, err error)
 	// OnTraffic 在单个事务判定完成后回调，用于界面展示「为什么没检测」。
 	OnTraffic func(TrafficEvent)
+	// OnCoverage 在「某个资产上某个检测器」的状态明确后回调，供覆盖度台账累计。
+	//
+	// 与 OnTraffic 的分工：后者是逐请求的过程记录，只在内存里滚动；前者是
+	// 按 (资产, 检测器) 聚合后的结论，用于回答「这块到底测没测、没测为什么」。
+	// 只有在本地/网络检测、跳过、异常等分支明确收敛时才上报，不做推测。
+	OnCoverage func(CoverageSignal)
 	// Workers 是**门控池**的 worker 数，<=0 用 defaultWorkers。
 	//
 	// 门控池只做「这条请求要不要检测」的筛选：便宜、极快，几乎不会成为瓶颈。
@@ -300,6 +306,7 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 	if e.cancel == nil {
 		atomic.AddUint64(&e.dropped, 1)
 		e.emitTraffic(tx, VerdictDropped, "被动扫描未启动，事务被丢弃", 0, 0, nil, nil, 0)
+		e.emitAllSkipped(tx, "被动扫描未启动，未检测", VerdictDropped)
 		return false
 	}
 	select {
@@ -308,10 +315,12 @@ func (e *Engine) Submit(tx *CapturedTransaction) bool {
 	case <-e.ctx.Done():
 		atomic.AddUint64(&e.dropped, 1)
 		e.emitTraffic(tx, VerdictDropped, "被动扫描正在停止，事务被丢弃", 0, 0, nil, nil, 0)
+		e.emitAllSkipped(tx, "被动扫描正在停止，未检测", VerdictDropped)
 		return false
 	default:
 		atomic.AddUint64(&e.dropped, 1)
 		e.emitTraffic(tx, VerdictDropped, "待检队列已满，为避免反压真实流量已丢弃", 0, 0, nil, nil, 0)
+		e.emitAllSkipped(tx, "待检队列已满，未检测（存在漏报风险）", VerdictDropped)
 		return false
 	}
 }
@@ -427,6 +436,8 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 		e.emitTraffic(tx, VerdictSkippedStatic,
 			"静态资源：跳过注入检测，已执行本地敏感信息提取与安全配置检查",
 			local.reported, local.duplicated, nil, local.ran, local.extractions)
+		// 网络类检测器在静态资源上没有语义，如实记成「跳过」而不是「测过」。
+		e.emitNetworkSkipped(tx, "静态资源不参与注入检测", VerdictSkippedStatic)
 		return
 	}
 
@@ -449,11 +460,13 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 			atomic.AddUint64(&e.skippedKnown, 1)
 			e.emitTraffic(tx, VerdictDuplicate, "该请求的注入点在本次运行内均已确认命中，跳过重复重放",
 				local.reported, local.duplicated, nil, local.ran, local.extractions)
+			e.emitNetworkSkipped(tx, "注入点在本次运行内已确认命中，无需重复检测", VerdictDuplicate)
 			return
 		case allSettled:
 			atomic.AddUint64(&e.skippedKnown, 1)
 			e.emitTraffic(tx, VerdictKnownClean, "该请求的注入点在有效期内已判定无注入，跳过重复重放",
 				local.reported, local.duplicated, nil, local.ran, local.extractions)
+			e.emitNetworkSkipped(tx, "注入点在有效期内已判定无注入，跳过重复检测", VerdictKnownClean)
 			return
 		case e.allPointsInFlight(points):
 			// 结论还没落定，但同注入点已有事务在检测队列中/检测中。此刻再投递只会
@@ -462,6 +475,7 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 			atomic.AddUint64(&e.skippedInFlight, 1)
 			e.emitTraffic(tx, VerdictInFlightDup, "该请求的注入点已有事务正在检测中，跳过并发重复投递",
 				local.reported, local.duplicated, nil, local.ran, local.extractions)
+			e.emitNetworkSkipped(tx, "同一注入点已有事务在检测队列中/检测中", VerdictInFlightDup)
 			return
 		}
 	}
@@ -473,7 +487,11 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 			continue
 		}
 		if !d.Interest(tx) {
-			reasons = append(reasons, interestReason(d, tx))
+			reason := interestReason(d, tx)
+			reasons = append(reasons, reason)
+			// 该检测器认为这条请求不具备检测条件——如实记成跳过，并保留它给出的
+			// 具体原因（例如「响应体过小」），这是覆盖度台账最有价值的一列。
+			e.emitCoverage(tx, d.Name(), CoverageSkipped, reason, VerdictNoInterest)
 			continue
 		}
 		interested = append(interested, d)
@@ -503,6 +521,10 @@ func (e *Engine) gate(tx *CapturedTransaction) {
 		e.emitTraffic(tx, VerdictDroppedDetect,
 			"检测队列已满：该请求已确认需要检测，但检测能力饱和，未能检测（存在漏报风险）",
 			local.reported, local.duplicated, nil, local.ran, local.extractions)
+		for _, d := range interested {
+			e.emitCoverage(tx, d.Name(), CoverageSkipped,
+				"检测队列已满，未能检测（存在漏报风险）", VerdictDroppedDetect)
+		}
 	}
 }
 
@@ -518,10 +540,15 @@ func (e *Engine) runLocal(tx *CapturedTransaction) localResult {
 
 	// 提取器：产物走独立通道，不参与漏洞台账的置信度门控。
 	for _, x := range e.extractors {
-		if x == nil || !x.Interest(tx) {
+		if x == nil {
+			continue
+		}
+		if !x.Interest(tx) {
+			e.emitCoverage(tx, x.Name(), CoverageSkipped, "响应类型不满足提取条件", "")
 			continue
 		}
 		res.ran = append(res.ran, x.Name())
+		extracted := 0
 		for _, ex := range e.safeExtract(x, tx) {
 			atomic.AddUint64(&e.detected, 1)
 			if !e.markSeenExtraction(ex) {
@@ -529,15 +556,25 @@ func (e *Engine) runLocal(tx *CapturedTransaction) localResult {
 			}
 			atomic.AddUint64(&e.extracted, 1)
 			res.extractions++
+			extracted++
 			if e.opts.OnExtraction != nil {
 				e.opts.OnExtraction(ex)
 			}
 		}
+		reason := "已执行，未提取到内容"
+		if extracted > 0 {
+			reason = fmt.Sprintf("已提取 %d 条", extracted)
+		}
+		e.emitCoverage(tx, x.Name(), CoverageTested, reason, "")
 	}
 
 	// 本地类漏洞检测器：与网络类共用「置信度门控 + 运行内去重」，但执行位置在内联。
 	for _, d := range e.localDetectors {
-		if d == nil || !d.Interest(tx) {
+		if d == nil {
+			continue
+		}
+		if !d.Interest(tx) {
+			e.emitCoverage(tx, d.Name(), CoverageSkipped, "不满足检测条件", "")
 			continue
 		}
 		res.ran = append(res.ran, d.Name())
@@ -547,24 +584,39 @@ func (e *Engine) runLocal(tx *CapturedTransaction) localResult {
 			if e.opts.OnError != nil {
 				e.opts.OnError(d.Name(), err)
 			}
+			e.emitCoverage(tx, d.Name(), CoverageError, err.Error(), VerdictError)
 			continue
 		}
+		dReported, dDuplicated, dFiltered := 0, 0, 0
 		for _, f := range findings {
 			atomic.AddUint64(&e.detected, 1)
 			if f.Confidence < ConfidenceCertain {
 				atomic.AddUint64(&e.filtered, 1)
+				dFiltered++
 				continue
 			}
 			if !e.markSeen(f) {
 				atomic.AddUint64(&e.duplicated, 1)
 				res.duplicated++
+				dDuplicated++
 				continue
 			}
 			atomic.AddUint64(&e.reported, 1)
 			res.reported++
+			dReported++
 			if e.opts.OnFinding != nil {
 				e.opts.OnFinding(f)
 			}
+		}
+		switch {
+		case dReported+dDuplicated > 0:
+			e.emitCoverage(tx, d.Name(), CoverageHit,
+				fmt.Sprintf("命中 %d 条", dReported+dDuplicated), VerdictFinding)
+		case dFiltered > 0:
+			e.emitCoverage(tx, d.Name(), CoverageTested,
+				fmt.Sprintf("%d 条低置信结论未通过门控", dFiltered), VerdictNoFinding)
+		default:
+			e.emitCoverage(tx, d.Name(), CoverageTested, "已执行，无结论", VerdictNoFinding)
 		}
 	}
 	return res
@@ -607,26 +659,41 @@ func (e *Engine) detect(job *detectJob) {
 			if e.opts.OnError != nil {
 				e.opts.OnError(d.Name(), err)
 			}
+			e.emitCoverage(tx, d.Name(), CoverageError, err.Error(), VerdictError)
 			continue
 		}
+		dReported, dDuplicated, dFiltered := 0, 0, 0
 		for _, f := range findings {
 			atomic.AddUint64(&e.detected, 1)
 			detectedHere++
 			// 零误报门控：非 Certain 一律拦下。
 			if f.Confidence < ConfidenceCertain {
 				atomic.AddUint64(&e.filtered, 1)
+				dFiltered++
 				continue
 			}
 			if !e.markSeen(f) {
 				atomic.AddUint64(&e.duplicated, 1)
 				duplicated++
+				dDuplicated++
 				continue
 			}
 			atomic.AddUint64(&e.reported, 1)
 			reported++
+			dReported++
 			if e.opts.OnFinding != nil {
 				e.opts.OnFinding(f)
 			}
+		}
+		switch {
+		case dReported+dDuplicated > 0:
+			e.emitCoverage(tx, d.Name(), CoverageHit,
+				fmt.Sprintf("命中 %d 条", dReported+dDuplicated), VerdictFinding)
+		case dFiltered > 0:
+			e.emitCoverage(tx, d.Name(), CoverageTested,
+				fmt.Sprintf("%d 条低置信结论未通过门控", dFiltered), VerdictNoFinding)
+		default:
+			e.emitCoverage(tx, d.Name(), CoverageTested, "已执行，无结论", VerdictNoFinding)
 		}
 	}
 

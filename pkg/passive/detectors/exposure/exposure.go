@@ -35,6 +35,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/v3/pkg/guard"
 	"github.com/zan8in/afrog/v3/pkg/passive"
 )
 
@@ -103,6 +104,11 @@ type Detector struct {
 	// 同时通过门控，若等到 Detect 才去重，这几条会一起进入检测池各探一轮。在门控
 	// 阶段用 LoadOrStore 语义认领，天然只放一条过去。
 	claimed map[string]struct{}
+	// policy 缓存每个 origin 的高危动作裁决：空串表示放行，非空为拒绝原因。
+	//
+	// 只裁决一次：闸门配置在进程启动时确定，逐请求重复裁决会把审计刷满
+	// （一个页面几十条请求就是几十条同样的记录），也让门控池承担不必要的加锁。
+	policy map[string]string
 }
 
 // New 创建检测器。
@@ -123,7 +129,11 @@ func New(opts Options) *Detector {
 	if opts.MaxFindings <= 0 {
 		opts.MaxFindings = def.MaxFindings
 	}
-	return &Detector{opts: opts, claimed: make(map[string]struct{})}
+	return &Detector{
+		opts:    opts,
+		claimed: make(map[string]struct{}),
+		policy:  make(map[string]string),
+	}
 }
 
 // Name 实现 passive.Detector。
@@ -146,6 +156,19 @@ func (d *Detector) Interest(tx *passive.CapturedTransaction) bool {
 	if isStaticAsset(u.Path) {
 		return false
 	}
+	// 高危动作闸门：敏感路径探测会主动发请求，必须受 allow/deny/ask 约束。
+	// 被拒的 origin 不认领，之后即使补上白名单（重启后）也能重新探测。
+	if reason, decided := d.cachedPolicy(u.Host); decided {
+		if reason != "" {
+			return false
+		}
+	} else {
+		decision := guard.Check(guard.ActionExposureProbe, u.Host)
+		d.rememberPolicy(u.Host, policyDenialReason(decision))
+		if !decision.Allowed {
+			return false
+		}
+	}
 	return d.claim(u.Host)
 }
 
@@ -163,6 +186,10 @@ func (d *Detector) InterestReason(tx *passive.CapturedTransaction) string {
 	}
 	if isStaticAsset(u.Path) {
 		return "请求路径是静态资源，不推导敏感路径"
+	}
+	// 被闸门拒绝时如实给出原因，而不是笼统的「已完成探测」。
+	if reason, decided := d.cachedPolicy(u.Host); decided && reason != "" {
+		return reason
 	}
 	return "该主机已完成一次性敏感路径探测"
 }
@@ -255,6 +282,31 @@ func (d *Detector) fetch(ctx context.Context, probe passive.Prober, tx *passive.
 		return nil
 	}
 	return res
+}
+
+// cachedPolicy 读取已缓存的闸门裁决；decided=false 表示这个 origin 还没裁决过。
+func (d *Detector) cachedPolicy(host string) (string, bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	reason, ok := d.policy[host]
+	return reason, ok
+}
+
+func (d *Detector) rememberPolicy(host, reason string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.policy[host] = reason
+}
+
+// policyDenialReason 把裁决收敛成缓存约定：放行是空串，拒绝是非空原因。
+func policyDenialReason(decision guard.Decision) string {
+	if decision.Allowed {
+		return ""
+	}
+	if decision.Reason != "" {
+		return decision.Reason
+	}
+	return "敏感路径探测被安全策略拒绝"
 }
 
 // claim 认领一个 origin 的探测权，返回是否为首次认领。

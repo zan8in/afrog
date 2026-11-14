@@ -111,6 +111,8 @@ func main() {
 			web.SetAIConfig(cfg.AI, options.ConfigFile)
 			web.SetOOBConfig(cfg.Reverse, options.ConfigFile)
 			web.SetPassiveConfig(cfg.Passive, options.ConfigFile)
+			// 高危动作闸门（集群派发等）：默认全 allow，配置后才生效。
+			web.SetSecurityConfig(cfg.Security)
 		}
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())
