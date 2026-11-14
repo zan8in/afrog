@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/guard"
 	"github.com/zan8in/gologger"
 	"github.com/zan8in/gologger/levels"
 )
@@ -30,6 +31,11 @@ func StartServer(addr string) error {
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
 	gologger.Info().Msgf("Web访问密码: %s", generatedPassword)
+
+	// 闸门裁决落盘：重启后仍能看到谁被拒绝/放行。写入失败只记日志（见 appendGuardAudit），
+	// 不影响任何动作。只在服务端启用，避免测试或 CLI 路径写用户目录。
+	guard.SetSink(appendGuardAudit)
+	defer guard.SetSink(nil)
 
 	// 初始化数据库（连接 + 写入worker）
 	if err := sqlite.NewWebSqliteDB(); err != nil {

@@ -134,7 +134,6 @@ func (p *Policy) configure(actions map[string]string, allowTargets []string) {
 // Check 裁决一次动作。target 可以是 URL、host:port、IP 或 CIDR 内的具体地址。
 func (p *Policy) Check(action Action, target string) Decision {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	mode := p.modes[action]
 	if mode == "" {
@@ -155,7 +154,13 @@ func (p *Policy) Check(action Action, target string) Decision {
 		d.Allowed = true
 	}
 
-	p.recordLocked(d)
+	entry := p.recordLocked(d)
+	p.mu.Unlock()
+
+	// 回调放在锁外：落盘可能涉及文件或数据库，不能让它持有策略锁。
+	if sink := decisionSink(); sink != nil {
+		sink(entry)
+	}
 	return d
 }
 
@@ -187,14 +192,16 @@ func (p *Policy) matchAny(target string) bool {
 	return false
 }
 
-func (p *Policy) recordLocked(d Decision) {
-	p.audit = append(p.audit, Entry{
+func (p *Policy) recordLocked(d Decision) Entry {
+	entry := Entry{
 		Time: time.Now(), Action: d.Action, Target: d.Target,
 		Mode: d.Mode, Allowed: d.Allowed, Reason: d.Reason,
-	})
+	}
+	p.audit = append(p.audit, entry)
 	if len(p.audit) > auditLimit {
 		p.audit = p.audit[len(p.audit)-auditLimit:]
 	}
+	return entry
 }
 
 // Snapshot 返回当前策略与最近审计（最新的在前）。
@@ -316,7 +323,26 @@ func stripPort(host string) string {
 var (
 	globalMu     sync.RWMutex
 	globalPolicy = NewPolicy(nil, nil)
+
+	sinkMu     sync.RWMutex
+	globalSink func(Entry)
 )
+
+// SetSink 设置裁决回调（传 nil 关闭）。
+//
+// 回调在策略锁外同步执行，用于把裁决写到文件或数据库；它位于动作执行路径上，
+// 实现方必须保持轻量，不能在里面做重活或回调 guard 本身。
+func SetSink(fn func(Entry)) {
+	sinkMu.Lock()
+	defer sinkMu.Unlock()
+	globalSink = fn
+}
+
+func decisionSink() func(Entry) {
+	sinkMu.RLock()
+	defer sinkMu.RUnlock()
+	return globalSink
+}
 
 // Configure 用配置重建全局策略。并发安全，可在运行时重复调用。
 func Configure(actions map[string]string, allowTargets []string) {

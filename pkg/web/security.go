@@ -21,9 +21,14 @@ func SetSecurityConfig(cfg config.Security) {
 // securityPolicyHandler 返回当前闸门策略与最近的裁决记录（只读）。
 //
 // 只读是有意为之：改策略必须改配置文件，避免「点一下就把自己扫描器的边界关了」。
+// 审计优先使用落盘记录：内存审计重启即清，落盘记录才能回答「上次是谁被拒的」。
 func securityPolicyHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: guard.Snapshot()})
+	view := guard.Snapshot()
+	if audit := loadGuardAudit(securityAuditReturn); len(audit) > 0 {
+		view.Audit = audit
+	}
+	_ = json.NewEncoder(w).Encode(APIResponse{Success: true, Message: "OK", Data: view})
 }
 
 // checkDispatchGuard 校验一次集群派发的目标是否被允许。

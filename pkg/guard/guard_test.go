@@ -98,3 +98,32 @@ func TestAuditNewestFirst(t *testing.T) {
 		t.Fatalf("审计应按时间倒序")
 	}
 }
+
+// TestDecisionSinkSeesEveryDecision 锁定落盘回调的契约：
+// 每次裁决都回调一次，且 SetSink(nil) 之后不再触发。
+func TestDecisionSinkSeesEveryDecision(t *testing.T) {
+	t.Cleanup(func() { SetSink(nil) })
+
+	var got []Entry
+	SetSink(func(e Entry) { got = append(got, e) })
+
+	p := NewPolicy(map[string]string{"cluster-dispatch": "deny"}, nil)
+	p.Check(ActionClusterDispatch, "a.example")
+	p.Check(ActionClusterDispatch, "b.example")
+
+	if len(got) != 2 {
+		t.Fatalf("回调次数 = %d, want 2", len(got))
+	}
+	if got[0].Allowed || got[0].Target != "a.example" {
+		t.Fatalf("回调内容 = %+v, want 拒绝 a.example", got[0])
+	}
+	if got[1].Reason == "" {
+		t.Fatalf("拒绝必须带原因")
+	}
+
+	SetSink(nil)
+	p.Check(ActionClusterDispatch, "c.example")
+	if len(got) != 2 {
+		t.Fatalf("关闭回调后仍被调用: %d", len(got))
+	}
+}
