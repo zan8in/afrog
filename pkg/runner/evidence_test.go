@@ -70,6 +70,17 @@ func TestBuildEvidenceFromResult(t *testing.T) {
 	if ev.Steps[1].Response.Status != 500 || ev.Steps[1].Response.LatencyMs != 183 {
 		t.Fatalf("unexpected response: %+v", ev.Steps[1].Response)
 	}
+	// 证据 target 必须是种子目标（r.Target），不是命中后的完整 URL——否则重放会把
+	// 规则 path 再拼一次。精确命中的 URL 由步骤自己带着。
+	if ev.Target != r.Target {
+		t.Fatalf("evidence target = %q, want seed target %q", ev.Target, r.Target)
+	}
+	if ev.Steps[1].Request.URL != r.AllPocResult[1].FullTarget {
+		t.Fatalf("confirm step url = %q, want full hit %q", ev.Steps[1].Request.URL, r.AllPocResult[1].FullTarget)
+	}
+	if !strings.Contains(ev.Replay.Command, r.Target) {
+		t.Fatalf("replay command %q must target the seed %q", ev.Replay.Command, r.Target)
+	}
 	if !strings.Contains(ev.Replay.Command, "test-poc") || !strings.Contains(ev.Replay.Command, "afrog verify") {
 		t.Fatalf("unexpected replay command: %q", ev.Replay.Command)
 	}

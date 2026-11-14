@@ -27,9 +27,17 @@ func buildEvidence(r *result.Result) *evidence.Evidence {
 		return nil
 	}
 
-	target := strings.TrimSpace(r.FullTarget)
-	if target == "" {
-		target = strings.TrimSpace(r.Target)
+	// Evidence.Target 记的是「种子目标」（扫描/verify 传入的 base），不是命中后的完整
+	// URL：replay.command 与 verify.replay 都要拿它当 base 重跑同一个 PoC，若带上规则
+	// path 会被再拼一次，非根路径 PoC 必然 404。每步精确命中的 URL 由 steps[].Request.URL
+	// 保留，观测信息不丢。
+	seed := strings.TrimSpace(r.Target)
+	full := strings.TrimSpace(r.FullTarget)
+	if seed == "" {
+		seed = full
+	}
+	if full == "" {
+		full = seed
 	}
 
 	steps := make([]evidence.Step, 0, len(r.AllPocResult))
@@ -43,7 +51,7 @@ func buildEvidence(r *result.Result) *evidence.Evidence {
 			Matched: pr.IsVul,
 			Request: evidence.Request{
 				Method:  strings.ToUpper(strings.TrimSpace(pr.ResultRequest.GetMethod())),
-				URL:     requestURL(pr, target),
+				URL:     requestURL(pr, full),
 				Headers: clampText(utils.Str2UTF8(string(pr.ResultRequest.GetRawHeader())), evidenceHeaderLimit),
 				Body:    clampText(utils.Str2UTF8(string(pr.ResultRequest.GetBody())), evidenceBodyLimit),
 			},
@@ -74,7 +82,7 @@ func buildEvidence(r *result.Result) *evidence.Evidence {
 		steps[idx].Extracted = extracted
 	}
 
-	b := evidence.NewBuilder(r.PocInfo.Id, target).WithConfidence(evidence.Certain)
+	b := evidence.NewBuilder(r.PocInfo.Id, seed).WithConfidence(evidence.Certain)
 	for _, s := range steps {
 		b.AddStep(s)
 	}

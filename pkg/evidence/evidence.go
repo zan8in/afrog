@@ -111,7 +111,11 @@ type Builder struct {
 	now        func() time.Time
 }
 
-// NewBuilder 创建一个证据构建器。target 应是本次实际命中的完整目标。
+// NewBuilder 创建一个证据构建器。
+//
+// target 应是「种子目标」——扫描/verify 传入的那个 base（不含规则 path），因为
+// replay.command 与 verify.replay 都要拿它当 base 重跑同一个 PoC。具体命中的完整
+// URL 由每一步的 Request.URL 记录。
 func NewBuilder(pocID, target string) *Builder {
 	return &Builder{
 		pocID:      strings.TrimSpace(pocID),
