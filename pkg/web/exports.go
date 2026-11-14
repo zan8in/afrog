@@ -190,7 +190,7 @@ func exportTaskHandler(w http.ResponseWriter, r *http.Request) {
 	severity := strings.TrimSpace(r.URL.Query().Get("severity"))
 	rows, err := sqlite.SelectAllByTask(taskID, severity, true, true)
 	if err != nil {
-		writeExportError(w, http.StatusInternalServerError, "读取扫描结果失败")
+		writeExportError(w, http.StatusInternalServerError, fmt.Sprintf("读取扫描结果失败：%v", err))
 		return
 	}
 
@@ -232,7 +232,7 @@ func exportReportsHandler(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := sqlite.SelectAllFiltered(taskID, projectID, severity, keyword, true, true)
 	if err != nil {
-		writeExportError(w, http.StatusInternalServerError, "读取报告数据失败")
+		writeExportError(w, http.StatusInternalServerError, fmt.Sprintf("读取报告数据失败：%v", err))
 		return
 	}
 
@@ -269,7 +269,7 @@ func exportProjectHandler(w http.ResponseWriter, r *http.Request) {
 	severity := strings.TrimSpace(r.URL.Query().Get("severity"))
 	rows, err := sqlite.SelectAllByProject(projectID, severity, true, true)
 	if err != nil {
-		writeExportError(w, http.StatusInternalServerError, "读取项目结果失败")
+		writeExportError(w, http.StatusInternalServerError, fmt.Sprintf("读取项目结果失败：%v", err))
 		return
 	}
 

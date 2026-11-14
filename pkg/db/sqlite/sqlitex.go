@@ -798,7 +798,7 @@ func SelectReportPage(f ReportFilter, expandPoc, expandResult bool) ([]db2.Resul
 	query += " ORDER BY " + reportOrderClause(f.SortBy, f.SortOrder) +
 		" LIMIT " + strconv.Itoa(f.PageSize) + " OFFSET " + strconv.Itoa(offset)
 
-	return runResultQuery(query, args, expandPoc, expandResult)
+	return runResultQuery("report-page", query, args, expandPoc, expandResult)
 }
 
 // CountReport 统计筛选后的命中数，与 SelectReportPage 口径一致。
@@ -877,7 +877,7 @@ func selectResultPage(where []string, args []interface{}, page, pageSize int, ex
 	}
 	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
 
-	return runResultQuery(query, args, expandPoc, expandResult)
+	return runResultQuery("page", query, args, expandPoc, expandResult)
 }
 
 // severityKeywordFilters 组装「严重级别 + 关键字」的过滤条件，列表/计数/导出共用。
@@ -926,7 +926,7 @@ func runExportQuery(from string, where []string, args []interface{}, expandPoc, 
 	}
 	query += " ORDER BY " + db2.TableName + ".id DESC LIMIT " + strconv.Itoa(ExportRowLimit)
 
-	return runResultQuery(query, args, expandPoc, expandResult)
+	return runResultQuery("export", query, args, expandPoc, expandResult)
 }
 
 // SelectAllByTask 返回某个任务的全部命中，供报告导出使用。
@@ -997,7 +997,7 @@ func SelectPageByTask(taskID, severity string, page, pageSize int, expandPoc, ex
 	}
 	query += " ORDER BY id DESC LIMIT " + strconv.Itoa(pageSize) + " OFFSET " + strconv.Itoa(offset)
 
-	return runResultQuery(query, args, expandPoc, expandResult)
+	return runResultQuery("task-page", query, args, expandPoc, expandResult)
 }
 
 // CountByTask 统计某个任务的命中数（可按 severity 过滤）。
@@ -1046,14 +1046,42 @@ func taskResultFilters(taskID, severity string) ([]string, []interface{}) {
 	return where, args
 }
 
+// 查询超时按用途分档。
+//
+// 整条链路只有一条 SQLite 连接，超时的作用不只是「别等太久」，也是「别把连接按住太久」：
+//
+//   - 列表/分页：一条 SQL 超过 5s 说明索引或数据量出了问题，早失败比拖住连接好；
+//   - 导出：要一次读回 ExportRowLimit 行（含请求/响应证据），慢盘或高负载下
+//     5s 会误杀正常导出，表现为「偶发导出失败」。放宽到 30s。
+//
+// 30s 是权衡后的上限：更大的结果集不应该靠超时去兜底，而应该缩小筛选范围。
+const (
+	listQueryTimeout   = 5 * time.Second
+	exportQueryTimeout = 30 * time.Second
+)
+
 // runResultQuery 执行结果查询并统一做展示层归一化（severity 大写、按需展开 JSON）。
-func runResultQuery(query string, args []interface{}, expandPoc, expandResult bool) ([]db2.ResultData, error) {
-	// 查询设置超时
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//
+// label 只用于慢查询日志与超时档位：同一份 SQL 在不同调用路径上的预期耗时不同
+// （列表 50 行 vs 导出 20000 行），没有 label 就分不清是哪条路径在占连接。
+func runResultQuery(label, query string, args []interface{}, expandPoc, expandResult bool) ([]db2.ResultData, error) {
+	timeout := listQueryTimeout
+	if label == "export" {
+		timeout = exportQueryTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	var data []db2.ResultData
-	if err := dbx.SelectContext(ctx, &data, query, args...); err != nil {
+	start := time.Now()
+	err := dbx.SelectContext(ctx, &data, query, args...)
+	// 耗时从 SelectContext 起算，因此包含「等连接」的时间——这正是要观测的部分。
+	observeQuery(label, query, start, len(data), err)
+	if err != nil {
+		// 超时要给出可行动的原因：裸的 context deadline exceeded 让人以为是程序坏了。
+		if label == "export" && errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("导出超时（超过 %s）：结果集过大，请缩小任务或筛选范围后重试", exportQueryTimeout)
+		}
 		return nil, err
 	}
 

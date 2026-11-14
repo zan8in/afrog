@@ -288,6 +288,8 @@ func registerAPIRoutes(api *mux.Router) {
 	// 敏感信息提取（HAE 等价能力）：独立于漏洞台账的产物通道。
 	api.HandleFunc("/passive/extractions", jwtAuthMiddleware(passiveExtractionsHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/passive/extractions/{id}", jwtAuthMiddleware(passiveExtractionDetailHandler)).Methods(http.MethodGet)
+	// 数据库可观测：连接池排队与慢查询。只读，不修改任何数据。
+	api.HandleFunc("/diagnostics/db", jwtAuthMiddleware(dbDiagnosticsHandler)).Methods(http.MethodGet)
 	// 多实例编排：/cluster/self 供同伴实例互访（走集群共享密钥，不走 JWT），
 	// /cluster/instances 是控制台自己的聚合视图，/cluster/config 用来在运行时
 	// 增删节点（会员能力，保存后写回 afrog-config.yaml 并立即生效）。
