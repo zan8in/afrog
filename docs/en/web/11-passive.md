@@ -146,6 +146,8 @@ The **Next steps** card on the Overview page is derived by deterministic rules f
 
 "Unscanned" and "stale" are strictly mutually exclusive: the former requires never being scanned, the latter only covers scanned assets, so the same target is never listed twice.
 
+The × on each suggestion means "don't show this for 7 days": the dismissal lives only in the current browser (localStorage) and does not affect other devices. **Ignored N · Restore** in the card header brings everything back immediately, and entries reappear automatically after 7 days.
+
 Targets are filtered for executability first: an address such as `21` never appears in a one-click scan. At startup afrog also cleans up historical junk — only rows that were **never scanned, starred, tagged, or archived** are removed; everything else is kept.
 
 ## Security gate
@@ -175,7 +177,7 @@ Where it applies:
 - `cluster-dispatch`: validates targets before accepting a remote dispatch. A rejected dispatch does not consume its `dispatch_id`, so it can be retried after the allowlist is updated.
 - `exposure-probe`: decided once per origin at the gate stage; when rejected no probe is sent, and coverage records `skipped` with the rejection reason. Decisions are cached per origin, so the audit log is not flooded per request.
 
-The **Gate details** drawer on the Overview page is read-only: it shows action modes, the allowlist, and recent decisions (the latest 200, kept in memory and cleared on restart). Change policy in the config file — that keeps a stray click from disabling your own scan boundary.
+The **Gate details** drawer on the Overview page is read-only: it shows action modes, the allowlist, and recent decisions. Decisions are appended to `~/.config/afrog/guard_audit.jsonl`, so denials and allows survive a restart; the UI shows the latest 200, and the file is trimmed to the latest 1000 once it exceeds 1 MB. Change policy in the config file — that keeps a stray click from disabling your own scan boundary.
 
 ## FAQ
 

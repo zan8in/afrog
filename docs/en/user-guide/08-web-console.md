@@ -47,6 +47,7 @@ The password is random on every start. Open the console in a browser and sign in
 | --- | --- |
 | Findings, assets, projects, ledger, task records | `~/.config/afrog/afrog.db` (SQLite) |
 | Scheduled scan configuration | `~/.config/afrog/schedules.json` |
+| Audit trail for the high-risk action gate | `~/.config/afrog/guard_audit.jsonl` (JSONL, rotated past 1 MB) |
 
 Findings are long-lived data and are kept indefinitely. Task records (status, targets, duration, hit counts of one scan) keep only the **most recent 200** entries to back the history list in the UI. Older tasks can still be found by task id in the ledger.
 

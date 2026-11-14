@@ -44,6 +44,7 @@ On startup the terminal prints this run's access password:
 | --- | --- |
 | Findings, assets, projects, vulnerability ledger, task records | `~/.config/afrog/afrog.db` (SQLite) |
 | Configuration for scheduled/planned scans | `~/.config/afrog/schedules.json` |
+| Audit trail for the high-risk action gate | `~/.config/afrog/guard_audit.jsonl` (JSONL, rotated past 1 MB) |
 
 Findings are long-lived data and are kept indefinitely; task records keep only the **most recent 200** entries to back the history list in the UI. Older tasks can still be found by task ID in the vulnerability ledger.
 
