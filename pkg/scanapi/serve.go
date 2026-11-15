@@ -95,7 +95,7 @@ func ServeCommand(args []string) error {
 		Executor:   ex,
 		Dispatcher: tools.Dispatcher(),
 		MaxRunning: *maxRunning,
-		// 工具面动作（probe_http / replay_evidence / brute）与扫描任务共用同一套
+		// 工具面动作（probe_http / replay_evidence / brute / oob_wait）与扫描任务共用同一套
 		// 排队、事件窗口与收尾，见 scantask.Dispatcher。
 		EventBuffer: *eventBuffer,
 	})
@@ -137,6 +137,8 @@ func ServeCommand(args []string) error {
 	}
 	gologger.Info().Msgf("节点=%s 并发上限=%d 事件窗口=%d Agent工具面=%s", mgr.Node(), *maxRunning, *eventBuffer, agentLabel)
 	gologger.Info().Msgf("示例: grpcurl -H 'authorization: Bearer <token>' -d '{\"spec\":{\"targets\":[\"http://example.com\"]}}' %s afrog.v1.AfrogScanner/SubmitScan",
+		lis.Addr().String())
+	gologger.Info().Msgf("示例: grpcurl -H 'authorization: Bearer <token>' -d '{\"spec\":{},\"actions\":[{\"kind\":\"probe_http\",\"target\":\"http://example.com\"}]}' %s afrog.v1.AfrogScanner/SubmitActions",
 		lis.Addr().String())
 	gologger.Info().Msgf("示例: grpcurl -H 'authorization: Bearer <token>' -d '{\"name\":\"observe.state\",\"arguments_json\":\"{\\\"subject\\\":\\\"example.com\\\"}\"}' %s afrog.v1.AgentService/Invoke",
 		lis.Addr().String())

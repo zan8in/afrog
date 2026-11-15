@@ -5,6 +5,7 @@ package scanapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -79,6 +80,33 @@ func (s *Server) SubmitScan(_ context.Context, req *afrogv1.SubmitScanRequest) (
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &afrogv1.SubmitScanResponse{TaskId: snap.ID, Node: snap.Node}, nil
+}
+
+// SubmitActions 提交一批同类型的原子动作，返回任务 ID。
+//
+// 与 SubmitScan 的唯一区别是「动作由谁给出」：这里动作显式列出，工具面动作在进程内执行、
+// 执行面动作走 CLI；排队、事件流、订阅、收尾完全复用同一套任务语义。
+func (s *Server) SubmitActions(_ context.Context, req *afrogv1.SubmitActionsRequest) (*afrogv1.SubmitActionsResponse, error) {
+	spec := req.GetSpec()
+	if spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "spec is required")
+	}
+	if len(req.GetActions()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "actions must not be empty")
+	}
+	if err := rejectUnmappableOOBCredentials(spec); err != nil {
+		return nil, err
+	}
+
+	batch, err := fromProtoActions(req)
+	if err != nil {
+		return nil, err
+	}
+	snap, err := s.opts.Manager.SubmitBatch(batch)
+	if err != nil {
+		return nil, toStatusError(err)
+	}
+	return &afrogv1.SubmitActionsResponse{TaskId: snap.ID, Node: snap.Node}, nil
 }
 
 // StreamEvents 订阅任务事件：先补发 from_seq 之后的事件，再持续推送，直到任务结束。
@@ -311,6 +339,34 @@ func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 	}
 }
 
+// fromProtoActions 把协议动作翻译成控制面批量。
+//
+// params_json 是工具面动作的唯一参数载体：scantask 不理解具体字段，原样交给 Dispatcher，
+// 由工具面按自己的 schema 解释。因此这里只做 JSON 合法性校验，不镜像工具 schema，
+// 避免出现「proto 与工具各维护一份真相」。
+func fromProtoActions(req *afrogv1.SubmitActionsRequest) (scantask.Batch, error) {
+	src := req.GetActions()
+	batch := scantask.Batch{
+		Options: fromProtoSpec(req.GetSpec()),
+		Actions: make([]scantask.Action, 0, len(src)),
+	}
+	for i, a := range src {
+		kind := scantask.ActionKind(strings.TrimSpace(a.GetKind()))
+		if kind == "" {
+			return scantask.Batch{}, status.Errorf(codes.InvalidArgument, "actions[%d].kind is required", i)
+		}
+		action := scantask.Action{Kind: kind, Target: a.GetTarget(), PocID: a.GetPocId()}
+		if p := strings.TrimSpace(a.GetParamsJson()); p != "" {
+			if !json.Valid([]byte(p)) {
+				return scantask.Batch{}, status.Errorf(codes.InvalidArgument, "actions[%d].params_json is not valid JSON", i)
+			}
+			action.Params = json.RawMessage(p)
+		}
+		batch.Actions = append(batch.Actions, action)
+	}
+	return batch, nil
+}
+
 // rejectUnmappableOOBCredentials 明确拒绝无法生效的 OOB 凭据。
 //
 // CLI 只有 -oob <adapter>，key/domain 只能来自节点自己的 afrog-config.yaml；
@@ -352,6 +408,15 @@ func toStatusError(err error) error {
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, scantask.ErrSlowSubscriber):
 		return status.Error(codes.ResourceExhausted, err.Error())
+	case errors.Is(err, scantask.ErrNoDispatcher):
+		// 提交了工具面动作却没有任何派发后端：这是能力缺失，不是参数错误。
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, scantask.ErrMixedActionKinds),
+		errors.Is(err, scantask.ErrActionNoTarget),
+		errors.Is(err, scantask.ErrUnknownActionKind),
+		errors.Is(err, scantask.ErrHeterogeneousBatch),
+		errors.Is(err, scantask.ErrNoTargets):
+		return status.Error(codes.InvalidArgument, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

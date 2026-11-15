@@ -91,7 +91,7 @@ const (
 type Options struct {
 	// Executor 真正负责跑扫描。
 	Executor executor.Executor
-	// Dispatcher 执行工具面动作（probe_http / replay_evidence / brute）。
+	// Dispatcher 执行工具面动作（probe_http / replay_evidence / brute / oob_wait）。
 	// 留空时提交这些动作会被拒绝为 ErrNoDispatcher，其余动作不受影响。
 	Dispatcher Dispatcher
 	// Node 是本控制面的节点名，写入事件信封，默认 "local"。

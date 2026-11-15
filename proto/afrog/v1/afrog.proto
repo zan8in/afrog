@@ -12,6 +12,13 @@ option go_package = "github.com/zan8in/afrog/v3/proto/afrog/v1;afrogv1";
 // ==================== 公开接口（第三方语言 / 未来 MCP 适配层） ====================
 service AfrogScanner {
   rpc SubmitScan(SubmitScanRequest) returns (SubmitScanResponse);
+  // SubmitActions 提交一批同类型的原子动作（架构稿 §4.3）。
+  //
+  // 与 SubmitScan 的唯一区别是「动作由谁给出」：这里动作显式列出——工具面动作
+  // （probe_http / replay_evidence / brute / oob_wait）在控制面进程内执行，执行面
+  // 动作（run_poc / port_scan / web_fingerprint）走 CLI 子进程。返回的 task_id
+  // 与 SubmitScan 同语义：用 StreamEvents / GetStatus / GetResults / Control 一视同仁地驱动。
+  rpc SubmitActions(SubmitActionsRequest) returns (SubmitActionsResponse);
   rpc StreamEvents(StreamEventsRequest) returns (stream ScanEvent);
   rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
   rpc GetResults(GetResultsRequest) returns (GetResultsResponse);
@@ -243,6 +250,28 @@ message SubmitScanRequest {
   ScanSpec spec = 1;
 }
 message SubmitScanResponse {
+  string task_id = 1;
+  string node = 2;
+}
+
+// ActionSpec 是一个原子动作（架构稿 §4.3），kind 取值见 SubmitActions 的注释。
+message ActionSpec {
+  string kind = 1;
+  string target = 2;
+  // poc_id 只有 run_poc 与 brute 使用；留空表示该目标按批量共享的 PoC 选择展开。
+  string poc_id = 3;
+  // params_json 是工具面动作的附加参数（JSON 对象），字段与 MCP 工具入参同名同义；
+  // 执行面动作忽略。空视为无参数。
+  string params_json = 4;
+}
+message SubmitActionsRequest {
+  // spec 是这批动作共享的执行选项（性能 / 网络 / OOB / 结果去向等），
+  // 语义与 SubmitScan 的 spec 完全一致。
+  ScanSpec spec = 1;
+  // actions 必须同 kind：一个任务只跑一种动作类型，与 scantask.Batch 的约束一致。
+  repeated ActionSpec actions = 2;
+}
+message SubmitActionsResponse {
   string task_id = 1;
   string node = 2;
 }

@@ -26,6 +26,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AfrogScanner_SubmitScan_FullMethodName       = "/afrog.v1.AfrogScanner/SubmitScan"
+	AfrogScanner_SubmitActions_FullMethodName    = "/afrog.v1.AfrogScanner/SubmitActions"
 	AfrogScanner_StreamEvents_FullMethodName     = "/afrog.v1.AfrogScanner/StreamEvents"
 	AfrogScanner_GetStatus_FullMethodName        = "/afrog.v1.AfrogScanner/GetStatus"
 	AfrogScanner_GetResults_FullMethodName       = "/afrog.v1.AfrogScanner/GetResults"
@@ -40,6 +41,13 @@ const (
 // ==================== 公开接口（第三方语言 / 未来 MCP 适配层） ====================
 type AfrogScannerClient interface {
 	SubmitScan(ctx context.Context, in *SubmitScanRequest, opts ...grpc.CallOption) (*SubmitScanResponse, error)
+	// SubmitActions 提交一批同类型的原子动作（架构稿 §4.3）。
+	//
+	// 与 SubmitScan 的唯一区别是「动作由谁给出」：这里动作显式列出——工具面动作
+	// （probe_http / replay_evidence / brute / oob_wait）在控制面进程内执行，执行面
+	// 动作（run_poc / port_scan / web_fingerprint）走 CLI 子进程。返回的 task_id
+	// 与 SubmitScan 同语义：用 StreamEvents / GetStatus / GetResults / Control 一视同仁地驱动。
+	SubmitActions(ctx context.Context, in *SubmitActionsRequest, opts ...grpc.CallOption) (*SubmitActionsResponse, error)
 	StreamEvents(ctx context.Context, in *StreamEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ScanEvent], error)
 	GetStatus(ctx context.Context, in *GetStatusRequest, opts ...grpc.CallOption) (*GetStatusResponse, error)
 	GetResults(ctx context.Context, in *GetResultsRequest, opts ...grpc.CallOption) (*GetResultsResponse, error)
@@ -59,6 +67,16 @@ func (c *afrogScannerClient) SubmitScan(ctx context.Context, in *SubmitScanReque
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SubmitScanResponse)
 	err := c.cc.Invoke(ctx, AfrogScanner_SubmitScan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *afrogScannerClient) SubmitActions(ctx context.Context, in *SubmitActionsRequest, opts ...grpc.CallOption) (*SubmitActionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitActionsResponse)
+	err := c.cc.Invoke(ctx, AfrogScanner_SubmitActions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +149,13 @@ func (c *afrogScannerClient) ListCapabilities(ctx context.Context, in *ListCapab
 // ==================== 公开接口（第三方语言 / 未来 MCP 适配层） ====================
 type AfrogScannerServer interface {
 	SubmitScan(context.Context, *SubmitScanRequest) (*SubmitScanResponse, error)
+	// SubmitActions 提交一批同类型的原子动作（架构稿 §4.3）。
+	//
+	// 与 SubmitScan 的唯一区别是「动作由谁给出」：这里动作显式列出——工具面动作
+	// （probe_http / replay_evidence / brute / oob_wait）在控制面进程内执行，执行面
+	// 动作（run_poc / port_scan / web_fingerprint）走 CLI 子进程。返回的 task_id
+	// 与 SubmitScan 同语义：用 StreamEvents / GetStatus / GetResults / Control 一视同仁地驱动。
+	SubmitActions(context.Context, *SubmitActionsRequest) (*SubmitActionsResponse, error)
 	StreamEvents(*StreamEventsRequest, grpc.ServerStreamingServer[ScanEvent]) error
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
 	GetResults(context.Context, *GetResultsRequest) (*GetResultsResponse, error)
@@ -148,6 +173,9 @@ type UnimplementedAfrogScannerServer struct{}
 
 func (UnimplementedAfrogScannerServer) SubmitScan(context.Context, *SubmitScanRequest) (*SubmitScanResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubmitScan not implemented")
+}
+func (UnimplementedAfrogScannerServer) SubmitActions(context.Context, *SubmitActionsRequest) (*SubmitActionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SubmitActions not implemented")
 }
 func (UnimplementedAfrogScannerServer) StreamEvents(*StreamEventsRequest, grpc.ServerStreamingServer[ScanEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StreamEvents not implemented")
@@ -199,6 +227,24 @@ func _AfrogScanner_SubmitScan_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AfrogScannerServer).SubmitScan(ctx, req.(*SubmitScanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AfrogScanner_SubmitActions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitActionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AfrogScannerServer).SubmitActions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AfrogScanner_SubmitActions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AfrogScannerServer).SubmitActions(ctx, req.(*SubmitActionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -296,6 +342,10 @@ var AfrogScanner_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SubmitScan",
 			Handler:    _AfrogScanner_SubmitScan_Handler,
+		},
+		{
+			MethodName: "SubmitActions",
+			Handler:    _AfrogScanner_SubmitActions_Handler,
 		},
 		{
 			MethodName: "GetStatus",
