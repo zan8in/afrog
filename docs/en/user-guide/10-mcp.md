@@ -131,6 +131,8 @@ Evaluation order is fixed: `deny → allowlist → mode → destructive → scop
 | `verify.poc` | Verify one target with one PoC; return evidence | `verify.*` |
 | `verify.replay` | Replay evidence by id and compare id/digest to see whether the old conclusion still holds | `verify.*` |
 | `act.brute` | Weak-credential / dictionary attempts | `full` + `destructive: true` |
+| `act.oob_payload` | Mint a set of out-of-band callback addresses (`filter` + DNS/HTTP, …) for validations that need a reverse callback (command execution, XXE, SSRF) | `full` + `destructive: true` |
+| `act.oob_wait` | Wait for an out-of-band callback; on a hit, return the evidence and write it to the observation stream (`oob_hit`) | `full` + `destructive: true` |
 | `judge.brief` | For a result id or evidence id, gather the judging material: the evidence chain, nearby observations for the same target, the attack-surface subgraph, and existing judgements | Read-only |
 | `judge.record` | Record a judgement (`likely_true` / `likely_false` / `uncertain`) in the `judgement` table as an advisory for human review; **it never touches the vulnerability ledger** | Read-only (writes a local advisory) |
 | `learn.brief` | Fetch tuning material: pipeline stats (including the ingest rate), recent review decisions (with rejection reasons), and pending tuning suggestions | Read-only |
@@ -234,9 +236,12 @@ The write-action surface takes its policy and audit from the `agent` section of 
 agent:
   policy: /path/to/agent-policy.yaml   # policy YAML; empty means the read-only default
   audit: /path/to/audit.jsonl          # decision audit JSONL; empty means no logging
+  oob: ceyeio                          # tool-surface OOB adapter (same values as CLI -oob); credentials come from the reverse section; empty disables act.oob_*
 ```
 
 `agent.policy` uses exactly the same format as `afrog mcp -policy` (see "Policy and budget" above). Unlike a one-shot CLI process, the web server is long-lived, so `budget.requests` inside the policy is the **total session budget for the whole process**, accumulated across requests — the same long-lived semantics as `afrog mcp -listen`.
+
+Set `agent.oob` only when you need out-of-band callbacks: it names the OOB adapter (`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`, same values as CLI `-oob`), and the credentials are reused from the `reverse` section (see "What `reverse` means" in the configuration reference). Once configured, `act.oob_payload` mints addresses and `act.oob_wait` waits for a callback; when empty both report "not configured" explicitly instead of silently waiting for a callback that will never arrive.
 
 ## gRPC entry (AgentService)
 

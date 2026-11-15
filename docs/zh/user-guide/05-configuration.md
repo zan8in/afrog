@@ -255,17 +255,20 @@ observe:
 | --- | --- | --- | --- |
 | `policy` | string | 策略 YAML 路径；格式与 `afrog mcp -policy` 一致 | 空（只读默认策略） |
 | `audit` | string | 判定审计 JSONL 路径 | 空（不记录） |
+| `oob` | string | 工具面的反连适配器名（`ceyeio`/`dnslogcn`/`alphalog`/`xray`/`revsuit`/`interactsh`，取值同 CLI `-oob`）；凭据取自 `reverse` 段 | 空（`act.oob_*` 不可用） |
 
 ```yaml
 agent:
   policy: /path/to/agent-policy.yaml
   audit: /path/to/audit.jsonl
+  oob: ceyeio
 ```
 
 要点：
 
 - `/api/v1/call` 与 MCP（stdio/SSE/streamable）**共用同一份策略、预算与审计**，脚本直连 REST 也不会绕过限额
 - Web 服务是长驻进程，`budget.requests` 是**整个进程的会话总预算**，跨请求累计扣减（与 `afrog mcp -listen` 一致）
+- `agent.oob` 配置后工具面才有反连能力（`act.oob_payload` 铸地址、`act.oob_wait` 等回连），凭据复用 `reverse` 段；未配置时两者明确报「未配置」，而不是静默等待
 - 错误码按语义区分：策略拒绝 `403`、预算耗尽 `429`、未知工具 `404`、参数错误 `400`
 
 ## reverse 是什么

@@ -131,6 +131,8 @@ policy:
 | `verify.poc` | 用单个 PoC 验证单个目标，返回证据 | `verify.*` |
 | `verify.replay` | 按证据 id 重放一次，比对 id/digest 判断旧结论是否仍成立 | `verify.*` |
 | `act.brute` | 弱口令/字典尝试 | `full` + `destructive: true` |
+| `act.oob_payload` | 铸一组带外回连地址（`filter` + DNS/HTTP 等），用于命令执行、XXE、SSRF 等需要反连回显的验证 | `full` + `destructive: true` |
+| `act.oob_wait` | 等待一次带外回连，命中后返回证据并写入观测流（`oob_hit`） | `full` + `destructive: true` |
 | `judge.brief` | 按 result id 或证据 id 取一条命中的研判材料：证据链、同目标周边观测、攻击面子图与已有研判意见 | 只读 |
 | `judge.record` | 记录一条研判意见（`likely_true`/`likely_false`/`uncertain`）到 `judgement` 表，作为 advisory 供人工复核；**不改漏洞台账** | 只读（写本地 advisory） |
 | `learn.brief` | 取调优素材：流水线指标（含自动入库率）、最近终审决议（含驳回原因）与待审调优建议 | 只读 |
@@ -234,9 +236,12 @@ curl -s -X POST "http://127.0.0.1:16868/api/v1/call" \
 agent:
   policy: /path/to/agent-policy.yaml   # 策略 YAML；留空表示只读默认策略
   audit: /path/to/audit.jsonl          # 判定审计 JSONL；留空表示不记录
+  oob: ceyeio                          # 工具面的反连适配器（取值同 CLI -oob）；凭据取自 reverse 段，留空则 act.oob_* 不可用
 ```
 
 `agent.policy` 与 `afrog mcp -policy` 的格式完全一致（见上文「策略与预算」）。与 CLI 的一次性进程不同，Web 服务是长驻进程，包内的预算 **`budget.requests` 是整个进程的会话总预算**，跨请求累计扣减，与 `afrog mcp -listen` 的长驻语义一致。
+
+`agent.oob` 只在需要带外回连时才配：它指定反连适配器（`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`，取值与 CLI `-oob` 一致），凭据复用 `reverse` 段（见配置参考「reverse 是什么」）。配置后 `act.oob_payload` 铸地址、`act.oob_wait` 等回连；留空则两者明确报「未配置」，而不是静默等待一个不会来的回连。
 
 ## gRPC 入口（AgentService）
 

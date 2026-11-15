@@ -255,17 +255,20 @@ Notes:
 | --- | --- | --- | --- |
 | `policy` | string | Path to the policy YAML; same format as `afrog mcp -policy` | empty (read-only default) |
 | `audit` | string | Path to the decision audit JSONL | empty (no logging) |
+| `oob` | string | Tool-surface OOB adapter (`ceyeio`/`dnslogcn`/`alphalog`/`xray`/`revsuit`/`interactsh`, same values as CLI `-oob`); credentials come from the `reverse` section | empty (`act.oob_*` unavailable) |
 
 ```yaml
 agent:
   policy: /path/to/agent-policy.yaml
   audit: /path/to/audit.jsonl
+  oob: ceyeio
 ```
 
 Notes:
 
 - `/api/v1/call` **shares the same policy, budget and audit machinery** as MCP (stdio/SSE/streamable); a script hitting REST directly cannot bypass the limits
 - The web server is long-lived, so `budget.requests` is the **total session budget for the whole process**, accumulated across requests (same as `afrog mcp -listen`)
+- Setting `agent.oob` is what gives the tool surface its OOB capability (`act.oob_payload` mints addresses, `act.oob_wait` waits for a callback), with credentials reused from the `reverse` section; when empty both report "not configured" instead of silently waiting
 - Errors are distinguished by semantics: policy denial `403`, budget exhaustion `429`, unknown tool `404`, bad request `400`
 
 ## What `reverse` means
