@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+// 动作类型分类：执行面三类走 CLI，工具面四类必须都被识别为进程内派发。
+func TestActionKindToolFaceClassification(t *testing.T) {
+	for _, k := range []ActionKind{ActionProbeHTTP, ActionReplayEvidence, ActionBrute, ActionOOBWait} {
+		if !k.ToolFace() {
+			t.Fatalf("%s must be a tool-face kind", k)
+		}
+	}
+	for _, k := range []ActionKind{ActionRunPoc, ActionPortScan, ActionWebFingerprint, "teleport"} {
+		if k.ToolFace() {
+			t.Fatalf("%s must not be a tool-face kind", k)
+		}
+	}
+}
+
 // 单 Action 提交：一个 run_poc 动作 = 目标 1 / PoC 1 的批量。
 func TestSubmitBatch_SingleRunPocAction(t *testing.T) {
 	rig := newRig(t, Options{})

@@ -67,8 +67,15 @@ func (t *Task) ID() string { return t.id }
 // Node 返回执行该任务的节点名。
 func (t *Task) Node() string { return t.node }
 
-// Spec 返回任务规格（只读）。
+// Spec 返回任务规格（只读）。工具面动作的规格只承载目标与任务名，不会交给执行面。
 func (t *Task) Spec() *executor.Spec { return t.spec }
+
+// toolFace 表示任务的动作由工具面在进程内执行，而非执行面的 CLI 子进程。
+//
+// batch 在构造后不再变化，因此无需持锁读取。
+func (t *Task) toolFace() bool {
+	return len(t.batch.Actions) > 0 && t.batch.Actions[0].Kind.ToolFace()
+}
 
 // Batch 返回任务的动作批量（只读）。
 //
@@ -350,9 +357,11 @@ func (t *Task) progressLocked() Progress {
 }
 
 // pausableLocked 如实反映「现在能不能暂停/继续」。调用方必须持有 t.mu。
-// Windows 不支持进程暂停，排队中（还没有进程）与已结束的任务也无从下手。
+//
+// Windows 不支持进程暂停；工具面动作在进程内跑，没有可挂起的进程；排队中（还没有
+// 句柄）与已结束的任务也无从下手。
 func (t *Task) pausableLocked() bool {
-	if !executor.PauseSupported {
+	if !executor.PauseSupported || t.toolFace() {
 		return false
 	}
 	if t.handle == nil {

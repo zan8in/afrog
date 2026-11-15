@@ -1,5 +1,7 @@
 package config
 
+import "strings"
+
 var (
 	OOBCeyeio     = "ceyeio"
 	OOBDnslogcn   = "dnslogcn"
@@ -97,4 +99,50 @@ func (opt *Options) SetOOBAdapter() {
 	}
 	// gologger.Info().Msg("Using OOB Server: " + opt.OOB)
 
+}
+
+// OOBConnectorParams 是构造一个反连适配器所需的连接参数。
+type OOBConnectorParams struct {
+	Adapter string
+	Key     string
+	Domain  string
+	HTTPURL string
+	APIURL  string
+}
+
+// ResolveOOBConnector 把「适配器名 + reverse 配置」解析成连接参数。
+//
+// 与 Options.SetOOBAdapter 同一份映射语义，供非 CLI 场景（长驻的工具面服务）复用，
+// 避免同一套「适配器名 → 凭据字段」的对照表出现第三份。adapter 为空、取值未识别、
+// 或该适配器的凭据全为空时 ok 为假——调用方据此 fail-closed，而不是拿一份空凭据去连。
+func ResolveOOBConnector(adapter string, r Reverse) (OOBConnectorParams, bool) {
+	name := strings.ToLower(strings.TrimSpace(adapter))
+	if name == "" {
+		return OOBConnectorParams{}, false
+	}
+	p := OOBConnectorParams{Adapter: name}
+	switch name {
+	case OOBCeyeio:
+		p.Key, p.Domain = r.Ceye.ApiKey, r.Ceye.Domain
+	case OOBDnslogcn:
+		p.Domain = r.Dnslogcn.Domain
+	case OOBAlphalog:
+		p.Domain, p.APIURL = r.Alphalog.Domain, r.Alphalog.ApiUrl
+	case OOBXray:
+		p.Domain, p.APIURL, p.Key = r.Xray.Domain, r.Xray.ApiUrl, r.Xray.XToken
+	case OOBRevsuit:
+		p.Key, p.Domain = r.Revsuit.Token, r.Revsuit.DnsDomain
+		p.HTTPURL, p.APIURL = r.Revsuit.HttpUrl, r.Revsuit.ApiUrl
+	case OOBInteractsh:
+		p.Domain, p.Key = r.Interactsh.Server, r.Interactsh.Token
+		if p.Domain == "" {
+			p.Domain = "oast.pro"
+		}
+	default:
+		return OOBConnectorParams{}, false
+	}
+	if p.Key == "" && p.Domain == "" && p.HTTPURL == "" && p.APIURL == "" {
+		return OOBConnectorParams{}, false
+	}
+	return p, true
 }

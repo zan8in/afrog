@@ -1,8 +1,8 @@
 // Package scanstream 定义 afrog 的 NDJSON 事件流格式。
 //
-// 该格式与 docs/plan/afrog-grpc-protocol.md 里的 ScanEvent 同构：
+// 该格式与 proto 里的 ScanEvent 同构：
 // 信封字段（v/node/task/seq/ts_ms/type）负责路由与可靠性，载荷放在与 type
-// 同名的键下。字段名必须与协议文档及 proto 草案逐字对应，两者不得私自加字段。
+// 同名的键下。字段名必须与 proto 草案逐字对应，两者不得私自加字段。
 package scanstream
 
 import "github.com/zan8in/afrog/v3/pkg/evidence"

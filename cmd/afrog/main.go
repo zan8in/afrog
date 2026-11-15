@@ -146,8 +146,8 @@ func main() {
 			web.SetPassiveConfig(cfg.Passive, options.ConfigFile)
 			// 高危动作闸门（集群派发等）：默认全 allow，配置后才生效。
 			web.SetSecurityConfig(cfg.Security)
-			// Agent 写动作面（/api/v1/call）的策略与审计来源；默认只读、不发包。
-			web.SetAgentConfig(cfg.Agent)
+			// Agent 写动作面（/api/v1/call）的策略、审计与带外来源；默认只读、不发包。
+			web.SetAgentConfig(cfg.Agent, cfg.Reverse)
 		}
 		if err = web.StartServer(addr); err != nil {
 			gologger.Error().Msg(err.Error())

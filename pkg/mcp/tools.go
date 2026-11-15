@@ -68,6 +68,8 @@ func (s *Server) buildTools() map[string]*Tool {
 		s.verifyPocTool(),
 		s.verifyReplayTool(),
 		s.actBruteTool(),
+		s.actOOBPayloadTool(),
+		s.actOOBWaitTool(),
 		s.judgeBriefTool(),
 		s.judgeRecordTool(),
 		s.learnBriefTool(),

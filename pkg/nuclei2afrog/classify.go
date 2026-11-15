@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Class 是转换结果的分档（见 docs/plan/afrog-nuclei-template-conversion-spec.md §4）。
+// Class 是转换结果的分档。
 type Class string
 
 const (

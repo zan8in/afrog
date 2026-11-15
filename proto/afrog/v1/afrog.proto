@@ -1,7 +1,7 @@
 // afrog 扫描能力服务协议。
 //
-// 本文件是 docs/plan/afrog-grpc-protocol.md 第 6 节 proto 草案的落地实现，
-// 两者必须逐字对应：字段名、编号、语义一律不得私自改动。
+// 这份 proto 是扫描能力服务的对外契约，
+// 字段名、编号、语义一律不得私自改动。
 // 重新生成代码：cd proto/afrog/v1 && go generate ./...
 syntax = "proto3";
 

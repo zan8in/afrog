@@ -34,6 +34,10 @@ type Options struct {
 	Budget  *policy.Budget
 	Auditor *policy.Auditor
 	Info    ServerInfo
+
+	// OOB 是工具面的带外（反连）后端，供 act.oob_payload / act.oob_wait 使用。
+	// 为 nil 表示未配置：这两个工具仍然注册，但会明确报「未配置 OOB」。
+	OOB OOBSource
 }
 
 // Tool 是一个可调用的 MCP 工具。
@@ -60,6 +64,7 @@ type ToolSpec struct {
 type Server struct {
 	gate  *policy.Gate
 	info  ServerInfo
+	oob   OOBSource
 	tools map[string]*Tool
 
 	// verifyMu 串行化验证类工具：SDK 内部有进程级全局状态，不支持并行扫描。
@@ -87,7 +92,7 @@ func New(opts Options) *Server {
 		info.Name = "afrog"
 	}
 
-	s := &Server{gate: policy.NewGate(p, b, opts.Auditor), info: info}
+	s := &Server{gate: policy.NewGate(p, b, opts.Auditor), info: info, oob: opts.OOB}
 	s.tools = s.buildTools()
 	return s
 }
@@ -97,7 +102,9 @@ func New(opts Options) *Server {
 //
 // 两者都留空即沿用只读默认策略、不落盘审计：Web 服务与 `afrog serve` 因此默认
 // 不获得发包能力。策略文件格式与 `afrog mcp -policy` 完全一致。
-func NewWithPaths(policyPath, auditPath string, info ServerInfo) (*Server, error) {
+//
+// oob 为 nil 表示不使用带外能力：act.oob_* 仍然注册，但会明确报未配置。
+func NewWithPaths(policyPath, auditPath string, oob OOBSource, info ServerInfo) (*Server, error) {
 	p := policy.Default()
 	if strings.TrimSpace(policyPath) != "" {
 		loaded, err := policy.Load(policyPath)
@@ -110,7 +117,7 @@ func NewWithPaths(policyPath, auditPath string, info ServerInfo) (*Server, error
 	if strings.TrimSpace(auditPath) != "" {
 		auditor = policy.NewAuditor(FileAuditWriter{Path: auditPath})
 	}
-	return New(Options{Policy: p, Auditor: auditor, Info: info}), nil
+	return New(Options{Policy: p, Auditor: auditor, OOB: oob, Info: info}), nil
 }
 
 // FileAuditWriter 每次写入都重新打开文件：不持有长驻句柄，日志轮转/删除后能自动重建。

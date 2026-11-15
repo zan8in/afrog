@@ -61,7 +61,7 @@ func (m *Manager) Submit(req Request) (*Snapshot, error) {
 // 单 Action 提交就是 len(batch.Actions) == 1 的批量；批量为空则退化为按
 // batch.Options 展开的扫描式批量（与 Submit 完全同义）。
 func (m *Manager) SubmitBatch(batch Batch) (*Snapshot, error) {
-	spec, cleanup, err := batch.buildSpec()
+	spec, cleanup, err := m.buildSpec(batch)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +75,21 @@ func (m *Manager) SubmitBatch(batch Batch) (*Snapshot, error) {
 
 	m.schedule(t)
 	return t.Snapshot(), nil
+}
+
+// buildSpec 把批量翻译成任务规格：工具面动作交给 Dispatcher，其余走执行面。
+//
+// 拒绝「没有派发后端」的工具面动作发生在受理阶段而不是启动阶段，因为那时还没有
+// 占用并发名额，调用方能立刻拿到明确错误。
+func (m *Manager) buildSpec(batch Batch) (*executor.Spec, func(), error) {
+	kind, ok := toolFaceKind(batch)
+	if !ok {
+		return batch.buildSpec()
+	}
+	if m.opts.Dispatcher == nil || !m.opts.Dispatcher.Supports(kind) {
+		return nil, func() {}, fmt.Errorf("%w: %s", ErrNoDispatcher, kind)
+	}
+	return dispatchSpec(batch)
 }
 
 // Get 按 ID 取任务。
@@ -172,11 +187,20 @@ func (m *Manager) schedule(t *Task) {
 	go m.run(t)
 }
 
-// run 拉起子进程、吸收事件，最后按引擎自报的收尾状态折算任务状态。
+// startTask 选择任务的执行后端：工具面动作走 Dispatcher（进程内），其余走执行面
+// （CLI 子进程）。两条路径产出的都是同一种事件流句柄，后续处理完全一致。
+func (m *Manager) startTask(t *Task) (executor.Handle, error) {
+	if t.toolFace() {
+		return m.opts.Dispatcher.Dispatch(context.Background(), t.ID(), t.batch)
+	}
+	return m.opts.Executor.Start(context.Background(), t.ID(), t.spec)
+}
+
+// run 拉起执行后端、吸收事件，最后按引擎自报的收尾状态折算任务状态。
 func (m *Manager) run(t *Task) {
-	h, err := m.opts.Executor.Start(context.Background(), t.ID(), t.spec)
+	h, err := m.startTask(t)
 	if err != nil {
-		gologger.Warning().Str("taskId", t.ID()).Str("error", err.Error()).Msg("scan failed to start")
+		gologger.Warning().Str("taskId", t.ID()).Str("error", err.Error()).Msg("task failed to start")
 		t.setErr(err.Error())
 		m.finalize(t, StatusFailed)
 		return

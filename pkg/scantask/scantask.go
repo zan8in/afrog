@@ -2,7 +2,7 @@
 // 事件缓冲并分发给订阅者。
 //
 // 它不关心传输：gRPC 的 StreamEvents 与 Web 的 SSE 都只是它的订阅者，因此两条路径
-// 共用同一份任务状态与事件口径（见 docs/plan/afrog-grpc-protocol.md §4.3）。
+// 共用同一份任务状态与事件口径。
 package scantask
 
 import (
@@ -91,6 +91,9 @@ const (
 type Options struct {
 	// Executor 真正负责跑扫描。
 	Executor executor.Executor
+	// Dispatcher 执行工具面动作（probe_http / replay_evidence / brute）。
+	// 留空时提交这些动作会被拒绝为 ErrNoDispatcher，其余动作不受影响。
+	Dispatcher Dispatcher
 	// Node 是本控制面的节点名，写入事件信封，默认 "local"。
 	Node string
 	// MaxRunning 是并发上限，<=0 用 DefaultMaxRunning。

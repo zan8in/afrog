@@ -100,7 +100,6 @@ func guardExpr(pv partView, expr string) string {
 // ---------------- 请求级模板变量 ----------------
 
 // celViewVar 把 nuclei 的请求级变量映射成 afrog CEL 表达式。
-// 语义对照见 docs/plan/afrog-nuclei-template-conversion-spec.md §8。
 var celViewVar = map[string]string{
 	"baseurl":  `(request.url.scheme + "://" + request.url.host + request.url.path)`,
 	"rooturl":  `(request.url.scheme + "://" + request.url.host)`,

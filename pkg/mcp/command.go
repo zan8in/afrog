@@ -72,13 +72,25 @@ func Command(args []string) error {
 	defer sqlite.CloseX()
 
 	// 保留策略与 CLI/Web 共用 afrog-config.yaml；读不到配置就沿用默认值。
-	if cfg, cfgErr := config.LoadConfigReadOnly(""); cfgErr == nil && cfg.Observe.MaxRows != nil {
-		sqlite.SetObservationMaxRows(*cfg.Observe.MaxRows)
+	// agent.oob 指定工具面的反连适配器（凭据取 reverse 段）：未配置就没有反连能力，
+	// act.oob_* 会明确报未配置，而不是静默等一个不会来的回连。
+	var oob OOBSource
+	if cfg, cfgErr := config.LoadConfigReadOnly(""); cfgErr == nil && cfg != nil {
+		if cfg.Observe.MaxRows != nil {
+			sqlite.SetObservationMaxRows(*cfg.Observe.MaxRows)
+		}
+		src, oobErr := NewOOBSource(cfg.Agent.OOB, cfg.Reverse)
+		if oobErr != nil {
+			gologger.Error().Msgf("初始化工具面反连后端失败，act.oob_* 将不可用: %v", oobErr)
+		} else {
+			oob = src
+		}
 	}
 
 	srv := New(Options{
 		Policy:  p,
 		Auditor: auditor,
+		OOB:     oob,
 		Info:    ServerInfo{Name: "afrog", Version: config.Version},
 	})
 

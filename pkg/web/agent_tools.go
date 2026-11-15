@@ -10,6 +10,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/mcp"
 	"github.com/zan8in/afrog/v3/pkg/policy"
+	"github.com/zan8in/gologger"
 )
 
 // Agent 写动作面：/api/v1/call 与 MCP 复用同一套工具注册表与策略门控。
@@ -18,16 +19,24 @@ import (
 // 审计在 MCP 与 REST 之间天然一致，不存在「REST 绕过了 MCP 的限额」这种缺口。
 // 默认策略为只读：不配置 agent.policy 时，写动作一律被拒，与既有只读语义一致。
 
-// agentPolicyPath / agentAuditPath 由 cmd 层在启动 Web 服务前通过 SetAgentConfig 注入。
+// agentPolicyPath / agentAuditPath / agentOOBAdapter / agentReverse 由 cmd 层在启动
+// Web 服务前通过 SetAgentConfig 注入。
 var (
 	agentPolicyPath string
 	agentAuditPath  string
+	agentOOBAdapter string
+	agentReverse    config.Reverse
 )
 
-// SetAgentConfig 注入 Agent 工具面的策略与审计来源，由 cmd 层在启动 Web 服务前调用。
-func SetAgentConfig(cfg config.Agent) {
+// SetAgentConfig 注入 Agent 工具面的策略、审计与带外来源，由 cmd 层在启动 Web 服务前调用。
+//
+// reverse 提供反连凭据（ceye / xray / …），配合 agent.oob 里的适配器名，工具面的
+// act.oob_payload / act.oob_wait 才有反连能力；未配置时两者会明确报未配置。
+func SetAgentConfig(cfg config.Agent, reverse config.Reverse) {
 	agentPolicyPath = strings.TrimSpace(cfg.Policy)
 	agentAuditPath = strings.TrimSpace(cfg.Audit)
+	agentOOBAdapter = strings.TrimSpace(cfg.OOB)
+	agentReverse = reverse
 }
 
 var (
@@ -52,7 +61,13 @@ func agentTools() (*mcp.Server, error) {
 
 func buildAgentTools() (*mcp.Server, error) {
 	// 装配口径与 gRPC AgentService 完全共用：策略/审计留空即只读默认。
-	return mcp.NewWithPaths(agentPolicyPath, agentAuditPath, mcp.ServerInfo{})
+	// 反连适配器配错不应拖垮整个工具面：记日志后按未配置处理，act.oob_* 会明确报未配置。
+	oob, err := mcp.NewOOBSource(agentOOBAdapter, agentReverse)
+	if err != nil {
+		gologger.Error().Msgf("初始化工具面反连后端失败，act.oob_* 将不可用: %v", err)
+		oob = nil
+	}
+	return mcp.NewWithPaths(agentPolicyPath, agentAuditPath, oob, mcp.ServerInfo{})
 }
 
 // agentCallHandler 是 /api/v1/call：POST {"name": "...", "arguments": {...}}。

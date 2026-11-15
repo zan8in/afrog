@@ -41,11 +41,16 @@ const DefaultObserveMaxRows = 200000
 //	agent:
 //	  policy: /etc/afrog/policy.yaml
 //	  audit: /var/log/afrog/agent-audit.jsonl
+//	  oob: ceyeio
 type Agent struct {
 	// Policy 是策略 YAML 路径；留空表示只读默认策略。
 	Policy string `yaml:"policy"`
 	// Audit 是判定审计 JSONL 路径；留空表示不记录。
 	Audit string `yaml:"audit"`
+	// OOB 是工具面（act.oob_payload / act.oob_wait）使用的反连适配器名，取值与 CLI
+	// 的 -oob 一致（ceyeio / dnslogcn / alphalog / xray / revsuit / interactsh）；
+	// 凭据仍取 reverse 段。留空表示工具面不提供 OOB 能力，两个工具会明确报未配置。
+	OOB string `yaml:"oob"`
 }
 
 // Observe 是观测流（observe.observations）的保留策略配置。

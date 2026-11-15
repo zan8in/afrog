@@ -68,9 +68,35 @@ func ServeCommand(args []string) error {
 		}
 	}
 
+	// Agent 工具面（AgentService）：与 MCP / REST 共用同一份工具注册表与门控。
+	// 策略/审计来自 afrog-config.yaml 的 agent 段，留空即只读默认——控制面默认
+	// 不获得发包能力，写动作一律被拒。
+	agentCfg := config.Agent{}
+	var reverseCfg config.Reverse
+	if cfg, cerr := config.LoadConfigReadOnly(""); cerr != nil {
+		gologger.Error().Msgf("读取 afrog-config.yaml 失败，Agent 工具面沿用只读默认: %v", cerr)
+	} else if cfg != nil {
+		agentCfg = cfg.Agent
+		reverseCfg = cfg.Reverse
+	}
+	// agent.oob 指定工具面的反连适配器（凭据取 reverse 段）：未配置就没有反连能力，
+	// act.oob_* 会明确报未配置。适配器配错不应拖垮整个工具面，因此只记日志、不发包。
+	oob, oobErr := mcp.NewOOBSource(agentCfg.OOB, reverseCfg)
+	if oobErr != nil {
+		gologger.Error().Msgf("初始化工具面反连后端失败，act.oob_* 将不可用: %v", oobErr)
+		oob = nil
+	}
+	tools, err := mcp.NewWithPaths(agentCfg.Policy, agentCfg.Audit, oob, mcp.ServerInfo{})
+	if err != nil {
+		return fmt.Errorf("init agent tools: %w", err)
+	}
+
 	mgr, err := scantask.New(scantask.Options{
-		Executor:    ex,
-		MaxRunning:  *maxRunning,
+		Executor:   ex,
+		Dispatcher: tools.Dispatcher(),
+		MaxRunning: *maxRunning,
+		// 工具面动作（probe_http / replay_evidence / brute）与扫描任务共用同一套
+		// 排队、事件窗口与收尾，见 scantask.Dispatcher。
 		EventBuffer: *eventBuffer,
 	})
 	if err != nil {
@@ -93,19 +119,7 @@ func ServeCommand(args []string) error {
 	)
 	afrogv1.RegisterAfrogScannerServer(grpcSrv, srv)
 
-	// Agent 工具面（AgentService）：与 MCP / REST 共用同一份工具注册表与门控。
-	// 策略/审计来自 afrog-config.yaml 的 agent 段，留空即只读默认——控制面默认
-	// 不获得发包能力，写动作一律被拒。
-	agentCfg := config.Agent{}
-	if cfg, cerr := config.LoadConfigReadOnly(""); cerr != nil {
-		gologger.Error().Msgf("读取 afrog-config.yaml 失败，Agent 工具面沿用只读默认: %v", cerr)
-	} else if cfg != nil {
-		agentCfg = cfg.Agent
-	}
-	tools, err := mcp.NewWithPaths(agentCfg.Policy, agentCfg.Audit, mcp.ServerInfo{})
-	if err != nil {
-		return fmt.Errorf("init agent tools: %w", err)
-	}
+	// Agent 工具面（AgentService）：与控制面共用同一份工具注册表与门控。
 	agentSrv, err := NewAgentService(tools)
 	if err != nil {
 		return err
