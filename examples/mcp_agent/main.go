@@ -154,15 +154,20 @@ func (c *rpcClient) callTool(ctx context.Context, name string, args any) (string
 }
 
 type finding struct {
-	VulID      string `json:"vulid"`
-	VulName    string `json:"vulname"`
-	Severity   string `json:"severity"`
-	Target     string `json:"target"`
-	FullTarget string `json:"fulltarget"`
-	Status     string `json:"status"`
-	HitCount   int64  `json:"hit_count"`
-	ResultID   int64  `json:"result_id"`
-	EvidenceID string `json:"evidence_id"`
+	ID         string   `json:"id"`
+	ProjectID  string   `json:"project_id"`
+	Subject    string   `json:"subject"`
+	VulnClass  string   `json:"vuln_class"`
+	Severity   string   `json:"severity"`
+	Title      string   `json:"title"`
+	Confidence string   `json:"confidence"`
+	Evidence   []string `json:"evidence"`
+	State      string   `json:"state"`
+	Source     string   `json:"source"`
+	FirstSeen  string   `json:"first_seen"`
+	LastSeen   string   `json:"last_seen"`
+	HitCount   int64    `json:"hit_count"`
+	Status     string   `json:"status"`
 }
 
 func main() {
@@ -218,25 +223,17 @@ func main() {
 
 	for i, f := range page.Items {
 		fmt.Printf("%d. [%s] %s  %s  命中 %d 次  状态: %s\n",
-			i+1, f.Severity, f.VulName, firstNonEmpty(f.FullTarget, f.Target), f.HitCount, f.Status)
-		if f.EvidenceID != "" {
-			fmt.Printf("   证据: %s\n", f.EvidenceID)
+			i+1, f.Severity, f.Title, firstNonEmpty(f.Subject, f.VulnClass), f.HitCount, f.State)
+		if len(f.Evidence) > 0 {
+			fmt.Printf("   证据: %s\n", strings.Join(f.Evidence, ", "))
 		}
 	}
 
 	first := page.Items[0]
-	ref := first.EvidenceID
-	if ref == "" && first.ResultID > 0 {
-		ref = fmt.Sprint(first.ResultID)
-	}
-	if ref != "" {
-		evText, err := client.callTool(ctx, "observe.evidence", map[string]any{"id": ref})
+	if len(first.Evidence) > 0 {
+		evText, err := client.callTool(ctx, "observe.evidence", map[string]any{"id": first.Evidence[0]})
 		if err != nil {
-			if ref == fmt.Sprint(first.ResultID) {
-				fmt.Println("\n第一条命中没有证据（可能是证据功能上线前的历史数据）。")
-			} else {
-				fmt.Printf("\n读取证据失败: %v\n", err)
-			}
+			fmt.Printf("\n读取证据失败: %v\n", err)
 		} else {
 			fmt.Printf("\n第一条命中的证据:\n%s\n", evText)
 		}

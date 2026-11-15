@@ -16,9 +16,10 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 )
 
-// Findings 返回与漏洞台账一致的命中分页。
-func Findings(f sqlite.LedgerFilter) (*sqlite.LedgerPage, error) {
-	return sqlite.SelectLedgerPage(f)
+// Findings 返回由 result / vuln_ledger / task_project / evidence 四表投影出的漏洞
+// 结论（Finding）分页：聚合口径为类目级（project_id + subject + vuln_class）。
+func Findings(f sqlite.LedgerFilter) (*sqlite.FindingPage, error) {
+	return sqlite.SelectFindings(f)
 }
 
 // Evidence 按证据 id（evd_ 前缀）或 result 主键取证据。

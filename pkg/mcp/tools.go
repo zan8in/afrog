@@ -95,7 +95,7 @@ func (s *Server) observeFindingsTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.findings",
-		Description: "按项目、台账状态、严重级别列出漏洞命中（聚合口径与漏洞台账一致）。",
+		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

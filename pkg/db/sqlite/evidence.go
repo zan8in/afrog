@@ -59,6 +59,30 @@ func insertEvidenceForResult(r *result.Result, resultID int64, taskID string) {
 	}
 	if err := InsertEvidence(r.Evidence, resultID, taskID); err != nil {
 		gologger.Error().Msgf("insert evidence failed: %v", err)
+		return
+	}
+	linkFindingEvidence(r, taskID)
+}
+
+// linkFindingEvidence 依据命中的 (项目, 主体, 类目) 算出 Finding id，写一条
+// finding → evidence 的判定边（D3 已定：落库时写）。
+//
+// 失败只记日志：这条边是图上反查的加速冗余，缺了不影响 Finding 投影查询
+// ——结论真源仍是 result / vuln_ledger / task_project / evidence 四表。
+func linkFindingEvidence(r *result.Result, taskID string) {
+	projectID, err := SelectTaskProject(taskID)
+	if err != nil {
+		gologger.Debug().Msgf("resolve task project failed: %v", err)
+	}
+	var cweID, tags, vulID string
+	if r.PocInfo != nil {
+		cweID = r.PocInfo.Info.Classification.CweId
+		tags = r.PocInfo.Info.Tags
+		vulID = r.PocInfo.Id
+	}
+	findingID, _, _ := findingKey(projectID, r.FullTarget, r.Target, cweID, tags, vulID)
+	if err := LinkFindingEvidence(findingID, r.Evidence.ID); err != nil {
+		gologger.Debug().Msgf("link finding evidence failed: %v", err)
 	}
 }
 
@@ -106,6 +130,9 @@ func evidenceInsertArgs(ev *evidence.Evidence, resultID int64, taskID string) ([
 //
 // 集群回填是「先清后写」的整批事务，而 sqlite 连接池只有一条连接：事务未提交时
 // 再用 dbx 写会直接自锁，因此必须复用同一个 tx。
+//
+// 这里不写 finding → evidence 判定边：那条边只是图上反查的加速冗余，Finding 真源
+// 始终是投影查询；在事务内解析项目归属又要复用 dbx，代价与收益不成比例。
 func insertEvidenceTx(tx *sqlx.Tx, ev *evidence.Evidence, resultID int64, taskID string) error {
 	if tx == nil || ev == nil || strings.TrimSpace(ev.ID) == "" {
 		return nil
@@ -243,6 +270,62 @@ func SelectEvidenceIDsByResultIDs(ids []int64) (map[int64]string, error) {
 		}
 		for _, r := range rows {
 			out[r.ResultID] = r.ID
+		}
+	}
+	return out, nil
+}
+
+// EvidenceRef 是证据的最小引用：内容寻址 id 与判定置信度。
+type EvidenceRef struct {
+	ID         string `db:"id"`
+	Confidence string `db:"confidence"`
+}
+
+// SelectEvidenceRefsByResultIDs 批量返回 result id → (证据 id, 置信度)。
+//
+// 与 SelectEvidenceIDsByResultIDs 的差别只是多带一列 confidence：Finding 投影需要
+// 置信度但不需要证据正文，避免为此把整条 payload 解码出来。
+func SelectEvidenceRefsByResultIDs(ids []int64) (map[int64]EvidenceRef, error) {
+	out := make(map[int64]EvidenceRef)
+	if dbx == nil {
+		return out, fmt.Errorf("sqlite not initialized")
+	}
+
+	clean := make([]int64, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		clean = append(clean, id)
+	}
+	if len(clean) == 0 {
+		return out, nil
+	}
+
+	type row struct {
+		ResultID   int64  `db:"result_id"`
+		ID         string `db:"id"`
+		Confidence string `db:"confidence"`
+	}
+	for _, chunk := range chunkSlice(clean, idChunkSize/2) {
+		holders := strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")
+		args := make([]interface{}, 0, len(chunk))
+		for _, id := range chunk {
+			args = append(args, id)
+		}
+		var rows []row
+		if err := dbx.Select(&rows,
+			`SELECT "result_id","id","confidence" FROM "evidence"
+			 WHERE "result_id" IN (`+holders+`) ORDER BY "created" ASC`, args...); err != nil {
+			return out, err
+		}
+		for _, r := range rows {
+			out[r.ResultID] = EvidenceRef{ID: r.ID, Confidence: r.Confidence}
 		}
 	}
 	return out, nil

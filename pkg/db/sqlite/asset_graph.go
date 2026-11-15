@@ -129,6 +129,11 @@ func SplitParamAssetID(id string) (endpoint, location string, ok bool) {
 const (
 	techAssetPrefix = "tech:"
 	pocAssetPrefix  = "poc:"
+	// findingIDPrefix 是 Finding 节点的 id 前缀（ref.KindFinding + "_"）。
+	// Finding 与 endpoint/param 一样是「读时合成」的节点：只在边里出现，不落 asset 行。
+	findingIDPrefix = "fnd_"
+	// findingEvidenceEdgeKind 是「结论 → 证据」的判定边类型。
+	findingEvidenceEdgeKind = "justified_by"
 )
 
 // TechAssetID 返回技术栈节点 id；名字为空时返回空串。
@@ -162,6 +167,9 @@ func ClassifyAssetAddress(addr string) string {
 	}
 	if strings.HasPrefix(lower, pocAssetPrefix) {
 		return "poc"
+	}
+	if strings.HasPrefix(lower, findingIDPrefix) {
+		return "finding"
 	}
 	if _, _, ok := SplitParamAssetID(s); ok {
 		return "param"
@@ -395,6 +403,26 @@ func EnsureTechGraph(endpoint string, techs []string, candidates map[string][]st
 		return nil
 	}
 	return insertAssetEdges(context.Background(), dbx, edges)
+}
+
+// LinkFindingEvidence 记录「Finding → 证据」的判定边（kind=justified_by），只写边。
+//
+// 仅作图上反查的加速冗余，不作为 Finding 真源：Finding 的实时口径以投影查询为准。
+// 项目归属可能在证据写入之后才确定，此时 finding id 会变化、本边可能陈旧——不影响
+// 结论的正确性，只是这张边不再指向最新 id。
+func LinkFindingEvidence(findingID, evidenceID string) error {
+	if dbx == nil {
+		return fmt.Errorf("sqlite not initialized")
+	}
+	findingID = strings.TrimSpace(findingID)
+	evidenceID = strings.TrimSpace(evidenceID)
+	if findingID == "" || evidenceID == "" {
+		return nil
+	}
+	now := time.Now().Format(assetTimeLayout)
+	return insertAssetEdges(context.Background(), dbx, []AssetEdge{{
+		ParentID: findingID, ChildID: evidenceID, Kind: findingEvidenceEdgeKind, CreatedAt: now,
+	}})
 }
 
 // TrimTechAssetID 把技术栈推导节点 id 还原成名字；不是技术栈节点时返回空串。
