@@ -121,14 +121,14 @@ policy:
 | `observe.evidence` | 按 result id 或 `evd_` 开头的证据 id 取证据 | 只读 |
 | `observe.state` | 以资产为根返回攻击面子图（上下游、端点/参数、技术栈与候选 PoC、覆盖、命中数） | 只读 |
 | `observe.observations` | 按 `seq` 游标增量拉取观测流：开放端口、Web 指纹、HTTP 事务、被动代理流量、TLS 证书、带外回连 | 只读 |
-| `plan.next` | 把攻击面图压成下一步的 `Action` 提议（`verify.poc` / `probe.fingerprint`），按确定性分数排序并附依据 | 只读 |
+| `plan.next` | 把攻击面图压成下一步的 `Action` 提议（`verify.poc` / `probe.fingerprint`），按确定性分数排序并附依据；靠带外回连下结论的候选会带 `requires_oob: true` | 只读 |
 | `poc.search` | 按关键词与级别检索 PoC，返回本地路径 | 只读 |
 | `poc.draft` | 校验一份 PoC 草稿：结构、能力等级、请求量估算；可选落盘供 `verify.poc` 使用 | 只读 |
 | `poc.submit` | 在真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（`afrog poc approve/reject`） | `verify.*`（按草稿能力分级，`exec` 级还需 `destructive: true`） |
 | `probe.http` | 发一次 HTTP 请求，返回状态、头、正文与耗时 | `probe.*` |
 | `probe.port` | 单主机端口探测（默认 top100，单次上限 1000 个），返回开放端口与服务指纹 | `probe.*` |
 | `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要 | `probe.*` |
-| `verify.poc` | 用单个 PoC 验证单个目标，返回证据 | `verify.*` |
+| `verify.poc` | 用单个 PoC 验证单个目标，返回证据；反向 PoC（含 `{{oob.*}}` 或 `oobCheck`）需要 `agent.oob`，未配置时明确报错（fail-closed），不会静默判为「未命中」 | `verify.*` |
 | `verify.replay` | 按证据 id 重放一次，比对 id/digest 判断旧结论是否仍成立 | `verify.*` |
 | `act.brute` | 弱口令/字典尝试 | `full` + `destructive: true` |
 | `act.oob_payload` | 铸一组带外回连地址（`filter` + DNS/HTTP 等），用于命令执行、XXE、SSRF 等需要反连回显的验证 | `full` + `destructive: true` |
@@ -241,7 +241,7 @@ agent:
 
 `agent.policy` 与 `afrog mcp -policy` 的格式完全一致（见上文「策略与预算」）。与 CLI 的一次性进程不同，Web 服务是长驻进程，包内的预算 **`budget.requests` 是整个进程的会话总预算**，跨请求累计扣减，与 `afrog mcp -listen` 的长驻语义一致。
 
-`agent.oob` 只在需要带外回连时才配：它指定反连适配器（`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`，取值与 CLI `-oob` 一致），凭据复用 `reverse` 段（见配置参考「reverse 是什么」）。配置后 `act.oob_payload` 铸地址、`act.oob_wait` 等回连；留空则两者明确报「未配置」，而不是静默等待一个不会来的回连。
+`agent.oob` 只在需要带外回连时才配：它指定反连适配器（`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`，取值与 CLI `-oob` 一致），凭据复用 `reverse` 段（见配置参考「reverse 是什么」）。配置后 `act.oob_payload` 铸地址、`act.oob_wait` 等回连；`verify.poc` 跑反向 PoC（含 `{{oob.*}}` 或 `oobCheck`）时也走它，把适配器交给 SDK 复用 `reverse` 凭据。留空则这几处都明确报「未配置」，而不是静默等待一个不会来的回连——反向 PoC 不会因此被悄悄判成「未命中」。
 
 ## gRPC 入口（AgentService）
 
@@ -306,7 +306,7 @@ grpcurl -H 'authorization: Bearer your-token' -plaintext \
 4. 需要复核旧结论时用 `verify.replay`，只给证据 id：重放成功但 digest 变了，说明目标行为或 PoC 已经变化；
 5. `observe.state` 看这个端点所在资产还暴露了哪些上下游与未覆盖面；
 6. 需要「过程事实」而不只是结论时，用 `observe.observations` 按 `since_seq` 增量拉取：开放端口、指纹、主动请求的往返、被动流量、证书与带外回连都在里面；
-7. 不知道该先试哪条 PoC 时用 `plan.next`：它按确定性分数给出 `verify.poc` / `probe.fingerprint` 提议与依据，只读、零预算，选中的那条仍需再走一次 `verify.*` / `probe.*` 的策略与预算门控；
+7. 不知道该先试哪条 PoC 时用 `plan.next`：它按确定性分数给出 `verify.poc` / `probe.fingerprint` 提议与依据，只读、零预算，选中的那条仍需再走一次 `verify.*` / `probe.*` 的策略与预算门控；提议带 `requires_oob: true` 时说明它靠带外回连下结论，执行前要先配 `agent.oob`，否则 `verify.poc` 会 fail-closed；
 8. 让模型写出草稿后，先 `poc.draft` 校验（`save: true` 落盘），再用 `poc.submit` 在一台真实目标上受限实跑取证据；拿到证据的候选进入待人工终审队列，由人在 CLI 用 `afrog poc approve/reject` 决定是否入库。
 
 已有可疑命中但还没有现成 PoC 时，可以让模型写出草稿，先 `poc.draft` 校验（`save: true` 落盘），再把它返回的 `poc_path` 交给 `verify.poc`。草稿的判定仍然只发生在 `verify.poc`，`poc.draft` 不发任何请求。

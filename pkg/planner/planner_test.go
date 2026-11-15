@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,6 +26,11 @@ func withStore(t *testing.T, items map[string]pocsrepo.Item) {
 		return it, ok
 	}
 	t.Cleanup(func() { pocMetadata = prev })
+
+	// OOB 判定也换成桩：默认都不需要带外，需要的那条用例自己改写。
+	prevOOB := pocNeedsOOB
+	pocNeedsOOB = func(string) bool { return false }
+	t.Cleanup(func() { pocNeedsOOB = prevOOB })
 }
 
 // 技术栈上的候选 PoC 要变成 verify.poc 提议，并按等级排序。
@@ -214,6 +221,96 @@ func TestBuildTruncates(t *testing.T) {
 	}
 	if len(plan.Proposals) != 1 || !plan.Truncated {
 		t.Fatalf("plan = %+v, want 截断到 1 条", plan)
+	}
+}
+
+// 还依赖带外回连的候选要把 requires_oob 透出来：调用方据此先补反连配置，
+// 否则执行时 verify.poc 只会 fail-closed。
+func TestBuildMarksProposalsRequiringOOB(t *testing.T) {
+	withStore(t, map[string]pocsrepo.Item{
+		"CVE-2024-oob": {ID: "CVE-2024-oob", Severity: "high"},
+		"CVE-2024-dry": {ID: "CVE-2024-dry", Severity: "high"},
+	})
+	pocNeedsOOB = func(id string) bool { return id == "CVE-2024-oob" }
+
+	endpoint := "https://a.example/login"
+	if err := sqlite.EnsureTechGraph(endpoint, []string{"ThinkPHP"}, map[string][]string{
+		"ThinkPHP": {"CVE-2024-oob", "CVE-2024-dry"},
+	}); err != nil {
+		t.Fatalf("ensure tech graph: %v", err)
+	}
+
+	plan, err := Build(Options{})
+	if err != nil {
+		t.Fatalf("build plan: %v", err)
+	}
+	if len(plan.Proposals) != 2 {
+		t.Fatalf("proposals = %+v, want 2", plan.Proposals)
+	}
+	got := make(map[string]bool, 2)
+	for _, p := range plan.Proposals {
+		got[p.Action.PocID] = p.RequiresOOB
+	}
+	if !got["CVE-2024-oob"] {
+		t.Fatal("CVE-2024-oob must be marked requires_oob")
+	}
+	if got["CVE-2024-dry"] {
+		t.Fatal("CVE-2024-dry must not be marked requires_oob")
+	}
+}
+
+// 默认实现认不认「反向 PoC」：直接拿真实 PoC 库里的 oob-http 形态过一遍。
+func TestDefaultPocNeedsOOBDistinguishesReversePocs(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	pocOOBCacheMu.Lock()
+	pocOOBCache = map[string]bool{}
+	pocOOBCacheMu.Unlock()
+
+	dir := filepath.Join(os.Getenv("HOME"), ".config", "afrog", "pocs-my")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("mkdir pocs-my: %v", err)
+	}
+	reverse := `id: unit-oob-reverse
+info:
+  name: unit oob reverse
+  author: afrog-test
+  severity: info
+rules:
+  r0:
+    request:
+      method: GET
+      path: /?http=curl%20{{oob.HTTP}}
+    expression: oobCheck(oob.ProtocolHTTP, 3)
+expression: r0()
+`
+	plain := `id: unit-oob-plain
+info:
+  name: unit oob plain
+  author: afrog-test
+  severity: info
+rules:
+  r0:
+    request:
+      method: GET
+      path: /
+    expression: response.status == 200
+expression: r0()
+`
+	for name, body := range map[string]string{"unit-oob-reverse.yaml": reverse, "unit-oob-plain.yaml": plain} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	if !defaultPocNeedsOOB("unit-oob-reverse") {
+		t.Fatal("a reverse PoC must be reported as requiring OOB")
+	}
+	if defaultPocNeedsOOB("unit-oob-plain") {
+		t.Fatal("a plain PoC must not be reported as requiring OOB")
+	}
+	if defaultPocNeedsOOB("") || defaultPocNeedsOOB("no-such-poc-id") {
+		t.Fatal("empty / unknown ids must not be reported as requiring OOB")
 	}
 }
 

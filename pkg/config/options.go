@@ -1184,50 +1184,7 @@ func (o *Options) ReversePoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {
 }
 
 func pocUsesOOB(p poc.Poc) bool {
-	if containsOOBToken(p.Expression) {
-		return true
-	}
-	for _, it := range p.Set {
-		if s, ok := it.Value.(string); ok && containsOOBToken(s) {
-			return true
-		}
-	}
-	for _, rm := range p.Rules {
-		r := rm.Value
-		if containsOOBToken(r.Expression) {
-			return true
-		}
-		for _, e := range r.Expressions {
-			if containsOOBToken(e) {
-				return true
-			}
-		}
-		req := r.Request
-		if containsOOBToken(req.Path) || containsOOBToken(req.Host) || containsOOBToken(req.Body) || containsOOBToken(req.Raw) || containsOOBToken(req.Data) {
-			return true
-		}
-		for _, hv := range req.Headers {
-			if containsOOBToken(hv) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func containsOOBToken(s string) bool {
-	if s == "" {
-		return false
-	}
-	l := strings.ToLower(s)
-	return strings.Contains(l, "oobcheck(") ||
-		strings.Contains(l, "oobchecktoken(") ||
-		strings.Contains(l, "oobevidence(") ||
-		strings.Contains(l, "{{oob") ||
-		strings.Contains(l, "{{ oob") ||
-		strings.Contains(l, "oob_") ||
-		strings.Contains(l, "oob.") ||
-		strings.Contains(l, "oob()")
+	return p.NeedsOOB()
 }
 
 func (o *Options) FingerprintPoCs(allpocs []poc.Poc) ([]poc.Poc, []poc.Poc) {

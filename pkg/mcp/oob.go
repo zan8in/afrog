@@ -28,6 +28,9 @@ var errOOBUnavailable = errors.New("oob not configured: set agent.oob and the re
 // 定义成窄接口而不是直接暴露 runner.OOBManager：工具面只依赖这三件事，单测因此可以
 // 用假实现，不必起真的反连平台。
 type OOBSource interface {
+	// Adapter 返回反连平台的适配器名（如 alphalog）；verify.poc 把它交给 SDK，
+	// 让 SDK 用同一套「适配器名 + 配置里的 reverse 凭据」去接反连平台。
+	Adapter() string
 	// Payload 铸一组新的反连地址，并开始监听回连。
 	Payload() (OOBPayload, error)
 	// Wait 在 timeout 内等待该 filter 的回连；true 表示命中。
@@ -89,6 +92,7 @@ func NewOOBSource(adapter string, reverse config.Reverse) (OOBSource, error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &oobSource{
+		name:    p.Adapter,
 		adapter: client,
 		mgr:     runner.NewOOBManager(ctx, client, DefaultOOBPollInterval, DefaultOOBHitRetention),
 		cancel:  cancel,
@@ -96,9 +100,17 @@ func NewOOBSource(adapter string, reverse config.Reverse) (OOBSource, error) {
 }
 
 type oobSource struct {
+	name    string
 	adapter *oobadapter.OOBAdapter
 	mgr     *runner.OOBManager
 	cancel  context.CancelFunc
+}
+
+func (s *oobSource) Adapter() string {
+	if s == nil {
+		return ""
+	}
+	return s.name
 }
 
 func (s *oobSource) Payload() (OOBPayload, error) {

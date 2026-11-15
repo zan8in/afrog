@@ -14,8 +14,10 @@ import (
 	"sync"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/ref"
+	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -56,6 +58,9 @@ type Proposal struct {
 	Score int `json:"score"`
 	// Severity 是候选 PoC 的等级；未知时为空。
 	Severity string `json:"severity,omitempty"`
+	// RequiresOOB 表示这条提议靠带外（反连）回连下结论：执行它需要反连平台，
+	// 否则 verify.poc 会 fail-closed。调用方据此先补配置，或改选别的候选。
+	RequiresOOB bool `json:"requires_oob,omitempty"`
 	// Rationale 是一句人话结论，直接可以展示给使用者。
 	Rationale string `json:"rationale"`
 	// Evidence 是得出这条提议的依据（图上的端点 / 技术栈节点）。
@@ -163,12 +168,13 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 
 	meta := pocMetadata
 	type group struct {
-		origin   string
-		pocID    string
-		score    int
-		severity string
-		techs    map[string]struct{}
-		points   map[string]struct{}
+		origin      string
+		pocID       string
+		score       int
+		severity    string
+		requiresOOB bool
+		techs       map[string]struct{}
+		points      map[string]struct{}
 	}
 	groups := make(map[string]*group, len(rows))
 	excluded := 0
@@ -194,8 +200,9 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 			}
 			g = &group{
 				origin: origin, pocID: pocID, score: score, severity: severity,
-				techs:  make(map[string]struct{}, 2),
-				points: make(map[string]struct{}, 2),
+				requiresOOB: pocNeedsOOB(pocID),
+				techs:       make(map[string]struct{}, 2),
+				points:      make(map[string]struct{}, 2),
 			}
 			groups[key] = g
 		}
@@ -209,12 +216,13 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 	for _, g := range groups {
 		techs := sortedKeys(g.techs)
 		out = append(out, Proposal{
-			Action:    Action{Name: "verify.poc", Target: g.origin, PocID: g.pocID},
-			Category:  CategoryCandidatePoc,
-			Score:     g.score,
-			Severity:  g.severity,
-			Rationale: candidateRationale(techs),
-			Evidence:  append(sortedKeys(g.points), techNodes(techs)...),
+			Action:      Action{Name: "verify.poc", Target: g.origin, PocID: g.pocID},
+			Category:    CategoryCandidatePoc,
+			Score:       g.score,
+			Severity:    g.severity,
+			RequiresOOB: g.requiresOOB,
+			Rationale:   candidateRationale(techs),
+			Evidence:    append(sortedKeys(g.points), techNodes(techs)...),
 		})
 	}
 	return out, excluded, nil
@@ -384,4 +392,43 @@ func defaultPocMetadata(id string) (pocsrepo.Item, bool) {
 	})
 	item, ok := pocMetaByID[id]
 	return item, ok
+}
+
+// pocNeedsOOB 判断一个 PoC 是否依赖带外（反连）验证。
+//
+// 与 pocMetadata 分开而不是塞进 Item：元信息来自 ListMeta，只解析 info 段；是否需要
+// 反连写在 rules 段里，只有读全文才知道。全库读一遍代价太大，所以这里按需读取并缓存，
+// 不因此拖慢列表。抽成变量同样是为了让提议逻辑的测试不必依赖真实 PoC 库的内容。
+var pocNeedsOOB = defaultPocNeedsOOB
+
+var (
+	pocOOBCacheMu sync.Mutex
+	pocOOBCache   = map[string]bool{}
+)
+
+func defaultPocNeedsOOB(id string) bool {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return false
+	}
+
+	pocOOBCacheMu.Lock()
+	cached, ok := pocOOBCache[id]
+	pocOOBCacheMu.Unlock()
+	if ok {
+		return cached
+	}
+
+	needs := false
+	if data, err := pocsrepo.ReadYamlByID(id); err == nil && len(data) > 0 {
+		var p poc.Poc
+		if yaml.Unmarshal(data, &p) == nil {
+			needs = p.NeedsOOB()
+		}
+	}
+
+	pocOOBCacheMu.Lock()
+	pocOOBCache[id] = needs
+	pocOOBCacheMu.Unlock()
+	return needs
 }

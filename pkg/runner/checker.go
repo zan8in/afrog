@@ -77,56 +77,6 @@ func (c *Checker) injectDefaultUploadVars() {
 	}
 }
 
-func checkerNeedsOOB(p *poc.Poc) bool {
-	if p == nil {
-		return false
-	}
-	if checkerContainsOOBToken(p.Expression) {
-		return true
-	}
-	for _, it := range p.Set {
-		if s, ok := it.Value.(string); ok && checkerContainsOOBToken(s) {
-			return true
-		}
-	}
-	for _, rm := range p.Rules {
-		r := rm.Value
-		if checkerContainsOOBToken(r.Expression) {
-			return true
-		}
-		for _, e := range r.Expressions {
-			if checkerContainsOOBToken(e) {
-				return true
-			}
-		}
-		req := r.Request
-		if checkerContainsOOBToken(req.Path) || checkerContainsOOBToken(req.Host) || checkerContainsOOBToken(req.Body) || checkerContainsOOBToken(req.Raw) || checkerContainsOOBToken(req.Data) {
-			return true
-		}
-		for _, hv := range req.Headers {
-			if checkerContainsOOBToken(hv) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func checkerContainsOOBToken(s string) bool {
-	if s == "" {
-		return false
-	}
-	l := strings.ToLower(s)
-	return strings.Contains(l, "oobcheck(") ||
-		strings.Contains(l, "oobchecktoken(") ||
-		strings.Contains(l, "oobevidence(") ||
-		strings.Contains(l, "{{oob") ||
-		strings.Contains(l, "{{ oob") ||
-		strings.Contains(l, "oob_") ||
-		strings.Contains(l, "oob.") ||
-		strings.Contains(l, "oob()")
-}
-
 func celSafeIdent(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -224,7 +174,7 @@ func (c *Checker) Check(target string, pocItem *poc.Poc) (err error) {
 		ProtocolHTTP: "http",
 		ProtocolDNS:  "dns",
 	}
-	if checkerNeedsOOB(pocItem) && c.OOBAlive && c.OOBAdapter != nil {
+	if pocItem.NeedsOOB() && c.OOBAlive && c.OOBAdapter != nil {
 		vdomains := c.OOBAdapter.GetValidationDomain()
 		o.Filter = vdomains.Filter
 		o.HTTP = vdomains.HTTP

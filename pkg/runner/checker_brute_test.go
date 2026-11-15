@@ -754,8 +754,8 @@ expression: oobCheckToken("dns", 3, "abc")
 			if err := yaml.Unmarshal([]byte(tt.yaml), p); err != nil {
 				t.Fatalf("unmarshal poc yaml: %v", err)
 			}
-			if got := checkerNeedsOOB(p); got != tt.want {
-				t.Fatalf("checkerNeedsOOB=%v, want %v", got, tt.want)
+			if got := p.NeedsOOB(); got != tt.want {
+				t.Fatalf("NeedsOOB=%v, want %v", got, tt.want)
 			}
 		})
 	}

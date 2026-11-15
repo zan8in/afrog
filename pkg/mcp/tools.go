@@ -722,7 +722,7 @@ func (s *Server) pocSubmitTool() *Tool {
 			if timeout <= 0 {
 				timeout = 60 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0)
+			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
 			if err != nil {
 				return nil, err
 			}
@@ -1327,7 +1327,7 @@ func (s *Server) verifyPocTool() *Tool {
 			if timeout <= 0 {
 				timeout = 60 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0)
+			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
 			if err != nil {
 				return nil, err
 			}
@@ -1415,7 +1415,7 @@ func (s *Server) verifyReplayTool() *Tool {
 			if timeout <= 0 {
 				timeout = 60 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0)
+			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
 			if err != nil {
 				return nil, err
 			}
@@ -1569,7 +1569,7 @@ func (s *Server) actBruteTool() *Tool {
 			if timeout <= 0 {
 				timeout = 120 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, maxReq)
+			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, maxReq, analyzePoc(pocData).NeedsOOB)
 			if err != nil {
 				return nil, err
 			}
@@ -1757,7 +1757,11 @@ func (s *Server) learnRecordTool() *Tool {
 // runSinglePoc 串行执行一个 PoC 对单个目标，返回归一化结果。
 //
 // SDK 内部有进程级全局状态，不支持并行扫描，因此这里用 verifyMu 串行化。
-func (s *Server) runSinglePoc(ctx context.Context, target, pocPath string, timeout time.Duration, maxRequests int) ([]map[string]any, error) {
+//
+// needsOOB 由调用方从 analyzePoc 得到：反向 PoC 的回连判定依赖反连平台，SDK 的
+// SDKMode 会在缺 OOB 时把这些 PoC 直接记成「未命中」。那是一个说不清楚的假阴性，
+// 所以这里改成两条明确路径：有 OOB 就真的接上，没有就报错，绝不下空结论。
+func (s *Server) runSinglePoc(ctx context.Context, target, pocPath string, timeout time.Duration, maxRequests int, needsOOB bool) ([]map[string]any, error) {
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -1776,6 +1780,14 @@ func (s *Server) runSinglePoc(ctx context.Context, target, pocPath string, timeo
 		// 还会把 webprobe 汇总写进 result 表，污染「只跑一个 PoC」的语义。
 		sdk.WithWebProbe(false),
 		sdk.WithStopOnFirstMatch(),
+	}
+	if needsOOB {
+		if s.oob == nil {
+			return nil, fmt.Errorf("this PoC verifies out of band: %w", errOOBUnavailable)
+		}
+		// 只给适配器名：凭据由 SDK 自己从 afrog-config.yaml 的 reverse 段取，
+		// 与 CLI 的 -oob 口径一致，这里不再复制一份凭据读取逻辑。
+		opts = append(opts, sdk.WithOOB(sdk.OOBOptions{Adapter: s.oob.Adapter()}))
 	}
 	if maxRequests > 0 {
 		opts = append(opts, sdk.WithBruteMaxRequests(maxRequests))
@@ -1881,6 +1893,9 @@ type pocEstimate struct {
 	// Script 表示规则由 JS/Go 脚本执行：脚本内部可能自行循环发包，
 	// 外部既数不出次数，也拦不住 —— 只能按调用方声明的上限预留。
 	Script bool
+	// NeedsOOB 表示该 PoC 依赖带外（反连）回连下结论：不接反连平台时它无法给出
+	// 可信结果，只能 fail-closed，不能当成「没命中」。
+	NeedsOOB bool
 }
 
 // analyzePoc 静态分析一个 PoC 单目标的潜在请求量。
@@ -1893,6 +1908,7 @@ func analyzePoc(data []byte) pocEstimate {
 	if err := yaml.Unmarshal(data, &p); err != nil {
 		return est
 	}
+	est.NeedsOOB = p.NeedsOOB()
 
 	n := 0
 	for _, rm := range p.Rules {

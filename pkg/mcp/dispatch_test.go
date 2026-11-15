@@ -14,7 +14,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/scantask"
 )
 
-// Supports 必须与映射表一致：已实现的三类工具面动作都认，执行面动作一律不认。
+// Supports 必须与映射表一致：已实现的四类工具面动作都认，执行面动作一律不认。
 func TestDispatcherSupportsToolFaceKinds(t *testing.T) {
 	s := newIntegrationServer(t, "mode: safe\n")
 	d := s.Dispatcher()

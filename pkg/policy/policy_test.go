@@ -100,7 +100,7 @@ func TestParsePolicyWrapperAndDuration(t *testing.T) {
 	p, err := Parse([]byte(`
 policy:
   mode: full
-  deny: ["act.upload"]
+  deny: ["act.brute"]
   scope:
     allow_hosts: ["10.0.0.0/8"]
   budget:

@@ -26,8 +26,12 @@ type fakeOOB struct {
 	lastFilterType string
 	lastTimeout    time.Duration
 
+	adapter string
+
 	closed bool
 }
+
+func (f *fakeOOB) Adapter() string { return f.adapter }
 
 func (f *fakeOOB) Payload() (OOBPayload, error) {
 	if f.payloadErr != nil {

@@ -121,14 +121,14 @@ Evaluation order is fixed: `deny → allowlist → mode → destructive → scop
 | `observe.evidence` | Fetch evidence by result id or an `evd_` evidence id | read-only |
 | `observe.state` | Attack-surface subgraph around an asset (upstream/downstream, endpoints/parameters, tech stack and candidate PoCs, coverage, findings) | read-only |
 | `observe.observations` | Incrementally pull the observation stream by `seq` cursor: open ports, web fingerprints, HTTP transactions, passive proxy traffic, TLS certificates, and out-of-band callbacks | read-only |
-| `plan.next` | Compress the attack-surface graph into next-step `Action` proposals (`verify.poc` / `probe.fingerprint`), ranked by a deterministic score with rationale | read-only |
+| `plan.next` | Compress the attack-surface graph into next-step `Action` proposals (`verify.poc` / `probe.fingerprint`), ranked by a deterministic score with rationale; candidates that conclude via a reverse callback carry `requires_oob: true` | read-only |
 | `poc.search` | Search PoCs by keyword and severity, return local paths | read-only |
 | `poc.draft` | Validate a PoC draft: structure, capability level, request estimate; optionally save it for `verify.poc` | read-only |
 | `poc.submit` | Run a draft in a restricted sandbox against one real target to obtain evidence, and stage it in the human-review queue (`afrog poc approve/reject`) on success | `verify.*` (per-draft capability; `exec`-level also needs `destructive: true`) |
 | `probe.http` | Send one HTTP request; return status, headers, body, latency | `probe.*` |
 | `probe.port` | Port probe on one host (top100 by default, 1000 ports max per call); return open ports and service fingerprints | `probe.*` |
 | `probe.fingerprint` | Fingerprint one URL: tech stack, WAF/CDN, redirect chain, TLS summary | `probe.*` |
-| `verify.poc` | Verify one target with one PoC; return evidence | `verify.*` |
+| `verify.poc` | Verify one target with one PoC; return evidence. A reverse PoC (containing `{{oob.*}}` or `oobCheck`) needs `agent.oob`; when it is missing the call fails closed with an explicit error instead of silently reporting "not found" | `verify.*` |
 | `verify.replay` | Replay evidence by id and compare id/digest to see whether the old conclusion still holds | `verify.*` |
 | `act.brute` | Weak-credential / dictionary attempts | `full` + `destructive: true` |
 | `act.oob_payload` | Mint a set of out-of-band callback addresses (`filter` + DNS/HTTP, …) for validations that need a reverse callback (command execution, XXE, SSRF) | `full` + `destructive: true` |
@@ -241,7 +241,7 @@ agent:
 
 `agent.policy` uses exactly the same format as `afrog mcp -policy` (see "Policy and budget" above). Unlike a one-shot CLI process, the web server is long-lived, so `budget.requests` inside the policy is the **total session budget for the whole process**, accumulated across requests — the same long-lived semantics as `afrog mcp -listen`.
 
-Set `agent.oob` only when you need out-of-band callbacks: it names the OOB adapter (`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`, same values as CLI `-oob`), and the credentials are reused from the `reverse` section (see "What `reverse` means" in the configuration reference). Once configured, `act.oob_payload` mints addresses and `act.oob_wait` waits for a callback; when empty both report "not configured" explicitly instead of silently waiting for a callback that will never arrive.
+Set `agent.oob` only when you need out-of-band callbacks: it names the OOB adapter (`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`, same values as CLI `-oob`), and the credentials are reused from the `reverse` section (see "What `reverse` means" in the configuration reference). Once configured, `act.oob_payload` mints addresses and `act.oob_wait` waits for a callback; `verify.poc` also uses it when running a reverse PoC (containing `{{oob.*}}` or `oobCheck`), handing the adapter to the SDK which reuses the `reverse` credentials. When empty, all of these report "not configured" explicitly instead of silently waiting for a callback that will never arrive — a reverse PoC is never quietly judged "not found".
 
 ## gRPC entry (AgentService)
 
@@ -306,7 +306,7 @@ grpcurl -H 'authorization: Bearer your-token' -plaintext \
 4. Re-check an old conclusion with `verify.replay`, passing only the evidence id: a successful replay with a different digest means the target or the PoC has changed;
 5. `observe.state` shows the surrounding assets and what is still uncovered;
 6. When you need process facts rather than verdicts, pull `observe.observations` incrementally with `since_seq`: open ports, fingerprints, round trips, passive traffic, certificates and out-of-band callbacks are all there;
-7. When you are unsure which PoC to try first, use `plan.next`: it ranks `verify.poc` / `probe.fingerprint` proposals by a deterministic score with rationale. It is read-only and zero-budget; the chosen action still has to pass `verify.*` / `probe.*` policy and budget gating again;
+7. When you are unsure which PoC to try first, use `plan.next`: it ranks `verify.poc` / `probe.fingerprint` proposals by a deterministic score with rationale. It is read-only and zero-budget; the chosen action still has to pass `verify.*` / `probe.*` policy and budget gating again. A proposal marked `requires_oob: true` concludes via a reverse callback, so configure `agent.oob` first or `verify.poc` will fail closed;
 8. After the model writes a draft, validate it with `poc.draft` (`save: true` to persist it), then run `poc.submit` to sandbox it against one real target for evidence; candidates that yield evidence land in the human-review queue, where a person decides with `afrog poc approve/reject`.
 
 When there is a suspicious hit but no matching PoC yet, let the model write a draft, validate it with `poc.draft` (`save: true` to persist it), and hand the returned `poc_path` to `verify.poc`. Verdicts still happen only in `verify.poc`; `poc.draft` sends no requests.

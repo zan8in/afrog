@@ -547,21 +547,64 @@ func (poc *Poc) IsHTTPType() bool {
 	return false
 }
 
-func (poc *Poc) IsReverse() bool {
-	// ... existing code ...
-	for _, set := range poc.Set {
-		k := set.Key.(string)
-		vStr, ok := set.Value.(string)
-		if !ok {
-			// 值不是字符串时无需参与反连判断，直接跳过
-			continue
-		}
-		if strings.Contains(k, "reverse") || strings.Contains(vStr, "reverse.url") {
+// NeedsOOB 判断一个 PoC 是否需要带外（反连）验证。
+//
+// 「需要」不等于「命中」：这里看的是 PoC 有没有引用反连地址或带外判定函数。
+// 判定口径只有这一份——配置侧的 PoC 分流、执行侧的引擎分支、工具面的 verify.poc
+// 都必须问同一个问题，否则会出现「分流说不需要、执行时又拿不到反连地址」的错配。
+func (p *Poc) NeedsOOB() bool {
+	if p == nil {
+		return false
+	}
+	if ContainsOOBToken(p.Expression) {
+		return true
+	}
+	for _, set := range p.Set {
+		if s, ok := set.Value.(string); ok && ContainsOOBToken(s) {
 			return true
 		}
 	}
-
+	for _, rm := range p.Rules {
+		r := rm.Value
+		if ContainsOOBToken(r.Expression) {
+			return true
+		}
+		for _, e := range r.Expressions {
+			if ContainsOOBToken(e) {
+				return true
+			}
+		}
+		req := r.Request
+		if ContainsOOBToken(req.Path) || ContainsOOBToken(req.Host) ||
+			ContainsOOBToken(req.Body) || ContainsOOBToken(req.Raw) || ContainsOOBToken(req.Data) {
+			return true
+		}
+		for _, hv := range req.Headers {
+			if ContainsOOBToken(hv) {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// ContainsOOBToken 判断一段文本是否引用了带外（反连）能力。
+//
+// 认的是反连变量（{{oob*}}、oob_*、oob.*）与带外判定函数（oobCheck / oobCheckToken /
+// oobEvidence）两类写法；只要出现其一，该 PoC 的结果就依赖回连，不能只靠响应体下结论。
+func ContainsOOBToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	l := strings.ToLower(s)
+	return strings.Contains(l, "oobcheck(") ||
+		strings.Contains(l, "oobchecktoken(") ||
+		strings.Contains(l, "oobevidence(") ||
+		strings.Contains(l, "{{oob") ||
+		strings.Contains(l, "{{ oob") ||
+		strings.Contains(l, "oob_") ||
+		strings.Contains(l, "oob.") ||
+		strings.Contains(l, "oob()")
 }
 
 // Extractors 支持两种写法：

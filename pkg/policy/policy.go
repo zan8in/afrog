@@ -95,7 +95,7 @@ type Policy struct {
 	Deny   []string `yaml:"deny"`
 	Scope  Scope    `yaml:"scope"`
 	Limits Limits   `yaml:"budget"`
-	// Destructive 为 false 时禁止暴力破解、上传等可能改变目标状态的动作。
+	// Destructive 为 false 时禁止可能改变目标状态的动作（典型是暴力破解）。
 	Destructive bool `yaml:"destructive"`
 	// Audit 为 true 时把每次判定写入审计流。
 	Audit bool `yaml:"audit"`
