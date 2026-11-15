@@ -132,7 +132,9 @@
 
 **这是 G1 的解法**：Action 是原子工作单元，`ScanTask` 退化为 `Batch<Action>`。现有「一次扫描」= 批量生成 N×M 个 `run_poc`，语义不变，行为不变。
 
-> v1 已落地（C3）：`ActionKind` 只取 `run_poc` / `port_scan` / `web_fingerprint` 三种，其余 `probe_http` / `replay_evidence` / `brute` / `oob_wait` 待有对应工具面动作再入枚举。批量内的动作必须同 `Kind`（执行面一次只拉起一个子进程，只能单一模式），且 `run_poc` 批量需构成完整的「目标 × PoC」笛卡尔积，残缺组合直接拒绝。
+> v1 已落地（C3）：`ActionKind` 只取 `run_poc` / `port_scan` / `web_fingerprint` 三种，批量内的动作必须同 `Kind`（执行面一次只拉起一个子进程，只能单一模式），且 `run_poc` 批量需构成完整的「目标 × PoC」笛卡尔积，残缺组合直接拒绝。
+>
+> `probe_http` / `replay_evidence` / `brute` / `oob_wait` 暂不入枚举。原因不是「工具面还没有对应动作」——`probe.http` / `verify.replay` / `act.brute` 都已存在——而是这几类的**执行路径不同**：它们在 `pkg/mcp` 内联执行（走 `policy.Gate`），不经过 `scantask`；而 `Batch.buildSpec()` 的终点是 `executor.Spec`（CLI 子进程模式），`Request` 里也没有对应字段。硬塞进枚举只会让 `deriveRequest` 落到 `ErrUnknownActionKind`，成为一个没有实现支撑的死值。要真正接入，需先给 `scantask.Manager` 注入一个「工具面派发」接口（由 `pkg/mcp` 实现——mcp 已 import scantask，不能反向依赖），并为四类各接执行路径与任务生命周期（`oob_wait` 连工具都还没有）。这套扩展的消费方是集群派发（`Action` 天然可派发），当前尚未实现；等到有真实派发需求再做，避免先造一层没有调用方的抽象。
 
 ### 4.4 Evidence —— 凭什么这么说
 
@@ -359,7 +361,7 @@ Web 指纹 / Agent 主动发起的 HTTP 往返），契约在 `pkg/observation`�
 |---|---|---|
 | P0 契约 | `pkg/ref`、`pkg/evidence`、`pkg/observe`；C1/C2/C5/C6 落地 | 现有扫描产出的每个命中都有 `evd_*`，`verify.replay` 能跑通且 digest 一致 |
 | P1 工具面 | `pkg/policy`、`afrog mcp`、`AgentService`、`verify.poc` 单动作执行（C3/C7/C8/C9）。C3/C7/C8/C9 全部完成：`policy.Gate` 为唯一门控，MCP / REST（`/api/v1/call`）/ gRPC（`AgentService`）三面共用同一份工具注册表与策略、预算、审计；`scantask` 已泛化为 `Batch<Action>` 并支持单 Action 提交 | 外部 agent 仅用 afrog 工具完成「目标 → 一条可重放证据」 |
-| P2 状态面 | endpoint/param 入图、`observe.state` / `observe.observations`（C4/C10）。前三项已完成；C4 已完成（被动 `http_passive` 先发观测后进检测）；观测流已扩到 `tls` / `oob_hit`（`dns` 待采集点）；C10 只读面已落地（observe.* / plan.next / poc.search），写动作面已落地 `POST /api/v1/call`（与 MCP 共用同一 `policy.Gate`，`agent.policy` / `agent.audit` 未配置即只读） | agent 一次查询拿到完整目标子图；观测流可断点续订 |
+| P2 状态面 | endpoint/param 入图、`observe.state` / `observe.observations`（C4/C10）。前三项已完成；C4 已完成（被动 `http_passive` 先发观测后进检测）；观测流已扩到 `tls` / `oob_hit` / `dns`（`dns` 采集点已补：Web 目标主机名解析，IP 字面量不产生）；C10 只读面已落地（observe.* / plan.next / poc.search），写动作面已落地 `POST /api/v1/call`（与 MCP 共用同一 `policy.Gate`，`agent.policy` / `agent.audit` 未配置即只读） | agent 一次查询拿到完整目标子图；观测流可断点续订 |
 | P3 决策面 | Planner、PoC Drafter 流水线、人工终审回流。Planner 确定性基线已完成（`pkg/planner` / `plan.next`：候选 PoC → `verify.poc`、未知面 → `probe.fingerprint`，按确定性分数排序）；Drafter 流水线已完成（`poc.submit` 受限实跑取证据 → `poc_draft` 待审队列 → `afrog poc approve/reject` 人工终审入库）；终审回流已完成（`Approve`/`Reject` 自动写只追加流水 `poc_review`）；入库率量化已完成（`drafter.GetStats()` + `afrog poc stats`，`IngestRate = approved/(approved+rejected)`，分母不含 pending，无决议渲染 `n/a`）；Judge / Learner 契约已完成（`pkg/judge` 的 `judge.brief`/`judge.record` → `judgement` 表，`pkg/learner` 的 `learn.brief`/`learn.record` + `afrog learn` → `learn_suggestion` 表；两者都是 advisory，模型永不写台账） | Drafter 产出的 PoC 经 validator + 沙箱 + 证据确认后自动入库率可量化（`afrog poc stats` 输出 total/pending/approved/rejected/reviews/ingest_rate，并按 severity/capability 分桶） |
 
 ## 11. 非目标

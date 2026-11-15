@@ -182,9 +182,10 @@ Evidence answers "why does this finding hold"; the observation stream answers "w
 }
 ```
 
-- Six kinds are recorded: `port_open` (port scan), `tech` (web fingerprint), `http_transaction` (requests actually sent by `probe.*` / `verify.*`), `http_passive` (real traffic seen by the passive proxy), `tls` (https certificate summary), and `oob_hit` (out-of-band callback).
+- Seven kinds are recorded: `port_open` (port scan), `tech` (web fingerprint), `http_transaction` (requests actually sent by `probe.*` / `verify.*`), `http_passive` (real traffic seen by the passive proxy), `tls` (https certificate summary), `oob_hit` (out-of-band callback), and `dns` (hostname resolution).
 - `http_passive` keeps metadata only (method, URL, status, content type, byte counts) and never stores messages; it is deduped on method + URL + status, so the same endpoint with different query values yields separate rows. Passive observations are published before detection: even if the traffic is later deduped, skipped or dropped, the fact still stands.
 - `tls` records issuer, subject, expiry and SANs; `oob_hit` records which filter the target called back and the owning PoC — callback time and source IP do not take part in deduplication.
+- `dns` records the addresses a web target hostname resolves to (nothing is recorded when the target is an IP literal itself); address order does not take part in deduplication.
 - In `observe.state`, endpoints expose two derived children: `tech:<name>` and `poc:<id>` (edges `tech` / `candidate`). The former is the detected tech stack; the latter is a ready-made candidate matched from the PoC's `info.requires`, meaning "worth verifying" only. Use `depth: 4` to see the full chain from a hostport.
 - Paging: pass the returned `next_seq` as the next `since_seq`; filter by `sources`, `kinds`, `subject` and `project_id`. With `subject_under: true`, `subject` is treated as a subtree root (a host includes its ports, an endpoint includes its parameters) rather than a plain prefix.
 - Re-scanning the same fact does not add a row: the id is content-derived and deduped on `(project_id, id)`, so it is a stable reference.

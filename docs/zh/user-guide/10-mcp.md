@@ -182,9 +182,10 @@ policy:
 }
 ```
 
-- 已记录六类：`port_open`（端口扫描）、`tech`（Web 指纹）、`http_transaction`（`probe.*` / `verify.*` 实际发出的请求）、`http_passive`（被动代理看到的真实流量）、`tls`（https 证书摘要）、`oob_hit`（带外回连）。
+- 已记录七类：`port_open`（端口扫描）、`tech`（Web 指纹）、`http_transaction`（`probe.*` / `verify.*` 实际发出的请求）、`http_passive`（被动代理看到的真实流量）、`tls`（https 证书摘要）、`oob_hit`（带外回连）、`dns`（主机名解析）。
 - `http_passive` 只留元数据（方法、URL、状态码、类型、字节数），不存报文；它按「方法 + URL + 状态码」去重，因此同一接口换参数值会各自成条。被动观测先于检测发布：即使这条流量随后被判重复、跳过或丢弃，事件仍然成立。
 - `tls` 记录签发者、主体、到期时间与 SAN；`oob_hit` 记录被目标打回来的 filter 与所属 PoC，回连时间与来源 IP 不参与去重。
+- `dns` 记录 Web 目标主机名解析到的地址集合（目标本身是 IP 字面量时不产生），地址顺序不参与去重。
 - 检索方式：`next_seq` 直接作为下一次的 `since_seq`；另可按 `sources`、`kinds`、`subject`、`project_id` 过滤。`subject_under: true` 把 `subject` 当子树根（主机含端口、端点含参数），不做纯前缀匹配。
 - `observe.state` 里，端点下游会出现 `tech:<名字>` 与 `poc:<id>` 两类派生节点（边类型 `tech` / `candidate`）：前者是识别到的技术栈，后者是 PoC `info.requires` 命中的现成候选，只表示「值得验证」。从 hostport 看完整链路需要 `depth: 4`。
 - 同一事实重扫不会新增行：id 由内容算出并按 `(project_id, id)` 去重，可以当作稳定引用。

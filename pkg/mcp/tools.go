@@ -241,7 +241,7 @@ func (s *Server) observeObservationsTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.observations",
-		Description: "按 seq 游标增量拉取观测流（开放端口 / Web 指纹 / HTTP 事务 / 被动代理流量 / TLS 证书 / 带外回连）。只读、零预算；next_seq 直接作为下次的 since_seq。",
+		Description: "按 seq 游标增量拉取观测流（开放端口 / Web 指纹 / HTTP 事务 / 被动代理流量 / TLS 证书 / 带外回连 / DNS 解析）。只读、零预算；next_seq 直接作为下次的 since_seq。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -249,7 +249,7 @@ func (s *Server) observeObservationsTool() *Tool {
 				"sources": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
 					"description": "过滤 portscan/webscan/http/passive/oob"},
 				"kinds": map[string]any{"type": "array", "items": map[string]any{"type": "string"},
-					"description": "过滤 port_open/tech/http_transaction/http_passive/tls/oob_hit"},
+					"description": "过滤 port_open/tech/http_transaction/http_passive/tls/oob_hit/dns"},
 				"subject":       map[string]any{"type": "string", "description": "只看某个归一化地址"},
 				"subject_under": map[string]any{"type": "boolean", "description": "把 subject 当作子树根：主机含其端口，端点含其参数；默认精确匹配"},
 				"project_id":    map[string]any{"type": "string", "description": "按项目口径过滤；留空为全局"},

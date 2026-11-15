@@ -66,6 +66,37 @@ func TestRecordTechObservationWritesTechAndTLS(t *testing.T) {
 	}
 }
 
+// 主机名解析观测：IP 字面量没有 DNS 事实、不记录；localhost 解析成功则落一条 dns 观测。
+func TestRecordDNSObservation(t *testing.T) {
+	withObservationDB(t)
+
+	recordDNSObservation("http://127.0.0.1/x")
+	recordDNSObservation("http://localhost/x")
+	sqlite.FlushObservations()
+
+	page, err := sqlite.SelectObservations(sqlite.ObservationFilter{Limit: 10})
+	if err != nil {
+		t.Fatalf("select observations: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("items = %d, want 1（IP 字面量不产生 DNS 观测）", len(page.Items))
+	}
+	obs := page.Items[0]
+	if obs.Kind != observation.KindDNS || obs.Source != observation.SourceWebscan {
+		t.Fatalf("kind/source = %s/%s, want dns/webscan", obs.Kind, obs.Source)
+	}
+	if obs.Subject != "localhost" {
+		t.Fatalf("subject = %q, want localhost", obs.Subject)
+	}
+	var payload observation.DNS
+	if err := json.Unmarshal(obs.Payload, &payload); err != nil {
+		t.Fatalf("decode dns payload: %v", err)
+	}
+	if payload.Host != "localhost" || len(payload.Addresses) == 0 {
+		t.Fatalf("dns payload = %+v", payload)
+	}
+}
+
 // 带外回连即使摘要抖动也只留一行，且摘要按上限截断。
 func TestRecordOOBObservation(t *testing.T) {
 	withObservationDB(t)

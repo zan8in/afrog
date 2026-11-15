@@ -45,6 +45,10 @@ const (
 	//
 	// 它先于「漏洞命中」存在：回连是事实，是否由此判定漏洞是下游结论。
 	KindOOBHit = "oob_hit"
+	// KindDNS 是一次主机名解析：目标主机名解析到了哪些地址。
+	//
+	// 只记「解析出了什么」，不记耗时与 TTL——观测流存的是事实，不是运行时特征。
+	KindDNS = "dns"
 )
 
 const (
@@ -187,6 +191,20 @@ type OOBHit struct {
 	Evidence   string `json:"evidence,omitempty"`
 }
 
+// DNS 是一次主机名解析观测：某个主机名解析到了哪些地址。
+//
+// Addresses 的顺序取决于解析器与 DNS 轮询，排序后才参与内容寻址，同一份解析结果
+// 在多次扫描里得到同一个 obs_ id。
+type DNS struct {
+	Host      string   `json:"host"`
+	Addresses []string `json:"addresses,omitempty"`
+}
+
+// HostSubject 用主机名（不含端口）作为观测流的 subject。
+func HostSubject(host string) string {
+	return strings.TrimSpace(strings.Trim(host, "[]"))
+}
+
 // HostPortSubject 把主机与端口拼成观测流的 subject。
 func HostPortSubject(host string, port int) string {
 	host = strings.TrimSpace(strings.Trim(host, "[]"))
@@ -265,6 +283,12 @@ func canonicalPayload(payload any) (any, error) {
 			Target     string `json:"target"`
 			PocID      string `json:"poc_id,omitempty"`
 		}{v.FilterType, v.Filter, v.Token, v.Target, v.PocID}, nil
+	case DNS:
+		// 地址集合的返回顺序取决于解析器与 DNS 轮询，排序后再算 id。
+		return struct {
+			Host      string   `json:"host"`
+			Addresses []string `json:"addresses,omitempty"`
+		}{v.Host, sortedStrings(v.Addresses)}, nil
 	default:
 		return nil, fmt.Errorf("observation: unsupported payload type %T", payload)
 	}

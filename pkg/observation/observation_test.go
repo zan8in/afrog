@@ -168,6 +168,34 @@ func TestNewOOBHitIdentity(t *testing.T) {
 	}
 }
 
+// 解析结果的地址顺序取决于解析器与 DNS 轮询，不能改变 id；换主机名才是新事实。
+func TestNewDNSIdentity(t *testing.T) {
+	base := DNS{Host: "a.example", Addresses: []string{"1.2.3.4", "5.6.7.8"}}
+	first, err := New("", SourceWebscan, KindDNS, "a.example", base)
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	reordered := base
+	reordered.Addresses = []string{"5.6.7.8", "1.2.3.4"}
+	second, err := New("", SourceWebscan, KindDNS, "a.example", reordered)
+	if err != nil {
+		t.Fatalf("new again: %v", err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("地址顺序不应改变 id: %s vs %s", first.ID, second.ID)
+	}
+
+	other := base
+	other.Host = "b.example"
+	third, err := New("", SourceWebscan, KindDNS, "b.example", other)
+	if err != nil {
+		t.Fatalf("new third: %v", err)
+	}
+	if third.ID == first.ID {
+		t.Fatal("换主机名必须产生新的观测 id")
+	}
+}
+
 func TestNewRejectsInvalidInput(t *testing.T) {
 	if _, err := New("", SourceHTTP, KindTech, "  ", Tech{}); err == nil {
 		t.Fatal("empty subject must be rejected")

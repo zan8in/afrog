@@ -434,6 +434,38 @@ func recordTLSObservation(urlStr string, info *TLSInfo) {
 	sqlite.RecordObservation(obs)
 }
 
+// dnsObservationTimeout 是单次 DNS 观测解析的超时。
+//
+// 解析只是扫描之外「顺手记一笔」，不能拖慢主流程，也不能因为解析慢让观测线程堆积。
+const dnsObservationTimeout = 3 * time.Second
+
+// recordDNSObservation 把一次主机名解析写进观测流。
+//
+// 只对真正的主机名记录：目标本身就是 IP 字面量时没有 DNS 事实可记。解析失败或超时
+// 静默跳过——观测流宁可少一条，也不要写进无法解释的数据。
+func recordDNSObservation(rawURL string) {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || u.Hostname() == "" {
+		return
+	}
+	host := u.Hostname()
+	if net.ParseIP(host) != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), dnsObservationTimeout)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil || len(addrs) == 0 {
+		return
+	}
+	obs, err := observation.New("", observation.SourceWebscan, observation.KindDNS,
+		observation.HostSubject(host), observation.DNS{Host: host, Addresses: addrs})
+	if err != nil {
+		return
+	}
+	sqlite.RecordObservation(obs)
+}
+
 // webTechSummary 把识别出的技术栈渲染成一行摘要，如 "PHP 8.1, ThinkPHP 6.0"。
 //
 // WAF/CDN 不计入摘要：它们属于站点前面的拦截层，已经由 WAF 字段单独外露，
@@ -2275,6 +2307,7 @@ func (runner *Runner) Execute() {
 				_, _ = sqlite.InsertWebProbeSummary(db2.TaskID, "webprobe", "webprobe", "webprobe", "webprobe", webMetas)
 				for _, meta := range webMetas {
 					recordTechObservation(meta)
+					recordDNSObservation(meta.URL)
 				}
 			}
 			if runner.Report != nil {
