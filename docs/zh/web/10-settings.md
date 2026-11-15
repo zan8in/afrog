@@ -44,4 +44,4 @@ OOB 在 PoC 中的写法见 [OOB 带外检测](../poc/06-oob.md)。
 
 > 部分设置会**写回配置文件**（如 OOB 的 `reverse` 段、AI 的 `ai` 段），字段字典见[配置文件说明](../user-guide/05-configuration.md)。
 
-> **← 上一篇：** [AI 辅助](./09-ai.md) ｜ **本手册首页：** [Web 控制台总览](./01-overview.md)
+> **← 上一篇：** [AI 辅助](./09-ai.md) ｜ **本手册首页：** [Web 控制台总览](./01-overview.md) ｜ **下一篇 →：** [被动扫描与覆盖度](./11-passive.md)

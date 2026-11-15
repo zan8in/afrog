@@ -19,24 +19,29 @@ import (
 // 审计在 MCP 与 REST 之间天然一致，不存在「REST 绕过了 MCP 的限额」这种缺口。
 // 默认策略为只读：不配置 agent.policy 时，写动作一律被拒，与既有只读语义一致。
 
-// agentPolicyPath / agentAuditPath / agentOOBAdapter / agentReverse 由 cmd 层在启动
-// Web 服务前通过 SetAgentConfig 注入。
+// agentPolicyPath / agentAuditPath / agentOOBAdapter / agentReverse / agentConfigPath
+// 由 cmd 层在启动 Web 服务前通过 SetAgentConfig 注入。
 var (
 	agentPolicyPath string
 	agentAuditPath  string
 	agentOOBAdapter string
 	agentReverse    config.Reverse
+	// agentConfigPath 是 afrog-config.yaml 的路径：控制台保存策略/审计路径时要写回它。
+	agentConfigPath string
 )
 
 // SetAgentConfig 注入 Agent 工具面的策略、审计与带外来源，由 cmd 层在启动 Web 服务前调用。
 //
 // reverse 提供反连凭据（ceye / xray / …），配合 agent.oob 里的适配器名，工具面的
 // act.oob_payload / act.oob_wait 才有反连能力；未配置时两者会明确报未配置。
-func SetAgentConfig(cfg config.Agent, reverse config.Reverse) {
+//
+// configPath 是 afrog-config.yaml 的位置：控制台在 Web 上保存 agent 段时写回它。
+func SetAgentConfig(cfg config.Agent, reverse config.Reverse, configPath string) {
 	agentPolicyPath = strings.TrimSpace(cfg.Policy)
 	agentAuditPath = strings.TrimSpace(cfg.Audit)
 	agentOOBAdapter = strings.TrimSpace(cfg.OOB)
 	agentReverse = reverse
+	agentConfigPath = strings.TrimSpace(configPath)
 }
 
 var (
@@ -68,6 +73,14 @@ func buildAgentTools() (*mcp.Server, error) {
 		oob = nil
 	}
 	return mcp.NewWithPaths(agentPolicyPath, agentAuditPath, oob, mcp.ServerInfo{})
+}
+
+// resetAgentTools 丢弃已装配的工具面，使下一次 agentTools() 按最新策略/审计路径重建。
+// 控制台保存策略后调用它即可「保存即生效」——旧的门控与已消耗预算一并作废。
+func resetAgentTools() {
+	agentToolMu.Lock()
+	agentToolSrv, agentToolErr, agentToolBuilt = nil, nil, false
+	agentToolMu.Unlock()
 }
 
 // agentCallHandler 是 /api/v1/call：POST {"name": "...", "arguments": {...}}。

@@ -982,6 +982,26 @@ func UpdateReverseSection(configPath string, reverse Reverse) error {
 	return replaceTopLevelSection(configPath, "reverse", reverseSectionLines(0, reverse))
 }
 
+// UpdateAgentSection 把 agent 段整体写回配置文件，其余段落原样保留。
+//
+// 用于 Web 控制台保存「Agent 写动作面」的策略/审计路径：段内只有三个路径字段，
+// 整体替换比逐键增量更不容易留下半截配置。
+func UpdateAgentSection(configPath string, agent Agent) error {
+	return replaceTopLevelSection(configPath, "agent", agentSectionLines(0, agent))
+}
+
+// agentSectionLines 生成 agent 段。
+func agentSectionLines(baseIndent int, agent Agent) []string {
+	prefix := strings.Repeat(" ", baseIndent)
+	q := strconv.Quote
+	return []string{
+		prefix + "agent:",
+		prefix + "  policy: " + q(strings.TrimSpace(agent.Policy)),
+		prefix + "  audit: " + q(strings.TrimSpace(agent.Audit)),
+		prefix + "  oob: " + q(strings.TrimSpace(agent.OOB)),
+	}
+}
+
 // replaceTopLevelSection 用 block 整体替换顶层 key 段；文件里没有该段时追加到末尾。
 //
 // 与 ensureCuratedSection 那种「缺哪个键就补哪个键」的增量写法不同：cluster 的

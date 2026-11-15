@@ -195,6 +195,26 @@ func registerAPIRoutes(api *mux.Router) {
 	// Agent 只读 REST 面（/api/v1/*）：与 MCP 工具同名同语义，旧 /api/* 保持兼容。
 	registerAgentAPIRoutes(api)
 
+	// Agent 人审流水线控制台：把 Drafter / Learner 的待审队列搬到 Web，
+	// 替代 `afrog poc` / `afrog learn` 的 CLI 终审。边界与 CLI 完全一致——只是同源
+	// API 的展示层，approve/accept/reject 最终都落到同一批状态机接口。
+	api.HandleFunc("/agent/drafts", jwtAuthMiddleware(agentDraftsListHandler)).Methods(http.MethodGet)
+	// stats 必须在 {id} 之前注册：mux 按注册顺序匹配，否则 "stats" 会被当成 id。
+	api.HandleFunc("/agent/drafts/stats", jwtAuthMiddleware(agentDraftsStatsHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/drafts/{id}", jwtAuthMiddleware(agentDraftShowHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/drafts/{id}/approve", jwtAuthMiddleware(agentDraftApproveHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/agent/drafts/{id}/reject", jwtAuthMiddleware(agentDraftRejectHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/agent/suggestions", jwtAuthMiddleware(agentSuggestionsListHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/suggestions/{id}", jwtAuthMiddleware(agentSuggestionShowHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/suggestions/{id}/accept", jwtAuthMiddleware(agentSuggestionAcceptHandler)).Methods(http.MethodPost)
+	api.HandleFunc("/agent/suggestions/{id}/reject", jwtAuthMiddleware(agentSuggestionRejectHandler)).Methods(http.MethodPost)
+
+	// 策略 / 预算 / 审计面板：展示并写回与 MCP、/api/v1/call 共用的同一份门控
+	// （pkg/policy.Gate）。此处只做展示与写文件，判定仍只发生在 Gate 内部。
+	api.HandleFunc("/agent/policy", jwtAuthMiddleware(agentPolicyGetHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/policy", jwtAuthMiddleware(agentPolicyPutHandler)).Methods(http.MethodPut)
+	api.HandleFunc("/agent/audit", jwtAuthMiddleware(agentAuditHandler)).Methods(http.MethodGet)
+
 	// 认证与业务 API（复用现有处理器）
 	api.HandleFunc("/login", loginRateLimitMiddleware(loginHandler)).Methods(http.MethodPost)
 	api.HandleFunc("/logout", jwtAuthMiddleware(logoutHandler)).Methods(http.MethodPost)

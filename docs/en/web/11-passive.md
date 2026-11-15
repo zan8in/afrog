@@ -193,4 +193,4 @@ Read the reason column: usually no parameters, a tiny response body, a target ou
 **Do passive findings duplicate active scans?**
 Same database and same ledger. Deduplication aggregates by `(project, fingerprint)`, so repeated hits only increase the count.
 
-> **← Previous:** [Settings](./10-settings.md) ｜ **Handbook home:** [Web Console Overview](./01-overview.md)
+> **← Previous:** [Settings](./10-settings.md) ｜ **Handbook home:** [Web Console Overview](./01-overview.md) ｜ **Next →:** [Agent Tools (MCP)](./12-agent.md)

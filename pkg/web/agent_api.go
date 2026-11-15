@@ -30,6 +30,9 @@ func registerAgentAPIRoutes(api *mux.Router) {
 	v1.HandleFunc("/poc/search", jwtAuthMiddleware(agentPocSearchHandler)).Methods(http.MethodGet)
 	// 写动作面：与 MCP 同名同语义地调用任意工具，策略、预算、审计与 MCP 共用同一份。
 	v1.HandleFunc("/call", jwtAuthMiddleware(agentCallHandler)).Methods(http.MethodPost)
+	// 工具目录：列出全部 MCP 工具的能力等级、破坏性标记与当前策略下的可用性，
+	// 是工具台与接入向导的唯一数据来源。
+	v1.HandleFunc("/tools", jwtAuthMiddleware(agentToolsCatalogHandler)).Methods(http.MethodGet)
 	v1.NotFoundHandler = http.HandlerFunc(agentNotFoundHandler)
 }
 

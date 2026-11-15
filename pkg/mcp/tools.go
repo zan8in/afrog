@@ -1516,6 +1516,9 @@ func (s *Server) actBruteTool() *Tool {
 	return &Tool{
 		Name:        "act.brute",
 		Description: "【破坏性】用带 brute 字典的 PoC 对目标做弱口令/字典尝试。默认策略拒绝，需先授予 full 模式且 destructive=true。",
+		// 目录里显式标出「破坏性 + exec 级」：它是唯一默认即被拒的写工具。
+		Capability:  capability.Exec,
+		Destructive: true,
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

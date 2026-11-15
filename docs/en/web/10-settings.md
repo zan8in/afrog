@@ -44,4 +44,4 @@ Shows the current service version, instance identifier and other runtime informa
 
 > Some settings are **written back to the config file** (such as the `reverse` section for OOB and the `ai` section for AI); for the field dictionary see the [configuration file reference](../user-guide/05-configuration.md).
 
-> **← Previous:** [AI Assist](./09-ai.md) ｜ **Handbook home:** [Web Console Overview](./01-overview.md)
+> **← Previous:** [AI Assist](./09-ai.md) ｜ **Handbook home:** [Web Console Overview](./01-overview.md) ｜ **Next →:** [Passive Scanning and Coverage](./11-passive.md)

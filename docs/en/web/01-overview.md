@@ -65,6 +65,9 @@ The sidebar groups pages by purpose:
 | Data | Vuln Library | Browse built-in/curated PoCs and vulnerability details, write your own PoC |
 | | Curated | Member configuration and activation, curated PoC mount status and updates |
 | Other | Settings | Account, notifications, OOB, AI, service info |
+| Agent | Review Queue | Handle candidate PoCs and tuning suggestions; only approval writes to pocs-my |
+| | MCP Tools | View each tool's capability and availability, call it with the same name and semantics, copy a client config |
+| | Policy & Audit | Adjust the capability mode, destructive switch, session budget, and host scope; review decision history |
 
 ## Permissions and membership
 
@@ -85,6 +88,7 @@ The sidebar groups pages by purpose:
 | [AI Assist](./09-ai.md) | Finding verdicts, report summaries, parameter recommendations |
 | [Settings](./10-settings.md) | Account, notifications, OOB, AI, service info |
 | [Passive Scanning and Coverage](./11-passive.md) | Two-stage pipeline, coverage matrix, evidence lineage, asset relations, next-step suggestions, security gate |
+| [Agent Tools (MCP)](./12-agent.md) | Review queue, MCP tools, policy & audit |
 
 If you would like a one-page quick tour first, read [Web Scan Workspace (quick tour)](../user-guide/08-web-console.md).
 

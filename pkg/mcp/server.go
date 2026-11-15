@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 	"github.com/zan8in/afrog/v3/pkg/webscan"
 )
@@ -47,6 +48,13 @@ type Tool struct {
 	InputSchema any
 	// Handler 返回可 JSON 序列化的结果；错误会以工具错误（isError）回给调用方。
 	Handler func(ctx context.Context, args json.RawMessage) (any, error)
+
+	// Capability / Destructive 是该工具在门控里声明的静态能力等级与破坏性标记。
+	// 它只用于「工具目录」这类只读展示：让使用者一眼看出哪些工具需要更高档位
+	// （例如 act.brute 需要 full + destructive）。真正的门控发生在 Handler 内部，
+	// 那里可以按入参动态提高（如 poc.submit 按草稿的 Capability）。
+	Capability  capability.Level
+	Destructive bool
 }
 
 // ToolSpec 是工具的对外描述，供 tools/list 与其它传输（gRPC AgentService/ListTools）复用，
@@ -55,6 +63,9 @@ type ToolSpec struct {
 	Name        string
 	Description string
 	InputSchema any
+	// Capability / Destructive 见 Tool 的同名说明。
+	Capability  capability.Level
+	Destructive bool
 }
 
 // Server 是工具面的核心：持有工具注册表与策略门控，本身与传输无关。
@@ -146,9 +157,21 @@ func (s *Server) ToolNames() []string {
 func (s *Server) Specs() []ToolSpec {
 	out := make([]ToolSpec, 0, len(s.tools))
 	for _, t := range s.tools {
-		out = append(out, ToolSpec{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema})
+		out = append(out, ToolSpec{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
+			Capability:  t.Capability,
+			Destructive: t.Destructive,
+		})
 	}
 	return out
+}
+
+// Gate 返回底层的策略门控，供 Web 控制台读取当前策略与预算余量。
+// 它只暴露既有能力（Policy / Budget 都是只读访问器），不新增执行入口。
+func (s *Server) Gate() *policy.Gate {
+	return s.gate
 }
 
 // --- JSON-RPC 传输层 ---
