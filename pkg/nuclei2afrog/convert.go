@@ -25,13 +25,19 @@ import (
 //
 // Class:
 //   - A/B：翻译成功且通过 CEL 自校验，YAML 非空；
-//   - C  ：需人工重写（含翻译失败与自校验失败），YAML 为空；
+//   - C  ：需人工重写（含翻译失败与自校验失败），YAML 为空，但会产出 Skeleton；
 //   - D  ：afrog 无对应运行时；
 //   - X  ：模板不含可识别的协议段。
 type Result struct {
-	Class    Class
-	Pocs     []poc.Poc
-	YAML     []byte // 单个 PoC 的序列化结果；Class 非 A/B 时为空
+	Class Class
+	Pocs  []poc.Poc
+	// YAML 是可直接扫描的 PoC 序列化结果；Usable 为 false 时为空。
+	YAML []byte
+	// Skeleton 是 C 类的「结构骨架 + TODO」草稿（见 skeleton.go）；
+	// 仅 Class==C 时非空，且绝不保证可用——它走独立字段，不会写入 YAML。
+	Skeleton []byte
+	// Usable 表示 YAML 是否为「可直接扫描」的 PoC（仅 A/B 为 true）。
+	Usable   bool
 	Warnings []Warning
 	Gaps     []string
 	Report   string
@@ -75,6 +81,9 @@ func Convert(data []byte) (*Result, error) {
 		res.Class = cls.class
 		res.Warnings = append(res.Warnings, Warning{Field: "classify", Message: cls.reason, Gap: true})
 		res.Gaps = append(res.Gaps, cls.reason)
+		if res.Class == ClassC {
+			res.Skeleton = buildSkeleton(data, &tpl, res.Class, res.Gaps)
+		}
 		res.Report = buildReport(res)
 		return res, nil
 	}
@@ -87,6 +96,7 @@ func Convert(data []byte) (*Result, error) {
 		if len(res.Gaps) == 0 {
 			res.Gaps = append(res.Gaps, "翻译过程未能忠实还原模板语义")
 		}
+		res.Skeleton = buildSkeleton(data, &tpl, res.Class, res.Gaps)
 		res.Report = buildReport(res)
 		return res, nil
 	}
@@ -99,6 +109,7 @@ func Convert(data []byte) (*Result, error) {
 			Message: "生成的 CEL 表达式未通过 afrog 编译自校验，已降级为需人工重写",
 			Gap:     true,
 		})
+		res.Skeleton = buildSkeleton(data, &tpl, res.Class, res.Gaps)
 		res.Report = buildReport(res)
 		return res, nil
 	}
@@ -110,6 +121,7 @@ func Convert(data []byte) (*Result, error) {
 
 	res.Pocs = []poc.Poc{p}
 	res.YAML = out
+	res.Usable = true
 	res.Report = buildReport(res)
 	return res, nil
 }
@@ -563,7 +575,11 @@ func buildReport(res *Result) string {
 	case ClassB:
 		b.WriteString("说明: 机械扩展（set / brute / raw / 多 rule 合并），建议人工复核\n")
 	case ClassC:
-		b.WriteString("说明: 需人工重写，未产出 PoC\n")
+		if len(res.Skeleton) > 0 {
+			b.WriteString("说明: 需人工重写；已产出骨架（见 skeleton 字段，带 TODO），不可直接使用\n")
+		} else {
+			b.WriteString("说明: 需人工重写，未产出 PoC\n")
+		}
 	case ClassD:
 		b.WriteString("说明: afrog 无对应运行时，不可转换\n")
 	case ClassX:

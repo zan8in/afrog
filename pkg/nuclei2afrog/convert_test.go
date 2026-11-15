@@ -441,7 +441,7 @@ func TestConvertCorpus(t *testing.T) {
 		t.Skipf("nuclei-templates 不存在：%s", root)
 	}
 
-	var total, classA, classB, classC, classD, classX, translated, badParse int
+	var total, classA, classB, classC, classD, classX, translated, badParse, skeletonCount int
 	reasons := map[string]int{}
 	msgs := map[string]int{}
 	msgSample := map[string][]string{}
@@ -489,6 +489,11 @@ func TestConvertCorpus(t *testing.T) {
 		case ClassC:
 			classC++
 			record(path, res.Gaps)
+			if len(res.Skeleton) == 0 {
+				t.Errorf("%s: C 类未产出骨架", path)
+			} else {
+				skeletonCount++
+			}
 		case ClassD:
 			classD++
 			record(path, res.Gaps)
@@ -514,8 +519,8 @@ func TestConvertCorpus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Logf("模板总数=%d 解析失败=%d A=%d B=%d C=%d D=%d X=%d 产出=%d",
-		total, badParse, classA, classB, classC, classD, classX, translated)
+	t.Logf("模板总数=%d 解析失败=%d A=%d B=%d C=%d D=%d X=%d 产出=%d C骨架=%d",
+		total, badParse, classA, classB, classC, classD, classX, translated, skeletonCount)
 	for _, line := range topBuckets(reasons, 20) {
 		t.Logf("未产出归因: %s", line)
 	}

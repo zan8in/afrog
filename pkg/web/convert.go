@@ -15,6 +15,9 @@ import (
 // 编译自校验，任一步做不到「忠实转换」都会降级为 C 类且不产出 YAML。
 // 因此本接口只做输入输出搬运，不做二次判定；分档结论与缺口原因原样透传给前端。
 //
+// 回应里的 usable 表示「yaml 是否为可直接扫描的 PoC」（仅 A/B 为 true）；
+// C 类会额外返回 skeleton（结构骨架 + TODO），它是给人/AI 补全的草稿，不可直接使用。
+//
 // 只转换、不落盘：是否保存由调用方在确认结果后再走 /api/pocs/create。
 func pocsConvertNucleiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -66,12 +69,17 @@ func pocsConvertNucleiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]any{
-		"class":       string(res.Class),
-		"convertible": res.Class == nuclei2afrog.ClassA || res.Class == nuclei2afrog.ClassB,
-		"yaml":        string(res.YAML),
-		"warnings":    warnings,
-		"gaps":        gaps,
-		"report":      res.Report,
+		"class": string(res.Class),
+		// convertible 为兼容旧前端保留，与 usable 同义：仅 A/B 为 true。
+		"convertible": res.Usable,
+		// usable=false 时 yaml 必为空；此时若为 C 类，skeleton 给出「骨架 + TODO」草稿，
+		// 仅供人工/AI 补全，禁止直接保存为可用 PoC。
+		"usable":   res.Usable,
+		"yaml":     string(res.YAML),
+		"skeleton": string(res.Skeleton),
+		"warnings": warnings,
+		"gaps":     gaps,
+		"report":   res.Report,
 	}
 	if len(res.Pocs) > 0 {
 		p := res.Pocs[0]

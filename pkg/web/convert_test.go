@@ -63,6 +63,12 @@ http:
 	if conv, _ := data["convertible"].(bool); !conv {
 		t.Errorf("convertible = %v, want true", data["convertible"])
 	}
+	if usable, _ := data["usable"].(bool); !usable {
+		t.Errorf("usable = %v, want true", data["usable"])
+	}
+	if sk, _ := data["skeleton"].(string); sk != "" {
+		t.Errorf("A 类不应返回骨架, got: %q", sk)
+	}
 	if yamlOut, _ := data["yaml"].(string); !strings.Contains(yamlOut, "id: sample-template") {
 		t.Errorf("yaml 未包含原 id, got: %q", yamlOut)
 	}
@@ -100,8 +106,14 @@ http:
 	if conv, _ := data["convertible"].(bool); conv {
 		t.Errorf("convertible = %v, want false", data["convertible"])
 	}
+	if usable, _ := data["usable"].(bool); usable {
+		t.Errorf("usable = %v, want false", data["usable"])
+	}
 	if yamlOut, _ := data["yaml"].(string); yamlOut != "" {
 		t.Errorf("C 类不应产出 YAML, got: %q", yamlOut)
+	}
+	if sk, _ := data["skeleton"].(string); !strings.Contains(sk, "# nuclei2afrog 骨架") {
+		t.Errorf("C 类应返回骨架（带 TODO 的草稿）, got: %q", sk)
 	}
 	if gaps, _ := data["gaps"].([]any); len(gaps) == 0 {
 		t.Errorf("gaps 为空，应给出降级原因")
