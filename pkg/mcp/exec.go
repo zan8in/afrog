@@ -189,19 +189,22 @@ func mcpTaskID(tool string) string {
 //
 // 口径：命中各关键词的 PoC 数 × 单个 PoC 的保守请求数，落在
 // [defaultVerifyReserve, maxVerifyReserve] 内。它只用于预算预留，不影响实际执行；
-// 关键词为空的兜底由调用方决定，这里按「全库」不估，直接返回下限。
+// 关键词为空时按「全库」估算——空 search 就是一次全量扫描，不能当成一次小检测预留。
 func estimateKeywordReserve(search string) int {
 	keywords := splitKeywords(search)
-	if len(keywords) == 0 {
-		return defaultVerifyReserve
-	}
 	count := 0
-	for _, kw := range keywords {
-		items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all", Q: kw})
-		if err != nil {
-			continue
+	if len(keywords) == 0 {
+		if items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"}); err == nil {
+			count = len(items)
 		}
-		count += len(items)
+	} else {
+		for _, kw := range keywords {
+			items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all", Q: kw})
+			if err != nil {
+				continue
+			}
+			count += len(items)
+		}
 	}
 	reserve := count * defaultVerifyReserve
 	if reserve < defaultVerifyReserve {

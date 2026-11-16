@@ -136,13 +136,13 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 | `observe.state` | 以资产为根返回攻击面子图（上下游、端点/参数、技术栈与候选 PoC、覆盖、命中数） | 只读 |
 | `observe.observations` | 按 `seq` 游标增量拉取观测流：开放端口、Web 指纹、HTTP 事务、被动代理流量、TLS 证书、带外回连 | 只读 |
 | `plan.next` | 把攻击面图压成下一步的 `Action` 提议（`scan.start` / `probe.fingerprint`），按确定性分数排序并附依据；同一源站的候选合并成一条 `scan.start`（`search` 为技术栈关键词）。`proposals` 为空表示该主体还没有可复现候选（先 `probe.*` 补观测，或改用 `poc.search`） | 只读 |
-| `poc.search` | 按关键词与级别检索本机已有 PoC，返回真实存在的 id、本地路径，以及 `total`（命中总数）与 `truncated`（是否被 `limit` 截断）。**它等价于 `afrog -pl -s <keyword>`：扫描前先预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞**；选检优先用指纹关键词（jquery、thinkphp、shiro），命中后把同一关键词交给 `scan.start`，没有线索时先 `plan.next`，`severity` 只作按级别的兜底粗筛 | 只读 |
+| `poc.search` | 按关键词与级别检索本机已有 PoC，返回真实存在的 id、本地路径，以及 `total`（命中总数）与 `truncated`（是否被 `limit` 截断）。**它等价于 `afrog -pl -s <keyword>`：扫描前先预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞**；关键词口径与 `-s` 完全一致（按逗号拆成多个词、任一命中 id/名称/标签即算命中），选检优先用指纹关键词（jquery、thinkphp、shiro），命中后把同一关键词交给 `scan.start`，没有线索时先 `plan.next`，`severity` 只作按级别的兜底粗筛（用户没指定等级就留空） | 只读 |
 | `poc.draft` | 校验一份 PoC 草稿：结构、能力等级、请求量估算；可选落盘供 `poc.submit` 实跑使用 | 只读 |
 | `poc.submit` | 在真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（`afrog poc approve/reject`） | `verify.*`（按草稿能力分级，`exec` 级还需 `destructive: true`） |
 | `probe.http` | 发一次 HTTP 请求，返回状态、头、正文与耗时 | `probe.*` |
 | `probe.port` | 单主机端口探测（默认 top100，单次上限 1000 个），返回开放端口与服务指纹 | `probe.*` |
-| `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要；拿到技术栈后先用 `poc.search` 预检，有结果再把该关键词交给 `scan.start` 并发扫描 | `probe.*` |
-| `scan.start` | **取代逐个验证的主入口**：用一次子进程并发跑完某个技术栈（`search` 关键词）下的全部 PoC，返回可重放证据。`afrog` 按 `-s` 选 PoC，且指纹 PoC 无论关键词如何都会被保留，于是指纹阶段照常运行、`requires` 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。反向 PoC 需要 `agent.oob`，未配置时明确报错（fail-closed） | `scan.start` |
+| `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要；返回的 `suggested_search` 是可直接透传的关键词串（由识别出的技术栈名拼成），先用它 `poc.search` 预检，有结果再把同一串交给 `scan.start` 并发扫描 | `probe.*` |
+| `scan.start` | **取代逐个验证的主入口**：用一次子进程并发跑完某个技术栈（`search` 关键词）下的全部 PoC，返回可重放证据。`afrog` 按 `-s` 选 PoC（命中 id/名称/标签）；`search` 留空表示不加关键词、跑全库（没有指纹线索时的兜底，需先征得用户同意）。带关键词时，命中该关键词的指纹 PoC 不受 `severity` 限制也会被保留（但关键词是硬前提，不命中的指纹 PoC 照样被滤掉），于是指纹阶段照常运行、`requires` 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。反向 PoC 需要 `agent.oob`，未配置时明确报错（fail-closed） | `scan.start` |
 | `verify.replay` | 按证据 id 重放一次，比对 id/digest 判断旧结论是否仍成立 | `verify.*` |
 | `act.brute` | 弱口令/字典尝试 | `full` + `destructive: true` |
 | `act.oob_payload` | 铸一组带外回连地址（`filter` + DNS/HTTP 等），用于命令执行、XXE、SSRF 等需要反连回显的验证 | `full` + `destructive: true` |
@@ -156,9 +156,9 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 
 `afrog mcp` 在 `initialize` 里返回一段 `instructions`（MCP 规范的可选字段），客户端会把它并入模型上下文，用来告诉模型这套工具怎么用——否则最常见的两种误用是：逐个 PoC 串行慢验，以及指纹命中后不知道该去 `poc.search` 检索对应 PoC。要点与下表一致：
 
-1. **先 `poc.search` 预检再 `scan.start`**：拿到技术栈关键词（jquery、thinkphp、shiro）先交给 `poc.search`（等价 `afrog -pl -s`）确认本机确实有这个技术栈的 PoC；结果非空就把**同一关键词**交给 `scan.start` 并发扫描，为空就别扫——afrog 没有该指纹/产品的漏洞。自己写的 PoC 先用 `poc.draft`（`save: true`）落盘，再把返回的 `poc_path` 交给 `poc.submit` 受限实跑取证据。
+1. **先 `poc.search` 预检再 `scan.start`**：指纹识别后，`probe.fingerprint` 返回的 `suggested_search` 就是可直接透传的关键词串——先把它交给 `poc.search`（等价 `afrog -pl -s`）确认本机确实有这个技术栈的 PoC；结果非空就把**同一关键词**交给 `scan.start` 并发扫描，为空就别扫——afrog 没有该指纹/产品的漏洞。别自己把 `technologies` 映射成关键词（曾出现识别出 jQuery、却去搜 wordpress,nginx 之类根本没识别到的产品的情况）。自己写的 PoC 先用 `poc.draft`（`save: true`）落盘，再把返回的 `poc_path` 交给 `poc.submit` 受限实跑取证据。
 2. **先让 `plan.next` 当主驾驶**：它按攻击面（端点 / 技术栈 / 已有结论）给出确定性的下一步——对还没指纹的 origin 提议 `probe.fingerprint`，对已识别技术栈的端点直接给出 `scan.start` 提议（`search` 为技术栈关键词，同一源站的多条候选会合并成一条），并自动跳过已出结论的组合；候选为空时再自己动手。
-3. **别用「按 severity 挨个验」当默认策略**：`severity` 只按级别粗筛，与目标是否真的运行那个产品无关——那既白扣额度、又得不出可信「无漏洞」结论。正确姿势永远是「指纹 → `poc.search` 预检 → `scan.start`」。
+3. **别用「按 severity 挨个验」当默认策略**：`severity` 只按级别粗筛，与目标是否真的运行那个产品无关——那既白扣额度、又得不出可信「无漏洞」结论。用户没有指定等级就留空（即扫描所有等级）；正确姿势永远是「指纹 → `poc.search` 预检 → `scan.start`」。**没有任何指纹线索时**（`technologies` 为空、`plan.next` 也给不出关键词）：不要凭空编关键词，**先询问用户是否要用 afrog 扫描全部漏洞**，得到同意后再用**空 `search`** 调 `scan.start`（空关键词 = 不加过滤、跑全库所有 PoC，请求量与耗时都大得多）。
 4. **只读工具**（`server.*` / `observe.*` / `plan.*` / `poc.search` / `poc.draft` / `judge.*` / `learn.*`）不发包、不扣预算；`probe.*` / `scan.start` / `verify.replay` / `poc.submit` / `act.*` 会发包并按请求数扣会话额度——`scan.start` 一次并发跑完一个技术栈的 PoC，远比逐个 `verify` 省时省额度。拿不准当前什么档位、还剩多少额度，先看 `server.status`。
 
 ### 协议层：客户端还会拿到哪些提示

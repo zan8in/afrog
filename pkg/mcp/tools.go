@@ -588,11 +588,11 @@ func (s *Server) pocSearchTool() *Tool {
 	return &Tool{
 		Name:        "poc.search",
 		Title:       "检索 PoC",
-		Description: "按关键词与严重级别检索本机已有的 PoC，返回真实存在的 id、名称、级别与本地路径，并带 total（命中总数）与 truncated（是否被 limit 截断）。**它等价于 `afrog -pl -s <keyword>`：用来在扫描前预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞。** 选检口径按优先级：① 有指纹/产品线索时，keyword 用技术栈关键词（jquery、thinkphp、shiro）——这是命中率最高的方式，命中后把同一关键词交给 scan.start 并发扫描；② 还没有线索时先用 plan.next，它会按攻击面决定是先做 probe.fingerprint 还是直接给出候选关键词；③ severity 只是「按级别粗筛」的兜底手段，它与目标是否真的跑那个产品无关，别把它当默认策略。truncated=true 时应继续收窄条件。",
+		Description: "按关键词与严重级别检索本机已有的 PoC，返回真实存在的 id、名称、级别与本地路径，并带 total（命中总数）与 truncated（是否被 limit 截断）。**它等价于 `afrog -pl -s <keyword>`：用来在扫描前预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞。** 关键词口径与 `-s` 完全一致：按逗号拆成多个词、任一命中 PoC 的 id/名称/标签即算命中（传 \"thinkphp,jquery\" 就是「thinkphp 或 jquery」）。选检口径按优先级：① 有指纹/产品线索时，keyword 用技术栈关键词（jquery、thinkphp、shiro）——这是命中率最高的方式，命中后把同一关键词交给 scan.start 并发扫描（probe.fingerprint 返回的 suggested_search 可直接透传）；② 还没有线索时先用 plan.next，它会按攻击面决定是先做 probe.fingerprint 还是直接给出候选关键词；③ severity 只是「按级别粗筛」的兜底手段，它与目标是否真的跑那个产品无关，别把它当默认策略——用户没有指定等级时留空即可。truncated=true 时应继续收窄条件。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签 / 作者；首选指纹类关键词，如 jquery、thinkphp"},
+				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签（与 afrog -s 同一口径，逗号分隔即多关键词 OR）；首选指纹类关键词，如 jquery、thinkphp"},
 				"severity": map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"info", "low", "medium", "high", "critical"}}, "description": "按级别粗筛；仅作兜底，不能替代按指纹检索"},
 				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 200, "description": "返回条数上限，默认 50"},
 			},
@@ -1231,7 +1231,7 @@ func (s *Server) probeFingerprintTool() *Tool {
 	return &Tool{
 		Name:        "probe.fingerprint",
 		Title:       "识别 Web 指纹",
-		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。默认不发 favicon 请求。**拿到技术栈后，先用 poc.search 预检（等价 afrog -pl -s），有结果再把该技术栈关键词交给 scan.start 并发扫描** —— 这是「先识别指纹、再找漏洞」的主路径。",
+		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。默认不发 favicon 请求。**返回里的 suggested_search 就是可直接透传的关键词串**（由识别出的技术栈名拼成）：先用它调 poc.search(keyword=suggested_search) 预检（等价 afrog -pl -s），有结果再把同一串交给 scan.start(search=…) 并发扫描——这是「先识别指纹、再找漏洞」的主路径，别自己另编关键词。若 technologies 为空（suggested_search 也是空），说明没识别出任何技术栈：不要凭空编关键词，改走 plan.next，或征得用户同意后用空 search 让 afrog 跑全部 PoC（见 scan.start）。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1332,6 +1332,12 @@ func (s *Server) probeFingerprintTool() *Tool {
 			techs := make([]map[string]any, 0, len(matched.Technologies))
 			waf := make([]string, 0, 2)
 			cdn := make([]string, 0, 2)
+			// suggested_search 是本工具交给模型的关键词：把识别出的技术栈名（小写、去重）
+			// 拼成逗号串，可原样透传给 poc.search(keyword=) 与 scan.start(search=)。
+			// 有它，模型就不必自己把 technologies 映射成 -s 关键词——那一步正是最容易乱编的地方
+			// （例如识别出 jQuery 却去搜 wordpress,nginx 之类根本没识别到的产品）。
+			searchTokens := make([]string, 0, len(matched.Technologies))
+			seenToken := make(map[string]struct{}, len(matched.Technologies))
 			for _, t := range matched.Technologies {
 				techs = append(techs, map[string]any{
 					"name":       t.Name,
@@ -1340,6 +1346,12 @@ func (s *Server) probeFingerprintTool() *Tool {
 					"cpe":        t.CPE,
 					"confidence": t.Confidence.String(),
 				})
+				if name := strings.ToLower(strings.TrimSpace(t.Name)); name != "" {
+					if _, ok := seenToken[name]; !ok {
+						seenToken[name] = struct{}{}
+						searchTokens = append(searchTokens, name)
+					}
+				}
 				switch strings.ToLower(t.Category) {
 				case "waf":
 					waf = append(waf, t.Name)
@@ -1349,18 +1361,19 @@ func (s *Server) probeFingerprintTool() *Tool {
 			}
 
 			out := map[string]any{
-				"url":          resp.Request.URL.String(),
-				"status":       resp.StatusCode,
-				"title":        extractHTMLTitle(body),
-				"server":       headers["server"],
-				"powered_by":   headers["x-powered-by"],
-				"technologies": techs,
-				"confidence":   matched.Confidence.String(),
-				"waf":          waf,
-				"cdn":          cdn,
-				"redirects":    redirects,
-				"favicon_hash": matched.FaviconHash,
-				"latency_ms":   latency,
+				"url":              resp.Request.URL.String(),
+				"status":           resp.StatusCode,
+				"title":            extractHTMLTitle(body),
+				"server":           headers["server"],
+				"powered_by":       headers["x-powered-by"],
+				"technologies":     techs,
+				"suggested_search": strings.Join(searchTokens, ","),
+				"confidence":       matched.Confidence.String(),
+				"waf":              waf,
+				"cdn":              cdn,
+				"redirects":        redirects,
+				"favicon_hash":     matched.FaviconHash,
+				"latency_ms":       latency,
 			}
 			if tls := tlsSummary(resp); tls != nil {
 				out["tls"] = tls
@@ -1439,10 +1452,11 @@ func fetchFavicon(ctx context.Context, base *url.URL) []byte {
 
 // scanStartTool 用一次子进程并发跑完「某技术栈（关键词）下的全部 PoC」。
 //
-// 这是取代「逐个 verify」的主入口。选择权交回 afrog 的 -s：关键词命中 id/名称/标签，
-// 且指纹 PoC 无论关键词如何都会被保留——于是指纹阶段照常运行、requires 按真实指纹
-// 放行，既避免「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成
-// 一次并发扫描。整批扫描交给独立子进程，规避 sdk 的进程级全局状态串扰。
+// 这是取代「逐个 verify」的主入口。选择权交回 afrog 的 -s：关键词命中 id/名称/标签；
+// 关键词为空时不加过滤、跑全库；带关键词时，命中该关键词的指纹 PoC 不受 severity 限制
+// 也会被保留（见 config.filterPocSeveritySearchWithFingerprint）。于是指纹阶段照常运行、
+// requires 按真实指纹放行，既避免「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把
+// N 次串行验证压成一次并发扫描。整批扫描交给独立子进程，规避 sdk 的进程级全局状态串扰。
 func (s *Server) scanStartTool() *Tool {
 	type args struct {
 		Target      string `json:"target"`
@@ -1455,18 +1469,18 @@ func (s *Server) scanStartTool() *Tool {
 	return &Tool{
 		Name:  "scan.start",
 		Title: "按技术栈并发扫描",
-		Description: "用一次子进程并发跑完某个技术栈（关键词）下的全部 PoC，返回可重放证据——这是取代逐个验证的主入口。search 传技术栈/产品关键词（thinkphp、jquery、shiro…，逗号分隔可多个）：afrog 按 -s 选 PoC（命中 id/名称/标签），且指纹 PoC 无论关键词如何都被保留，于是指纹阶段照常运行、requires 按真实指纹放行。因此既不会出现「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。执行前可先用 poc.search(keyword=…) 预检「本机有没有该技术栈的 PoC」（等价 afrog -pl -s），结果为空就别扫。severity 只是按级别粗筛的兜底，不能替代按指纹检索。",
+		Description: "用一次子进程并发跑完某个技术栈（关键词）下的全部 PoC，返回可重放证据——这是取代逐个验证的主入口。search 传技术栈/产品关键词（thinkphp、jquery、shiro…，逗号分隔可多个）：afrog 按 -s 选 PoC（命中 id/名称/标签）。**search 留空表示不加关键词、跑全库所有 PoC**——这是「没有任何指纹线索」时的兜底，请求量与耗时都大得多，只在 plan.next 也给不出关键词、且已征得用户同意「用 afrog 扫描全部漏洞」时才用。带关键词时，命中该关键词的指纹 PoC 不受 severity 限制也会被保留（关键词是硬前提：关键词不命中的指纹 PoC 同样会被滤掉），于是指纹阶段照常运行、requires 按真实指纹放行——既不会出现「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不为 N 个候选发 N 次串行请求。执行前先用 poc.search(keyword=…) 预检「本机有没有该技术栈的 PoC」（等价 afrog -pl -s；probe.fingerprint 返回的 suggested_search 可直接透传），结果为空就别扫。severity 只是按级别粗筛的兜底：用户没有指定等级时留空（即扫描所有等级），不要无理由默认塞 high,critical。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"target":      map[string]any{"type": "string", "description": "目标 URL 或 host:port"},
-				"search":      map[string]any{"type": "string", "description": "技术栈/产品关键词（如 thinkphp,jquery,nacos）；命中 PoC 的 id/名称/标签"},
-				"severity":    map[string]any{"type": "string", "description": "可选的级别粗筛（逗号分隔，如 high,critical）；仅作兜底"},
+				"search":      map[string]any{"type": "string", "description": "技术栈/产品关键词（如 thinkphp,jquery,nacos）；命中 PoC 的 id/名称/标签。留空 = 不加关键词、跑全库所有 PoC（量大，需先征得用户同意）"},
+				"severity":    map[string]any{"type": "string", "description": "可选的级别粗筛（逗号分隔，如 high,critical）；用户没指定等级时留空，即扫描所有等级"},
 				"concurrency": map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "description": "并发数，默认由引擎决定"},
 				"rate_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": 1000, "description": "每秒请求上限，0 表示不限"},
 				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 1800, "description": "整批扫描的整体超时，默认 300 秒"},
 			},
-			"required": []string{"target", "search"},
+			"required": []string{"target"},
 		},
 		OutputSchema: map[string]any{
 			"type": "object",
@@ -1503,10 +1517,9 @@ func (s *Server) scanStartTool() *Tool {
 			if target == "" {
 				return nil, fmt.Errorf("target is required")
 			}
+			// search 允许为空：空关键词 = 不加过滤、跑全库，用在「没有任何指纹线索」的兜底
+			// （描述里要求模型先征得用户同意再这么做）。此时 -s 不会下发，afrog 加载全部 PoC。
 			search := strings.TrimSpace(a.Search)
-			if search == "" {
-				return nil, fmt.Errorf("search is required: pass the technology/product keyword (e.g. thinkphp,jquery); precheck availability with poc.search(keyword=...) which is the equivalent of `afrog -pl -s`")
-			}
 
 			if err := s.gate.Take(policy.Action{
 				Name:   "scan.start",
@@ -1984,10 +1997,10 @@ func (s *Server) learnRecordTool() *Tool {
 //
 // PoC 走 -ap（追加语义）挂在内置库之上、再用 -s 以 PoC id 作关键词选中它，而不是用
 // -P（独占语义）：
-//   - -P 只加载这一个 PoC，指纹阶段就没有指纹 PoC 可跑，requires 门控会把这次验证
-//     整个跳过——那是一个说不清楚的假阴性；
-//   - -ap + -s 下指纹 PoC 一律被过滤规则保留，指纹阶段照常运行、requires 按真实指纹
-//     放行；再叠加 -w（Web 指纹），requires 的两条准入来源都在。
+//   - -ap + -s 不动内置库，选择权交回 afrog 的 -s；再叠加 -w（Web 指纹），requires
+//     能用 Web 指纹命中的技术栈 tokens 作为准入来源；
+//   - -P（独占）会屏蔽内置库、只加载这一个 PoC，指纹阶段没有可跑的内置指纹 PoC，
+//     requires 的准入来源最少，最容易把这次验证整个跳过——那是一个说不清楚的假阴性。
 //
 // 这与 scan.start 的 -s 口径一致，也是 afrog 自己的推荐用法。SDK 的 HTTP 客户端、
 // 限速器与探测缓存都是进程级全局状态，同进程并发 scanner 会互相污染，所以整批交给

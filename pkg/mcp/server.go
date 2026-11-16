@@ -35,11 +35,14 @@ const Instructions = `afrog 把本机的扫描结论、攻击面与 PoC 能力�
 
 1. 先看现状：observe.findings 列出已扫出的漏洞结论，observe.state 看某个资产的攻击面子图，observe.observations 增量拉取观测流。返回为空表示「本地还没有这类数据」，而不是「没有漏洞」。
 2. 让 plan.next 当主驾驶：它按攻击面（端点 / 技术栈 / 已有结论）给出确定性的下一步——对还没指纹的 origin 提议 probe.fingerprint，对已识别技术栈的 origin 直接给出 scan.start 提议（按源站合并成一条、带上技术栈关键词、等级与是否需要 OOB），并自动跳过已出结论的组合。不确定做什么时先调它。
-3. 需要自己推进时：先用 probe.fingerprint 拿到技术栈（jquery、thinkphp、shiro），再用 poc.search(keyword=…) 回答「本机有没有该技术栈的 PoC」（等价 afrog -pl -s）；结果非空就用 scan.start(search=…) 一次跑完。scan.start 走的就是 afrog -s：关键词命中 id/name/tags，且指纹 PoC 无论关键词如何都会被保留，于是指纹阶段照常运行、requires 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成一次并发扫描。severity 只按级别粗筛，与目标是否真的运行那个产品无关——别把「没有指纹就 severity=["high","critical"] 挨个扫」当默认策略：那是既白扣额度、又得不出可信「无漏洞」结论的遍历。
+3. 需要自己推进时：先用 probe.fingerprint 拿到技术栈——它返回的 suggested_search 就是可直接透传的关键词串，先把它交给 poc.search(keyword=…) 预检「本机有没有该技术栈的 PoC」（等价 afrog -pl -s），结果非空就用同一串 scan.start(search=…) 一次跑完。别自己把 technologies 映射成关键词（曾出现识别出 jQuery、却去搜 wordpress,nginx 之类根本没识别到的产品的情况）。
+   - 关键词口径：afrog -s 命中 PoC 的 id/名称/标签，逗号分隔即多关键词 OR；带关键词时，命中该关键词的指纹 PoC 不受 severity 限制也会保留（但关键词是硬前提，不命中的指纹 PoC 照样被滤掉），于是指纹阶段照常运行、requires 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成一次并发扫描。
+   - 没有任何指纹线索时（technologies 为空、plan.next 也给不出关键词）：不要凭空编关键词；**先问用户是否要用 afrog 扫描全部漏洞**，得到同意后再用**空 search** 调 scan.start（空关键词 = 不加过滤、跑全库所有 PoC，请求量与耗时都大得多）。
+   - severity（-S）只是按级别粗筛的兜底：用户没有指定等级就留空（即扫描所有等级），不要无理由默认塞 high,critical。别把「没有指纹就 severity=["high","critical"] 挨个扫」当默认策略：那是既白扣额度、又得不出可信「无漏洞」结论的遍历。
 4. poc_id 只能来自 poc.search 的真实返回或 plan.next 的提议，禁止凭空编造；自己写的 PoC 先用 poc.draft（save=true）落盘，再把返回的 poc_path 交给 poc.submit 实跑取证据。
 5. 只读工具（observe.* / plan.* / judge.* / learn.* / server.* / poc.search / poc.draft）不发包也不消耗会话额度；probe.* / scan.* / verify.* / act.* 会发包并按请求数扣额度。scan.start 在子进程里并发跑完整个技术栈的 PoC（一次调用即一批，不要退回逐个串行）；单个 PoC 的重放或实跑用 verify.replay / poc.submit / act.brute。拿不准当前档位、还剩多少额度，先看 server.status。
 6. 默认策略是只读：probe.* / scan.* / verify.* 需要 safe 或 full 档位，act.brute / poc.submit 等破坏性动作还需要 destructive=true。被拒绝（403）是策略挡的，不是工具故障。
-7. 需要「整目标、全量库」的大范围扫描时，交给 afrog scan / Web 控制台 / gRPC 去做，再用 observe.* 回读结论；本工具面的定位是「按需、可解释、可重放的动作」，scan.start 则是「按指纹关键词、一次并发跑完一批」的入口。`
+7. 需要「整目标、全量库」的大范围扫描时，交给 afrog scan / Web 控制台 / gRPC 去做，再用 observe.* 回读结论（除非用户明确同意在 scan.start 里用空 search 跑全库）；本工具面的定位是「按需、可解释、可重放的动作」，scan.start 则是「按指纹关键词、一次并发跑完一批」的入口。`
 
 
 // supportedProtocolVersions 是本服务能真正对话的 MCP 协议版本集合。

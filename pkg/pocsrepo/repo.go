@@ -258,7 +258,10 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 	sevSet := toLowerSet(opts.Severity)
 	tagSet := toRawSet(opts.Tags)
 	authSet := toRawSet(opts.Authors)
-	q := strings.ToLower(strings.TrimSpace(opts.Q))
+	// Q 与 afrog -s 同一口径：按逗号拆成多个关键词，任一命中 id/名称/标签即算匹配。
+	// 不能把整串当字面量比对——那会让 "a,b" 这类多关键词检索永远匹配不到
+	// （-s 是拆开逐个匹配的），于是同一个 keyword 在 poc.search 里返回 0、在扫描里却命中一堆。
+	qs := splitKeywordList(opts.Q)
 
 	filtered := items[:0]
 	for _, it := range items {
@@ -273,10 +276,11 @@ func ListMeta(opts ListOptions) ([]Item, error) {
 		if len(authSet) > 0 && !matchesAny(it.Author, authSet) {
 			continue
 		}
-		if q != "" {
-			if !containsAny([]string{strings.ToLower(it.ID), strings.ToLower(it.Name)}, q) &&
-				!sliceContainsSubstring(stringsToLower(it.Tags), q) &&
-				!sliceContainsSubstring(stringsToLower(it.Author), q) {
+		if len(qs) > 0 {
+			hay := make([]string, 0, len(it.Tags)+2)
+			hay = append(hay, strings.ToLower(it.ID), strings.ToLower(it.Name))
+			hay = append(hay, stringsToLower(it.Tags)...)
+			if !containsAnyKeyword(hay, qs) {
 				continue
 			}
 		}
@@ -602,19 +606,25 @@ func stringsToLower(list []string) []string {
 	return out
 }
 
-func containsAny(vals []string, q string) bool {
-	for _, v := range vals {
-		if strings.Contains(v, q) {
-			return true
+// splitKeywordList 把逗号分隔的关键词表切成非空、小写、去空的切片。
+// 与 config.SetSearchKeyword（afrog -s）保持同一拆分口径。
+func splitKeywordList(raw string) []string {
+	out := make([]string, 0)
+	for _, v := range strings.Split(raw, ",") {
+		if k := strings.ToLower(strings.TrimSpace(v)); k != "" {
+			out = append(out, k)
 		}
 	}
-	return false
+	return out
 }
 
-func sliceContainsSubstring(list []string, q string) bool {
-	for _, v := range list {
-		if strings.Contains(v, q) {
-			return true
+// containsAnyKeyword 判断 hay 中是否有任一元素包含 keywords 里的任意一个关键词。
+func containsAnyKeyword(hay, keywords []string) bool {
+	for _, v := range hay {
+		for _, k := range keywords {
+			if strings.Contains(v, k) {
+				return true
+			}
 		}
 	}
 	return false
