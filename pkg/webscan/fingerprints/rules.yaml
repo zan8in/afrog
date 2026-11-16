@@ -772,6 +772,10 @@
     - source: body
       pattern: '(?i)react(?:-dom|-with-addons)?[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 路径段带版本：/react/16.13.1/umd/react.production.min.js（版本独占一段，不是文件名前缀）
+    - source: body
+      pattern: '(?i)react(?:-dom|-with-addons)?/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     # 查询串带版本：react.production.min.js?v=18.2.0（兼容 CDN 追加参数 ?a=1&v=18.2.0）
     - source: body
       pattern: '(?i)react(?:-dom)?(?:\.production|\.development)?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
@@ -802,6 +806,10 @@
     - source: body
       pattern: '(?i)vue(?:\.runtime|\.global|\.prod|\.esm-browser|\.esm-bundler|\.esm|\.dev)*[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 路径段带版本：/vue/3.4.21/dist/vue.global.prod.js
+    - source: body
+      pattern: '(?i)vue/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     # 查询串带版本：vue.min.js?v=3.4.21（Vue 的构建产物通常不带版本号，版本多在查询串里）
     - source: body
       pattern: '(?i)vue(?:\.runtime|\.global|\.prod|\.esm-browser|\.esm-bundler|\.esm|\.dev)*(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
@@ -826,6 +834,10 @@
     - source: body
       pattern: '(?i)jquery[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 路径段带版本：/jquery/3.6.0/jquery.min.js
+    - source: body
+      pattern: '(?i)jquery/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     # 查询串带版本：jquery.min.js?v=3.6.0（很多站点用 jquery.min.js 再加 ?v= 标注版本）
     - source: body
       pattern: '(?i)jquery(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
@@ -847,6 +859,10 @@
     - source: body
       pattern: '(?i)lodash[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 路径段带版本：/lodash/4.17.21/lodash.min.js
+    - source: body
+      pattern: '(?i)lodash/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     - source: body
       pattern: '(?i)lodash(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
       version: ${version}
@@ -865,6 +881,10 @@
     - source: body
       pattern: '(?i)moment[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 路径段带版本：/moment/2.24.0/min/moment.min.js
+    - source: body
+      pattern: '(?i)moment/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     - source: body
       pattern: '(?i)moment(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
       version: ${version}
@@ -882,6 +902,10 @@
   match:
     - source: body
       pattern: '(?i)underscore[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    # 路径段带版本：/underscore/1.13.6/underscore-min.js
+    - source: body
+      pattern: '(?i)underscore/(?<version>\d+(?:\.\d+){1,3})/'
       version: ${version}
     - source: body
       pattern: '(?i)underscore(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
@@ -905,6 +929,10 @@
     - source: body
       pattern: '(?i)preact[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|mjs)'
       version: ${version}
+    # 路径段带版本：/preact/10.19.2/dist/preact.min.js
+    - source: body
+      pattern: '(?i)preact/(?<version>\d+(?:\.\d+){1,3})/'
+      version: ${version}
     # 查询串带版本：preact.min.js?v=10.19.2
     - source: body
       pattern: '(?i)preact(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.(?:js|mjs)\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
@@ -926,6 +954,10 @@
     # 文件名带版本：knockout-3.5.1.js / knockout@3.5.1.min.js
     - source: body
       pattern: '(?i)knockout[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.debug|\.min)?\.js'
+      version: ${version}
+    # 路径段带版本：/knockout/3.5.1/knockout-min.js
+    - source: body
+      pattern: '(?i)knockout/(?<version>\d+(?:\.\d+){1,3})/'
       version: ${version}
     # 横幅注释：/*! Knockout JavaScript library v3.5.1 */
     - source: body
@@ -1914,3 +1946,32 @@
   match:
     - source: favicon
       pattern: "^1464851260$"
+
+# ---- 页面元信息（社区库未覆盖） ----
+#
+# Open Graph 与 PWA 在 Wappalyzer 社区库里查无对应规则，但判据就在首页 HTML 里、且是
+# 确定性的：og:* 的 <meta>、<link rel="manifest">。可信度按 probable 计——它们是页面
+# 约定标记，不足以单独确认站点身份（只用于扩容 requires 证据），故走 softmatch。
+
+- id: open-graph
+  name: Open Graph
+  category: miscellaneous
+  softmatch: true
+  match:
+    - source: meta
+      key: og:title
+    - source: meta
+      key: og:type
+    - source: meta
+      key: og:image
+    - source: meta
+      key: og:url
+
+- id: pwa
+  name: PWA
+  category: miscellaneous
+  softmatch: true
+  match:
+    # 声明了 Web App Manifest，是 PWA 的确定性标记。
+    - source: body
+      pattern: '(?i)<link[^>]+rel=["'']manifest["'']'

@@ -537,8 +537,13 @@ func TestFrontendLibraryVersions(t *testing.T) {
 		{"vue-banner", `<script>/*! Vue.js v3.4.21 */</script>`, "vue", "3.4.21"},
 		{"vue-build-suffix", `<script src="/assets/vue.global.prod.js"></script>`, "vue", ""},
 		{"react-query", `<script src="/static/react.production.min.js?v=18.2.0"></script>`, "react", "18.2.0"},
+		// 版本独占一个路径段（CDN 的 name/version/ 形态），不是文件名前缀。
+		{"react-path-segment", `<script src="https://gw.alipayobjects.com/os/lib/??react/16.13.1/umd/react.production.min.js"></script>`, "react", "16.13.1"},
+		{"jquery-path-segment", `<script src="/cdn/jquery/3.6.0/jquery.min.js"></script>`, "jquery", "3.6.0"},
+		{"vue-path-segment", `<script src="/cdn/vue/3.4.21/vue.global.prod.js"></script>`, "vue", "3.4.21"},
 		{"lodash-query", `<script src="/assets/lodash.min.js?v=4.17.21"></script>`, "lodash", "4.17.21"},
 		{"moment-query", `<script src="/assets/moment.min.js?v=2.30.1"></script>`, "moment-js", "2.30.1"},
+		{"moment-path-segment", `<script src="/os/lib/??moment/2.24.0/min/moment.min.js"></script>`, "moment-js", "2.24.0"},
 		{"angular-attr", `<div ng-version="17.1.0"></div>`, "angular", "17.1.0"},
 	}
 	for _, tc := range cases {
@@ -558,6 +563,48 @@ func TestFrontendLibraryVersions(t *testing.T) {
 				t.Errorf("%s version = %q, want %q", tc.wantRule, got.Version, tc.wantVersion)
 			}
 		})
+	}
+}
+
+// 社区库缺失、由精选集补齐的页面元信息判据：Open Graph（og:* 的 meta）与
+// PWA（<link rel="manifest">）。判据就在首页 HTML 里，但属页面约定标记而非厂商身份，
+// 一律记 probable；没有这些标记的普通页面不得误报。
+func TestPageMetadataFingerprints(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name, body, wantRule string
+	}{
+		{"open-graph-title", `<meta property="og:title" content="语雀">`, "open-graph"},
+		{"open-graph-image", `<meta property="og:image" content="https://x/y.png">`, "open-graph"},
+		{"pwa-manifest", `<link rel="manifest" href="/manifest.json" />`, "pwa"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(Response{Body: []byte("<html><head>" + tc.body + "</head></html>")})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Confidence != ConfidenceProbable {
+				t.Errorf("%s confidence = %s, want probable", tc.wantRule, got.Confidence)
+			}
+		})
+	}
+
+	res := m.Match(Response{Body: []byte("<html><head><title>plain</title></head></html>")})
+	for _, tech := range res.Technologies {
+		if tech.RuleID == "open-graph" || tech.RuleID == "pwa" {
+			t.Fatalf("plain page reported %s: %+v", tech.RuleID, tech)
+		}
 	}
 }
 
