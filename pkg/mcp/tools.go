@@ -592,7 +592,7 @@ func (s *Server) pocSearchTool() *Tool {
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签（与 afrog -s 同一口径，逗号分隔即多关键词 OR）；首选指纹类关键词，如 jquery、thinkphp"},
+				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签 / requires（与 afrog -s 同一口径，逗号分隔即多关键词 OR）；首选指纹类关键词，如 jquery、thinkphp。requires 也纳入检索，可搜到「依赖该技术栈」的 PoC"},
 				"severity": map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"info", "low", "medium", "high", "critical"}}, "description": "按级别粗筛；仅作兜底，不能替代按指纹检索"},
 				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 200, "description": "返回条数上限，默认 50"},
 			},

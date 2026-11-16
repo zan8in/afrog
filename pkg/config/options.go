@@ -848,32 +848,23 @@ func (opt *Options) VerifyOptions() error {
 }
 
 func (o *Options) SetSearchKeyword() bool {
-	o.SearchKeywords = o.SearchKeywords[:0]
-	if strings.TrimSpace(o.Search) == "" {
-		return false
-	}
-	for _, v := range strings.Split(o.Search, ",") {
-		k := strings.ToLower(strings.TrimSpace(v))
-		if k == "" {
-			continue
-		}
-		o.SearchKeywords = append(o.SearchKeywords, k)
-	}
+	// 拆分口径收敛到 pkg/poc，与 poc.search（MCP/Web）共用一份。
+	o.SearchKeywords = poc.SplitSearchKeywords(o.Search)
 	return len(o.SearchKeywords) > 0
 }
 
-func (o *Options) CheckPocKeywords(id, name, tags string) bool {
-	if len(o.SearchKeywords) > 0 {
-		idLower := strings.ToLower(id)
-		nameLower := strings.ToLower(name)
-		tagsLower := strings.ToLower(tags)
-		for _, v := range o.SearchKeywords {
-			if strings.Contains(idLower, v) || strings.Contains(nameLower, v) || strings.Contains(tagsLower, v) {
-				return true
-			}
-		}
+// CheckPocKeywords 判断一条 PoC 是否命中 -s 关键词。检索范围含 requires，
+// 与 poc.search 同口径（见 poc.MatchSearchKeywords）。
+func (o *Options) CheckPocKeywords(id, name, tags string, requires []string) bool {
+	if len(o.SearchKeywords) == 0 {
+		return false
 	}
-	return false
+	return poc.MatchSearchKeywords(poc.SearchTerms{
+		ID:       id,
+		Name:     name,
+		Tags:     strings.Split(tags, ","),
+		Requires: requires,
+	}, o.SearchKeywords)
 }
 
 func (o *Options) SetSeverityKeyword() bool {
@@ -900,10 +891,10 @@ func (o *Options) CheckPocSeverityKeywords(severity string) bool {
 	return false
 }
 
-func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, pocTags, severity string) bool {
+func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, pocTags string, pocRequires []string, severity string) bool {
 	var isShow bool
 	if len(o.Search) > 0 && o.SetSearchKeyword() && len(o.Severity) > 0 && o.SetSeverityKeyword() {
-		if o.CheckPocKeywords(pocId, pocInfoName, pocTags) && o.CheckPocSeverityKeywords(severity) {
+		if o.CheckPocKeywords(pocId, pocInfoName, pocTags, pocRequires) && o.CheckPocSeverityKeywords(severity) {
 			isShow = true
 		}
 	} else if len(o.Severity) > 0 && o.SetSeverityKeyword() {
@@ -911,7 +902,7 @@ func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, pocTags, severity 
 			isShow = true
 		}
 	} else if len(o.Search) > 0 && o.SetSearchKeyword() {
-		if o.CheckPocKeywords(pocId, pocInfoName, pocTags) {
+		if o.CheckPocKeywords(pocId, pocInfoName, pocTags, pocRequires) {
 			isShow = true
 		}
 	} else {
@@ -920,17 +911,9 @@ func (o *Options) FilterPocSeveritySearch(pocId, pocInfoName, pocTags, severity 
 	return isShow
 }
 
-func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocName, pocSeverity, pocTags string) bool {
-	searchKeywords := make([]string, 0)
-	if strings.TrimSpace(search) != "" {
-		for _, v := range strings.Split(search, ",") {
-			k := strings.ToLower(strings.TrimSpace(v))
-			if k == "" {
-				continue
-			}
-			searchKeywords = append(searchKeywords, k)
-		}
-	}
+func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocName, pocSeverity, pocTags string, pocRequires []string) bool {
+	// 拆分与匹配口径收敛到 pkg/poc，与 poc.search（MCP/Web）共用一份。
+	searchKeywords := poc.SplitSearchKeywords(search)
 	severityKeywords := make([]string, 0)
 	if strings.TrimSpace(severityFilter) != "" {
 		for _, v := range strings.Split(severityFilter, ",") {
@@ -945,21 +928,6 @@ func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocNa
 	isFingerprint := func(tags string) bool {
 		for _, t := range strings.Split(strings.ToLower(tags), ",") {
 			if strings.TrimSpace(t) == "fingerprint" {
-				return true
-			}
-		}
-		return false
-	}
-
-	matchKeyword := func(id, name, tags string) bool {
-		if len(searchKeywords) == 0 {
-			return true
-		}
-		idLower := strings.ToLower(id)
-		nameLower := strings.ToLower(name)
-		tagsLower := strings.ToLower(tags)
-		for _, k := range searchKeywords {
-			if strings.Contains(idLower, k) || strings.Contains(nameLower, k) || strings.Contains(tagsLower, k) {
 				return true
 			}
 		}
@@ -982,7 +950,12 @@ func filterPocSeveritySearchWithFingerprint(search, severityFilter, pocID, pocNa
 	if len(searchKeywords) == 0 && len(severityKeywords) == 0 {
 		return true
 	}
-	if !matchKeyword(pocID, pocName, pocTags) {
+	if !poc.MatchSearchKeywords(poc.SearchTerms{
+		ID:       pocID,
+		Name:     pocName,
+		Tags:     strings.Split(pocTags, ","),
+		Requires: pocRequires,
+	}, searchKeywords) {
 		return false
 	}
 	if matchSeverity(pocSeverity) {
@@ -1033,6 +1006,7 @@ func (o *Options) PrintPocList() error {
 		var (
 			id, name, tags, severity string
 			authors                  []string
+			requires                 []string
 			err                      error
 		)
 
@@ -1046,6 +1020,7 @@ func (o *Options) PrintPocList() error {
 				name = pm.Info.Name
 				tags = pm.Info.Tags
 				severity = pm.Info.Severity
+				requires = pm.Info.Requires
 				authors = pocsrepo.SplitAuthors(pm.Info.Author)
 			}
 		} else {
@@ -1056,6 +1031,7 @@ func (o *Options) PrintPocList() error {
 				name = pm.Info.Name
 				tags = pm.Info.Tags
 				severity = pm.Info.Severity
+				requires = pm.Info.Requires
 				authors = pocsrepo.SplitAuthors(pm.Info.Author)
 			}
 		}
@@ -1066,7 +1042,7 @@ func (o *Options) PrintPocList() error {
 		}
 
 		// 保留原有过滤逻辑
-		if !o.FilterPocSeveritySearch(id, name, tags, severity) {
+		if !o.FilterPocSeveritySearch(id, name, tags, requires, severity) {
 			continue
 		}
 		// 排除列表
@@ -1328,7 +1304,7 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 			id = strings.TrimSuffix(strings.TrimSuffix(filepath.Base(srcPath), ".yaml"), ".yml")
 		}
 
-		if !filterPocSeveritySearchWithFingerprint(o.Search, o.Severity, id, pm.Info.Name, pm.Info.Severity, pm.Info.Tags) {
+		if !filterPocSeveritySearchWithFingerprint(o.Search, o.Severity, id, pm.Info.Name, pm.Info.Severity, pm.Info.Tags, pm.Info.Requires) {
 			continue
 		}
 

@@ -139,6 +139,7 @@ func SearchPocs(keyword string, severity []string, limit int) (*PocSearchResult,
 			"name":     it.Name,
 			"severity": it.Severity,
 			"tags":     it.Tags,
+			"requires": it.Requires,
 			"path":     it.Path,
 			"source":   string(it.Source),
 		})

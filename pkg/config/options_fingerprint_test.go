@@ -29,45 +29,55 @@ func TestOptions_FingerprintPoCs(t *testing.T) {
 
 func TestFilterPocSeveritySearchWithFingerprint(t *testing.T) {
 	t.Run("includes fingerprint even when severity mismatches", func(t *testing.T) {
-		if got := filterPocSeveritySearchWithFingerprint("", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint"); !got {
+		if got := filterPocSeveritySearchWithFingerprint("", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint", nil); !got {
 			t.Fatalf("expected fingerprint poc to be included when severity mismatches")
 		}
-		if got := filterPocSeveritySearchWithFingerprint("", "high", "not-finger", "Not Finger", "info", "panel"); got {
+		if got := filterPocSeveritySearchWithFingerprint("", "high", "not-finger", "Not Finger", "info", "panel", nil); got {
 			t.Fatalf("expected non-fingerprint poc to be excluded when severity mismatches")
 		}
 	})
 
 	t.Run("search keyword still restricts fingerprint pocs", func(t *testing.T) {
-		if got := filterPocSeveritySearchWithFingerprint("tomcat", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint"); got {
+		if got := filterPocSeveritySearchWithFingerprint("tomcat", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint", nil); got {
 			t.Fatalf("expected fingerprint poc to be excluded when search mismatches")
 		}
-		if got := filterPocSeveritySearchWithFingerprint("nacos", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint"); !got {
+		if got := filterPocSeveritySearchWithFingerprint("nacos", "high", "nacos-detect", "Nacos Detect", "info", "nacos,panel,fingerprint", nil); !got {
 			t.Fatalf("expected fingerprint poc to be included when search matches")
 		}
 	})
 
 	t.Run("includes all when no filters", func(t *testing.T) {
-		if got := filterPocSeveritySearchWithFingerprint("", "", "any", "Any", "info", ""); !got {
+		if got := filterPocSeveritySearchWithFingerprint("", "", "any", "Any", "info", "", nil); !got {
 			t.Fatalf("expected included when no filters are set")
 		}
 	})
 
 	t.Run("search keyword matches tags", func(t *testing.T) {
-		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,weblogic,rce"); !got {
+		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,weblogic,rce", nil); !got {
 			t.Fatalf("expected included when search matches tags")
 		}
-		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,tomcat,rce"); got {
+		if got := filterPocSeveritySearchWithFingerprint("weblogic", "", "id-not-match", "name-not-match", "high", "java,tomcat,rce", nil); got {
 			t.Fatalf("expected excluded when search mismatches tags")
+		}
+	})
+
+	// 检索口径覆盖 requires：名称/标签不含该词、只把依赖写进 requires 的 PoC 也应命中。
+	t.Run("search keyword matches requires", func(t *testing.T) {
+		if got := filterPocSeveritySearchWithFingerprint("jquery", "", "wp-xss", "WordPress XSS", "high", "wordpress", []string{"jquery<3.5"}); !got {
+			t.Fatalf("expected included when search matches requires")
+		}
+		if got := filterPocSeveritySearchWithFingerprint("drupal", "", "wp-xss", "WordPress XSS", "high", "wordpress", []string{"jquery<3.5"}); got {
+			t.Fatalf("expected excluded when neither tags nor requires match")
 		}
 	})
 }
 
 func TestOptions_FilterPocSeveritySearch_MatchesTags(t *testing.T) {
 	o := &Options{Search: "weblogic"}
-	if !o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,weblogic,rce", "high") {
+	if !o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,weblogic,rce", nil, "high") {
 		t.Fatalf("expected included when search matches tags")
 	}
-	if o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,tomcat,rce", "high") {
+	if o.FilterPocSeveritySearch("id-not-match", "name-not-match", "java,tomcat,rce", nil, "high") {
 		t.Fatalf("expected excluded when search mismatches tags")
 	}
 }
