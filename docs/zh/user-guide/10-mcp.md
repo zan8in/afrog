@@ -47,7 +47,8 @@ afrog mcp -listen 127.0.0.1:16870 -token your-token
 
 - 默认只监听本机时可以不配 token；
 - 监听 `0.0.0.0` 等非本机地址时**必须**提供 `-token`，否则拒绝启动；
-- 鉴权支持 `Authorization: Bearer <token>` 或 `?token=`。
+- 鉴权支持 `Authorization: Bearer <token>` 或 `?token=`；
+- 按 MCP 规范校验 `Origin`：浏览器带来的跨站来源一律 403（防 DNS rebinding）；不带 `Origin` 的原生客户端与 curl 不受影响。
 
 ## 客户端配置
 
@@ -79,7 +80,7 @@ afrog mcp -listen 127.0.0.1:16870 -token your-token
 
 ## 策略
 
-默认策略是 **只读**：刚拉起的服务不会自动获得发包能力。需要放大能力时用 `-policy` 指定 YAML：
+默认策略是 **只读**：刚拉起的服务不会自动获得发包能力。放宽策略有两条路，优先级为 `-policy` 参数 > `afrog-config.yaml` 的 `agent.policy`（即 Web 控制台保存的位置）> 只读默认：
 
 ```yaml
 policy:
@@ -92,43 +93,56 @@ policy:
     deny_paths:  ["/logout"]
   budget:
     requests: 2000
-    duration: 30m
+    duration: 30m             # 空闲窗口：连续这么久没有消耗额度的调用即开新会话
   destructive: false
   audit: true
 ```
+
+用法：
+
+```bash
+afrog mcp                                     # 没传 -policy 时跟随 afrog-config.yaml 的 agent.policy
+afrog mcp -policy ./agent-policy.yaml         # 显式指定，覆盖配置
+afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
+```
+
+> 在 Web 控制台「Agent 工具面 → 策略与审计」保存后，路径会写进 `agent.policy`，因此客户端里不起眼的 `afrog mcp` 也会读到同一份策略；显式传入的 `-policy` 仍优先。
 
 ### 档位
 
 | 档位 | 允许 | 典型场景 |
 | --- | --- | --- |
-| `readonly`（默认） | `observe.*`、`plan.*`、`poc.search`、`poc.draft`、`judge.*`、`learn.*` | 只让 Agent 读结果、做判断、写本地 advisory |
-| `safe` | 在只读基础上加 `probe.*`、`verify.*`、`poc.submit` | 允许复测与验证，不改变目标状态 |
+| `readonly`（默认） | `observe.*`、`plan.*`、`poc.search`、`poc.draft`、`judge.*`、`learn.*`、`server.*` | 只让 Agent 读结果、做判断、写本地 advisory |
+| `safe` | 在只读基础上加 `probe.*`、`scan.start`、`verify.replay`、`poc.submit` | 允许复测与验证，不改变目标状态 |
 | `full` | 除显式 `deny` 外全部允许 | 受控环境下的完整评估 |
 
 判定顺序固定为：`deny → allowlist → mode → destructive → scope`。**deny 永远优先**。
 
 ### 预算与审计
 
-- `budget.requests` / `budget.duration` 是**单次会话**上限；超限时工具直接拒绝，不会悄悄放过。
-- 缓存类动作（如 `verify.poc`）会按 PoC 可能的请求数预留预算，而不是固定扣 1。
+- `budget.requests` 是一次会话的请求额度，**只统计真正发包的动作**；读库、查证据这类只读调用既不扣额度，也不受任何预算限制。
+- `budget.duration` 是**空闲窗口**（默认 10 分钟）：只要有消耗额度的调用成功，窗口就顺延；连续空闲这么久即判定会话结束，下一次调用自动开一个新会话、把额度补满。因此长驻服务（Web 服务、`afrog mcp -listen`）不会跑够一段时间就整体失效，也不必为了恢复额度去重启。
+- 发包类动作（如 `scan.start`、`poc.submit`）会按候选 PoC 可能的请求数预留预算，而不是固定扣 1。
 - `audit: true` 配合 `-audit audit.jsonl` 逐条记录「哪个动作、打哪、放行与否、剩余预算」。
+- 拿不准还剩多少额度、当前是什么档位，调只读的 `server.status` 看 `requests_remaining` / `policy.mode`——它本身不计额度，比撞上 403/429 再回头猜更省事。
 
 ## 工具清单
 
 | 工具 | 作用 | 需要的能力 |
 | --- | --- | --- |
+| `server.status` | 只读自省：返回本次会话的策略档位、剩余请求额度与空闲到期时间、作用域白/黑名单，以及服务与协议版本；不发包也不扣额度 | 只读 |
 | `observe.findings` | 按项目、台账状态、严重级别列命中 | 只读 |
 | `observe.evidence` | 按 result id 或 `evd_` 开头的证据 id 取证据 | 只读 |
 | `observe.state` | 以资产为根返回攻击面子图（上下游、端点/参数、技术栈与候选 PoC、覆盖、命中数） | 只读 |
 | `observe.observations` | 按 `seq` 游标增量拉取观测流：开放端口、Web 指纹、HTTP 事务、被动代理流量、TLS 证书、带外回连 | 只读 |
-| `plan.next` | 把攻击面图压成下一步的 `Action` 提议（`verify.poc` / `probe.fingerprint`），按确定性分数排序并附依据；靠带外回连下结论的候选会带 `requires_oob: true` | 只读 |
-| `poc.search` | 按关键词与级别检索 PoC，返回本地路径 | 只读 |
-| `poc.draft` | 校验一份 PoC 草稿：结构、能力等级、请求量估算；可选落盘供 `verify.poc` 使用 | 只读 |
+| `plan.next` | 把攻击面图压成下一步的 `Action` 提议（`scan.start` / `probe.fingerprint`），按确定性分数排序并附依据；同一源站的候选合并成一条 `scan.start`（`search` 为技术栈关键词）。`proposals` 为空表示该主体还没有可复现候选（先 `probe.*` 补观测，或改用 `poc.search`） | 只读 |
+| `poc.search` | 按关键词与级别检索本机已有 PoC，返回真实存在的 id、本地路径，以及 `total`（命中总数）与 `truncated`（是否被 `limit` 截断）。**它等价于 `afrog -pl -s <keyword>`：扫描前先预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞**；选检优先用指纹关键词（jquery、thinkphp、shiro），命中后把同一关键词交给 `scan.start`，没有线索时先 `plan.next`，`severity` 只作按级别的兜底粗筛 | 只读 |
+| `poc.draft` | 校验一份 PoC 草稿：结构、能力等级、请求量估算；可选落盘供 `poc.submit` 实跑使用 | 只读 |
 | `poc.submit` | 在真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（`afrog poc approve/reject`） | `verify.*`（按草稿能力分级，`exec` 级还需 `destructive: true`） |
 | `probe.http` | 发一次 HTTP 请求，返回状态、头、正文与耗时 | `probe.*` |
 | `probe.port` | 单主机端口探测（默认 top100，单次上限 1000 个），返回开放端口与服务指纹 | `probe.*` |
-| `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要 | `probe.*` |
-| `verify.poc` | 用单个 PoC 验证单个目标，返回证据；反向 PoC（含 `{{oob.*}}` 或 `oobCheck`）需要 `agent.oob`，未配置时明确报错（fail-closed），不会静默判为「未命中」 | `verify.*` |
+| `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要；拿到技术栈后先用 `poc.search` 预检，有结果再把该关键词交给 `scan.start` 并发扫描 | `probe.*` |
+| `scan.start` | **取代逐个验证的主入口**：用一次子进程并发跑完某个技术栈（`search` 关键词）下的全部 PoC，返回可重放证据。`afrog` 按 `-s` 选 PoC，且指纹 PoC 无论关键词如何都会被保留，于是指纹阶段照常运行、`requires` 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。反向 PoC 需要 `agent.oob`，未配置时明确报错（fail-closed） | `scan.start` |
 | `verify.replay` | 按证据 id 重放一次，比对 id/digest 判断旧结论是否仍成立 | `verify.*` |
 | `act.brute` | 弱口令/字典尝试 | `full` + `destructive: true` |
 | `act.oob_payload` | 铸一组带外回连地址（`filter` + DNS/HTTP 等），用于命令执行、XXE、SSRF 等需要反连回显的验证 | `full` + `destructive: true` |
@@ -137,6 +151,26 @@ policy:
 | `judge.record` | 记录一条研判意见（`likely_true`/`likely_false`/`uncertain`）到 `judgement` 表，作为 advisory 供人工复核；**不改漏洞台账** | 只读（写本地 advisory） |
 | `learn.brief` | 取调优素材：流水线指标（含自动入库率）、最近终审决议（含驳回原因）与待审调优建议 | 只读 |
 | `learn.record` | 记录一条调优建议（`rule`/`threshold`/`other`）到 `learn_suggestion` 表，供人工审阅；**不自动应用任何 diff** | 只读（写本地 advisory） |
+
+### 工具怎么选（AI 客户端也会收到同样的提示）
+
+`afrog mcp` 在 `initialize` 里返回一段 `instructions`（MCP 规范的可选字段），客户端会把它并入模型上下文，用来告诉模型这套工具怎么用——否则最常见的两种误用是：逐个 PoC 串行慢验，以及指纹命中后不知道该去 `poc.search` 检索对应 PoC。要点与下表一致：
+
+1. **先 `poc.search` 预检再 `scan.start`**：拿到技术栈关键词（jquery、thinkphp、shiro）先交给 `poc.search`（等价 `afrog -pl -s`）确认本机确实有这个技术栈的 PoC；结果非空就把**同一关键词**交给 `scan.start` 并发扫描，为空就别扫——afrog 没有该指纹/产品的漏洞。自己写的 PoC 先用 `poc.draft`（`save: true`）落盘，再把返回的 `poc_path` 交给 `poc.submit` 受限实跑取证据。
+2. **先让 `plan.next` 当主驾驶**：它按攻击面（端点 / 技术栈 / 已有结论）给出确定性的下一步——对还没指纹的 origin 提议 `probe.fingerprint`，对已识别技术栈的端点直接给出 `scan.start` 提议（`search` 为技术栈关键词，同一源站的多条候选会合并成一条），并自动跳过已出结论的组合；候选为空时再自己动手。
+3. **别用「按 severity 挨个验」当默认策略**：`severity` 只按级别粗筛，与目标是否真的运行那个产品无关——那既白扣额度、又得不出可信「无漏洞」结论。正确姿势永远是「指纹 → `poc.search` 预检 → `scan.start`」。
+4. **只读工具**（`server.*` / `observe.*` / `plan.*` / `poc.search` / `poc.draft` / `judge.*` / `learn.*`）不发包、不扣预算；`probe.*` / `scan.start` / `verify.replay` / `poc.submit` / `act.*` 会发包并按请求数扣会话额度——`scan.start` 一次并发跑完一个技术栈的 PoC，远比逐个 `verify` 省时省额度。拿不准当前什么档位、还剩多少额度，先看 `server.status`。
+
+### 协议层：客户端还会拿到哪些提示
+
+除了工具清单本身，`afrog mcp` 按 MCP 规范给客户端一系列结构化提示，让「哪些能自动放行、哪些要确认、下一步试什么」不必靠模型猜：
+
+- **`instructions`**（`initialize` 返回）：一段用法说明，客户端会并入模型上下文，要点即上文「工具怎么选」。
+- **协议版本协商**：客户端报的版本在支持集（`2024-11-05` / `2025-03-26` / `2025-06-18`）内就沿用，否则回 afrog 支持的最新版，而不是原样复述一个并不会说的版本。
+- **`title` 与 `annotations`**（每个工具）：`title` 是给人看的短标签；`annotations` 是提示性标注——`readOnlyHint` 与 afrog 自己的只读判定完全一致（`server.*` / `observe.*` / `plan.*` / `poc.search` / `poc.draft` / `judge.*` / `learn.*`），`openWorldHint` 标出会向外部目标发包的工具，`destructiveHint` 只给 `act.brute`、`poc.submit`。它们**只是提示、不参与门控**：放行与否仍由策略与预算决定。
+- **`outputSchema` 与 `structuredContent`**：返回结构稳定的工具（如 `server.status`、`poc.search`、`plan.next`）声明 `outputSchema`，调用结果里会附 `structuredContent`，客户端可直接按 schema 取值；返回大对象的工具不声明，避免同一份 payload 在 `content` 与 `structuredContent` 里各塞一遍。
+- **进度通知**（`notifications/progress`）：客户端在 `tools/call` 的 `_meta.progressToken` 里声明要进度时，长调用（如 `act.oob_wait` 等回连）会按秒上报「已等多久 / 上限」；Streamable HTTP 是一次 POST 一问一答、没有中途推送的地方，因此该传输不推进度。
+- **取消**（`notifications/cancelled`）：客户端按 `requestId` 取消某一次调用时，afrog 精确取消那一次，而不是把整条连接一起断掉；stdio 这类可并发读写的持久连接才支持中途取消。
 
 ### 证据长什么样
 
@@ -227,10 +261,10 @@ curl -s "http://127.0.0.1:16868/api/v1/observe/observations?since_seq=0&limit=20
 curl -s -X POST "http://127.0.0.1:16868/api/v1/call" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"verify.poc","arguments":{"poc_path":"/tmp/draft.yaml","target":"https://example.com"}}'
+  -d '{"name":"scan.start","arguments":{"target":"https://example.com","search":"thinkphp"}}'
 ```
 
-写动作面的策略与审计来自 `afrog-config.yaml` 的 `agent` 段；**不配置即沿用只读默认**——Web 服务默认不获得发包能力：
+写动作面（REST / gRPC）与 `afrog mcp`（未显式传 `-policy`/`-audit` 时）的策略与审计同源，都来自 `afrog-config.yaml` 的 `agent` 段；**不配置即沿用只读默认**——默认不获得发包能力：
 
 ```yaml
 agent:
@@ -239,9 +273,9 @@ agent:
   oob: ceyeio                          # 工具面的反连适配器（取值同 CLI -oob）；凭据取自 reverse 段，留空则 act.oob_* 不可用
 ```
 
-`agent.policy` 与 `afrog mcp -policy` 的格式完全一致（见上文「策略与预算」）。与 CLI 的一次性进程不同，Web 服务是长驻进程，包内的预算 **`budget.requests` 是整个进程的会话总预算**，跨请求累计扣减，与 `afrog mcp -listen` 的长驻语义一致。
+`agent.policy` 与 `afrog mcp -policy` 的格式完全一致（见上文「策略与预算」），Web 控制台保存的也正是这个字段。与 CLI 的一次性进程不同，Web 服务是长驻进程，`budget.requests` 是整个进程共享的一份会话额度、跨请求累计扣减，与 `afrog mcp -listen` 的长驻语义一致；它不会「用满就永久失效」，连续空闲 `budget.duration` 后自动开新会话补满。
 
-`agent.oob` 只在需要带外回连时才配：它指定反连适配器（`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`，取值与 CLI `-oob` 一致），凭据复用 `reverse` 段（见配置参考「reverse 是什么」）。配置后 `act.oob_payload` 铸地址、`act.oob_wait` 等回连；`verify.poc` 跑反向 PoC（含 `{{oob.*}}` 或 `oobCheck`）时也走它，把适配器交给 SDK 复用 `reverse` 凭据。留空则这几处都明确报「未配置」，而不是静默等待一个不会来的回连——反向 PoC 不会因此被悄悄判成「未命中」。
+`agent.oob` 只在需要带外回连时才配：它指定反连适配器（`ceyeio` / `dnslogcn` / `alphalog` / `xray` / `revsuit` / `interactsh`，取值与 CLI `-oob` 一致），凭据复用 `reverse` 段（见配置参考「reverse 是什么」）。配置后 `act.oob_payload` 铸地址、`act.oob_wait` 等回连；`scan.start` / `poc.submit` 跑反向 PoC（含 `{{oob.*}}` 或 `oobCheck`）时也走它——只把适配器名下发给子进程，子进程复用 `reverse` 凭据。留空则这几处都明确报「未配置」，而不是静默等待一个不会来的回连——反向 PoC 不会因此被悄悄判成「未命中」。
 
 ## gRPC 入口（AgentService）
 
@@ -274,7 +308,7 @@ afrog serve -listen :16869 -api-token your-token
 
 工具入参与返回值都用 **JSON 透传**：工具契约只在 `pkg/mcp` 维护一份，proto 不镜像一套 schema，避免两份真相漂移（与 `Evidence.native_json` 同一理由）。
 
-`AgentService` 与 MCP / REST **共用同一个 `policy.Gate`**：同一份工具注册表、同一套策略判定、预算扣减与审计落盘。策略与审计同样来自 `afrog-config.yaml` 的 `agent` 段，**不配置即只读默认**——控制面默认不发包。长驻进程的 `budget.requests` 也是整进程会话总预算。
+`AgentService` 与 MCP / REST **共用同一个 `policy.Gate`**：同一份工具注册表、同一套策略判定、预算扣减与审计落盘。策略与审计同样来自 `afrog-config.yaml` 的 `agent` 段，**不配置即只读默认**——控制面默认不发包。长驻进程同样共享一份会话额度，空闲超时后自动补满。
 
 错误码与 REST 语义一致：
 
@@ -302,18 +336,18 @@ grpcurl -H 'authorization: Bearer your-token' -plaintext \
 
 1. `observe.findings` 拿到一条可疑命中；
 2. `observe.evidence` 读证据，确认判定依据与复现命令；
-3. 需要复测时用 `verify.poc`（或 `probe.http`）单独验证一次；
+3. 需要复测时用 `scan.start`（按技术栈关键词并发跑一批，或 `probe.http` 发一次请求）验证；
 4. 需要复核旧结论时用 `verify.replay`，只给证据 id：重放成功但 digest 变了，说明目标行为或 PoC 已经变化；
 5. `observe.state` 看这个端点所在资产还暴露了哪些上下游与未覆盖面；
 6. 需要「过程事实」而不只是结论时，用 `observe.observations` 按 `since_seq` 增量拉取：开放端口、指纹、主动请求的往返、被动流量、证书与带外回连都在里面；
-7. 不知道该先试哪条 PoC 时用 `plan.next`：它按确定性分数给出 `verify.poc` / `probe.fingerprint` 提议与依据，只读、零预算，选中的那条仍需再走一次 `verify.*` / `probe.*` 的策略与预算门控；提议带 `requires_oob: true` 时说明它靠带外回连下结论，执行前要先配 `agent.oob`，否则 `verify.poc` 会 fail-closed；
+7. 不知道该先试哪条 PoC 时用 `plan.next`：它按确定性分数给出 `scan.start` / `probe.fingerprint` 提议与依据（同一源站的候选合并成一条 `scan.start`），只读、零预算，选中的那条仍需再走一次 `scan.start` / `probe.*` 的策略与预算门控；
 8. 让模型写出草稿后，先 `poc.draft` 校验（`save: true` 落盘），再用 `poc.submit` 在一台真实目标上受限实跑取证据；拿到证据的候选进入待人工终审队列，由人在 CLI 用 `afrog poc approve/reject` 决定是否入库。
 
-已有可疑命中但还没有现成 PoC 时，可以让模型写出草稿，先 `poc.draft` 校验（`save: true` 落盘），再把它返回的 `poc_path` 交给 `verify.poc`。草稿的判定仍然只发生在 `verify.poc`，`poc.draft` 不发任何请求。
+已有可疑命中但还没有现成 PoC 时，可以让模型写出草稿，先 `poc.draft` 校验（`save: true` 落盘），再把它返回的 `poc_path` 交给 `poc.submit` 受限实跑。草稿的判定仍然只发生在实跑，`poc.draft` 不发任何请求。
 
 ### 候选 PoC 的收口：`poc.submit` 与 `afrog poc`
 
-`poc.submit` 把草稿在真实目标上跑一次（复用 `verify.poc` 的受限实跑：并发 1、限速 10、命中即停），**只有拿到证据才进队列**；拿不到证据的候选不会入库。入队后状态是 `pending`，入库动作只能由人在 CLI 发起——模型没有「自己写进 PoC 目录」的路径。
+`poc.submit` 把草稿在真实目标上跑一次（受限实跑：并发 1、限速 10、命中即停），**只有拿到证据才进队列**；拿不到证据的候选不会入库。入队后状态是 `pending`，入库动作只能由人在 CLI 发起——模型没有「自己写进 PoC 目录」的路径。
 
 ```bash
 afrog poc pending [--json]            # 列出待审候选（默认子命令）
@@ -345,4 +379,4 @@ afrog learn list [--status s]         # 调优建议的人工审阅：list/show/
 - 工具读取的是本机 `~/.config/afrog/afrog.db`，与 Web 控制台、命令行共享同一份数据。
 - 没有证据的旧命中（本功能上线前产生的）`observe.evidence` 会返回未找到，这属于预期行为。
 
-> **← 上一篇：** [定时与计划扫描](./09-scheduled-scans.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **文档首页 →：** [afrog 文档](../index.md)
+> **← 上一篇：** [定时与计划扫描](./09-scheduled-scans.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **下一篇 →：** [小白教程：把你的 AI 客户端接入 afrog](./11-mcp-quickstart.md)

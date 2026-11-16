@@ -249,7 +249,7 @@ Notes:
 
 ## `agent` field dictionary
 
-`agent` controls the policy and audit source for the web Agent write-action surface (`POST /api/v1/call`). It is synonymous with `afrog mcp -policy/-audit`: **empty means the read-only default, and the web server has no network-sending capability by default**.
+`agent` controls the policy and audit source for the Agent write-action surface (the web `POST /api/v1/call`, gRPC, and `afrog mcp` when no flags are passed). It is synonymous with `afrog mcp -policy/-audit`: **empty means the read-only default, and no network-sending capability is granted by default**; an explicit `-policy`/`-audit` on the command line wins over these fields.
 
 | Field | Type | Purpose | Default |
 | --- | --- | --- | --- |
@@ -266,8 +266,10 @@ agent:
 
 Notes:
 
+- **Agent → Policy & Audit** in the web console saves exactly these two fields (the policy lands in `~/.config/afrog/agent-policy.yaml`), so a change made in the UI is also picked up by the plain `afrog mcp` on the command line
 - `/api/v1/call` **shares the same policy, budget and audit machinery** as MCP (stdio/SSE/streamable); a script hitting REST directly cannot bypass the limits
-- The web server is long-lived, so `budget.requests` is the **total session budget for the whole process**, accumulated across requests (same as `afrog mcp -listen`)
+- The web server is long-lived, so `budget.requests` is a single session allowance shared by the whole process and debited across requests (same as `afrog mcp -listen`); `budget.duration` is the idle window, after which a fresh session starts with the allowance refilled — no restart required
+- Read-only calls (`observe.*`, `plan.next`, `poc.search`, `judge.*`, `learn.*`) consume no allowance and are not subject to any budget limit
 - Setting `agent.oob` is what gives the tool surface its OOB capability (`act.oob_payload` mints addresses, `act.oob_wait` waits for a callback), with credentials reused from the `reverse` section; when empty both report "not configured" instead of silently waiting
 - Errors are distinguished by semantics: policy denial `403`, budget exhaustion `429`, unknown tool `404`, bad request `400`
 

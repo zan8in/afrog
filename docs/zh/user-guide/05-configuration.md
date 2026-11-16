@@ -249,7 +249,7 @@ observe:
 
 ## `agent` 字段字典
 
-`agent` 控制 Web 端 Agent 写动作面（`POST /api/v1/call`）的策略与审计来源。它与 `afrog mcp -policy/-audit` 同语义：**留空即沿用只读默认，Web 服务默认不获得发包能力**。
+`agent` 控制 Agent 写动作面（Web 的 `POST /api/v1/call`、gRPC，以及未显式传参的 `afrog mcp`）的策略与审计来源。它与 `afrog mcp -policy/-audit` 同语义：**留空即沿用只读默认，默认不获得发包能力**；命令行显式传入的 `-policy`/`-audit` 优先于这里。
 
 | 字段 | 类型 | 作用 | 默认值 |
 | --- | --- | --- | --- |
@@ -266,8 +266,10 @@ agent:
 
 要点：
 
+- Web 控制台「Agent 工具面 → 策略与审计」保存的就是这两个字段（策略落盘到 `~/.config/afrog/agent-policy.yaml`），因此界面上一改，CLI 里不起眼的 `afrog mcp` 也会读到同一份策略
 - `/api/v1/call` 与 MCP（stdio/SSE/streamable）**共用同一份策略、预算与审计**，脚本直连 REST 也不会绕过限额
-- Web 服务是长驻进程，`budget.requests` 是**整个进程的会话总预算**，跨请求累计扣减（与 `afrog mcp -listen` 一致）
+- Web 服务是长驻进程，`budget.requests` 是整个进程共享的一份会话额度、跨请求累计扣减（与 `afrog mcp -listen` 一致）；`budget.duration` 是空闲窗口，连续空闲这么久后自动开新会话、把额度补满，不必重启进程
+- 只读调用（`observe.*`、`plan.next`、`poc.search`、`judge.*`、`learn.*`）不扣额度，也不受任何预算限制
 - `agent.oob` 配置后工具面才有反连能力（`act.oob_payload` 铸地址、`act.oob_wait` 等回连），凭据复用 `reverse` 段；未配置时两者明确报「未配置」，而不是静默等待
 - 错误码按语义区分：策略拒绝 `403`、预算耗尽 `429`、未知工具 `404`、参数错误 `400`
 

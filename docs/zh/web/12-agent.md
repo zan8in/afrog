@@ -10,17 +10,18 @@ last_reviewed: 2026-11-15
 
 ## 这是什么
 
-[`afrog mcp`](../user-guide/10-mcp.md) 把 afrog 的能力暴露成一组 MCP 工具，交给 AI Agent 在策略、预算与审计的约束下调用。Web 控制台新增的「Agent 工具面」分组，就是把这套工具面搬进图形界面，共三个页面：
+[`afrog mcp`](../user-guide/10-mcp.md) 把 afrog 的能力暴露成一组 MCP 工具，交给 AI Agent 在策略、预算与审计的约束下调用。Web 控制台新增的「Agent 工具面」分组，就是把这套工具面搬进图形界面，共四个页面：
 
 | 页面 | 作用 | 等价 CLI |
 | --- | --- | --- |
+| 快速上手 | 跟着步骤把常用 AI 客户端接入 afrog，每段配置都可一键复制 | [小白教程](../user-guide/11-mcp-quickstart.md) |
 | 人审队列 | 处理候选 PoC 草稿与调优建议：查看证据、批准或驳回 | `afrog poc` / `afrog learn` |
 | MCP 工具台 | 查看每个工具的能力等级与可用性、按同名同语义调用、复制接入配置 | `afrog mcp` 工具面 |
 | 策略与审计 | 调整能力档位、破坏性开关、会话预算与主机范围，回看判定流水 | 编辑 policy YAML |
 
-关键点：这三个页面与 MCP、REST（`/api/v1`）、gRPC（`AgentService`）**共用同一份门控**（`pkg/policy.Gate`）——同一套工具注册表、同一套策略判定、同一份预算与审计。在页面上改的策略，下一次工具调用即刻生效；在这里看到的可用性与预算余量，就是 Agent 真正受到的限制。
+关键点：这四个页面与 MCP、REST（`/api/v1`）、gRPC（`AgentService`）**共用同一份门控**（`pkg/policy.Gate`）——同一套工具注册表、同一套策略判定、同一份预算与审计。在页面上改的策略，下一次工具调用即刻生效；在这里看到的可用性与预算余量，就是 Agent 真正受到的限制。
 
-工具本身的含义、入参与返回值见 [MCP 服务](../user-guide/10-mcp.md)。
+工具本身的含义、入参与返回值见 [MCP 服务](../user-guide/10-mcp.md)；第一次接入客户端、想照着一步步做，请看 [小白教程：把你的 AI 客户端接入 afrog](../user-guide/11-mcp-quickstart.md)。
 
 ## 人审队列
 
@@ -55,7 +56,7 @@ last_reviewed: 2026-11-15
 
 **接入向导**提供两段可复制的配置：
 
-- stdio：把 afrog 作为 MCP server 交给客户端拉起，`command` 为 `afrog`，`args` 带 `mcp -policy <策略文件> -audit <审计文件>`
+- stdio：把 afrog 作为 MCP server 交给客户端拉起，`command` 为 `afrog`，`args` 只写 `mcp` 即可——策略与审计自动跟随本页保存的 `agent.policy`/`agent.audit`；要覆盖时再带 `-policy <策略文件> -audit <审计文件>`
 - HTTP/REST：脚本直连 `/api/v1`，鉴权用控制台登录态（`Authorization: Bearer <token>`）
 
 两种方式都不会绕过限额——策略判定、预算扣减、审计落盘走的是同一条路径。
@@ -69,13 +70,13 @@ last_reviewed: 2026-11-15
 | 能力档位 | `readonly`（只读默认）/ `safe`（网络能力）/ `full`（含 exec 与破坏性） |
 | 破坏性动作 | 是否允许 `act.brute` 等破坏性工具，仅授权目标上开启 |
 | 审计日志 | 是否把每次判定写入审计 JSONL |
-| 会话预算 | 单会话请求上限与时长（留空表示不限制时长） |
+| 会话预算 | 一次会话的请求额度与空闲窗口（留空则回落默认：5000 次 / 10 分钟） |
 | 工具白/黑名单 | `allow` / `deny`，**deny 永远优先** |
 | 范围限制 | `allow_hosts` / `deny_hosts` / `deny_paths` |
 
 判定顺序固定为 `deny → allowlist → mode → destructive → scope`。
 
-点「保存」会：把策略写成 policy YAML（原子落盘）、把 `policy` 与 `audit` 路径回写进 `afrog-config.yaml` 的 `agent` 段（让重启后仍指向同一份文件），随后丢弃旧门控，**下一次调用按新策略生效，会话预算随之重置**。面板同时展示当前可达能力等级与三个文件路径。
+点「保存」会：把策略写成 policy YAML（原子落盘）、把 `policy` 与 `audit` 路径回写进 `afrog-config.yaml` 的 `agent` 段（让重启后仍指向同一份文件），随后丢弃旧门控，**下一次调用按新策略生效，会话额度按新配置重建并补满**。面板同时展示当前可达能力等级与三个文件路径。
 
 > 反连适配器（`agent.oob`）不在本面板编辑，仍在 `afrog-config.yaml` 里设置；保存策略时它的现值会被保留。
 
@@ -87,7 +88,10 @@ last_reviewed: 2026-11-15
 默认策略是**只读**：新拉起的服务不会自动获得发包能力。到「策略与审计」放宽档位（`safe` / `full`）或在 `allow` 里显式加入所需工具。
 
 **保存策略后预算为什么变多了？**
-保存会丢弃旧门控并重建，`budget.requests` 是**单会话**上限，因此余量随之重置。长驻的 Web 服务里，这个预算是整个进程的会话总预算，跨请求累计扣减。
+保存会丢弃旧门控并重建，新的会话额度从满额开始，所以余量看起来「变多」了——这是正常的，并不意味着它在别处被扣过。长驻的 Web 服务里，额度是整个进程共享的会话额度，跨请求累计扣减；即便长期不重启，**连续空闲 `budget.duration` 后也会自动开新会话补满**。
+
+**长时间跑着跑着突然报 429？**
+说明这次会话的请求额度（默认 5000）被消耗完了——通常是 Agent 连续发包的动作太多。只读动作（查命中、取证据、检索 PoC）不扣额度；想继续发包，把 `budget.requests` 调大，或空闲 `budget.duration`（默认 10 分钟）后让下一次调用自动开新会话，**不用重启进程**。
 
 **批准了候选，但 PoC 没出现？**
 `approve` 会挡掉与非 my 来源（curated / local / append / builtin）同 id 的候选，避免写进 `pocs-my` 后被去重优先级静默忽略。这类冲突会在操作时报错，不会静默成功。

@@ -37,6 +37,7 @@ The User Guide covers everything you need to put `afrog` to work: install, first
 7. [Web Scan Workspace](./08-web-console.md)
 8. [Scheduled Scans](./09-scheduled-scans.md)
 9. [MCP Server](./10-mcp.md)
+10. [Beginner's Guide: Connect Your AI Client to afrog](./11-mcp-quickstart.md)
 
 ## Shortest path
 
