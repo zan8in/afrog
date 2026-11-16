@@ -60,6 +60,9 @@ type WebTechnology struct {
 	Category   string
 	CPE        string
 	Confidence string
+	// Evidence is why the rule matched: the material location plus the matched
+	// snippet, so the identification can be reviewed (especially weak "probable" hits).
+	Evidence string
 }
 
 // WebProbeResult is the metadata of a probed web service.
@@ -609,6 +612,7 @@ func (s *SDKScanner) handleWebProbe(e sdk.WebProbeEvent) {
 				Category:   t.Category,
 				CPE:        t.CPE,
 				Confidence: t.Confidence,
+				Evidence:   t.Evidence,
 			})
 		}
 	}

@@ -93,6 +93,19 @@ func GetMetaByID(pocId string) (Item, bool) {
 	return Item{}, false
 }
 
+// CountMatched 返回本机 PoC 库里与关键词 search 匹配的 PoC 数。
+//
+// 口径与 ListMeta 的 Q 过滤、afrog -s 完全一致：按逗号拆词、任一命中 id/名称/标签即算匹配；
+// 空关键词表示全库。它是「本机到底有没有这个技术栈的 PoC」的唯一答案来源，
+// CLI、Web、MCP 共用同一实现，避免同一个 keyword 在不同入口给出不同数字。
+func CountMatched(search string) int {
+	items, err := ListMeta(ListOptions{Source: "all", Q: search})
+	if err != nil {
+		return 0
+	}
+	return len(items)
+}
+
 // 统一的路径项（扫描与 -pl 用）
 type PathItem struct {
 	Path   string

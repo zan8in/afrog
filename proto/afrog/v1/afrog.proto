@@ -175,6 +175,8 @@ message WebTechnology {
   string cpe = 4;
   // confidence 取值 probable/certain，与 port.confidence 同一标尺。
   string confidence = 5;
+  // evidence 是为什么命中的一句话依据：素材位置 + 触发匹配的片段。
+  string evidence = 6;
 }
 message WebProbeEvent {
   string url = 1;

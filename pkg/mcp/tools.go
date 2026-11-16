@@ -1233,14 +1233,8 @@ func countProbePorts(spec string) (int, error) {
 
 // --- probe.fingerprint ---
 
-const (
-	fpBodyLimit    = 1024 * 1024
-	fpMaxRedirects = 5
-	fpFaviconLimit = 512 * 1024
-	fpUserAgent    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-)
-
-var fpTitleRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+// probeFingerprintAccept 是与浏览器一致的 Accept，减少被 WAF 简单规则拦下的概率。
+const probeFingerprintAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 func (s *Server) probeFingerprintTool() *Tool {
 	type args struct {
@@ -1292,62 +1286,27 @@ func (s *Server) probeFingerprintTool() *Tool {
 			runCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 
-			var redirects []string
-			client := &http.Client{
+			// 抓取与指纹素材组装统一在 pkg/webscan.Prober（与 afrog CLI 同一实现）：
+			// 这里只做 MCP 参数到探测参数的映射。
+			prober := webscan.NewProber(webscan.ProbeOptions{
 				Timeout: timeout,
-				CheckRedirect: func(req *http.Request, via []*http.Request) error {
-					if len(via) >= fpMaxRedirects {
-						return http.ErrUseLastResponse
-					}
-					redirects = append(redirects, req.URL.String())
-					return nil
-				},
-			}
-			req, err := http.NewRequestWithContext(runCtx, http.MethodGet, target, nil)
-			if err != nil {
-				return nil, err
-			}
-			req.Header.Set("User-Agent", fpUserAgent)
-			req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-			reqHeaders := make(map[string]string, len(req.Header))
-			for k, vs := range req.Header {
-				reqHeaders[k] = strings.Join(vs, ", ")
-			}
+				Headers: []string{"Accept: " + probeFingerprintAccept},
+			})
 
 			start := time.Now()
-			resp, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(io.LimitReader(resp.Body, fpBodyLimit))
+			probe, err := prober.Probe(runCtx, target)
 			if err != nil {
 				return nil, err
 			}
 			latency := time.Since(start).Milliseconds()
-
-			headers := make(map[string]string, len(resp.Header))
-			for k, vs := range resp.Header {
-				headers[strings.ToLower(k)] = strings.Join(vs, ", ")
-			}
+			headers := probe.Headers
 
 			matcher, err := s.webMatcher()
 			if err != nil {
 				return nil, err
 			}
-			match := func(fav []byte) webscan.Result {
-				return matcher.Match(webscan.Response{
-					StatusCode: resp.StatusCode,
-					Headers:    headers,
-					Body:       body,
-					Favicon:    fav,
-					RequestURL: resp.Request.URL.String(),
-					Cookies:    resp.Header.Values("Set-Cookie"),
-				})
-			}
 			// 先用首页素材匹配一次（不含 favicon）。
-			matched := match(nil)
+			matched := matcher.Match(probe.Response())
 
 			// 抓 favicon 的时机：显式要求，或首页什么技术栈都没识别出来。favicon 的 mmh3
 			// 是最稳定、最便宜的兜底指纹维度——首页没命中时补抓一次，往往能把「识别不出」
@@ -1362,9 +1321,11 @@ func (s *Server) probeFingerprintTool() *Tool {
 					}
 				}
 				if allowed {
-					if fav := fetchFavicon(runCtx, resp.Request.URL); len(fav) > 0 {
+					if fav := prober.FetchFavicon(runCtx, probe.FinalURL); len(fav) > 0 {
 						faviconFetched = true
-						matched = match(fav)
+						withFav := probe.Response()
+						withFav.Favicon = fav
+						matched = matcher.Match(withFav)
 					}
 				}
 			}
@@ -1390,6 +1351,7 @@ func (s *Server) probeFingerprintTool() *Tool {
 					"category":   t.Category,
 					"cpe":        t.CPE,
 					"confidence": t.Confidence.String(),
+					"evidence":   t.Evidence,
 				})
 				category := strings.ToLower(strings.TrimSpace(t.Category))
 				for _, tok := range t.MatchTokens() {
@@ -1411,9 +1373,9 @@ func (s *Server) probeFingerprintTool() *Tool {
 			}
 
 			out := map[string]any{
-				"url":              resp.Request.URL.String(),
-				"status":           resp.StatusCode,
-				"title":            extractHTMLTitle(body),
+				"url":              probe.FinalURL,
+				"status":           probe.Status,
+				"title":            probe.Title,
 				"server":           headers["server"],
 				"powered_by":       headers["x-powered-by"],
 				"technologies":     techs,
@@ -1421,21 +1383,26 @@ func (s *Server) probeFingerprintTool() *Tool {
 				"confidence":       matched.Confidence.String(),
 				"waf":              waf,
 				"cdn":              cdn,
-				"redirects":        redirects,
+				"redirects":        probe.Redirects,
 				"favicon_hash":     matched.FaviconHash,
 				"favicon_fetched":  faviconFetched,
 				"latency_ms":       latency,
 			}
-			if tls := tlsSummary(resp); tls != nil {
-				out["tls"] = tls
+			if probe.TLS != nil {
+				out["tls"] = map[string]any{
+					"subject":   probe.TLS.Subject,
+					"issuer":    probe.TLS.Issuer,
+					"not_after": probe.TLS.NotAfter,
+					"dns_names": probe.TLS.DNSNames,
+				}
 			}
 
-			recordHTTPObservation("", http.MethodGet, resp.Request.URL.String(), resp.StatusCode,
+			recordHTTPObservation("", http.MethodGet, probe.FinalURL, probe.Status,
 				len(matched.Technologies) > 0, latency,
-				describeRequest(http.MethodGet, resp.Request.URL.String(), reqHeaders),
-				describeResponse(resp, body))
-			recordTechObservation(resp.Request.URL.String(), resp.StatusCode,
-				extractHTMLTitle(body), headers["server"], headers["x-powered-by"], matched)
+				describeRequest(http.MethodGet, probe.FinalURL, map[string]string{"Accept": probeFingerprintAccept}),
+				describeProbeResponse(probe))
+			recordTechObservation(probe.FinalURL, probe.Status,
+				probe.Title, headers["server"], headers["x-powered-by"], matched)
 
 			return out, nil
 		},
@@ -1450,53 +1417,34 @@ func (s *Server) webMatcher() (*webscan.Matcher, error) {
 	return s.webscanMatcher, s.webscanErr
 }
 
-func extractHTMLTitle(body []byte) string {
-	m := fpTitleRe.FindSubmatch(body)
-	if len(m) < 2 {
+// describeProbeResponse 从探测素材生成响应片段（状态行 + 头 + 正文），供观测流留存。
+//
+// 抓取由 pkg/webscan.Prober 完成，这里只有 MCP 观测流的展示格式。
+func describeProbeResponse(p *webscan.ProbeResult) string {
+	if p == nil {
 		return ""
 	}
-	return clampText(strings.TrimSpace(string(m[1])), 200)
-}
+	var sb strings.Builder
+	sb.WriteString(p.Proto)
+	sb.WriteByte(' ')
+	sb.WriteString(strconv.Itoa(p.Status))
+	sb.WriteByte(' ')
+	sb.WriteString(http.StatusText(p.Status))
 
-func tlsSummary(resp *http.Response) map[string]any {
-	if resp == nil || resp.TLS == nil || len(resp.TLS.PeerCertificates) == 0 {
-		return nil
+	keys := make([]string, 0, len(p.Headers))
+	for k := range p.Headers {
+		keys = append(keys, k)
 	}
-	leaf := resp.TLS.PeerCertificates[0]
-	return map[string]any{
-		"subject":   leaf.Subject.String(),
-		"issuer":    leaf.Issuer.String(),
-		"not_after": leaf.NotAfter.Format("2006-01-02"),
-		"dns_names": leaf.DNSNames,
+	sort.Strings(keys)
+	for _, k := range keys {
+		sb.WriteByte('\n')
+		sb.WriteString(k)
+		sb.WriteString(": ")
+		sb.WriteString(p.Headers[k])
 	}
-}
-
-// fetchFavicon 抓一次 /favicon.ico；失败只影响 favicon 规则，不影响主结果。
-func fetchFavicon(ctx context.Context, base *url.URL) []byte {
-	if base == nil {
-		return nil
-	}
-	u := *base
-	u.Path = "/favicon.ico"
-	u.RawQuery = ""
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil
-	}
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil
-	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, fpFaviconLimit))
-	if err != nil {
-		return nil
-	}
-	return data
+	sb.WriteString("\n\n")
+	sb.Write(p.Body)
+	return sb.String()
 }
 
 // --- scan.start ---
@@ -1607,7 +1555,7 @@ func (s *Server) scanStartTool() *Tool {
 			if err != nil {
 				return nil, err
 			}
-			return scanRunResult(target, search, run, countMatchedPocs(search)), nil
+			return scanRunResult(target, search, run, pocsrepo.CountMatched(search)), nil
 		},
 	}
 }

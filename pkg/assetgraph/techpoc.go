@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 )
 
@@ -19,11 +20,23 @@ type TechRef struct {
 	Name     string
 	RuleID   string
 	Category string
+	// Version 是识别到的版本（可能为空）。带版本时，候选 PoC 的 requires 版本约束
+	// （如 jquery<3.5）会据此过滤：识别到的版本不落在受影响区间就不挂候选。
+	Version string
+}
+
+// techCandidate 是索引里的一条「候选 PoC + 其版本约束」。
+//
+// ID 之外单独存版本约束：requires 的索引键只取技术标识（jquery），但候选是否成立
+// 还要看版本（jquery<3.5）——把约束带到检索期才能做版本级过滤。
+type techCandidate struct {
+	ID      string
+	Version *poc.RequireVersion
 }
 
 var (
 	requiresOnce  sync.Once
-	requiresIndex map[string][]string
+	requiresIndex map[string][]techCandidate
 )
 
 // requiresIndexByTech 用 PoC 的 info.requires 建「技术标识 → PoC」索引。
@@ -31,14 +44,14 @@ var (
 // 不另造模糊匹配：requires 本来就是扫描器的准入条件（`requires: [thinkphp]` 表示
 // 只有识别到 ThinkPHP 才会跑），拿它做候选关系与真正的执行口径完全同源。
 // 索引进程内只建一次——PoC 元信息要从磁盘读几千个 YAML，不能按 URL 重复付这笔钱。
-func requiresIndexByTech() map[string][]string {
+func requiresIndexByTech() map[string][]techCandidate {
 	requiresOnce.Do(func() {
 		items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"})
 		if err != nil {
-			requiresIndex = map[string][]string{}
+			requiresIndex = map[string][]techCandidate{}
 			return
 		}
-		idx := make(map[string][]string, len(items))
+		idx := make(map[string][]techCandidate, len(items))
 		seen := make(map[string]map[string]struct{}, len(items))
 		for _, it := range items {
 			id := strings.TrimSpace(it.ID)
@@ -46,7 +59,10 @@ func requiresIndexByTech() map[string][]string {
 				continue
 			}
 			for _, r := range it.Requires {
-				key := normalizeTechKey(r)
+				// requires 词条可能是带版本约束的（jquery<3.5）：索引键只取技术标识，
+				// 版本约束随候选一起保存，留给检索期按识别到的版本过滤。
+				tech, rv := poc.ParseRequire(r)
+				key := normalizeTechKey(tech)
 				if key == "" {
 					continue
 				}
@@ -57,15 +73,15 @@ func requiresIndexByTech() map[string][]string {
 					continue
 				}
 				seen[key][id] = struct{}{}
-				idx[key] = append(idx[key], id)
+				idx[key] = append(idx[key], techCandidate{ID: id, Version: rv})
 			}
 		}
-		for k, ids := range idx {
-			sort.Strings(ids)
-			if len(ids) > maxCandidatesPerTech {
-				ids = ids[:maxCandidatesPerTech]
+		for k, cands := range idx {
+			sort.Slice(cands, func(i, j int) bool { return cands[i].ID < cands[j].ID })
+			if len(cands) > maxCandidatesPerTech {
+				cands = cands[:maxCandidatesPerTech]
 			}
-			idx[k] = ids
+			idx[k] = cands
 		}
 		requiresIndex = idx
 	})
@@ -106,14 +122,19 @@ func techKeys(t TechRef) []string {
 // candidatesFor 按索引算出某个技术栈的候选 PoC id（已排序、已截断）。
 //
 // WAF/CDN 不参与：它们是站点前面的拦截层，不是可被 PoC 验证的产品。
-func candidatesFor(index map[string][]string, t TechRef) []string {
+// 带版本约束的候选（jquery<3.5）按识别到的版本过滤：版本已知且不满足就剔除，
+// 版本未知时保留——识别到产品、版本无从判定，不该因此丢掉候选。
+func candidatesFor(index map[string][]techCandidate, t TechRef) []string {
 	if isFrontLayer(t.Category) {
 		return nil
 	}
 	set := make(map[string]struct{})
 	for _, key := range techKeys(t) {
-		for _, id := range index[key] {
-			set[id] = struct{}{}
+		for _, cand := range index[key] {
+			if cand.Version != nil && !cand.Version.Satisfied(t.Version) {
+				continue
+			}
+			set[cand.ID] = struct{}{}
 		}
 	}
 	if len(set) == 0 {

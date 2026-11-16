@@ -176,6 +176,7 @@ func (m *Matcher) matchRule(rule *Rule, mat material, hits, hitsCI []bool) (Tech
 				CPE:        rule.CPE,
 				Confidence: mr.confidenceFor(rule),
 				RuleID:     rule.ID,
+				Evidence:   evidenceFor(mr, ""),
 			}, true
 		}
 		if text == "" {
@@ -205,9 +206,49 @@ func (m *Matcher) matchRule(rule *Rule, mat material, hits, hitsCI []bool) (Tech
 			CPE:        strings.TrimSpace(cpe),
 			Confidence: mr.confidenceFor(rule),
 			RuleID:     rule.ID,
+			Evidence:   evidenceFor(mr, groups.match[0]),
 		}, true
 	}
 	return Technology{}, false
+}
+
+// maxEvidenceSnippet 是证据里匹配片段的长度上限（按 rune 计）。
+const maxEvidenceSnippet = 120
+
+// evidenceFor 生成一条命中的「证据」短串：素材位置 + 触发匹配的片段。
+//
+// 位置取素材种类；带键的源再补上键名（如 `header server`、`meta generator`、
+// `cookie PHPSESSID`），使同一 source 下不同键的命中也能区分。片段是正则的整段命中，
+// 压平成单行并截断，避免把一大段 HTML 原样塞进输出。存在性判据（无正则）没有片段。
+func evidenceFor(mr *MatchRule, matched string) string {
+	loc := mr.Source
+	switch mr.Source {
+	case SourceHeader:
+		if h := strings.ToLower(strings.TrimSpace(mr.Header)); h != "" {
+			loc = SourceHeader + " " + h
+		}
+	case SourceMeta:
+		loc = SourceMeta + " " + strings.TrimSpace(mr.Key)
+	case SourceCookies:
+		loc = "cookie " + strings.TrimSpace(mr.Key)
+	}
+	if snippet := compactSnippet(matched); snippet != "" {
+		return loc + ": " + snippet
+	}
+	return loc
+}
+
+// compactSnippet 把匹配片段压成单行（连续空白折成一个空格）并按 rune 截断。
+func compactSnippet(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > maxEvidenceSnippet {
+		s = string(r[:maxEvidenceSnippet]) + "…"
+	}
+	return s
 }
 
 // material 是从一次 HTTP 响应里抽出的匹配素材。
@@ -279,12 +320,25 @@ func newMaterial(resp Response) material {
 	return mat
 }
 
+// Title 从正文里抽取 <title>，解码 HTML 实体并归一化空白；没有标题时返回空串。
+//
+// 三端共用这一份：CLI 的探测元数据与 MCP 的标题字段都取这里的结果，避免各写一份
+// 标题解析（其中一处漏了 HTML 实体解码）。
+func Title(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	m := titleRe.FindSubmatch(body)
+	if len(m) < 2 {
+		return ""
+	}
+	t := html.UnescapeString(strings.TrimSpace(string(m[1])))
+	return strings.Join(strings.Fields(t), " ")
+}
+
 // extractHTML 从正文里抽取标题、脚本地址与元信息。
 func (mat *material) extractHTML(body []byte) {
-	if m := titleRe.FindSubmatch(body); len(m) > 1 {
-		t := html.UnescapeString(strings.TrimSpace(string(m[1])))
-		mat.title = strings.Join(strings.Fields(t), " ")
-	}
+	mat.title = Title(body)
 
 	var sb strings.Builder
 	count := 0

@@ -92,6 +92,8 @@ type Technology struct {
 	Version    string `json:"version,omitempty"`
 	Category   string `json:"category,omitempty"`
 	Confidence string `json:"confidence,omitempty"`
+	// Evidence 是命中的依据（素材位置 + 匹配片段），供 Agent 复核识别结论。
+	Evidence string `json:"evidence,omitempty"`
 }
 
 // Tech 是一次 Web 指纹识别的结果。

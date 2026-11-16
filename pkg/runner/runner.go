@@ -21,6 +21,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/utils"
 	"github.com/zan8in/afrog/v3/pkg/webhook/dingtalk"
 	"github.com/zan8in/afrog/v3/pkg/webhook/wecom"
+	"github.com/zan8in/afrog/v3/pkg/webscan"
 	"github.com/zan8in/afrog/v3/pocs"
 )
 
@@ -79,18 +80,15 @@ type WebTech struct {
 	Confidence string
 	// RuleID 是命中的内置/外置规则 id，只用于 requires 门控的标识词，不进入事件契约。
 	RuleID string
+	// Evidence 是命中的依据（素材位置 + 匹配片段），会随事件契约外发，供人复核与模型推理。
+	Evidence string
 }
 
 // TLSInfo 是 Web 探测顺带取到的服务端证书摘要，仅 https 目标有值。
 //
-// 证书信息在信息收集阶段的价值就是「这家站是谁签的、什么时候过期」，
-// 因此只保留判断所需的最小字段，不落完整证书。
-type TLSInfo struct {
-	Subject  string
-	Issuer   string
-	NotAfter string
-	DNSNames []string
-}
+// 直接复用 webscan 的证书摘要，保证 CLI/Web/MCP 三端解析证书的口径（subject 取 CN、
+// issuer 取组织名）完全一致。
+type TLSInfo = webscan.TLSInfo
 
 // WebMeta 是一次 Web 探测的结果，也是全链路 WebProbeEvent 的唯一来源。
 type WebMeta struct {

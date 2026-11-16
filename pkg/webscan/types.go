@@ -32,6 +32,12 @@ type Technology struct {
 	CPE        string
 	Confidence Confidence
 	RuleID     string
+	// Evidence 是为什么命中的一句话依据：素材位置 + 触发匹配的片段，如
+	// `header server: nginx/1.25.3`、`body: jquery-3.6.0.min.js`、`cookie: rememberMe`。
+	//
+	// RuleID 回答「哪条规则」，Evidence 回答「规则在哪里命中的」，两者互补，
+	// 让识别结论可复核（尤其是 probable 的弱判据）。
+	Evidence string
 }
 
 // MatchTokens 返回一条 Web 指纹在 PoC requires 门控里可用的标识词，全部小写、去重。

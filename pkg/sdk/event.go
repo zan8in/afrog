@@ -130,6 +130,9 @@ type WebTechnology struct {
 	Category   string `json:"category,omitempty"`
 	CPE        string `json:"cpe,omitempty"`
 	Confidence string `json:"confidence,omitempty"`
+	// Evidence is why the rule matched: the material location plus the matched
+	// snippet, so the identification can be reviewed (especially weak "probable" hits).
+	Evidence string `json:"evidence,omitempty"`
 }
 
 // WebTLS is the TLS certificate summary of an https target.

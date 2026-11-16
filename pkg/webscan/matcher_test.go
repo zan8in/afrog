@@ -511,6 +511,141 @@ func TestExclusiveFingerprints(t *testing.T) {
 	}
 }
 
+// 前端库的版本识别：文件名、?v= 查询串、内联脚本横幅注释三种来源都要能取到版本，
+// 且带构建后缀（vue.global.prod.js）的产物仍应被识别（只是拿不到版本）。
+func TestFrontendLibraryVersions(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name        string
+		body        string
+		wantRule    string
+		wantVersion string
+	}{
+		{"jquery-filename", `<script src="/js/jquery-3.6.0.min.js"></script>`, "jquery", "3.6.0"},
+		{"jquery-query", `<script src="/assets/jquery.min.js?v=3.6.0"></script>`, "jquery", "3.6.0"},
+		{"jquery-query-extra", `<script src="/assets/jquery.min.js?foo=1&v=3.6.0"></script>`, "jquery", "3.6.0"},
+		{"jquery-banner", `<script>/*! jQuery v3.7.1 | (c) OpenJS Foundation */</script>`, "jquery", "3.7.1"},
+		{"jquery-no-version", `<script src="/assets/jquery.min.js"></script>`, "jquery", ""},
+		{"vue-query", `<script src="/js/vue.min.js?v=3.4.21"></script>`, "vue", "3.4.21"},
+		{"vue-banner", `<script>/*! Vue.js v3.4.21 */</script>`, "vue", "3.4.21"},
+		{"vue-build-suffix", `<script src="/assets/vue.global.prod.js"></script>`, "vue", ""},
+		{"react-query", `<script src="/static/react.production.min.js?v=18.2.0"></script>`, "react", "18.2.0"},
+		{"lodash-query", `<script src="/assets/lodash.min.js?v=4.17.21"></script>`, "lodash", "4.17.21"},
+		{"moment-query", `<script src="/assets/moment.min.js?v=2.30.1"></script>`, "moment-js", "2.30.1"},
+		{"angular-attr", `<div ng-version="17.1.0"></div>`, "angular", "17.1.0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(Response{Body: []byte(tc.body)})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Version != tc.wantVersion {
+				t.Errorf("%s version = %q, want %q", tc.wantRule, got.Version, tc.wantVersion)
+			}
+		})
+	}
+}
+
+// 回收被 id 碰撞丢弃的社区判据：这些判据（如 Cloudflare 的 cf-cache-status、Vercel 的
+// x-vercel-cache、Netlify 的 server 头）精选集里没有，此前随整条社区规则一并被丢弃。
+// 现在应追加到精选规则上，只凭社区判据也能命中，且按社区数据的可信度记为 probable。
+func TestCommunityCriteriaReclaimedOnIDCollision(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name     string
+		resp     Response
+		wantRule string
+	}{
+		{"cloudflare-cf-cache-status", Response{Headers: map[string]string{"cf-cache-status": "HIT"}}, "cloudflare"},
+		{"vercel-x-vercel-cache", Response{Headers: map[string]string{"x-vercel-cache": "HIT"}}, "vercel"},
+		{"netlify-server", Response{Headers: map[string]string{"server": "Netlify"}}, "netlify"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected from community-only criteria: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Confidence != ConfidenceProbable {
+				t.Errorf("%s confidence = %s, want probable (社区判据)", tc.wantRule, got.Confidence)
+			}
+		})
+	}
+}
+
+// 社区库未覆盖的前端库（Preact / Knockout / Element UI / Element Plus / Layui /
+// Vant / WeUI / Bulma / Lit）：新增的精选规则要能从文件名、资源路径或专属语法
+// 识别出来，并尽量取到版本。
+func TestGapFilledFrontendLibraries(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name, body, wantRule, wantVersion string
+	}{
+		{"preact-file", `<script src="/js/preact-10.19.2.min.js"></script>`, "preact", "10.19.2"},
+		{"preact-banner", `<script>/*! Preact v10.19.2 */</script>`, "preact", "10.19.2"},
+		{"knockout-file", `<script src="/js/knockout-3.5.1.js"></script>`, "knockout", "3.5.1"},
+		{"knockout-banner", `<script>/*! Knockout JavaScript library v3.5.1 */</script>`, "knockout", "3.5.1"},
+		{"knockout-binding", `<script>ko.applyBindings({});</script>`, "knockout", ""},
+		{"element-ui-version", `<link href="/element-ui@2.15.14/lib/theme-chalk/index.css">`, "element-ui", "2.15.14"},
+		{"element-ui-path", `<link href="/element-ui/lib/theme-chalk/index.css">`, "element-ui", ""},
+		{"element-plus-version", `<link href="/element-plus@2.5.6/dist/index.css">`, "element-plus", "2.5.6"},
+		{"element-plus-var", `<style>:root{--el-color-primary:#409eff}</style>`, "element-plus", ""},
+		{"layui-file", `<script src="/static/layui-2.9.16.js"></script>`, "layui", "2.9.16"},
+		{"layui-use", `<script>layui.use(['form'], function(){});</script>`, "layui", ""},
+		{"vant-version", `<script src="/js/vant-2.12.0.min.js"></script>`, "vant", "2.12.0"},
+		{"vant-path", `<link href="/vant/lib/index.css">`, "vant", ""},
+		{"vant-class", `<button class="van-button">ok</button>`, "vant", ""},
+		{"weui-version", `<link href="/css/weui-2.6.5.min.css">`, "weui", "2.6.5"},
+		{"weui-class", `<div class="weui-cells">ok</div>`, "weui", ""},
+		{"bulma-version", `<link href="/css/bulma-0.9.4.min.css">`, "bulma", "0.9.4"},
+		{"bulma-banner", `<style>/*! bulma.io v0.9.4 | MIT License | github.com/jgthms/bulma */</style>`, "bulma", ""},
+		{"lit-element-file", `<script src="/js/lit-element-3.3.0.js"></script>`, "lit", "3.3.0"},
+		{"lit-html-file", `<script src="/js/lit-html@2.8.0.js"></script>`, "lit", "2.8.0"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(Response{Body: []byte(tc.body)})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Version != tc.wantVersion {
+				t.Errorf("%s version = %q, want %q", tc.wantRule, got.Version, tc.wantVersion)
+			}
+		})
+	}
+}
+
 // 收紧后的弱判据必须落在 probable，避免以 certain 结论输出。
 func TestTightenedRulesUseProbable(t *testing.T) {
 	m, err := LoadMatcher("")
@@ -653,6 +788,82 @@ func TestLiteralHints(t *testing.T) {
 		if strings.Join(got, "|") != strings.Join(tc.want, "|") || ci != tc.ci {
 			t.Errorf("literalHints(%q) = %q ci=%v, want %q ci=%v", tc.pattern, got, ci, tc.want, tc.ci)
 		}
+	}
+}
+
+// TestTechnologyEvidence 钉住「为什么命中」的证据串：素材位置 + 触发片段。
+//
+// Evidence 是新增的可复核字段（D11），probable 弱判据尤其依赖它——没有证据串，
+// 使用者只能相信一个黑白结论。位置命名与片段都是对外契约，改动应在此暴露。
+func TestTechnologyEvidence(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		resp       Response
+		wantTech   string
+		wantPrefix string
+		wantIn     string // 期望出现在证据里的匹配片段；空表示只断言位置前缀
+	}{
+		{
+			name:       "header-with-key",
+			resp:       Response{Headers: map[string]string{"server": "nginx/1.25.3"}},
+			wantTech:   "Nginx",
+			wantPrefix: "header server: ",
+			wantIn:     "nginx/1.25.3",
+		},
+		{
+			name:       "set-cookie-header",
+			resp:       Response{Headers: map[string]string{"set-cookie": "rememberMe=deleteMe; Path=/"}},
+			wantTech:   "Apache Shiro",
+			wantPrefix: "header set-cookie: ",
+			wantIn:     "rememberMe=",
+		},
+		{
+			name:       "body",
+			resp:       Response{Body: []byte(`<meta name="generator" content="WordPress 6.4.2">`)},
+			wantTech:   "WordPress",
+			wantPrefix: "body: ",
+			wantIn:     "WordPress 6.4.2",
+		},
+		{
+			name:       "keyed-meta-source",
+			resp:       Response{Body: []byte(`<meta name="application-name" content="Tailwind CSS">`)},
+			wantTech:   "Tailwind CSS",
+			wantPrefix: "meta application-name: ",
+			wantIn:     "Tailwind CSS",
+		},
+		{
+			// 存在性判据（无正则）没有片段，证据只到素材位置为止。
+			name:       "cookie-existence",
+			resp:       Response{Cookies: []string{"AWSALB=abc123; Path=/"}},
+			wantTech:   "Amazon ALB",
+			wantPrefix: "cookie AWSALB",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].Name == tc.wantTech {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not matched: %+v", tc.wantTech, res.Technologies)
+			}
+			if !strings.HasPrefix(got.Evidence, tc.wantPrefix) {
+				t.Fatalf("evidence = %q, want prefix %q", got.Evidence, tc.wantPrefix)
+			}
+			if tc.wantIn != "" && !strings.Contains(got.Evidence, tc.wantIn) {
+				t.Errorf("evidence = %q, want it to contain %q", got.Evidence, tc.wantIn)
+			}
+		})
 	}
 }
 

@@ -2,16 +2,11 @@ package runner
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"html"
-	"io"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -51,8 +46,6 @@ var CheckerPool = sync.Pool{
 		}
 	},
 }
-
-var titleExtractRe = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
 
 func keyFromTargetWithPath(target string) string {
 	target = strings.TrimSpace(target)
@@ -159,45 +152,6 @@ func (c *openPortsCollector) FactFor(hostPort string) *portscan.ScanResult {
 	return c.Result(host, port)
 }
 
-// maxFaviconBytes 是抓取 favicon 时接受的最大体积，超过则视为非 favicon 直接丢弃。
-const maxFaviconBytes = 1 << 20
-
-// webProbeMaxRedirects 是 Web 探测最多跟随的跳转次数，与浏览器口径一致。
-const webProbeMaxRedirects = 10
-
-// redirectTraceKey 用于把跳转落点收集器塞进探测请求的 context。
-//
-// http.Client 的 CheckRedirect 是「客户端级」回调，一次探测要拿到自己的跳转链，
-// 只能靠 context 把收集器带进去，否则并发探测下几个目标的链会搅在一起。
-type redirectTraceKey struct{}
-
-// redirectTrace 收集一次探测里每一次跳转的落点（不含初始 URL）。
-type redirectTrace struct {
-	mu   sync.Mutex
-	urls []string
-}
-
-func (t *redirectTrace) add(u string) {
-	if t == nil {
-		return
-	}
-	t.mu.Lock()
-	t.urls = append(t.urls, u)
-	t.mu.Unlock()
-}
-
-func (t *redirectTrace) result() []string {
-	if t == nil {
-		return nil
-	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if len(t.urls) == 0 {
-		return nil
-	}
-	return append([]string(nil), t.urls...)
-}
-
 // webProbeTimeout 返回 Web 探测的单次请求超时（-w-timeout，默认 30s）。
 //
 // 与全局 -timeout 解耦：-timeout 是给漏洞 PoC 留出的长超时（默认 50s），
@@ -212,92 +166,23 @@ func (runner *Runner) webProbeTimeout() time.Duration {
 	return time.Duration(secs) * time.Second
 }
 
-// newWebProbeClient 构造 Web 探测专用的 HTTP 客户端。
+// webProber 构造 Web 探测专用的探测器，并做 CLI 配置到探测参数的映射。
 //
-// 不复用 PoC 扫描的 retryhttpclient：那里的重定向与 TLS 握手都封在 retryablehttp
-// 连接池内部，拿不到跳转链与证书，而「站是谁签的、跳到了哪」恰恰是信息收集的产出。
-// 自建客户端还让探测阶段拥有独立短超时，且一次请求就能带齐这三样，请求数仍是 1。
-func newWebProbeClient(options *config.Options, timeout time.Duration) *http.Client {
-	transport := &http.Transport{
-		// 扫描器语义：证书是否可信交给使用者判断，这里先把证书取回来。
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-		MaxIdleConnsPerHost: 4,
-		IdleConnTimeout:     30 * time.Second,
+// 探测的全部实现（客户端、跳转链、证书摘要、favicon、指纹素材组装）都在
+// pkg/webscan.Prober；这里不复用 PoC 扫描的 retryhttpclient——那里的重定向与 TLS
+// 握手都封在 retryablehttp 连接池内部，拿不到跳转链与证书，而「站是谁签的、跳到了哪」
+// 恰恰是信息收集的产出，因此探测用独立客户端（独立短超时、一次请求带齐这几样）。
+func (runner *Runner) webProber() *webscan.Prober {
+	opts := webscan.ProbeOptions{
+		Timeout:            runner.webProbeTimeout(),
+		BodyLimit:          webProbeBodyLimit(runner.options),
+		InsecureSkipVerify: true,
 	}
-	if options != nil {
-		if p := strings.TrimSpace(strings.Split(options.Proxy, ",")[0]); p != "" {
-			if u, err := url.Parse(p); err == nil && u.Host != "" {
-				transport.Proxy = http.ProxyURL(u)
-			}
-		}
+	if runner.options != nil {
+		opts.Headers = runner.options.Header
+		opts.Proxy = runner.options.Proxy
 	}
-	return &http.Client{
-		Transport: transport,
-		Timeout:   timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if trace, ok := req.Context().Value(redirectTraceKey{}).(*redirectTrace); ok {
-				trace.add(req.URL.String())
-			}
-			if len(via) >= webProbeMaxRedirects {
-				return http.ErrUseLastResponse
-			}
-			return nil
-		},
-	}
-}
-
-// applyWebProbeHeaders 把 CLI 的 -H 自定义头与默认 UA 加到探测请求上，
-// 使探测请求的外发特征与 PoC 请求一致（否则 WAF 按 UA 就把探测挡了）。
-func applyWebProbeHeaders(req *http.Request, options *config.Options) {
-	if req == nil {
-		return
-	}
-	if options != nil {
-		for _, line := range options.Header {
-			key, val, ok := strings.Cut(line, ":")
-			key = strings.TrimSpace(key)
-			if !ok || key == "" {
-				continue
-			}
-			if strings.EqualFold(key, "Host") {
-				req.Host = strings.TrimSpace(val)
-				continue
-			}
-			req.Header.Set(key, strings.TrimSpace(val))
-		}
-	}
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", utils.RandomUA())
-	}
-}
-
-// tlsInfoFromState 从一次 TLS 握手结果里提取证书摘要，没有证书时返回 nil。
-func tlsInfoFromState(state *tls.ConnectionState) *TLSInfo {
-	if state == nil || len(state.PeerCertificates) == 0 {
-		return nil
-	}
-	leaf := state.PeerCertificates[0]
-	subject := strings.TrimSpace(leaf.Subject.CommonName)
-	if subject == "" {
-		subject = leaf.Subject.String()
-	}
-	// 签发者取组织名（Let's Encrypt、DigiCert Inc…）比取 CN 更贴近「谁签的」这个问题。
-	issuer := ""
-	if len(leaf.Issuer.Organization) > 0 {
-		issuer = strings.TrimSpace(leaf.Issuer.Organization[0])
-	}
-	if issuer == "" {
-		issuer = strings.TrimSpace(leaf.Issuer.CommonName)
-	}
-	if issuer == "" {
-		issuer = leaf.Issuer.String()
-	}
-	return &TLSInfo{
-		Subject:  subject,
-		Issuer:   issuer,
-		NotAfter: leaf.NotAfter.Format("2006-01-02"),
-		DNSNames: append([]string(nil), leaf.DNSNames...),
-	}
+	return webscan.NewProber(opts)
 }
 
 // webProbeBodyLimit 返回探测时读取响应体的上限（字节），与 PoC 请求同口径。
@@ -327,6 +212,7 @@ func applyWebFingerprint(meta *WebMeta, res webscan.Result) {
 				CPE:        t.CPE,
 				Confidence: t.Confidence.String(),
 				RuleID:     t.RuleID,
+				Evidence:   t.Evidence,
 			})
 		}
 		meta.Confidence = res.Confidence.String()
@@ -366,7 +252,7 @@ func recordTechObservation(meta WebMeta) {
 	// 技术栈入图：端点 → 技术栈 → 候选 PoC。失败只影响这一张派生图，不阻断观测与扫描。
 	techRefs := make([]assetgraph.TechRef, 0, len(meta.Technologies))
 	for _, t := range meta.Technologies {
-		techRefs = append(techRefs, assetgraph.TechRef{Name: t.Name, RuleID: t.RuleID, Category: t.Category})
+		techRefs = append(techRefs, assetgraph.TechRef{Name: t.Name, RuleID: t.RuleID, Category: t.Category, Version: t.Version})
 	}
 	if err := assetgraph.LinkTechCandidates(urlStr, techRefs); err != nil {
 		gologger.Debug().Msgf("技术栈图写入失败: url=%s err=%v", urlStr, err)
@@ -379,6 +265,7 @@ func recordTechObservation(meta WebMeta) {
 			Version:    t.Version,
 			Category:   t.Category,
 			Confidence: t.Confidence,
+			Evidence:   t.Evidence,
 		})
 		switch strings.ToLower(strings.TrimSpace(t.Category)) {
 		case "waf":
@@ -761,24 +648,6 @@ func formatPortResult(r *portscan.ScanResult, seq int) string {
 	return log.ResNum(seq, log.KindBadge(r.State.String()), target, attrs...)
 }
 
-func extractTitle(body []byte) string {
-	if len(body) == 0 {
-		return ""
-	}
-	m := titleExtractRe.FindSubmatch(body)
-	if len(m) < 2 {
-		return ""
-	}
-	t := strings.TrimSpace(string(m[1]))
-	if t == "" {
-		return ""
-	}
-	// 部分站点把标题写成 HTML 实体（如 &#x4E2D;&#x7164;），浏览器会解码，这里同样解码后再归一化空白
-	t = html.UnescapeString(t)
-	t = strings.Join(strings.Fields(t), " ")
-	return t
-}
-
 // installHostBreakerReporter 把 HTTP 熔断提示接到 CLI 输出上。
 //
 // 熔断会让一部分目标「不再被扫」，这必须显式可见：否则用户只看到速率变快，却不知道
@@ -1118,89 +987,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		}
 	}
 
-	// probeClient 是探测阶段的专用客户端：它决定了这一阶段的超时（-w-timeout）
-	// 与「一次请求带齐状态码/标题/跳转链/TLS 证书」的能力。
-	probeClient := newWebProbeClient(runner.options, runner.webProbeTimeout())
-	bodyLimit := webProbeBodyLimit(runner.options)
-
-	// webProbeFetch 是一次探测的网络层产出，供指纹匹配与元数据组装共用。
-	type webProbeFetch struct {
-		status  int
-		headers map[string]string
-		body    []byte
-		// cookies 是原始 Set-Cookie 行，供指纹的 cookies 源按名字精确匹配。
-		cookies []string
-	}
-
-	// fetchResponse 请求一次目标，拿到状态码、响应头、正文、跳转链与证书。
-	// 返回 nil 表示服务端没有响应（用于判定存活）。
-	fetchResponse := func(urlStr string) (WebMeta, *webProbeFetch) {
-		meta := WebMeta{URL: urlStr}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
-		if err != nil {
-			return meta, nil
-		}
-		trace := &redirectTrace{}
-		req = req.WithContext(context.WithValue(req.Context(), redirectTraceKey{}, trace))
-		applyWebProbeHeaders(req, runner.options)
-
-		resp, err := probeClient.Do(req)
-		if err != nil {
-			if resp != nil {
-				resp.Body.Close()
-			}
-			return meta, nil
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, bodyLimit))
-
-		headers := make(map[string]string, len(resp.Header))
-		for k, v := range resp.Header {
-			headers[strings.ToLower(k)] = strings.Join(v, ";")
-		}
-
-		meta.Status = resp.StatusCode
-		meta.Server = strings.TrimSpace(resp.Header.Get("Server"))
-		meta.PoweredBy = strings.TrimSpace(resp.Header.Get("X-Powered-By"))
-		meta.Title = extractTitle(body)
-		meta.Redirects = trace.result()
-		meta.TLS = tlsInfoFromState(resp.TLS)
-		return meta, &webProbeFetch{
-			status:  resp.StatusCode,
-			headers: headers,
-			body:    body,
-			cookies: resp.Header.Values("Set-Cookie"),
-		}
-	}
-
-	// fetchFavicon 额外抓取 /favicon.ico，仅在调用方判定需要时调用（-w-favicon 或外置
-	// 规则集含 favicon 规则）。
-	fetchFavicon := func(urlStr string) []byte {
-		u, err := url.Parse(urlStr)
-		if err != nil {
-			return nil
-		}
-		u.Path = "/favicon.ico"
-		u.RawQuery = ""
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-		if err != nil {
-			return nil
-		}
-		applyWebProbeHeaders(req, runner.options)
-		resp, err := probeClient.Do(req)
-		if err != nil {
-			if resp != nil {
-				resp.Body.Close()
-			}
-			return nil
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxFaviconBytes+1))
-		if len(body) == 0 || len(body) > maxFaviconBytes {
-			return nil
-		}
-		return body
-	}
+	// prober 是探测阶段的专用探测器（唯一实现在 pkg/webscan.Prober）：它决定了这一阶段的
+	// 超时（-w-timeout）与「一次请求带齐状态码/标题/跳转链/TLS 证书」的能力。
+	prober := runner.webProber()
 
 	for i := 0; i < con; i++ {
 		wg.Add(1)
@@ -1257,25 +1046,28 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 							}
 						}
 					}
-					meta, fetched := fetchResponse(u)
-					if fetched == nil {
+					probe, err := prober.Probe(ctx, u)
+					if err != nil || probe == nil {
 						continue
 					}
-					if strings.TrimSpace(meta.Server) == "" && it.fact != nil {
+					meta := WebMeta{
+						URL:       u,
+						Status:    probe.Status,
+						Title:     probe.Title,
+						Server:    strings.TrimSpace(probe.Headers["server"]),
+						PoweredBy: strings.TrimSpace(probe.Headers["x-powered-by"]),
+						Redirects: probe.Redirects,
+						TLS:       probe.TLS,
+					}
+					if meta.Server == "" && it.fact != nil {
 						// HTTP 响应没有 Server 头时，回落到端口指纹识别的产品与版本。
 						meta.Server = strings.Join(strings.Fields(it.fact.Product+" "+it.fact.Version), " ")
 					}
-					webfp := webscan.Response{
-						StatusCode: fetched.status,
-						Headers:    fetched.headers,
-						Body:       fetched.body,
-						Cookies:    fetched.cookies,
-						RequestURL: u,
-					}
+					webfp := probe.Response()
 					// 抓 favicon 会多一次请求，因此默认不抓：只有显式开启 -w-favicon，或外置
 					// 规则集里写了 favicon 规则（用户意图明显）时才抓。
 					if runner.options.WebFavicon || matcher.HasFavicon() {
-						webfp.Favicon = fetchFavicon(u)
+						webfp.Favicon = prober.FetchFavicon(ctx, u)
 					}
 					applyWebFingerprint(&meta, matcher.Match(webfp))
 					record(u, meta)
@@ -1370,24 +1162,30 @@ func (c *openPortsCollector) Snapshot() map[string][]int {
 
 // shouldSkipRequires 判断目标是否因 requires 门控而跳过。
 //
-// fingerRequiresByKey 是「该目标命中的指纹标识集合」，同时包含指纹 PoC 的 tag 与 id，
+// fingerRequiresByKey 是「该目标命中的指纹标识 → 版本」，同时包含指纹 PoC 的 tag 与 id，
 // 因此 requires: [mysql]（tag）与 requires: [ajp-protocol-detect]（指纹 PoC id）都能命中。
-func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerRequiresByKey map[string]map[string]struct{}, testMode bool) bool {
+// 值为该标识对应的识别版本（未知记空串），供 requires 里的版本约束（如 jquery<3.5）判定：
+// 版本未知时放行，避免因为拿不到版本而漏报。
+func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerRequiresByKey map[string]map[string]string, testMode bool) bool {
 	if testMode {
 		return false
 	}
 	if len(p.Info.Requires) == 0 {
 		return false
 	}
-	reqSet := make(map[string]struct{}, len(p.Info.Requires))
+	type requirement struct {
+		tech string
+		rv   *poc.RequireVersion
+	}
+	reqs := make([]requirement, 0, len(p.Info.Requires))
 	for _, r := range p.Info.Requires {
-		rr := strings.ToLower(strings.TrimSpace(r))
-		if rr == "" {
+		tech, rv := poc.ParseRequire(r)
+		if tech == "" {
 			continue
 		}
-		reqSet[rr] = struct{}{}
+		reqs = append(reqs, requirement{tech: tech, rv: rv})
 	}
-	if len(reqSet) == 0 {
+	if len(reqs) == 0 {
 		return false
 	}
 
@@ -1415,8 +1213,12 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 	if len(tts) == 0 {
 		return mode == "strict"
 	}
-	for r := range reqSet {
-		if _, ok := tts[r]; ok {
+	for _, req := range reqs {
+		version, ok := tts[req.tech]
+		if !ok {
+			continue
+		}
+		if req.rv.Satisfied(version) {
 			return false
 		}
 	}
@@ -1429,10 +1231,13 @@ func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) stri
 // requires: [wordpress] / [thinkphp] / [apache-shiro] 这类写法可直接命中响应里识别出的
 // 技术栈，从而跳过明显不可能命中的 PoC。
 //
+// 返回值为「标识词 → 该词对应技术栈的版本」，让 requires 里的版本约束（如 jquery<3.5）
+// 能用上 Web 指纹识别出的版本；没有解析出版本时值为空串。
+//
 // targets 是本次扫描真正会跑的目标列表，metas 是 webProbe 的原始结果（键为去掉路径的
 // host:port）。这里按 host:port 反查，使带路径的目标也能用上其站点级指纹；键仍取
 // keyFromTargetWithPath，保证与 shouldSkipRequires 的查表口径一致。
-func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[string]struct{} {
+func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[string]string {
 	if len(targets) == 0 || len(metas) == 0 {
 		return nil
 	}
@@ -1445,7 +1250,7 @@ func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[
 	if len(techsByKey) == 0 {
 		return nil
 	}
-	out := make(map[string]map[string]struct{})
+	out := make(map[string]map[string]string)
 	for _, t := range targets {
 		techs, ok := techsByKey[fingerprint.KeyFromTarget(t)]
 		if !ok {
@@ -1457,12 +1262,17 @@ func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[
 		}
 		set := out[key]
 		if set == nil {
-			set = make(map[string]struct{}, len(techs)*3)
+			set = make(map[string]string, len(techs)*3)
 			out[key] = set
 		}
 		for _, tech := range techs {
+			version := strings.TrimSpace(tech.Version)
 			for _, tok := range webscan.MatchTokens(tech.RuleID, tech.Name, tech.Category) {
-				set[tok] = struct{}{}
+				// 同一标识词可能被多条技术栈产出：保留已解析出的版本，别被空串覆盖。
+				if cur, ok := set[tok]; ok && cur != "" {
+					continue
+				}
+				set[tok] = version
 			}
 		}
 	}
@@ -2604,7 +2414,7 @@ func (runner *Runner) Execute() {
 	// 匹配使用（作者既可能写 requires: [mysql]（tag），也可能写 requires: [ajp-protocol-detect]
 	// （指纹 PoC id），还可能写 requires: [wordpress]（Web 指纹））。
 	fingerTagsByKey := make(map[string]map[string]struct{})
-	fingerRequiresByKey := make(map[string]map[string]struct{})
+	fingerRequiresByKey := make(map[string]map[string]string)
 	globalFingerTags := make(map[string]struct{})
 	{
 		runner.fingerMu.Lock()
@@ -2621,14 +2431,14 @@ func (runner *Runner) Execute() {
 
 		for k, hits := range fingerSnap {
 			tagSet := make(map[string]struct{})
-			reqSet := make(map[string]struct{})
+			reqSet := make(map[string]string)
 			for _, h := range hits {
 				for t := range normalizeTags(h.Tags, true) {
 					tagSet[t] = struct{}{}
-					reqSet[t] = struct{}{}
+					reqSet[t] = ""
 				}
 				if id := strings.ToLower(strings.TrimSpace(h.ID)); id != "" {
-					reqSet[id] = struct{}{}
+					reqSet[id] = ""
 				}
 			}
 			if len(reqSet) == 0 {
@@ -2647,6 +2457,7 @@ func (runner *Runner) Execute() {
 
 	// 把 -w 识别出的 Web 技术栈并入 requires 词表：Web 指纹比指纹 PoC 更能说清
 	// 「这个站点是什么」，因此 requires: [wordpress] 这类门控才真正落地。
+	// 值带上识别出的版本，供 requires 的版本约束（如 jquery<3.5）判定。
 	if len(webScanTargets) > 0 {
 		runner.webMu.Lock()
 		webSnap := make(map[string]WebMeta, len(runner.webMetaByKey))
@@ -2658,11 +2469,14 @@ func (runner *Runner) Execute() {
 		for k, set := range webTechRequires(webScanTargets, webSnap) {
 			reqSet := fingerRequiresByKey[k]
 			if reqSet == nil {
-				reqSet = make(map[string]struct{}, len(set))
+				reqSet = make(map[string]string, len(set))
 				fingerRequiresByKey[k] = reqSet
 			}
-			for tok := range set {
-				reqSet[tok] = struct{}{}
+			for tok, ver := range set {
+				if cur, ok := reqSet[tok]; ok && cur != "" {
+					continue
+				}
+				reqSet[tok] = ver
 			}
 		}
 	}

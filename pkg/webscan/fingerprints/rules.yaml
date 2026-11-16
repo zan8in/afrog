@@ -702,11 +702,24 @@
   cpe: cpe:/a:facebook:react
   softmatch: true
   match:
+    # 文件名带版本：react-18.2.0.min.js / react@18.2.0 / react-dom.18.2.0.js
+    # 版本类判据必须排在「存在性判据」之前——matchRule 取第一条命中的 match。
+    - source: body
+      pattern: '(?i)react(?:-dom|-with-addons)?[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    # 查询串带版本：react.production.min.js?v=18.2.0（兼容 CDN 追加参数 ?a=1&v=18.2.0）
+    - source: body
+      pattern: '(?i)react(?:-dom)?(?:\.production|\.development)?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 内联脚本横幅注释：/*! React v18.2.0 */
+    - source: body
+      pattern: '(?i)react(?:-dom)?\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
     - source: body
       pattern: "(?i)data-reactroot"
+    # 兜底：只要引了 react 资源即判定（无版本）
     - source: body
-      pattern: '(?i)react(?:-dom)?[.@-](?<version>[\d.]+)(?:\.min)?\.js'
-      version: ${version}
+      pattern: '(?i)react(?:-dom|-with-addons)?(?:\.production|\.development)?(?:\.min)?\.js'
 
 - id: vue
   name: Vue.js
@@ -714,8 +727,21 @@
   cpe: cpe:/a:vuejs:vue.js
   softmatch: true
   match:
+    # 文件名带版本：vue-3.4.21.min.js / vue@3.4.21 / vue.global.prod.3.4.21.js
     - source: body
-      pattern: '(?i)vue(?:\.runtime)?(?:\.min)?\.js'
+      pattern: '(?i)vue(?:\.runtime|\.global|\.prod|\.esm-browser|\.esm-bundler|\.esm|\.dev)*[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    # 查询串带版本：vue.min.js?v=3.4.21（Vue 的构建产物通常不带版本号，版本多在查询串里）
+    - source: body
+      pattern: '(?i)vue(?:\.runtime|\.global|\.prod|\.esm-browser|\.esm-bundler|\.esm|\.dev)*(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 内联脚本横幅注释：/*! Vue.js v3.4.21 */
+    - source: body
+      pattern: '(?i)vue(?:\.js)?\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 兜底：只要引了 vue 资源即判定（无版本）。构建产物名带 .global/.prod 等后缀，需一并放行。
+    - source: body
+      pattern: '(?i)vue(?:\.runtime|\.global|\.prod|\.esm-browser|\.esm-bundler|\.esm|\.min|\.dev)*\.js'
     - source: body
       pattern: "(?i)data-v-[0-9a-f]{8}"
 
@@ -725,9 +751,251 @@
   cpe: cpe:/a:jquery:jquery
   softmatch: true
   match:
+    # 文件名带版本：jquery-3.6.0.min.js / jquery@3.6.0 / jquery.3.6.0.js
     - source: body
-      pattern: '(?i)jquery[.-](?<version>[\d.]+)(?:\.min)?\.js'
+      pattern: '(?i)jquery[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
       version: ${version}
+    # 查询串带版本：jquery.min.js?v=3.6.0（很多站点用 jquery.min.js 再加 ?v= 标注版本）
+    - source: body
+      pattern: '(?i)jquery(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 内联脚本横幅注释：/*! jQuery v3.7.1 | (c) OpenJS Foundation */
+    - source: body
+      pattern: '(?i)jquery\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 兜底：只要引了 jquery 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)jquery[\w.@-]*\.js'
+
+- id: lodash
+  name: Lodash
+  category: js-library
+  cpe: cpe:/a:lodash:lodash
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)lodash[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    - source: body
+      pattern: '(?i)lodash(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    - source: body
+      pattern: '(?i)lodash\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    - source: body
+      pattern: '(?i)lodash[\w.@-]*\.js'
+
+- id: moment-js
+  name: Moment.js
+  category: js-library
+  cpe: cpe:/a:momentjs:moment
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)moment[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    - source: body
+      pattern: '(?i)moment(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    - source: body
+      pattern: '(?i)moment\.js\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    - source: body
+      pattern: '(?i)moment[\w.@-]*\.js'
+
+- id: underscore-js
+  name: Underscore.js
+  category: js-library
+  cpe: cpe:/a:underscorejs:underscore.js
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)underscore[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    - source: body
+      pattern: '(?i)underscore(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.js\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    - source: body
+      pattern: '(?i)underscore(?:\.min)?\.js'
+
+# ---- 社区库未覆盖的前端库 ----
+#
+# 下面这几条在 Wappalyzer 社区库里查无对应规则，属纯缺口，只能手工维护。
+# 判据优先取「文件名 / 资源路径」这类强特征，避免用过于泛化的 class 名误伤；
+# 版本类判据一律排在存在性判据之前（matchRule 取第一条命中的 match）。
+
+- id: preact
+  name: Preact
+  category: js-library
+  cpe: cpe:/a:preactjs:preact
+  softmatch: true
+  match:
+    # 文件名带版本：preact-10.19.2.min.js / preact@10.19.2.mjs
+    - source: body
+      pattern: '(?i)preact[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|mjs)'
+      version: ${version}
+    # 查询串带版本：preact.min.js?v=10.19.2
+    - source: body
+      pattern: '(?i)preact(?:[-.@]\d+(?:\.\d+){1,3})?(?:\.min)?\.(?:js|mjs)\?(?:[^"''\s]*[?&])?v=(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 横幅注释：/*! Preact v10.19.2 */
+    - source: body
+      pattern: '(?i)\bpreact\b\s+v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 兜底：引了 preact（含 preact-compat / preact-hooks）资源即判定（无版本）
+    - source: body
+      pattern: '(?i)preact(?:-compat|-hooks)?[\w.@/-]*\.(?:js|mjs)'
+
+- id: knockout
+  name: Knockout
+  category: js-library
+  cpe: cpe:/a:knockoutjs:knockout
+  softmatch: true
+  match:
+    # 文件名带版本：knockout-3.5.1.js / knockout@3.5.1.min.js
+    - source: body
+      pattern: '(?i)knockout[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.debug|\.min)?\.js'
+      version: ${version}
+    # 横幅注释：/*! Knockout JavaScript library v3.5.1 */
+    - source: body
+      pattern: '(?i)knockout javascript library v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 兜底：引了 knockout 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)knockout(?:-latest|\.min|-debug)?[\w.@/-]*\.js'
+    # 专属绑定入口（弱判据）
+    - source: body
+      pattern: '(?i)\bko\.applyBindings\s*\('
+      confidence: probable
+
+- id: element-ui
+  name: Element UI
+  category: js-library
+  cpe: cpe:/a:element:element_ui
+  softmatch: true
+  match:
+    # 文件名 / 路径带版本：element-ui@2.15.14 / element-ui/2.15.14/index.js
+    - source: body
+      pattern: '(?i)element[-_]ui(?:@|/|[-.])(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 资源路径：/element-ui/lib/theme-chalk/index.css
+    - source: body
+      pattern: '(?i)element[-_]ui/(?:lib|theme-chalk|packages)/'
+
+- id: element-plus
+  name: Element Plus
+  category: js-library
+  cpe: cpe:/a:element:element_plus
+  softmatch: true
+  match:
+    # 文件名 / 路径带版本：element-plus@2.5.6
+    - source: body
+      pattern: '(?i)element[-_]plus(?:@|/|[-.])(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 资源路径：/element-plus/theme-chalk/index.css
+    - source: body
+      pattern: '(?i)element[-_]plus/(?:lib|theme-chalk|es|dist)/'
+    # Element Plus 的 CSS 变量前缀（Element UI 无此写法，可区分两者）
+    - source: body
+      pattern: '(?i)--el-(?:color|font|border|text)-'
+      confidence: probable
+
+- id: layui
+  name: Layui
+  category: js-library
+  cpe: cpe:/a:layui:layui
+  softmatch: true
+  match:
+    # 文件名带版本：layui-2.9.16.js / layui@2.9.16 / /*! layui-v2.9.16 */
+    - source: body
+      pattern: '(?i)layui[-.@]?v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|css)'
+      version: ${version}
+    # 专属样式前缀：layui-btn / layui-nav 等
+    - source: body
+      pattern: '(?i)\blayui-(?:btn|nav|form|table|card|layer)\b'
+      confidence: probable
+    # 内联脚本调用入口：layui.use([...])
+    - source: body
+      pattern: '(?i)\blayui\.(?:use|config|define)\s*\('
+      confidence: probable
+    # 兜底：引了 layui 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)layui[\w.@/-]*\.(?:js|css)'
+
+- id: vant
+  name: Vant
+  category: js-library
+  cpe: cpe:/a:youzan:vant
+  softmatch: true
+  match:
+    # 文件名带版本：vant-2.12.0.min.js / vant@2.12.0/lib/index.css
+    - source: body
+      pattern: '(?i)vant[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|css)'
+      version: ${version}
+    # 资源路径：/vant/lib/index.css、/vant/es/...
+    - source: body
+      pattern: '(?i)vant/(?:lib|es|dist)/'
+    # 专属样式前缀：van-button / van-cell / van-tab 等
+    - source: body
+      pattern: '(?i)\bvan-(?:button|cell|nav-bar|tab|popup|field|toast)\b'
+      confidence: probable
+    # 兜底：引了 vant 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)\bvant[\w.@/-]*\.(?:js|css)'
+
+- id: weui
+  name: WeUI
+  category: js-library
+  cpe: cpe:/a:tencent:weui
+  softmatch: true
+  match:
+    # 文件名带版本：weui-2.6.5.min.css / weui@2.6.5
+    - source: body
+      pattern: '(?i)weui[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|css)'
+      version: ${version}
+    # 专属样式前缀：weui-btn / weui-cells / weui-dialog 等
+    - source: body
+      pattern: '(?i)\bweui-(?:btn|cells?|dialog|mask|navbar|tab|panel)\b'
+      confidence: probable
+    # 兜底：引了 weui 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)\bweui[\w.@/-]*\.(?:js|css)'
+
+- id: bulma
+  name: Bulma
+  category: js-library
+  cpe: cpe:/a:jgthms:bulma
+  softmatch: true
+  match:
+    # 文件名带版本：bulma-0.9.4.min.css / bulma@0.9.4
+    - source: body
+      pattern: '(?i)bulma[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.css'
+      version: ${version}
+    # 官方样式表横幅注释：/*! bulma.io v0.9.4 | MIT License | github.com/jgthms/bulma */
+    - source: body
+      pattern: '(?i)bulma\.io'
+      confidence: probable
+    # 兜底：引了 bulma 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)\bbulma[\w.@/-]*\.css'
+
+- id: lit
+  name: Lit
+  category: js-library
+  cpe: cpe:/a:lit:lit
+  softmatch: true
+  match:
+    # 文件名带版本：lit-element-3.3.0.js / lit-html@2.8.0.js
+    - source: body
+      pattern: '(?i)lit[-.]?(?:element|html)[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.js'
+      version: ${version}
+    # 打包入口带版本：lit@2.8.0
+    - source: body
+      pattern: '(?i)\blit@v?(?<version>\d+(?:\.\d+){1,3})'
+      version: ${version}
+    # 兜底：引了 lit-element / lit-html 资源即判定（无版本）
+    - source: body
+      pattern: '(?i)\blit[-.]?(?:element|html)(?:\.min)?\.js'
 
 - id: bootstrap
   name: Bootstrap

@@ -72,7 +72,7 @@ info:
 
 | Field | Commonness | Purpose | Default behavior |
 | --- | --- | --- | --- |
-| `requires` | common | declare which fingerprint identifiers must match first (fingerprint tag or fingerprint PoC id) | no gating when omitted |
+| `requires` | common | declare which fingerprint identifiers must match first (fingerprint tag or fingerprint PoC id, optionally with a version constraint like `jquery<3.5`) | no gating when omitted |
 | `requires-mode` | common | define what happens when fingerprint data is missing | default `strict` |
 
 ## `requires` syntax
@@ -104,6 +104,26 @@ The code path also accepts these `requires-mode` spellings:
 - `requires-mode`
 - `requiresMode`
 - `requires_mode`
+
+### Version constraint (optional)
+
+A `requires` entry may carry a version comparator, narrowing gating from "this product was identified" to "the identified version falls in the affected range":
+
+```yaml
+requires: [jquery<3.5]
+```
+
+Supported comparators: `<`, `<=`, `>`, `>=`, `==` (a single `=` is equivalent to `==`). Spaces around the comparator are allowed, so `jquery < 3.5` and `jquery<3.5` are equivalent.
+
+Rules:
+
+- tech identified and the version satisfies the constraint: execute
+- tech identified but the version violates the constraint: skip
+- version cannot be determined (no version parsed): execute, so a missing version does not cause a missed finding
+
+Versions are compared segment by segment on `.`, sharing the semantics of the CEL `versionCompare` function. Candidate PoC recommendations for a technology are filtered the same way: a candidate whose `requires` version constraint is not met is not linked.
+
+> Versions come from the product version parsed during the web fingerprint stage. Fingerprint PoCs (technologies matched via `info.tags` / `info.id`) do not currently produce a concrete version, so a version constraint on those identifiers always passes as "version unknown".
 
 ## How execution is allowed
 

@@ -120,6 +120,7 @@ func ToProtoEvent(ev *scanstream.Event) *afrogv1.ScanEvent {
 						Category:   t.Category,
 						Cpe:        t.CPE,
 						Confidence: t.Confidence,
+						Evidence:   t.Evidence,
 					})
 				}
 			}
@@ -255,6 +256,7 @@ func FromProtoEvent(in *afrogv1.ScanEvent) *scanstream.Event {
 					Category:   t.GetCategory(),
 					CPE:        t.GetCpe(),
 					Confidence: t.GetConfidence(),
+					Evidence:   t.GetEvidence(),
 				})
 			}
 		}

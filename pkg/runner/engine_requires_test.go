@@ -22,8 +22,8 @@ func TestShouldSkipRequires_Opportunistic_NoFingerprint(t *testing.T) {
 
 func TestShouldSkipRequires_Strict_Match(t *testing.T) {
 	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]struct{}{
-		"127.0.0.1:3306": {"mysql": {}},
+	fingerTagsByKey := map[string]map[string]string{
+		"127.0.0.1:3306": {"mysql": ""},
 	}
 	if shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, fingerTagsByKey, false) {
 		t.Fatalf("expected not skip when requires matches target fingerprint tags")
@@ -35,8 +35,8 @@ func TestShouldSkipRequires_Strict_Match(t *testing.T) {
 // 指纹 PoC 的 id，其 tags 里并无 "ajp-protocol-detect" 这个 tag。
 func TestShouldSkipRequires_Strict_MatchFingerprintPocID(t *testing.T) {
 	p := poc.Poc{Info: poc.Info{Requires: []string{"ajp-protocol-detect"}}}
-	fingerRequiresByKey := map[string]map[string]struct{}{
-		"127.0.0.1:8009": {"ajp": {}, "tomcat": {}, "ajp-protocol-detect": {}},
+	fingerRequiresByKey := map[string]map[string]string{
+		"127.0.0.1:8009": {"ajp": "", "tomcat": "", "ajp-protocol-detect": ""},
 	}
 	if shouldSkipRequires("127.0.0.1:8009", p, func(s string) string { return s }, fingerRequiresByKey, false) {
 		t.Fatalf("expected not skip when requires matches fingerprint poc id")
@@ -45,8 +45,8 @@ func TestShouldSkipRequires_Strict_MatchFingerprintPocID(t *testing.T) {
 
 func TestShouldSkipRequires_Strict_Mismatch(t *testing.T) {
 	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]struct{}{
-		"127.0.0.1:3306": {"redis": {}},
+	fingerTagsByKey := map[string]map[string]string{
+		"127.0.0.1:3306": {"redis": ""},
 	}
 	if !shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, fingerTagsByKey, false) {
 		t.Fatalf("expected skip when requires does not match target fingerprint tags")
@@ -55,11 +55,37 @@ func TestShouldSkipRequires_Strict_Mismatch(t *testing.T) {
 
 func TestShouldSkipRequires_Strict_EmptyKey(t *testing.T) {
 	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]struct{}{
-		"127.0.0.1:3306": {"mysql": {}},
+	fingerTagsByKey := map[string]map[string]string{
+		"127.0.0.1:3306": {"mysql": ""},
 	}
 	if !shouldSkipRequires("127.0.0.1:3306", p, func(string) string { return "" }, fingerTagsByKey, false) {
 		t.Fatalf("expected skip when strict and target key cannot be resolved")
+	}
+}
+
+// requires 带版本约束时，命中产品还要版本落在区间内才放行。
+func TestShouldSkipRequires_VersionConstraint(t *testing.T) {
+	p := poc.Poc{Info: poc.Info{Requires: []string{"jquery<3.5"}}}
+
+	// 识别到的版本满足约束 → 放行。
+	old := map[string]map[string]string{"a.example:80": {"jquery": "3.4.1"}}
+	if shouldSkipRequires("a.example:80", p, func(s string) string { return s }, old, false) {
+		t.Fatal("expected not skip when version satisfies the constraint")
+	}
+	// 识别到的版本不满足 → 跳过。
+	newer := map[string]map[string]string{"a.example:80": {"jquery": "3.6.0"}}
+	if !shouldSkipRequires("a.example:80", p, func(s string) string { return s }, newer, false) {
+		t.Fatal("expected skip when version violates the constraint")
+	}
+	// 版本未知 → 放行，避免因拿不到版本而漏报。
+	unknown := map[string]map[string]string{"a.example:80": {"jquery": ""}}
+	if shouldSkipRequires("a.example:80", p, func(s string) string { return s }, unknown, false) {
+		t.Fatal("expected not skip when version is unknown")
+	}
+	// 没识别到该产品 → 跳过。
+	absent := map[string]map[string]string{"a.example:80": {"nginx": "1.24"}}
+	if !shouldSkipRequires("a.example:80", p, func(s string) string { return s }, absent, false) {
+		t.Fatal("expected skip when tech is absent")
 	}
 }
 
@@ -75,7 +101,7 @@ func TestShouldSkipRequires_TestMode(t *testing.T) {
 func TestWebTechRequires(t *testing.T) {
 	metas := map[string]WebMeta{
 		"127.0.0.1:8080": {URL: "http://127.0.0.1:8080", Technologies: []WebTech{
-			{Name: "WordPress", Category: "cms", RuleID: "wordpress"},
+			{Name: "WordPress", Version: "6.4.2", Category: "cms", RuleID: "wordpress"},
 			{Name: "Apache Shiro", Category: "framework", RuleID: "apache-shiro", Confidence: "probable"},
 		}},
 		// 没有技术栈的探测结果不应产生 requires 词。
@@ -98,6 +124,10 @@ func TestWebTechRequires(t *testing.T) {
 			if _, ok := set[want]; !ok {
 				t.Fatalf("key %s missing token %q: %v", key, want, set)
 			}
+		}
+		// 版本要随标识词一起带出，供版本约束门控使用。
+		if set["wordpress"] != "6.4.2" {
+			t.Fatalf("key %s wordpress version = %q, want 6.4.2", key, set["wordpress"])
 		}
 	}
 	if _, ok := got["127.0.0.1:9090"]; ok {

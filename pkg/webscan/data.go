@@ -534,11 +534,14 @@ func LoadDB(dir string) (*DB, error) {
 // loadBuiltinRules 合并两份内置规则源。
 //
 // 两份数据的分工：精选集判据强（专属 Cookie、favicon 哈希、CPE），社区集体量大、
-// 覆盖广（脚本地址、CSS 变量、meta 等）。因此：
-//   - 同 id：精选集先入表，社区条目丢弃；
-//   - 同技术名（id 不同）：社区判据**追加**到精选规则里，而非另立一条。
-//     否则同一个 Vue.js 会出现两条记录，且社区集里更宽的判据（scriptSrc、class 名）
-//     会被白白丢掉——覆盖率正是这次要解决的问题。
+// 覆盖广（脚本地址、CSS 变量、meta 等）。命中同一条技术时把社区判据**追加**到精选规则
+// 里，而不是另立一条或整条丢弃：
+//   - 追加来源更宽的判据（scriptSrc、class 名、Cookie 名）正是扩容要解决的问题；
+//   - 若另立一条，同一个 Vue.js 会出现两条记录；
+//   - 若整条丢弃，社区集里精选集没有的判据（如 Cloudflare 的 cf-cache-status）就被白白浪费。
+//
+// 「同一条技术」有两种等价判定：同 id，或同技术名（id 不同）。前者是社区沿用我们 id 的
+// 情况，后者是 id 命名习惯不同的情况（如 nextjs vs next-js），两者一视同仁。
 func loadBuiltinRules() ([]*Rule, error) {
 	var curated []*Rule
 	if err := unmarshalEmbedded(builtinRulesFile, &curated); err != nil {
@@ -556,14 +559,15 @@ func loadBuiltinRules() ([]*Rule, error) {
 	byName := make(map[string]*Rule, len(curated))
 	for _, r := range curated {
 		byID[r.ID] = r
-		byName[strings.ToLower(strings.TrimSpace(r.Name))] = r
+		byName[ruleNameKey(r.Name)] = r
 	}
 
 	for _, r := range community {
-		if _, dup := byID[r.ID]; dup {
-			continue
+		host, ok := byID[r.ID]
+		if !ok {
+			host, ok = byName[ruleNameKey(r.Name)]
 		}
-		if host, ok := byName[strings.ToLower(strings.TrimSpace(r.Name))]; ok {
+		if ok {
 			// 社区判据来自众包数据，强度不如人工精调，统一压到 probable：
 			// 追加的是「能多识别一些」的能力，不该顺带把精选集的可信度语义改掉。
 			for i := range r.Match {
@@ -573,10 +577,15 @@ func loadBuiltinRules() ([]*Rule, error) {
 			continue
 		}
 		byID[r.ID] = r
-		byName[strings.ToLower(strings.TrimSpace(r.Name))] = r
+		byName[ruleNameKey(r.Name)] = r
 		merged = append(merged, r)
 	}
 	return merged, nil
+}
+
+// ruleNameKey 是合并规则时用的「技术名」归一化键：忽略大小写与首尾空白。
+func ruleNameKey(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 func unmarshalEmbedded(name string, out interface{}) error {

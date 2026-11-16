@@ -124,6 +124,8 @@ type WebTechnologyEvent struct {
 	Category   string `json:"category,omitempty"`
 	CPE        string `json:"cpe,omitempty"`
 	Confidence string `json:"confidence,omitempty"`
+	// Evidence 是命中的依据（素材位置 + 匹配片段），让识别结论可复核。
+	Evidence string `json:"evidence,omitempty"`
 }
 
 // WebProbeEvent 描述一次 Web 探测。

@@ -312,6 +312,7 @@ func translateScanEvent(t *Task, ev *scanstream.Event) {
 					"category":   t.Category,
 					"cpe":        t.CPE,
 					"confidence": t.Confidence,
+					"evidence":   t.Evidence,
 				})
 			}
 			webData["technologies"] = techs

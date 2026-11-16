@@ -285,6 +285,7 @@ func (s *Scanner) installRunnerHooks() {
 					Category:   t.Category,
 					CPE:        t.CPE,
 					Confidence: t.Confidence,
+					Evidence:   t.Evidence,
 				})
 			}
 		}

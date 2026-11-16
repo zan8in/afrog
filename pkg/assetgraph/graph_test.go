@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 )
 
 // 子图要能穿透到「端点 → 技术栈 → 候选 PoC」，且两类派生节点不落资产表。
@@ -60,13 +61,16 @@ func TestBuildIncludesTechAndCandidatePoc(t *testing.T) {
 	}
 }
 
-// requires 索引的匹配口径：规则 id、完整名字、首个词都能命中；WAF/CDN 不参与。
+// requires 索引的匹配口径：规则 id、完整名字、首个词都能命中；WAF/CDN 不参与；
+// 带版本约束的候选按识别到的版本过滤。
 func TestCandidatesForUsesRequiresIndex(t *testing.T) {
-	index := map[string][]string{
-		"thinkphp":            {"CVE-2024-1"},
-		"thinkphp 6":          {"CVE-2024-2"},
-		"ajp-protocol-detect": {"ajp-file-read"},
-		"cloudflare":          {"not-a-real-poc"},
+	index := map[string][]techCandidate{
+		"thinkphp":            {{ID: "CVE-2024-1"}},
+		"thinkphp 6":          {{ID: "CVE-2024-2"}},
+		"ajp-protocol-detect": {{ID: "ajp-file-read"}},
+		"cloudflare":          {{ID: "not-a-real-poc"}},
+		// jquery<3.5：只在识别到旧版本时才是候选。
+		"jquery": {{ID: "jquery-xss", Version: &poc.RequireVersion{Tech: "jquery", Op: "<", Value: "3.5"}}},
 	}
 	cases := []struct {
 		tech TechRef
@@ -77,6 +81,12 @@ func TestCandidatesForUsesRequiresIndex(t *testing.T) {
 		{TechRef{Name: "Tomcat", RuleID: "ajp-protocol-detect"}, []string{"ajp-file-read"}},
 		{TechRef{Name: "Cloudflare", Category: "waf"}, nil},
 		{TechRef{Name: "UnknownTech"}, nil},
+		// 旧版本满足 jquery<3.5，挂出候选。
+		{TechRef{Name: "jQuery", Version: "3.4.1"}, []string{"jquery-xss"}},
+		// 新版本不满足，剔除候选。
+		{TechRef{Name: "jQuery", Version: "3.6.0"}, nil},
+		// 版本未知：保留候选，避免因拿不到版本而漏报。
+		{TechRef{Name: "jQuery"}, []string{"jquery-xss"}},
 	}
 	for _, tc := range cases {
 		got := candidatesFor(index, tc.tech)

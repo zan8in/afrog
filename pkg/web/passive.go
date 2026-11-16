@@ -453,6 +453,7 @@ func (rt *passiveRuntime) onExtraction(projectID string, x passive.Extraction) {
 			Name:     x.Title,
 			RuleID:   x.Rule,
 			Category: extraString(x.Extra["tech_category"]),
+			Version:  extraString(x.Extra["version"]),
 		}
 		if err := assetgraph.LinkTechCandidates(x.Target, []assetgraph.TechRef{ref}); err != nil {
 			gologger.Debug().Msgf("技术栈图写入失败: target=%s err=%v", x.Target, err)

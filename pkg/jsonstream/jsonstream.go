@@ -264,6 +264,7 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 					Category:   t.Category,
 					CPE:        t.CPE,
 					Confidence: t.Confidence,
+					Evidence:   t.Evidence,
 				})
 			}
 		}
