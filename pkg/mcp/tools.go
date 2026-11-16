@@ -618,6 +618,8 @@ func (s *Server) pocSearchTool() *Tool {
 				"count":     map[string]any{"type": "integer", "description": "本次返回条数"},
 				"total":     map[string]any{"type": "integer", "description": "命中总数"},
 				"truncated": map[string]any{"type": "boolean", "description": "命中数超过 limit 被截断"},
+				"conclusion": map[string]any{"type": "string", "description": "has_poc（本机有该关键词的 PoC）/ no_poc_for_keyword（本机没有，别据此判定目标无漏洞）"},
+				"guidance":   map[string]any{"type": "string", "description": "total 为 0 时给出的下一步建议"},
 			},
 			"required": []string{"items", "count", "total", "truncated"},
 		},
@@ -630,7 +632,25 @@ func (s *Server) pocSearchTool() *Tool {
 				return nil, err
 			}
 
-			return agentapi.SearchPocs(a.Keyword, a.Severity, a.Limit)
+			res, err := agentapi.SearchPocs(a.Keyword, a.Severity, a.Limit)
+			if err != nil {
+				return nil, err
+			}
+			out := map[string]any{
+				"items":     res.Items,
+				"count":     res.Count,
+				"total":     res.Total,
+				"truncated": res.Truncated,
+			}
+			// 显式区分「本机没有该关键词的 PoC」与「有」：只有前者才需要把「不能据此判定
+			// 无漏洞」讲清楚——否则模型会把「afrog 没有这个产品的 PoC」读成「目标安全」。
+			if res.Total == 0 {
+				out["conclusion"] = "no_poc_for_keyword"
+				out["guidance"] = fmt.Sprintf("本机 PoC 库里没有与关键词 %q 匹配的 PoC——说明 afrog 暂无该技术栈/产品的检测能力，**不能据此判定目标无漏洞**。可换更通用的关键词，或征得用户同意后用空 search 让 scan.start 跑全库。", strings.TrimSpace(a.Keyword))
+			} else {
+				out["conclusion"] = "has_poc"
+			}
+			return out, nil
 		},
 	}
 }
@@ -1231,12 +1251,12 @@ func (s *Server) probeFingerprintTool() *Tool {
 	return &Tool{
 		Name:        "probe.fingerprint",
 		Title:       "识别 Web 指纹",
-		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。默认不发 favicon 请求。**返回里的 suggested_search 就是可直接透传的关键词串**（由识别出的技术栈名拼成）：先用它调 poc.search(keyword=suggested_search) 预检（等价 afrog -pl -s），有结果再把同一串交给 scan.start(search=…) 并发扫描——这是「先识别指纹、再找漏洞」的主路径，别自己另编关键词。若 technologies 为空（suggested_search 也是空），说明没识别出任何技术栈：不要凭空编关键词，改走 plan.next，或征得用户同意后用空 search 让 afrog 跑全部 PoC（见 scan.start）。",
+		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。**返回里的 suggested_search 就是可直接透传的关键词串**（由识别出的技术栈的规则 id、名称等标识词拼成）：先用它调 poc.search(keyword=suggested_search) 预检（等价 afrog -pl -s），有结果再把同一串交给 scan.start(search=…) 并发扫描——这是「先识别指纹、再找漏洞」的主路径，别自己另编关键词。首页识别不出任何技术栈时，会自动补抓一次 /favicon.ico 再匹配（多一次请求与预算，返回里的 favicon_fetched 标明是否真的抓了）；favicon=true 则无论首页是否有结果都抓。若 technologies 为空（suggested_search 也是空），说明没识别出任何技术栈：不要凭空编关键词，改走 plan.next，或征得用户同意后用空 search 让 afrog 跑全部 PoC（见 scan.start）。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"url":         map[string]any{"type": "string", "description": "绝对 URL，缺省协议时按 http 处理"},
-				"favicon":     map[string]any{"type": "boolean", "description": "额外抓取一次 /favicon.ico（多一次请求与预算）"},
+				"favicon":     map[string]any{"type": "boolean", "description": "强制抓取 /favicon.ico（多一次请求与预算）；默认关闭，但首页没识别出任何技术栈时会自动补抓一次"},
 				"timeout_sec": map[string]any{"type": "integer", "minimum": 1, "maximum": 60, "description": "整体超时，默认 15 秒"},
 			},
 			"required": []string{"url"},
@@ -1316,28 +1336,53 @@ func (s *Server) probeFingerprintTool() *Tool {
 			if err != nil {
 				return nil, err
 			}
-			var favicon []byte
-			if a.Favicon {
-				favicon = fetchFavicon(runCtx, resp.Request.URL)
+			match := func(fav []byte) webscan.Result {
+				return matcher.Match(webscan.Response{
+					StatusCode: resp.StatusCode,
+					Headers:    headers,
+					Body:       body,
+					Favicon:    fav,
+					RequestURL: resp.Request.URL.String(),
+					Cookies:    resp.Header.Values("Set-Cookie"),
+				})
 			}
-			matched := matcher.Match(webscan.Response{
-				StatusCode: resp.StatusCode,
-				Headers:    headers,
-				Body:       body,
-				Favicon:    favicon,
-				RequestURL: resp.Request.URL.String(),
-				Cookies:    resp.Header.Values("Set-Cookie"),
-			})
+			// 先用首页素材匹配一次（不含 favicon）。
+			matched := match(nil)
+
+			// 抓 favicon 的时机：显式要求，或首页什么技术栈都没识别出来。favicon 的 mmh3
+			// 是最稳定、最便宜的兜底指纹维度——首页没命中时补抓一次，往往能把「识别不出」
+			// 变成「识别得出」。显式要求已在上面按 2 次请求计过费；自动补抓的这一次在此单独
+			// 计费，预算不足就放弃补抓、不影响主结果。
+			faviconFetched := false
+			if a.Favicon || len(matched.Technologies) == 0 {
+				allowed := true
+				if !a.Favicon {
+					if err := s.gate.Take(policy.Action{Name: "probe.fingerprint", Target: target}, 1); err != nil {
+						allowed = false
+					}
+				}
+				if allowed {
+					if fav := fetchFavicon(runCtx, resp.Request.URL); len(fav) > 0 {
+						faviconFetched = true
+						matched = match(fav)
+					}
+				}
+			}
 
 			techs := make([]map[string]any, 0, len(matched.Technologies))
 			waf := make([]string, 0, 2)
 			cdn := make([]string, 0, 2)
-			// suggested_search 是本工具交给模型的关键词：把识别出的技术栈名（小写、去重）
-			// 拼成逗号串，可原样透传给 poc.search(keyword=) 与 scan.start(search=)。
-			// 有它，模型就不必自己把 technologies 映射成 -s 关键词——那一步正是最容易乱编的地方
-			// （例如识别出 jQuery 却去搜 wordpress,nginx 之类根本没识别到的产品）。
-			searchTokens := make([]string, 0, len(matched.Technologies))
-			seenToken := make(map[string]struct{}, len(matched.Technologies))
+			// suggested_search 是本工具交给模型的关键词：把每条技术栈的 requires 标识词
+			// （规则 id、技术名及其连字符写法）拼成逗号串，可原样透传给 poc.search(keyword=)
+			// 与 scan.start(search=)。用 MatchTokens 而不是只用名称，是为了让「检索口径」与
+			// afrog 自身的 requires 门控一致——模型不必再猜关键词（那一步最容易乱编：
+			// 识别出 jQuery 却去搜 wordpress、nginx 之类根本没识别到的产品）。
+			//
+			// 有意去掉 category：它是 requires 门控用的粗粒度语义，拿它做检索会一搜一大片
+			// （实测 afrog -s "cms" 命中 83 条 PoC），把一次按需扫描放大成长列表扫描，
+			// 违背本工具面「按需、可解释」的定位。规则 id 才是 PoC requires 里真正书写的词。
+			searchTokens := make([]string, 0, len(matched.Technologies)*2)
+			seenToken := make(map[string]struct{}, len(matched.Technologies)*2)
 			for _, t := range matched.Technologies {
 				techs = append(techs, map[string]any{
 					"name":       t.Name,
@@ -1346,11 +1391,16 @@ func (s *Server) probeFingerprintTool() *Tool {
 					"cpe":        t.CPE,
 					"confidence": t.Confidence.String(),
 				})
-				if name := strings.ToLower(strings.TrimSpace(t.Name)); name != "" {
-					if _, ok := seenToken[name]; !ok {
-						seenToken[name] = struct{}{}
-						searchTokens = append(searchTokens, name)
+				category := strings.ToLower(strings.TrimSpace(t.Category))
+				for _, tok := range t.MatchTokens() {
+					if tok == category {
+						continue
 					}
+					if _, ok := seenToken[tok]; ok {
+						continue
+					}
+					seenToken[tok] = struct{}{}
+					searchTokens = append(searchTokens, tok)
 				}
 				switch strings.ToLower(t.Category) {
 				case "waf":
@@ -1373,6 +1423,7 @@ func (s *Server) probeFingerprintTool() *Tool {
 				"cdn":              cdn,
 				"redirects":        redirects,
 				"favicon_hash":     matched.FaviconHash,
+				"favicon_fetched":  faviconFetched,
 				"latency_ms":       latency,
 			}
 			if tls := tlsSummary(resp); tls != nil {
@@ -1504,9 +1555,19 @@ func (s *Server) scanStartTool() *Tool {
 					},
 				},
 				"summary": map[string]any{"type": "object", "description": "子进程汇总：executed / found / by_severity / elapsed_ms"},
-				"error":   map[string]any{"type": "string"},
+				"library": map[string]any{
+					"type":        "object",
+					"description": "本机 PoC 库对该关键词的覆盖：matched_pocs（库中匹配数）/ executed_pocs（实际执行数）",
+					"properties": map[string]any{
+						"matched_pocs":  map[string]any{"type": "integer"},
+						"executed_pocs": map[string]any{"type": "integer"},
+					},
+				},
+				"conclusion": map[string]any{"type": "string", "description": "hit / no_finding / no_poc_for_keyword"},
+				"guidance":   map[string]any{"type": "string", "description": "未命中时的说明，用来分清「本机没 PoC」与「有 PoC 没命中」"},
+				"error":      map[string]any{"type": "string"},
 			},
-			"required": []string{"target", "search", "status", "found", "results"},
+			"required": []string{"target", "search", "status", "found", "results", "library", "conclusion"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -1546,25 +1607,53 @@ func (s *Server) scanStartTool() *Tool {
 			if err != nil {
 				return nil, err
 			}
-			return scanRunResult(target, search, run), nil
+			return scanRunResult(target, search, run, countMatchedPocs(search)), nil
 		},
 	}
 }
 
-// scanRunResult 把一次扫描的产物整理成工具返回。
-func scanRunResult(target, search string, run *scanRun) map[string]any {
+// scanRunResult 把一次扫描的产物整理成工具返回，并显式区分三种结论——否则模型会把
+// 「本机没有该技术栈的 PoC」读成「目标没有漏洞」：
+//
+//	hit                  有命中；
+//	no_finding           本机有匹配 PoC 且已执行，但均未命中（只能说明这些 PoC 未在目标上成立）；
+//	no_poc_for_keyword   关键词在本机 PoC 库里根本没有匹配（afrog 暂无该产品的检测能力）。
+func scanRunResult(target, search string, run *scanRun, matched int) map[string]any {
+	executed := 0
+	if run.Summary != nil {
+		executed = int(run.Summary.Executed)
+	}
 	out := map[string]any{
 		"target":  target,
 		"search":  search,
 		"status":  run.Status,
 		"found":   len(run.Results) > 0,
 		"results": run.Results,
+		// library 是「本机 PoC 库对这个关键词的覆盖」：matched_pocs 为库中匹配数，
+		// executed_pocs 为实际执行数。两者一起看，才能分清「没 PoC」与「有 PoC 没命中」。
+		"library": map[string]any{
+			"matched_pocs": matched,
+			"executed_pocs": executed,
+		},
 	}
 	if run.Summary != nil {
 		out["summary"] = run.Summary
 	}
 	if run.Error != "" {
 		out["error"] = run.Error
+	}
+	switch {
+	case len(run.Results) > 0:
+		out["conclusion"] = "hit"
+	case matched == 0:
+		out["conclusion"] = "no_poc_for_keyword"
+		out["guidance"] = fmt.Sprintf("本机 PoC 库中没有与关键词 %q 匹配的 PoC——这只说明 afrog 暂无该产品的检测能力，**不能据此判定目标无漏洞**。可换更通用的关键词，或征得用户同意后用空 search 跑全库。", search)
+	case executed == 0:
+		out["conclusion"] = "no_finding"
+		out["guidance"] = fmt.Sprintf("本机有 %d 条匹配 PoC，但没有一条被执行（多半被 severity 过滤挡下）——这不构成「无漏洞」结论，去掉 severity 限制或用空 severity 重扫。", matched)
+	default:
+		out["conclusion"] = "no_finding"
+		out["guidance"] = fmt.Sprintf("本机有 %d 条匹配 PoC、已执行 %d 条，均未命中——只能说明这些 PoC 未在目标上成立，**不等于目标无漏洞**。", matched, executed)
 	}
 	return out
 }

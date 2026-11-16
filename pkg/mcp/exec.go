@@ -185,28 +185,38 @@ func mcpTaskID(tool string) string {
 	return fmt.Sprintf("mcp-%s-%d", name, time.Now().UnixNano())
 }
 
+// countMatchedPocs 返回本机 PoC 库里与关键词 search 匹配的 PoC 数（不做 severity 过滤，
+// 空关键词表示全库）。
+//
+// 它有两个用途：一是预算预留的分母，二是回答「本机到底有没有这个技术栈的 PoC」。
+// 后者是可信度的关键——有它才能区分「本机无该技术栈 PoC」与「有 PoC 但未命中」，
+// 否则模型会把前者当成「目标无漏洞」。
+func countMatchedPocs(search string) int {
+	keywords := splitKeywords(search)
+	if len(keywords) == 0 {
+		if items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"}); err == nil {
+			return len(items)
+		}
+		return 0
+	}
+	count := 0
+	for _, kw := range keywords {
+		items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all", Q: kw})
+		if err != nil {
+			continue
+		}
+		count += len(items)
+	}
+	return count
+}
+
 // estimateKeywordReserve 估算「按关键词扫一批」需要预留多少请求额度。
 //
 // 口径：命中各关键词的 PoC 数 × 单个 PoC 的保守请求数，落在
 // [defaultVerifyReserve, maxVerifyReserve] 内。它只用于预算预留，不影响实际执行；
 // 关键词为空时按「全库」估算——空 search 就是一次全量扫描，不能当成一次小检测预留。
 func estimateKeywordReserve(search string) int {
-	keywords := splitKeywords(search)
-	count := 0
-	if len(keywords) == 0 {
-		if items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all"}); err == nil {
-			count = len(items)
-		}
-	} else {
-		for _, kw := range keywords {
-			items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all", Q: kw})
-			if err != nil {
-				continue
-			}
-			count += len(items)
-		}
-	}
-	reserve := count * defaultVerifyReserve
+	reserve := countMatchedPocs(search) * defaultVerifyReserve
 	if reserve < defaultVerifyReserve {
 		reserve = defaultVerifyReserve
 	}

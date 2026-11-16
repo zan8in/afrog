@@ -3,7 +3,59 @@ package mcp
 import (
 	"strings"
 	"testing"
+
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
+
+// scanRunResult 必须显式区分三种结论，否则模型会把「本机没有该技术栈的 PoC」
+// 读成「目标没有漏洞」。
+func TestScanRunResultConclusions(t *testing.T) {
+	hit := scanRunResult("http://t", "thinkphp", &scanRun{
+		Status:  "completed",
+		Results: []map[string]any{{"poc_id": "thinkphp-rce"}},
+		Summary: &scanstream.Summary{Executed: 3, Found: 1},
+	}, 3)
+	if hit["conclusion"] != "hit" {
+		t.Fatalf("hit conclusion = %v", hit["conclusion"])
+	}
+
+	// 本机有 PoC 且已执行，但均未命中。
+	noFind := scanRunResult("http://t", "thinkphp", &scanRun{
+		Status:  "completed",
+		Summary: &scanstream.Summary{Executed: 3},
+	}, 3)
+	if noFind["conclusion"] != "no_finding" {
+		t.Fatalf("no_finding conclusion = %v", noFind["conclusion"])
+	}
+	if _, ok := noFind["guidance"]; !ok {
+		t.Fatal("no_finding must carry guidance")
+	}
+
+	// 有 PoC，但被 severity 全部过滤、一条都没执行。
+	filtered := scanRunResult("http://t", "thinkphp", &scanRun{
+		Status:  "completed",
+		Summary: &scanstream.Summary{Executed: 0},
+	}, 5)
+	if filtered["conclusion"] != "no_finding" {
+		t.Fatalf("filtered conclusion = %v", filtered["conclusion"])
+	}
+
+	// 本机根本没有这个关键词的 PoC——最容易被误读成「无漏洞」的一种。
+	noPoc := scanRunResult("http://t", "no-such-tech", &scanRun{
+		Status:  "completed",
+		Summary: &scanstream.Summary{},
+	}, 0)
+	if noPoc["conclusion"] != "no_poc_for_keyword" {
+		t.Fatalf("no_poc conclusion = %v", noPoc["conclusion"])
+	}
+	lib, ok := noPoc["library"].(map[string]any)
+	if !ok {
+		t.Fatalf("library missing: %+v", noPoc)
+	}
+	if lib["matched_pocs"] != 0 {
+		t.Fatalf("library matched_pocs = %v, want 0", lib["matched_pocs"])
+	}
+}
 
 func TestEstimatePocRequests(t *testing.T) {
 	plain := []byte(`

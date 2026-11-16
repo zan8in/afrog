@@ -152,8 +152,54 @@ func TestProbeFingerprintToolMatchesTech(t *testing.T) {
 	if names["WordPress"] != "6.4.2" {
 		t.Fatalf("WordPress missing/wrong version: %+v", names)
 	}
+	// suggested_search 由规则 id / 技术名等标识词拼成，且不带 category
+	// （category 太宽，如 cms 会命中上百条 PoC）。
+	suggested, _ := res["suggested_search"].(string)
+	for _, want := range []string{"nginx", "wordpress"} {
+		if !strings.Contains(suggested, want) {
+			t.Fatalf("suggested_search = %q, want token %q", suggested, want)
+		}
+	}
+	if strings.Contains(suggested, "web-server") {
+		t.Fatalf("suggested_search must not carry category tokens: %q", suggested)
+	}
 	if got := s.gate.Budget().Remaining(); got != 19 {
 		t.Fatalf("budget remaining = %d, want 19", got)
+	}
+}
+
+// 首页识别不出任何技术栈时，应自动补抓一次 /favicon.ico 再匹配（多一次请求、多一次预算）。
+func TestProbeFingerprintAutoFetchesFaviconWhenNoTech(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/favicon.ico" {
+			_, _ = w.Write([]byte("\x00\x01\x02favicon-bytes"))
+			return
+		}
+		// 首页给一个完全不携带指纹素材的响应：无 Server 头、无正文技术特征。
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 20\n  duration: 2m\n")
+	out, err := s.tools["probe.fingerprint"].Handler(context.Background(), mustJSON(t, map[string]any{
+		"url": srv.URL,
+	}))
+	if err != nil {
+		t.Fatalf("probe.fingerprint: %v", err)
+	}
+	res := out.(map[string]any)
+	if techs, _ := res["technologies"].([]map[string]any); len(techs) != 0 {
+		t.Fatalf("precondition failed: homepage should yield no tech, got %+v", techs)
+	}
+	if res["favicon_fetched"] != true {
+		t.Fatalf("favicon_fetched = %v, want true", res["favicon_fetched"])
+	}
+	if res["favicon_hash"] == "" {
+		t.Fatalf("favicon_hash empty after auto fetch: %+v", res)
+	}
+	// 首页 1 次 + 自动补抓 favicon 1 次 = 2。
+	if got := s.gate.Budget().Remaining(); got != 18 {
+		t.Fatalf("budget remaining = %d, want 18", got)
 	}
 }
 
