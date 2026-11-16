@@ -143,7 +143,7 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
 
 ## 第 3 步：接入你的客户端
 
-### 3.0 通用规则（先看这四条）
+### 3.0 通用规则（先看这几条）
 
 1. **`command` 一律填绝对路径**（第 0 步查到的结果）。
 2. **一次只加一个 server**，名字建议就叫 `afrog`，方便对照。
@@ -152,6 +152,16 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
    > 用 afrog 列出最近的漏洞命中，最多 5 条。
 
    看到它调用 `observe.findings` 并返回结果，就算通过。
+5. **长扫描要调大超时**：`scan.start` 一次可能跑几分钟，而多数客户端默认的工具调用超时只有 60 秒——不调大就会在跑到一半时被**客户端侧掐断**（现象是「工具调用超时/无响应」，但 afrog 子进程其实还在跑，白扣额度）。建议设成 **10 分钟**。
+
+> **超时怎么填（各客户端不一样）**：
+>
+> - **Cline**：在配置里写 `"timeout": 600`，**单位是秒**（默认 60、可选 30 秒–1 小时，故 600 = 10 分钟）；
+> - **Cherry Studio**：不在配置文件里，去 `设置 → MCP → 超时时间` 调大；
+> - **Claude Code**：工具调用超时默认就极大（约 28 小时），一般不用管；只有服务器启动慢时才需要在启动前设 `MCP_TIMEOUT`（**单位毫秒**，如 `MCP_TIMEOUT=60000`）；
+> - **VS Code / Cursor / Windsurf / Claude Desktop**：官方配置里**没有**这个字段，写了也会被忽略——长扫描若被掐断，到各自设置里找超时项。
+>
+> 另外 `scan.start` 自身还有整批扫描的 `timeout_sec`（默认 300 秒、最大 1800 秒），客户端超时应不小于它。
 
 下面按市面主流的客户端分类，挑你正在用的那一节照着做即可。
 
@@ -221,6 +231,8 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
 如果上一步已经写好了 JSON，也可以点右上角 `从 JSON 导入`，把 3.1 那段 `mcpServers` 配置粘进去。
 
 **启用**：保存后，把服务器列表里 `afrog` 右侧的开关打开。
+
+**超时**：Cherry Studio 的 MCP 超时**不在配置文件里**，去 `设置 → MCP → 超时时间` 调大（长扫描建议 10 分钟）。
 
 **验证**：展开 `afrog` 条目应能看到 21 个工具；在对话界面选中「启用 MCP」，然后提问「用 afrog 列出最近的漏洞命中」。
 
@@ -327,12 +339,15 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
     "afrog": {
       "command": "/usr/local/bin/afrog",
       "args": ["mcp"],
+      "timeout": 600,
       "disabled": false,
       "autoApprove": []
     }
   }
 }
 ```
+
+> 这里的 `"timeout": 600` 是 Cline 的**单次工具调用超时，单位是秒**（600 = 10 分钟）——Cline 默认只有 60 秒，不调大跑长扫描会被掐断。这是主流客户端里少数能在配置文件里直接设超时的。
 
 **验证**：MCP Servers 面板里应出现 `afrog` 及其工具数；在对话里提问并允许调用。
 
@@ -345,6 +360,7 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
       "type": "streamableHttp",
       "url": "http://127.0.0.1:16870/mcp",
       "headers": { "Authorization": "Bearer your-token" },
+      "timeout": 600,
       "disabled": false,
       "autoApprove": []
     }
@@ -400,6 +416,8 @@ Claude Code 不用手写 JSON，一条命令搞定：
 # -s user 表示对所有项目生效；想只给当前项目用，可省略 -s 或改成 -s local
 claude mcp add afrog -s user -- afrog mcp
 ```
+
+**超时**：Claude Code 的工具调用超时默认就极大（约 28 小时），一般**不用管**；只有服务器启动慢时才需要在启动前设 `MCP_TIMEOUT`（**单位毫秒**，例如 `MCP_TIMEOUT=60000 claude`）。
 
 **验证**
 
@@ -575,6 +593,7 @@ agent:
 | 工具列出来了，但全显示「被拦截」 | 默认策略是只读 | 见第 5 步放宽档位 |
 | 调用报 401 | HTTP 模式的 token 不对 | 客户端 `Authorization: Bearer <token>` 与服务端 `-token` 保持一致 |
 | 调用报 429 | 本次会话的请求额度用尽了 | 提高 `budget.requests`，或空闲 `budget.duration` 后自动开新会话补满 |
+| 长扫描跑到一半报「工具调用超时」 | 客户端侧的工具超时太短（多数默认 60s） | 调大客户端超时（见 3.0 通用规则）：Cline 写 `"timeout": 600`（秒）、Cherry Studio 去 `设置 → MCP → 超时时间`；afrog 子进程此时可能仍在跑 |
 | 调用报 403 | 被策略拒绝（可能是 `deny` 或 `scope`） | 看客户端返回的规则名与原因，改策略后重启 |
 | 提示需要配置反连（OOB） | 跑的是反向 PoC，但没配 `agent.oob` | 在 `afrog-config.yaml` 的 `agent.oob` 里配反连适配器 |
 | 返回空列表 | 本机台账里还没有命中 | 先跑一次扫描，再问一次 |

@@ -153,6 +153,16 @@ afrog's MCP default policy is **read-only**. A freshly started server never gain
    > Use afrog to list the most recent findings, at most 5.
 
    If it calls `observe.findings` and returns a result, you have passed.
+5. **Raise the timeout for long scans**: `scan.start` can run for a few minutes, while most clients default the tool-call timeout to just 60 seconds — without raising it the scan gets **cut off on the client side** halfway through (the symptom is "tool call timed out / no response", while the afrog subprocess is actually still running and burning your quota for nothing). Set it to **10 minutes**.
+
+> **How to set it (differs per client)**:
+>
+> - **Cline**: write `"timeout": 600` in the config, **in seconds** (default 60, allowed range 30 seconds – 1 hour, so 600 = 10 minutes);
+> - **Cherry Studio**: not in the config file — go to `Settings → MCP → Timeout` and raise it;
+> - **Claude Code**: the tool-call timeout is already huge by default (about 28 hours), usually nothing to do; only set `MCP_TIMEOUT` before launch if the server starts slowly (**in milliseconds**, e.g. `MCP_TIMEOUT=60000`);
+> - **VS Code / Cursor / Windsurf / Claude Desktop**: there is **no** such field in the official config, and it is ignored if written — if a long scan is cut off, look for a timeout setting in each client's own preferences.
+>
+> Separately, `scan.start` also has its own whole-batch `timeout_sec` (default 300 seconds, max 1800 seconds), and the client timeout should be no smaller than that.
 
 Pick the section for the client you actually use.
 
@@ -222,6 +232,8 @@ Menu bar `Claude → Settings → Developer → Edit Config` opens it for you. T
 If you already have the JSON from 3.1, click `Import from JSON` and paste the `mcpServers` block instead.
 
 **Enable**: after saving, flip the toggle next to `afrog` in the server list.
+
+**Timeout**: Cherry Studio's MCP timeout is **not in the config file** — go to `Settings → MCP → Timeout` and raise it (10 minutes is recommended for long scans).
 
 **Verify**: expanding `afrog` should show 21 tools. In a chat with MCP enabled, ask "Use afrog to list the most recent findings."
 
@@ -328,12 +340,15 @@ After saving, a `Start` code lens appears above the entry; click it and wait for
     "afrog": {
       "command": "/usr/local/bin/afrog",
       "args": ["mcp"],
+      "timeout": 600,
       "disabled": false,
       "autoApprove": []
     }
   }
 }
 ```
+
+> Here `"timeout": 600` is Cline's **single tool-call timeout, in seconds** (600 = 10 minutes) — Cline defaults to only 60 seconds, so a long scan gets cut off if you do not raise it. Cline is one of the few mainstream clients where you can set the timeout directly in the config file.
 
 **Verify**: the MCP Servers panel should list `afrog` and its tool count. Ask in chat and approve the call.
 
@@ -346,6 +361,7 @@ After saving, a `Start` code lens appears above the entry; click it and wait for
       "type": "streamableHttp",
       "url": "http://127.0.0.1:16870/mcp",
       "headers": { "Authorization": "Bearer your-token" },
+      "timeout": 600,
       "disabled": false,
       "autoApprove": []
     }
@@ -401,6 +417,8 @@ Claude Code needs no hand-written JSON — one command does it:
 # -s user applies to all projects; omit it (or use -s local) for the current project only
 claude mcp add afrog -s user -- afrog mcp
 ```
+
+**Timeout**: Claude Code's tool-call timeout is already huge by default (about 28 hours), so there is usually **nothing to do**; only set `MCP_TIMEOUT` before launch if the server starts slowly (**in milliseconds**, e.g. `MCP_TIMEOUT=60000 claude`).
 
 **Verify**
 
@@ -576,6 +594,7 @@ agent:
 | Tools are listed but all show "blocked" | Default policy is read-only | Widen the mode (Step 5) |
 | A call returns 401 | Wrong token in HTTP mode | Make the client's `Authorization: Bearer <token>` match the server's `-token` |
 | A call returns 429 | This session's request allowance is used up | Raise `budget.requests`, or wait out `budget.duration` for a fresh session to refill it |
+| A long scan reports "tool call timed out" halfway | The client-side tool timeout is too short (most default to 60s) | Raise the client timeout (see 3.0 Ground rules): Cline writes `"timeout": 600` (seconds), Cherry Studio goes to `Settings → MCP → Timeout`; the afrog subprocess may still be running at this point |
 | A call returns 403 | Denied by policy (`deny` or `scope`) | Read the rule name and reason in the response, adjust the policy, restart |
 | It asks for out-of-band (OOB) configuration | A reverse PoC was run but `agent.oob` is unset | Configure the OOB adapter under `agent.oob` in `afrog-config.yaml` |
 | Empty result list | No findings in the local ledger yet | Run a scan, then ask again |
