@@ -3,10 +3,12 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -258,6 +260,32 @@ func TestBrowsableAddr(t *testing.T) {
 	for in, want := range cases {
 		if got := browsableAddr(in); got != want {
 			t.Errorf("browsableAddr(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// 端口被占用必须在启动早期就报错，不能等初始化完才抛 bind 错误。
+func TestListenWebPortRejectsOccupiedPort(t *testing.T) {
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = busy.Close() })
+
+	if _, err := listenWebPort(busy.Addr().String()); err == nil {
+		t.Fatalf("端口 %s 已被占用，应当返回错误", busy.Addr().String())
+	} else if !strings.Contains(err.Error(), "端口已被占用") {
+		t.Fatalf("错误信息应说明端口被占用，实际: %v", err)
+	}
+}
+
+// 占用提示要包含可访问地址与「换端口」的出口，用户才知道下一步做什么。
+func TestDescribeListenErrorIsActionable(t *testing.T) {
+	err := describeListenError(":59999", &net.OpError{Op: "listen", Err: syscall.EADDRINUSE})
+	msg := err.Error()
+	for _, want := range []string{"127.0.0.1:59999", "端口已被占用", "server"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("错误信息缺少 %q: %s", want, msg)
 		}
 	}
 }

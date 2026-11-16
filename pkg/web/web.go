@@ -3,9 +3,14 @@ package web
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
@@ -27,6 +32,20 @@ func generateInstanceID() string {
 }
 
 func StartServer(addr string) error {
+	// 先占端口：端口不可用（被占用/无权限）就没必要再初始化数据库、调度器与实例编排，
+	// 也能避免先打印一堆「已启动」再紧跟一串「已停止」的误导日志。
+	ln, err := listenWebPort(addr)
+	if err != nil {
+		return err
+	}
+	serving := false
+	defer func() {
+		// 交给 srv.Serve 后由它负责关闭；中途失败（数据库/路由出错）在这里释放。
+		if !serving {
+			_ = ln.Close()
+		}
+	}()
+
 	gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
 	generatedPassword = generateRandomPassword()
 	initJWTSecret()
@@ -121,7 +140,51 @@ func StartServer(addr string) error {
 	serverArgv = os.Args
 
 	gologger.Info().Msgf("Web服务器启动于: %s", serverBaseURL)
-	return srv.ListenAndServe()
+	serving = true
+	return srv.Serve(ln)
+}
+
+// listenWebPort 提前完成端口绑定：把「端口被占用」这类问题在启动早期就暴露出来。
+func listenWebPort(addr string) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, describeListenError(addr, err)
+	}
+	return ln, nil
+}
+
+// describeListenError 把绑定失败整理成能照着做的提示，端口被占用时额外指出占用进程。
+func describeListenError(addr string, err error) error {
+	host := browsableAddr(addr)
+	if !errors.Is(err, syscall.EADDRINUSE) {
+		return fmt.Errorf("无法监听 %s: %w", host, err)
+	}
+	msg := fmt.Sprintf("端口已被占用，Web 服务无法启动：%s", host)
+	if holder := portHolder(addr); holder != "" {
+		msg += fmt.Sprintf(" 已被 %s 监听", holder)
+	}
+	return fmt.Errorf("%s；请先停止占用该端口的进程，或在 afrog-config.yaml 里把 server 改成其他端口（例如 \":16869\"）后重试", msg)
+}
+
+// portHolder 尽力找出监听该端口的进程，仅用于错误提示；取不到（如系统无 lsof）返回空串。
+func portHolder(addr string) string {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil || port == "" {
+		return ""
+	}
+	out, err := exec.Command("lsof", "-nP", "-iTCP:"+port, "-sTCP:LISTEN").Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) < 2 { // 只有表头，说明没查到
+		return ""
+	}
+	fields := strings.Fields(lines[1])
+	if len(fields) < 2 {
+		return ""
+	}
+	return fmt.Sprintf("%s (pid %s)", fields[0], fields[1])
 }
 
 // browsableAddr 把监听地址转成浏览器/客户端可直接使用的地址。
