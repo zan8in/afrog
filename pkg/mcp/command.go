@@ -32,12 +32,13 @@ func (stderrLogWriter) Write(data []byte, _ levels.Level) {
 
 // Command 实现 `afrog mcp`：在 stdio 上提供 MCP 工具服务。
 //
-// 默认策略是只读——一个刚被拉起的服务不应该自动获得发包能力，需要按需用
-// -policy 显式放宽到 safe 或 full。
+// 策略来源与 Web 控制台同一份：优先 -policy 指向的 YAML，未传时用 afrog-config.yaml
+// 的 agent.policy（控制台「策略与审计」保存的就是它）。两者都没有才回落到只读默认——
+// 一个刚被拉起的服务不应该自动获得发包能力，放宽档位必须由使用者显式配置。
 func Command(args []string) error {
 	fs := flag.NewFlagSet("afrog mcp", flag.ContinueOnError)
-	policyPath := fs.String("policy", "", "策略 YAML 路径；留空使用只读默认策略")
-	auditPath := fs.String("audit", "", "策略审计日志路径（JSONL）；留空不记录")
+	policyPath := fs.String("policy", "", "策略 YAML 路径；留空时用 afrog-config.yaml 的 agent.policy，仍为空则只读默认")
+	auditPath := fs.String("audit", "", "策略审计日志路径（JSONL）；留空时用 afrog-config.yaml 的 agent.audit，仍为空则不记录")
 	listen := fs.String("listen", "", "以 HTTP+SSE 方式监听（如 127.0.0.1:16870）；留空走 stdio")
 	token := fs.String("token", "", "SSE 模式的访问 token；监听非本机地址时必须提供")
 	if err := fs.Parse(args); err != nil {
@@ -46,18 +47,38 @@ func Command(args []string) error {
 
 	gologger.DefaultLogger.SetWriter(stderrLogWriter{})
 
-	p := policy.Default()
-	if strings.TrimSpace(*policyPath) != "" {
-		loaded, err := policy.Load(*policyPath)
-		if err != nil {
-			return err
-		}
-		p = loaded
+	// 策略、审计与观测保留上限共用 afrog-config.yaml；读不到配置就沿用默认值。
+	cfg, cfgErr := config.LoadConfigReadOnly("")
+	if cfgErr != nil {
+		cfg = nil
 	}
 
+	path := strings.TrimSpace(*policyPath)
+	explicitPolicy := path != ""
+	if !explicitPolicy && cfg != nil {
+		path = strings.TrimSpace(cfg.Agent.Policy)
+	}
+	p := policy.Default()
+	if path != "" {
+		loaded, err := policy.Load(path)
+		switch {
+		case err == nil:
+			p = loaded
+		case explicitPolicy:
+			return err
+		default:
+			// 配置里指的策略文件坏了不该让 MCP 起不来：退回只读默认并说明原因。
+			gologger.Error().Msgf("加载 agent.policy(%s) 失败，本次回退只读默认: %v", path, err)
+		}
+	}
+
+	audit := strings.TrimSpace(*auditPath)
+	if audit == "" && cfg != nil {
+		audit = strings.TrimSpace(cfg.Agent.Audit)
+	}
 	var auditor *policy.Auditor
-	if strings.TrimSpace(*auditPath) != "" {
-		f, err := os.OpenFile(*auditPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if audit != "" {
+		f, err := os.OpenFile(audit, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
 			return err
 		}
@@ -71,11 +92,10 @@ func Command(args []string) error {
 	}
 	defer sqlite.CloseX()
 
-	// 保留策略与 CLI/Web 共用 afrog-config.yaml；读不到配置就沿用默认值。
 	// agent.oob 指定工具面的反连适配器（凭据取 reverse 段）：未配置就没有反连能力，
 	// act.oob_* 会明确报未配置，而不是静默等一个不会来的回连。
 	var oob OOBSource
-	if cfg, cfgErr := config.LoadConfigReadOnly(""); cfgErr == nil && cfg != nil {
+	if cfg != nil {
 		if cfg.Observe.MaxRows != nil {
 			sqlite.SetObservationMaxRows(*cfg.Observe.MaxRows)
 		}
