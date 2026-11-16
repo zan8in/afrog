@@ -26,7 +26,7 @@ func TestDefaultIsReadOnly(t *testing.T) {
 func TestSafeMode(t *testing.T) {
 	p := &Policy{Mode: ModeSafe}
 
-	for _, name := range []string{"probe.http", "verify.poc", "observe.findings", "poc.search"} {
+	for _, name := range []string{"probe.http", "scan.start", "observe.findings", "poc.search"} {
 		if v := p.Evaluate(Action{Name: name, Target: "http://example.com"}); !v.Allow {
 			t.Fatalf("%s must be allowed in safe mode: %+v", name, v)
 		}
@@ -34,7 +34,7 @@ func TestSafeMode(t *testing.T) {
 	if v := p.Evaluate(Action{Name: "act.brute", Target: "http://example.com"}); v.Allow {
 		t.Fatalf("act.* must be denied in safe mode: %+v", v)
 	}
-	if v := p.Evaluate(Action{Name: "verify.poc", Target: "http://example.com", Destructive: true}); v.Allow {
+	if v := p.Evaluate(Action{Name: "scan.start", Target: "http://example.com", Destructive: true}); v.Allow {
 		t.Fatalf("destructive action must be denied by default: %+v", v)
 	}
 }
@@ -59,11 +59,11 @@ func TestDenyWinsOverAllow(t *testing.T) {
 }
 
 func TestAllowlistRestricts(t *testing.T) {
-	p := &Policy{Mode: ModeFull, Allow: []string{"observe.*", "verify.poc"}}
+	p := &Policy{Mode: ModeFull, Allow: []string{"observe.*", "scan.start"}}
 	if v := p.Evaluate(Action{Name: "probe.http", Target: "http://example.com"}); v.Allow {
 		t.Fatalf("action outside allowlist must be denied: %+v", v)
 	}
-	if v := p.Evaluate(Action{Name: "verify.poc", Target: "http://example.com"}); !v.Allow {
+	if v := p.Evaluate(Action{Name: "scan.start", Target: "http://example.com"}); !v.Allow {
 		t.Fatalf("allowlisted action must be allowed: %+v", v)
 	}
 }
@@ -146,16 +146,26 @@ func TestBudget(t *testing.T) {
 	}
 }
 
-func TestBudgetExpiry(t *testing.T) {
-	now := time.Now().Add(-time.Hour)
-	b := NewBudget(Limits{Requests: 10, Duration: Duration(time.Minute)}, now)
+// 空闲超过 Duration 即视为上个会话结束：下一次消耗额度的调用自动开新会话、把额度
+// 补满，而不是把长驻服务整体拒掉。
+func TestBudgetIdleResetsSession(t *testing.T) {
+	b := NewBudget(Limits{Requests: 2, Duration: Duration(time.Minute)}, time.Now().Add(-time.Hour))
+	if err := b.Take(1); err != nil {
+		t.Fatalf("idle-expired session must start a fresh one, got %v", err)
+	}
+	if got := b.Remaining(); got != 1 {
+		t.Fatalf("remaining = %d, want 1 (fresh session of 2)", got)
+	}
+	if err := b.Take(1); err != nil {
+		t.Fatalf("take 2: %v", err)
+	}
 	if err := b.Take(1); !errors.Is(err, ErrBudgetExceeded) {
-		t.Fatalf("expired budget must reject, got %v", err)
+		t.Fatalf("exhausted session must reject, got %v", err)
 	}
 }
 
-// 不产生网络请求的动作（读库、取证据、校验草稿）传 0，不能扣请求额度；
-// 但会话时间预算到期后仍然要拒绝。
+// 不产生网络请求的动作（读库、取证据、校验草稿）传 0：不扣请求额度，也不受空闲
+// 超时影响——查证据不该被「额度」挡住。
 func TestBudgetZeroCostActions(t *testing.T) {
 	b := NewBudget(Limits{Requests: 2, Duration: Duration(time.Minute)}, time.Now())
 	for i := 0; i < 5; i++ {
@@ -168,8 +178,26 @@ func TestBudgetZeroCostActions(t *testing.T) {
 	}
 
 	expired := NewBudget(Limits{Requests: 2, Duration: Duration(time.Minute)}, time.Now().Add(-time.Hour))
-	if err := expired.Take(0); !errors.Is(err, ErrBudgetExceeded) {
-		t.Fatalf("expired session must reject even zero-cost actions, got %v", err)
+	if err := expired.Take(0); err != nil {
+		t.Fatalf("zero-cost action must never be budgeted, got %v", err)
+	}
+}
+
+// 只读调用不顺延空闲窗口：额度用尽后靠轮询只读结果「续命」是不成立的，窗口照常
+// 推进，到点自动开新会话。
+func TestBudgetZeroCostDoesNotExtendWindow(t *testing.T) {
+	b := NewBudget(Limits{Requests: 1, Duration: Duration(50 * time.Millisecond)}, time.Now())
+	if err := b.Take(1); err != nil {
+		t.Fatalf("first take: %v", err)
+	}
+	time.Sleep(80 * time.Millisecond) // 让空闲窗口过期
+
+	if err := b.Take(0); err != nil {
+		t.Fatalf("read-only call must stay allowed: %v", err)
+	}
+	// 只读调用若顺延了窗口，这里会被判成「会话还活着但额度已用光」。
+	if err := b.Take(1); err != nil {
+		t.Fatalf("read-only calls must not keep the session alive, got %v", err)
 	}
 }
 

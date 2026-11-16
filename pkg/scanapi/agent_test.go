@@ -74,7 +74,7 @@ func TestAgentServiceListTools(t *testing.T) {
 	for _, tool := range resp.GetTools() {
 		byName[tool.GetName()] = tool
 	}
-	for _, want := range []string{"observe.state", "observe.observations", "plan.next", "poc.search", "probe.http", "verify.poc"} {
+	for _, want := range []string{"observe.state", "observe.observations", "plan.next", "poc.search", "probe.http", "scan.start"} {
 		spec, ok := byName[want]
 		if !ok {
 			t.Fatalf("tool %q missing from ListTools", want)
