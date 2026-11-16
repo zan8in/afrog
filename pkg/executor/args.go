@@ -167,6 +167,11 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		} else {
 			args = append(args, "-w-favicon=false")
 		}
+		// 静态资源抓取同理默认开启（10 个）。它是数值而非开关，0 恰好是合法取值（关闭），
+		// 所以用指针区分「未设置」与「显式 0」：未设置时省略，让子进程用自己的默认值。
+		if spec.WebAssets != nil {
+			args = append(args, "-w-assets", strconv.Itoa(*spec.WebAssets))
+		}
 	}
 
 	// OOB：CLI 只有 -oob <adapter> 用于选择适配器；key/domain 等凭据来自子进程的

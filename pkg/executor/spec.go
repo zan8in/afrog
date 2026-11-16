@@ -70,6 +70,10 @@ type Spec struct {
 	WebProbeTimeout int
 	// WebFavicon 开启 favicon 抓取（每个目标多一次请求）。
 	WebFavicon bool
+	// WebAssets 对应 -w-assets：Web 探测时最多抓几个首页引用的同源脚本/样式做内容指纹。
+	// 用指针区分「未设置」与显式的 0：nil 表示交回子进程默认值（10，即默认开启），
+	// 显式 0 表示关闭（把抓取请求省掉），N>0 表示最多抓 N 个。
+	WebAssets *int
 
 	// 报告输出：OutputHTML 为真时子进程写 HTML 报告（-o），否则用 -disable-output-html。
 	// OutputFile 只是文件名：子进程 CWD 是每任务独立的临时目录，实际路径由执行器固定

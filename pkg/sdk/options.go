@@ -158,6 +158,12 @@ type Options struct {
 	// (30s), matching the CLI's -w-timeout.
 	WebProbeTimeout int
 
+	// WebAssets is the maximum number of same-origin script/style assets the
+	// -w stage fetches and matches fingerprints against, so that frameworks
+	// hidden in hashed SPA bundles can still be identified. On by default (10,
+	// same as the CLI): up to ten extra requests per target; zero disables it.
+	WebAssets int
+
 	// StopOnFirstMatch stops the scan as soon as a vulnerability is found.
 	StopOnFirstMatch bool
 
@@ -398,6 +404,7 @@ func NewOptions() *Options {
 		FingerprintFilterMode:  FingerprintStrict,
 		GatingLevel:            GatingSafe,
 		WebFavicon:             true,
+		WebAssets:              10,
 		IncludeRequestResponse: true,
 		StreamBuffer:           DefaultStreamBuffer,
 		PortScan: PortScanOptions{
@@ -1012,6 +1019,22 @@ func WithWebFingerprintDir(dir string) Option {
 // directory whose rules.yaml has favicon rules also forces fetching on.
 func WithWebFavicon() Option {
 	return func(o *Options) error { o.WebFavicon = true; return nil }
+}
+
+// WithWebAssets sets how many same-origin script/style assets the -w stage
+// fetches and matches fingerprints against (0 disables the fetch).
+//
+// It is equivalent to the CLI's -w-assets and matches the CLI default of 10, so
+// this option is only kept for explicitness — use WithWebAssets(0) to save the
+// extra requests. Negative values are clamped to 0.
+func WithWebAssets(n int) Option {
+	return func(o *Options) error {
+		if n < 0 {
+			n = 0
+		}
+		o.WebAssets = n
+		return nil
+	}
 }
 
 // WithWebProbeTimeout sets the per-request timeout of the -w stage in seconds,

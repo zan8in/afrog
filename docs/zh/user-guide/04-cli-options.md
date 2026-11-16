@@ -114,6 +114,20 @@ afrog -t http://example.com -w -w-timeout 30
 afrog -t http://example.com -w -w-favicon=false
 ```
 
+### `-w-assets`
+
+在 Web 探测阶段最多抓取 N 个首页引用的**同源**脚本 / 样式，对其内容做指纹匹配。
+
+SPA 打包后脚本名被哈希化，框架标识藏在文件内容里；当首页是空壳、响应头又被 CDN 剥离时，只有抓回这些资源内容才能识别前端框架，因此**默认开启（`10`）**，每个目标最多多 10 次请求；需要省掉这些请求时用 `-w-assets=0` 关闭。
+
+- 只抓同源资源（按注册域判定，兼容独立子域），跨站 CDN 不抓；非 2xx、空响应或超过 1MiB 的资源跳过。
+- 命中一律记为 `probable` 证据，**只用于扩容 `requires` 准入，绝不参与否定跳过**——与 favicon 同一稳妥口径，宁可多打不可漏打。
+
+```bash
+afrog -t http://example.com -w -w-assets 20   # 最多抓 20 个
+afrog -t http://example.com -w -w-assets=0    # 关闭，省掉抓取请求
+```
+
 ### `-p`
 
 控制预扫端口范围，支持：

@@ -16,7 +16,7 @@ last_reviewed: 2026-11-15
 | --- | --- | --- |
 | 快速上手 | 跟着步骤把常用 AI 客户端接入 afrog，每段配置都可一键复制 | [小白教程](../user-guide/11-mcp-quickstart.md) |
 | 人审队列 | 处理候选 PoC 草稿与调优建议：查看证据、批准或驳回 | `afrog poc` / `afrog learn` |
-| MCP 工具台 | 查看每个工具的能力等级与可用性、按同名同语义调用、复制接入配置 | `afrog mcp` 工具面 |
+| MCP 工具台 | 查看每个工具的能力等级与可用性、按同名同语义调用 | `afrog mcp` 工具面 |
 | 策略与审计 | 调整能力档位、破坏性开关、会话预算与主机范围，回看判定流水 | 编辑 policy YAML |
 
 关键点：这四个页面与 MCP、REST（`/api/v1`）、gRPC（`AgentService`）**共用同一份门控**（`pkg/policy.Gate`）——同一套工具注册表、同一套策略判定、同一份预算与审计。在页面上改的策略，下一次工具调用即刻生效；在这里看到的可用性与预算余量，就是 Agent 真正受到的限制。
@@ -54,12 +54,7 @@ last_reviewed: 2026-11-15
 
 页面顶部同时给出当前档位、会话预算余量、工具数量与审计开关。
 
-**接入向导**提供两段可复制的配置：
-
-- stdio：把 afrog 作为 MCP server 交给客户端拉起，`command` 为 `afrog`，`args` 只写 `mcp` 即可——策略与审计自动跟随本页保存的 `agent.policy`/`agent.audit`；要覆盖时再带 `-policy <策略文件> -audit <审计文件>`
-- HTTP/REST：脚本直连 `/api/v1`，鉴权用控制台登录态（`Authorization: Bearer <token>`）
-
-两种方式都不会绕过限额——策略判定、预算扣减、审计落盘走的是同一条路径。
+要把 afrog 接入 MCP 客户端（stdio 或 HTTP），见「快速上手」页与[小白教程](../user-guide/11-mcp-quickstart.md)；不经过 MCP 客户端、用脚本直连 REST（`/api/v1`）的写法也在「快速上手」页里给出。无论哪种方式都不会绕过限额——策略判定、预算扣减、审计落盘走的是同一条路径。
 
 ## 策略与审计
 

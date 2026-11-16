@@ -1137,6 +1137,7 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		EnableWebProbe:                 !opts.DisableWebProbe,
 		WebFingerprintDir:              opts.WebFingerprintDir,
 		WebFavicon:                     opts.WebFavicon,
+		WebAssets:                      opts.WebAssets,
 		WebProbeTimeout:                opts.WebProbeTimeout,
 		FingerprintFilterMode:          opts.FingerprintFilterMode,
 		GatingLevel:                    opts.GatingLevel,

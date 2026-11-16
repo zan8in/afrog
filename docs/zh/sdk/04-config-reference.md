@@ -68,6 +68,7 @@ last_reviewed: 2026-09-16
 | `WithWebProbe()` | 默认开启（与 CLI 的 `-w` 一致），传 `false` 关闭 |
 | `WithWebProbeTimeout(seconds)` | `0`，表示用引擎默认值（30s），对应 `-w-timeout` |
 | `WithWebFavicon()` | 默认开启（与 CLI 的 `-w-favicon` 一致），每个目标多一次请求；保留该选项仅为显式表达意图 |
+| `WithWebAssets(n)` | 默认 `10`（与 CLI 的 `-w-assets` 一致），抓取首页引用的同源脚本/样式做内容指纹；`0` 表示不抓，负值被夹到 `0` |
 
 ## 网络
 

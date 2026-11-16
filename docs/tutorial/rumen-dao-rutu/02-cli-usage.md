@@ -109,6 +109,7 @@ afrog -t 192.168.1.0/24 -ps -w=false
 - **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch` 或社区判据）与 `certain`（强特征，如专属响应头、`meta generator`）。
 - **外置指纹库**：`-w-fingerprint-dir <dir>` 指定目录下放置 `rules.yaml` 即可覆盖/扩展内置规则；**外置规则整体排在内置之前，同 `id` 覆盖内置**，新增的 specific 规则不会被内置通用规则抢先命中。
 - **favicon 默认抓取**：`/favicon.ico` 的 mmh3 哈希是「按图定位同一套站」的稳定标识，命中内置 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）属 `certain` 证据，因此**默认开启**，每个目标会多一次请求；不需要时用 `-w-favicon=false` 关掉。若外置 `rules.yaml` 里出现 `source: favicon` 规则，则强制抓取、不受开关影响。
+- **静态资源指纹默认开启**：`-w-assets <N>` 会在探测阶段最多抓取 N 个首页引用的**同源**脚本 / 样式，对其内容做指纹匹配。SPA 打包后脚本名被哈希化、框架标识藏在文件内容里，首页是空壳且响应头被 CDN 剥离时只能靠资源内容识别前端框架，因此**默认开启（10 个，每个目标最多多 10 次请求）**；需要省请求时用 `-w-assets=0` 关闭。抓取只认同源（按注册域判定，兼容独立子域），跨站 CDN 不抓，非 2xx / 空 / 超 1MiB 的资源跳过；命中一律记为 `probable`，**只用于扩容 `requires` 准入，绝不参与否定跳过**。
 - **探测超时单独可控**：`-w-timeout <秒>` 控制探测阶段单次请求与证书获取的超时，默认 `30`；它与全局 `-timeout` 相互独立，目标响应慢时可只放宽探测阶段而不影响 PoC 扫描。
 - **驱动 `requires` 门控**：识别出的技术栈会并入 PoC 的 `requires` 词表，`requires: [wordpress]`、`[thinkphp]`、`[apache-shiro]`、`[cms]` 这类写法从此有据可依，明显不可能命中的 PoC 会被直接跳过，不再浪费请求。可用标识为：规则 `id`（如 `nextjs` / `rails`）、技术名（`Next.js` → `next.js`）、技术名连字符写法（`Apache Shiro` → `apache-shiro`）与 `category`（如 `cms`）。
 - 事件流 / SDK / gRPC 输出同时提供 `fingerprint`（一行摘要）与 `technologies`（`name`/`version`/`category`/`cpe`/`confidence` 明细）。
@@ -119,6 +120,9 @@ afrog -t https://example.com -w -w-fingerprint-dir ./my-web-fingerprints
 
 # 关闭 favicon 抓取（默认开启，每个目标省一次请求）
 afrog -t https://example.com -w -w-favicon=false
+
+# 关闭静态资源抓取（默认抓 10 个，每个目标省最多 10 次请求）
+afrog -t https://example.com -w -w-assets=0
 ```
 
 #### 2.5 常见服务探测 → 弱口令/默认口令探测

@@ -307,8 +307,9 @@ type Options struct {
 	// WebAssets 是 Web 探测时最多抓取几个首页引用的同源脚本/样式资源以匹配指纹，0 表示不抓。
 	//
 	// SPA 打包后脚本名被哈希化，框架标识藏在文件内容里；首页是空壳、响应头又被 CDN 剥离时，
-	// 只有抓回这些资源内容才能识别前端框架。默认关闭：每次探测会多出 N 个请求，是否可接受
-	// 交给使用者决定。
+	// 只有抓回这些资源内容才能识别前端框架。默认开启（10 个，每个目标最多多 10 次请求）：
+	// 与 favicon 同理，命中只作 probable 证据用于扩容准入，不参与否定跳过，属于稳赚的补充。
+	// 需要省这些请求时用 -w-assets=0 关闭。
 	WebAssets int
 	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒），默认 30。
 	// 与全局 -timeout 解耦：信息收集阶段不该被漏洞扫描的长超时拖住。
@@ -449,7 +450,7 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.EnableWebProbe, "w", true, "collect web asset info (url/status/title/server/tech-stack fingerprint) before scanning; enabled by default, disable with -w=false"),
 		flagSet.StringVar(&options.WebFingerprintDir, "w-fingerprint-dir", "", "directory with rules.yaml overriding the built-in web fingerprint set"),
 		flagSet.BoolVar(&options.WebFavicon, "w-favicon", true, "fetch /favicon.ico during web probe to match favicon rules, enabled by default; disable with -w-favicon=false (adds one extra request per target)"),
-		flagSet.IntVar(&options.WebAssets, "w-assets", 0, "fetch up to N same-origin script/style assets referenced by the page and match fingerprints against their content, to identify frameworks hidden in hashed SPA bundles (0 disables; adds up to N requests per target)"),
+		flagSet.IntVar(&options.WebAssets, "w-assets", 10, "fetch up to N same-origin script/style assets referenced by the page and match fingerprints against their content, to identify frameworks hidden in hashed SPA bundles; enabled by default, disable with -w-assets=0 (adds up to N requests per target)"),
 		flagSet.IntVar(&options.WebProbeTimeout, "w-timeout", 30, "web probe timeout in seconds for each request and certificate fetch, independent of the global -timeout"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),

@@ -114,6 +114,20 @@ Fetch the favicon during web probing and compute its hash, which helps identify 
 afrog -t http://example.com -w -w-favicon=false
 ```
 
+### `-w-assets`
+
+During web probing, fetch up to N **same-origin** scripts/styles referenced by the page and match fingerprints against their content.
+
+After SPA bundling, script names are hashed and the framework signature lives inside the file content; when the landing page is a shell and the response headers are stripped by a CDN, only the asset contents reveal the frontend framework. It is therefore **on by default (`10`)**, costing up to ten extra requests per target; use `-w-assets=0` to save those requests.
+
+- Only same-origin assets are fetched (judged by registrable domain, so independent subdomains count); cross-site CDNs are skipped, and non-2xx, empty or over-1MiB assets are ignored.
+- Hits are always recorded as `probable` evidence — used **only to widen `requires` admission, never to skip by negation**, the same conservative rule as favicon: better to scan more than to miss.
+
+```bash
+afrog -t http://example.com -w -w-assets 20   # fetch up to 20
+afrog -t http://example.com -w -w-assets=0    # disable, saving the fetch requests
+```
+
 ### `-p`
 
 Control the port range for pre-scan. Supports:

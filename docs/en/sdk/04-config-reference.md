@@ -68,6 +68,7 @@ Adaptive per-target (`host:port`) limiting is on by default (same as the CLI): t
 | `WithWebProbe()` | enabled by default (matching the CLI `-w`); pass `false` to disable |
 | `WithWebProbeTimeout(seconds)` | `0`, meaning the engine default (30s); equivalent to `-w-timeout` |
 | `WithWebFavicon()` | on by default (matching the CLI `-w-favicon`), costing one extra request per target; the option is kept only to state the intent explicitly |
+| `WithWebAssets(n)` | `10` by default (matching the CLI `-w-assets`): fetch `n` same-origin scripts/styles referenced by the page and match fingerprints against their content; `0` disables the fetch, negative values are clamped to `0` |
 
 ## Network
 

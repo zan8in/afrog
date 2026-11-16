@@ -145,10 +145,14 @@ type ScanCreateRequest struct {
 	WebProbe       bool `json:"webprobe,omitempty"`
 	WebFingerprint bool `json:"web_fingerprint,omitempty"`
 	// WebProbeTimeout 是单次 Web 探测请求/证书获取的超时（秒）；0 表示用引擎默认值。
-	WebProbeTimeout int      `json:"web_probe_timeout,omitempty"`
-	WebFavicon      bool     `json:"web_favicon,omitempty"`
-	Headers         []string `json:"headers,omitempty"`
-	Sort            string   `json:"sort,omitempty"`
+	WebProbeTimeout int  `json:"web_probe_timeout,omitempty"`
+	WebFavicon      bool `json:"web_favicon,omitempty"`
+	// WebAssets 对应 -w-assets：Web 探测时最多抓几个同源脚本/样式做内容指纹。
+	// 用指针区分「未设置」与显式的 0：nil 表示用子进程默认值（10，即默认开启），
+	// 显式 0 表示关闭。
+	WebAssets *int     `json:"web_assets,omitempty"`
+	Headers   []string `json:"headers,omitempty"`
+	Sort      string   `json:"sort,omitempty"`
 	// 请求节流：-rlt 与 auto/polite/balanced/aggressive 互斥，最多只有一个为真。
 	ReqLimitPerTarget int  `json:"req_limit_per_target,omitempty"`
 	AutoReqLimit      bool `json:"auto_req_limit,omitempty"`

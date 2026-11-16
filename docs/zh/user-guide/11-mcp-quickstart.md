@@ -527,6 +527,21 @@ afrog 在同一个监听上同时提供两种传输，客户端按自己支持�
 - 用浏览器直接打开 `http://127.0.0.1:16870/mcp` 会返回 **405**。这是对的——这个入口只接受 POST，不支持 GET。
 - 不带 token 请求会返回 **401**。
 
+### 用脚本直连 REST（不起 MCP 客户端）
+
+不走 MCP 客户端、想让脚本直接调同一套工具面时，用 Web 控制台的 REST 接口（`/api/v1`，与 MCP 同名同语义，共用同一份策略、预算与审计）。鉴权用控制台的登录态 token（`Authorization: Bearer <token>`），与上面的 `afrog mcp -token` 不是同一个值：
+
+```bash
+# 工具目录（能力等级 / 破坏性 / 当前可用性）
+curl -H "Authorization: Bearer <token>" \
+  http://127.0.0.1:<控制台端口>/api/v1/tools
+
+# 调用工具（与 MCP 同名同语义）
+curl -X POST -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"name":"observe.findings","arguments":{"limit":20}}' \
+  http://127.0.0.1:<控制台端口>/api/v1/call
+```
+
 ## 第 7 步：进阶速览（按需）
 
 前 6 步能让你「接上并用起来」。下面四件事是接上之后最常被问到的，各用一句话说清，细节见文末链接。
