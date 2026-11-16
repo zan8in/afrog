@@ -628,6 +628,14 @@
     - source: header
       header: x-powered-by
       pattern: '(?i)\bNext\.js\b'
+    # Pages Router 把整页数据以 __NEXT_DATA__ 内联脚本直出；App Router 用 __next_f.push
+    # 流式直出。两者都是服务端产物、藏在被打包哈希化的页面里，属内容型强判据。
+    - source: body
+      pattern: '(?i)__NEXT_DATA__'
+      confidence: probable
+    - source: body
+      pattern: '(?i)__next_f\b'
+      confidence: probable
     - source: body
       pattern: "(?i)/_next/static/"
       confidence: probable
@@ -640,9 +648,54 @@
     - source: header
       header: x-powered-by
       pattern: '(?i)\bNuxt\b'
+    # Nuxt 2/3 都以 __NUXT__ / __NUXT_DATA__ 内联直出首屏数据。
     - source: body
       pattern: "(?i)__NUXT__"
       confidence: probable
+    - source: body
+      pattern: "(?i)__NUXT_DATA__"
+      confidence: probable
+    - source: body
+      pattern: "(?i)/_nuxt/"
+      confidence: probable
+
+# ---- 打包器 / 前端框架（内容型判据） ----
+#
+# 判据取自「页面内联脚本」与「打包产物内容」，而非响应头或文件名：SPA 站点首页常是空壳、
+# 脚本名被哈希化（/assets/index-a1b2.js），只剩内容里还留着框架的运行时痕迹。
+# 内容型判据一律记为 probable——一段压缩产物里出现某个符号不足以单独确认站点身份，
+# 它们只用于扩容 requires 证据（放行），绝不参与否定跳过。
+
+- id: vite
+  name: Vite
+  category: bundler
+  cpe: cpe:/a:vitejs:vite
+  softmatch: true
+  match:
+    # 开发服务器注入的客户端入口。
+    - source: body
+      pattern: '(?i)/@vite/client'
+    # 生产构建产物里注入的运行时片段（文件名被哈希化后的唯一线索）。
+    - source: body
+      pattern: '(?i)__vite__mapDeps'
+    - source: body
+      pattern: '(?i)__vite_import_meta_url__'
+
+- id: sveltekit
+  name: SvelteKit
+  category: framework
+  cpe: cpe:/a:svelte:sveltekit
+  softmatch: true
+  match:
+    # 运行时注入的全局变量名带随机后缀：__sveltekit_xxxxxxxx。
+    - source: body
+      pattern: '(?i)__sveltekit_[0-9a-z]+'
+    # 客户端路由的属性前缀。
+    - source: body
+      pattern: '(?i)data-sveltekit-(?:preload|reload|noscroll|keepfocus)'
+    # 构建产物固定目录。
+    - source: body
+      pattern: "(?i)/_app/immutable/"
 
 - id: spring-boot
   name: Spring Boot
@@ -691,10 +744,22 @@
   cpe: cpe:/a:angular:angular
   softmatch: true
   match:
+    # 服务端直出的 ng-version 属性，可据此取版本（唯一的 certain 判据）。
     - source: body
       pattern: '(?i)ng-version="(?<version>[\d.]+)"'
       version: ${version}
       confidence: certain
+    # 视图封装注入的属性前缀（编译后的模板与样式里随处可见）。
+    - source: body
+      pattern: '(?i)_ngcontent-'
+    - source: body
+      pattern: '(?i)_nghost-'
+    # Angular Universal（SSR）直出的标记。
+    - source: body
+      pattern: '(?i)ng-server-context'
+    # Ivy 运行时在打包产物里的标识符前缀（ɵ 是 Angular 专用字符）。
+    - source: body
+      pattern: '(?i)ɵɵdefineComponent'
 
 - id: react
   name: React
@@ -717,6 +782,12 @@
       version: ${version}
     - source: body
       pattern: "(?i)data-reactroot"
+    # 打包后的 React DOM 生产构建里，错误信息固定以该前缀开头（文件名被哈希化时的判据）。
+    - source: body
+      pattern: '(?i)Minified React error #'
+    # React 运行时探测的开发者工具钩子名（dev/prod 构建里都出现）。
+    - source: body
+      pattern: '(?i)__REACT_DEVTOOLS_GLOBAL_HOOK__'
     # 兜底：只要引了 react 资源即判定（无版本）
     - source: body
       pattern: '(?i)react(?:-dom|-with-addons)?(?:\.production|\.development)?(?:\.min)?\.js'
@@ -996,6 +1067,26 @@
     # 兜底：引了 lit-element / lit-html 资源即判定（无版本）
     - source: body
       pattern: '(?i)\blit[-.]?(?:element|html)(?:\.min)?\.js'
+
+- id: swiper
+  name: Swiper
+  category: js-library
+  cpe: cpe:/a:swiper:swiper
+  softmatch: true
+  match:
+    # 文件名 / 路径带版本：swiper@8.4.5、swiper-8.4.5.min.js / .css
+    - source: body
+      pattern: '(?i)swiper[-.@]v?(?<version>\d+(?:\.\d+){1,3})(?:\.min)?\.(?:js|css)'
+      version: ${version}
+    # 官方打包产物名：swiper-bundle.min.js / swiper-bundle.min.css
+    - source: body
+      pattern: '(?i)swiper-bundle(?:\.min)?\.(?:js|css)'
+    # 初始化入口：new Swiper('.selector', {...})
+    - source: body
+      pattern: '(?i)\bnew\s+Swiper\s*\('
+    # 专属 DOM 结构：swiper-container / swiper-wrapper / swiper-slide。
+    - source: body
+      pattern: '(?i)\bswiper-(?:container|wrapper|slide)\b'
 
 - id: bootstrap
   name: Bootstrap
@@ -1724,8 +1815,8 @@
 
 # ============================== favicon 指纹 ==============================
 #
-# 只有把 /favicon.ico 抓下来（CLI 加 -w-favicon，或外置规则集里自己写了 favicon 规则）才会
-# 参与匹配，因此这里的规则默认不产生任何额外请求。
+# 默认会抓 /favicon.ico（CLI 的 -w-favicon 默认开启，关闭用 -w-favicon=false；外置规则集里
+# 自己写了 favicon 规则时强制抓），因此这里的规则默认参与匹配，每个目标多一次请求。
 #
 # 哈希取自本仓库既有 PoC 的 favicon 指纹（shodan: http.favicon.hash / icon_hash），都是
 # 产品自带图标的哈希，命中即可认定是该产品，故记为 certain。

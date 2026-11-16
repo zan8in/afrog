@@ -3,12 +3,15 @@ package webscan
 import (
 	"encoding/base64"
 	"html"
+	"net"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/spaolacci/murmur3"
+	"golang.org/x/net/publicsuffix"
 )
 
 const (
@@ -39,6 +42,8 @@ var (
 	hrefRe = regexp.MustCompile(`(?is)\shref\s*=\s*["']([^"']+)["']`)
 	// relRe 抽取标签里的 rel。
 	relRe = regexp.MustCompile(`(?is)\srel\s*=\s*["']([^"']+)["']`)
+	// asRe 抽取 <link rel=preload> 的 as 属性（script/style/...）。
+	asRe = regexp.MustCompile(`(?is)\sas\s*=\s*["']([^"']+)["']`)
 	// metaTagRe 抽取 <meta ...>。
 	metaTagRe = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
 	// metaNameRe 抽取 meta 的 name/property/http-equiv。
@@ -72,8 +77,8 @@ func LoadMatcher(dir string) (*Matcher, error) {
 // HasFavicon 报告外置规则集里是否有 favicon 规则。
 //
 // 调用方据此决定要不要额外抓取 /favicon.ico：内置规则虽然带了 favicon 规则，但抓取与否
-// 仍以 -w-favicon 开关为准；而用户在外置目录里写 favicon 规则，本身就说明他要抓 favicon，
-// 因此这里返回 true 时调用方应自动开启抓取、不必再要求开关。
+// 以 -w-favicon 开关为准（默认开启）；而用户在外置目录里写 favicon 规则，本身就说明他要抓
+// favicon，因此这里返回 true 时调用方应强制开启抓取、不再看开关。
 func (m *Matcher) HasFavicon() bool {
 	return m != nil && m.db != nil && m.db.hasFavicon
 }
@@ -124,6 +129,174 @@ func (m *Matcher) Match(resp Response) Result {
 	}
 	sortTechnologies(res.Technologies)
 	return res
+}
+
+// MatchAssets 对抓回来的静态资源内容做指纹匹配，用于从被打包/哈希化的 JS/CSS 里
+// 识别前端框架与库（首页为 SPA 空壳、响应头被 CDN 剥离时的唯一线索）。
+//
+// 与 Match 的两点差别，都源于「资源内容不等于站点身份」：
+//   - 只喂正文：资源各自的响应头、Cookie 是该文件的、不是站点的，不作为身份判据；
+//   - 可信度一律压到 probable：压缩后的 bundle 里出现一个词不足以确认站点身份，
+//     这些结论只用于扩容 requires 证据，绝不参与否定跳过（CertainTokens 只收 certain 级）。
+func (m *Matcher) MatchAssets(assets []Asset) Result {
+	var res Result
+	if m == nil || m.db == nil {
+		return res
+	}
+	seen := make(map[string]int, 8)
+	for _, a := range assets {
+		if len(a.Body) == 0 {
+			continue
+		}
+		r := m.Match(Response{Body: a.Body})
+		label := assetLabel(a.URL)
+		for _, t := range r.Technologies {
+			if t.Confidence > ConfidenceProbable {
+				t.Confidence = ConfidenceProbable
+			}
+			if t.Evidence != "" {
+				t.Evidence = "asset " + label + ": " + t.Evidence
+			} else {
+				t.Evidence = "asset " + label
+			}
+			if t.Confidence > res.Confidence {
+				res.Confidence = t.Confidence
+			}
+			key := t.Name + "\x00" + t.Version
+			if idx, dup := seen[key]; dup {
+				if t.Confidence > res.Technologies[idx].Confidence {
+					res.Technologies[idx] = t
+				}
+				continue
+			}
+			seen[key] = len(res.Technologies)
+			res.Technologies = append(res.Technologies, t)
+		}
+	}
+	sortTechnologies(res.Technologies)
+	return res
+}
+
+// assetLabel 取资源地址里可读的一段（路径优先），用于把命中证据指向具体资源。
+func assetLabel(rawURL string) string {
+	if u, err := url.Parse(strings.TrimSpace(rawURL)); err == nil && u.Path != "" {
+		return u.Path
+	}
+	return strings.TrimSpace(rawURL)
+}
+
+// sameSite 判断资源主机是否属于站点自身：同一 host，或与目标同属一个注册域
+// （如 style.example.com 与 www.example.com 同站）。跨注册域（第三方 CDN）不算。
+//
+// 放宽到「同站」而非「同源」是被真实形态逼出来的：静态资源常挂在独立子域
+// （style.example.com），只认同一 host 会把这类站点的资源全部丢掉，探测等于没做。
+// 同站资源仍属目标自身基础设施，抓它既不越界、也不漏证据。
+func sameSite(baseHost, absHost string) bool {
+	if absHost == "" {
+		return false
+	}
+	if strings.EqualFold(absHost, baseHost) {
+		return true
+	}
+	base := registrableDomain(baseHost)
+	if base == "" {
+		return false
+	}
+	return base == registrableDomain(absHost)
+}
+
+// registrableDomain 返回 host 的注册域（example.com）；IP、单标签主机或解析失败时返回空。
+func registrableDomain(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i] // 去端口
+	}
+	if host == "" || net.ParseIP(host) != nil {
+		return ""
+	}
+	domain, err := publicsuffix.EffectiveTLDPlusOne(host)
+	if err != nil {
+		return ""
+	}
+	return domain
+}
+
+// AssetRefs 从首页 HTML 里抽取值得抓回来做指纹匹配的同站静态资源地址（脚本与样式表）。
+//
+// 只收同站（同一注册域）：跨站资源（第三方 CDN 上的库）的指纹属于资源方而非被扫站点，
+// 且抓外站资源会给目标之外的第三方造成请求，违背扫描最小冲击原则。
+// 脚本地址沿用 collectScriptSrc 的口径（<script src> 与 modulepreload href），样式另取
+// <link rel=stylesheet>；相对地址按 baseURL 解析成绝对地址，去重后最多返回 max 个。
+func AssetRefs(baseURL string, body []byte, max int) []string {
+	if len(body) == 0 || max <= 0 {
+		return nil
+	}
+	base, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil || base.Host == "" {
+		return nil
+	}
+	seen := make(map[string]struct{}, 8)
+	out := make([]string, 0, max)
+	add := func(raw string) {
+		if len(out) >= max {
+			return
+		}
+		ref, err := url.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			return
+		}
+		abs := base.ResolveReference(ref)
+		if (abs.Scheme != "http" && abs.Scheme != "https") || !sameSite(base.Host, abs.Host) {
+			return
+		}
+		abs.Fragment = ""
+		key := abs.String()
+		if _, dup := seen[key]; dup {
+			return
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	for _, m := range scriptSrcRe.FindAllSubmatch(body, -1) {
+		if len(out) >= max {
+			break
+		}
+		add(string(m[1]))
+	}
+	for _, tag := range linkTagRe.FindAll(body, -1) {
+		if len(out) >= max {
+			break
+		}
+		rel := relRe.FindSubmatch(tag)
+		if len(rel) < 2 {
+			continue
+		}
+		r := strings.ToLower(strings.TrimSpace(string(rel[1])))
+		switch r {
+		case "stylesheet", "modulepreload":
+		case "preload":
+			// preload 覆盖字体/图片等，只收脚本与样式，免得抓一堆无关二进制。
+			as := asRe.FindSubmatch(tag)
+			if len(as) < 2 {
+				continue
+			}
+			a := strings.ToLower(strings.TrimSpace(string(as[1])))
+			if a != "script" && a != "style" {
+				continue
+			}
+		default:
+			continue
+		}
+		href := hrefRe.FindSubmatch(tag)
+		if len(href) < 2 {
+			continue
+		}
+		add(string(href[1]))
+	}
+	return out
 }
 
 // hitLiteral 判断某条正文类模式的字面量是否出现在正文里（任一出现即通过）。

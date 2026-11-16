@@ -150,11 +150,16 @@ type SDKOptions struct {
 	// DisableWebProbe 关闭 Web 探测（-w）阶段；默认开启，与 CLI 的 -w 默认值一致。
 	DisableWebProbe       bool
 	FingerprintFilterMode string
+	// GatingLevel 是资产画像驱动的 PoC 门控档位：off|safe|balanced|aggressive。
+	GatingLevel string
+	// DryRun 为真时只预演门控决策与归因，不执行任何漏洞 PoC。
+	DryRun bool
 
 	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒）；0 表示用引擎
 	// 默认值（30s），对应 CLI 的 -w-timeout，与全局 Timeout 相互独立。
 	WebProbeTimeout int
 	// WebFavicon 开启 favicon 抓取（每个目标多一次请求），对应 CLI 的 -w-favicon。
+	// favicon 哈希命中属强证据（certain），默认开启，NewSDKOptions 已置 true。
 	WebFavicon bool
 
 	MaxRespBodySize  int
@@ -263,7 +268,9 @@ func NewSDKOptions() *SDKOptions {
 		BruteMaxRequests:      5000,
 		DefaultAccept:         true,
 		EnableWebProbe:        true,
+		WebFavicon:            true,
 		FingerprintFilterMode: "strict",
+		GatingLevel:           "safe",
 		PSPorts:               "top",
 		PSS4Chunk:             1000,
 		OOBRateLimit:          25,
@@ -444,6 +451,12 @@ func (s *SDKScanner) build() (*sdk.Scanner, error) {
 	}
 	if v := strings.TrimSpace(o.FingerprintFilterMode); v != "" {
 		options = append(options, sdk.WithFingerprintFilterMode(v))
+	}
+	if v := strings.TrimSpace(o.GatingLevel); v != "" {
+		options = append(options, sdk.WithGatingLevel(v))
+	}
+	if o.DryRun {
+		options = append(options, sdk.WithDryRun())
 	}
 	// Web 探测默认开启；EnableWebProbe 与 DisableWebProbe 任一为「关」即关闭，
 	// 其中前者用于兼容既有集成，后者是推荐的新写法。

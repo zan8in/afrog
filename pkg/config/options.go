@@ -181,7 +181,14 @@ type Options struct {
 	DisableFingerprint    bool
 	EnableWebProbe        bool
 	FingerprintFilterMode string
-	Test                  bool
+	// GatingLevel 是资产画像驱动的 PoC 门控档位：off|safe|balanced|aggressive。
+	// safe（默认）等价引入门控前行为；off 关闭全部门控退回全量扫描；balanced/aggressive
+	// 逐档放开「推断式否定」。归一与消费统一在 pkg/gating 完成，引擎只做装配。
+	GatingLevel string
+	// DryRun 为真时只计算并打印门控归因，不执行任何漏洞 PoC（前置的端口/Web/指纹阶段照常，
+	// 否则没有画像可供决策）。
+	DryRun bool
+	Test   bool
 
 	// number of times to retry a failed request (default 1)
 	Retries int
@@ -293,7 +300,16 @@ type Options struct {
 	// 默认只上报开放端口。开启后才能区分「被防火墙丢弃」与「端口确实关闭」。
 	PSReportStates    bool
 	WebFingerprintDir string
-	WebFavicon        bool
+	// WebFavicon 控制 Web 探测时抓取 /favicon.ico 并按 mmh3 哈希匹配 favicon 规则。
+	// 默认开启（每个目标多一次请求）：favicon 命中属 certain 证据，是成本最低的强指纹来源；
+	// 需要省这次请求时用 -w-favicon=false 关闭。
+	WebFavicon bool
+	// WebAssets 是 Web 探测时最多抓取几个首页引用的同源脚本/样式资源以匹配指纹，0 表示不抓。
+	//
+	// SPA 打包后脚本名被哈希化，框架标识藏在文件内容里；首页是空壳、响应头又被 CDN 剥离时，
+	// 只有抓回这些资源内容才能识别前端框架。默认关闭：每次探测会多出 N 个请求，是否可接受
+	// 交给使用者决定。
+	WebAssets int
 	// WebProbeTimeout 是 Web 探测阶段单次请求/证书获取的超时（秒），默认 30。
 	// 与全局 -timeout 解耦：信息收集阶段不该被漏洞扫描的长超时拖住。
 	WebProbeTimeout  int
@@ -432,10 +448,13 @@ func NewOptions() (*Options, error) {
 		flagSet.BoolVar(&options.PSReportStates, "ps-states", false, "report closed/filtered ports as results in port pre-scan (default: report only open ports)"),
 		flagSet.BoolVar(&options.EnableWebProbe, "w", true, "collect web asset info (url/status/title/server/tech-stack fingerprint) before scanning; enabled by default, disable with -w=false"),
 		flagSet.StringVar(&options.WebFingerprintDir, "w-fingerprint-dir", "", "directory with rules.yaml overriding the built-in web fingerprint set"),
-		flagSet.BoolVar(&options.WebFavicon, "w-favicon", false, "fetch /favicon.ico during web probe to match favicon rules (adds one extra request per target)"),
+		flagSet.BoolVar(&options.WebFavicon, "w-favicon", true, "fetch /favicon.ico during web probe to match favicon rules, enabled by default; disable with -w-favicon=false (adds one extra request per target)"),
+		flagSet.IntVar(&options.WebAssets, "w-assets", 0, "fetch up to N same-origin script/style assets referenced by the page and match fingerprints against their content, to identify frameworks hidden in hashed SPA bundles (0 disables; adds up to N requests per target)"),
 		flagSet.IntVar(&options.WebProbeTimeout, "w-timeout", 30, "web probe timeout in seconds for each request and certificate fetch, independent of the global -timeout"),
 		flagSet.BoolVar(&options.DisableFingerprint, "nf", false, "disable fingerprint stage (skip PoCs tagged 'fingerprint')"),
 		flagSet.StringVar(&options.FingerprintFilterMode, "fingerprint-filter-mode", "strict", "fingerprint filter mode for app-specific PoCs: strict|opportunistic"),
+		flagSet.StringVar(&options.GatingLevel, "gating-level", "safe", "asset-profile driven PoC gating level: off|safe|balanced|aggressive (safe=current behavior; off=no gating/full scan; balanced/aggressive progressively enable inferred negative evidence)"),
+		flagSet.BoolVar(&options.DryRun, "dry-run", false, "compute and print PoC gating attribution without executing any vulnerability PoC (recon stages still run to build the asset profile)"),
 		flagSet.BoolVar(&options.MonitorTargets, "mt", false, "enable the monitor-target feature during scanning"),
 		flagSet.BoolVar(&options.VulnerabilityScannerBreakpoint, "vsb", false, "Once a vulnerability is detected, the scanning program will immediately halt the scan and report the identified vulnerability."),
 	)
@@ -751,6 +770,14 @@ func (opt *Options) VerifyOptions() error {
 	}
 	if opt.FingerprintFilterMode != "strict" && opt.FingerprintFilterMode != "opportunistic" {
 		opt.FingerprintFilterMode = "strict"
+	}
+
+	// 门控档位与指纹过滤模式同口径归一：空或非法一律归 safe（保守默认，等价现状）。
+	opt.GatingLevel = strings.ToLower(strings.TrimSpace(opt.GatingLevel))
+	switch opt.GatingLevel {
+	case "off", "safe", "balanced", "aggressive":
+	default:
+		opt.GatingLevel = "safe"
 	}
 
 	opt.PedmSummaryBy = strings.ToLower(strings.TrimSpace(opt.PedmSummaryBy))
@@ -1330,6 +1357,9 @@ func (o *Options) CreatePocListWithDiagnostics() ([]poc.Poc, []PocLoadError) {
 		if pp.Id == "" {
 			pp.Id = id
 		}
+		// 软适用性 applies-to：显式声明优先，缺省时按 tags/文件名/名称在加载期推断一次。
+		// 它只服务后续「有反面证据才跳过」的否定门控，不参与本条 PoC 的任何加载期取舍。
+		pp.Info.FillAppliesTo(srcPath)
 		// 能力策略：declarative 一律放行；network（javascript）跟随 -enable-js-poc；
 		// 将来的 exec 一档由 AllowsCapability 统一决定，这里无需改动。
 		capLevel := pp.Capability()

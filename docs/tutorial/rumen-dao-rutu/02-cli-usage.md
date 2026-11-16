@@ -108,7 +108,7 @@ afrog -t 192.168.1.0/24 -ps -w=false
 - **只取服务端可见的判据**：Wappalyzer 浏览器版能读 `window` 上的 JS 变量（`js` 源），HTTP 侧拿不到；这部分判据已被刻意丢弃，不做子串猜测——宁可识别不到，也不误报。
 - **可信度与端口指纹同一标尺**：`probable`（弱特征，如 `softmatch` 或社区判据）与 `certain`（强特征，如专属响应头、`meta generator`）。
 - **外置指纹库**：`-w-fingerprint-dir <dir>` 指定目录下放置 `rules.yaml` 即可覆盖/扩展内置规则；**外置规则整体排在内置之前，同 `id` 覆盖内置**，新增的 specific 规则不会被内置通用规则抢先命中。
-- **favicon 匹配按需开启**：抓 `/favicon.ico` 会额外产生一次请求，因此默认不抓；加 `-w-favicon` 即可开启，命中内置的 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）。若外置 `rules.yaml` 里出现 `source: favicon` 规则，也会自动开启抓取，无需再加开关。
+- **favicon 默认抓取**：`/favicon.ico` 的 mmh3 哈希是「按图定位同一套站」的稳定标识，命中内置 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix、Harbor、致远 OA、Zimbra、Exchange OWA、Apache Superset、D-Link D-View、Juniper J-Web、SysAid、MCMS 等）属 `certain` 证据，因此**默认开启**，每个目标会多一次请求；不需要时用 `-w-favicon=false` 关掉。若外置 `rules.yaml` 里出现 `source: favicon` 规则，则强制抓取、不受开关影响。
 - **探测超时单独可控**：`-w-timeout <秒>` 控制探测阶段单次请求与证书获取的超时，默认 `30`；它与全局 `-timeout` 相互独立，目标响应慢时可只放宽探测阶段而不影响 PoC 扫描。
 - **驱动 `requires` 门控**：识别出的技术栈会并入 PoC 的 `requires` 词表，`requires: [wordpress]`、`[thinkphp]`、`[apache-shiro]`、`[cms]` 这类写法从此有据可依，明显不可能命中的 PoC 会被直接跳过，不再浪费请求。可用标识为：规则 `id`（如 `nextjs` / `rails`）、技术名（`Next.js` → `next.js`）、技术名连字符写法（`Apache Shiro` → `apache-shiro`）与 `category`（如 `cms`）。
 - 事件流 / SDK / gRPC 输出同时提供 `fingerprint`（一行摘要）与 `technologies`（`name`/`version`/`category`/`cpe`/`confidence` 明细）。
@@ -117,8 +117,8 @@ afrog -t 192.168.1.0/24 -ps -w=false
 # 使用自建 Web 指纹库
 afrog -t https://example.com -w -w-fingerprint-dir ./my-web-fingerprints
 
-# 额外抓取 favicon，识别「页面上看不出」的产品
-afrog -t https://example.com -w -w-favicon
+# 关闭 favicon 抓取（默认开启，每个目标省一次请求）
+afrog -t https://example.com -w -w-favicon=false
 ```
 
 #### 2.5 常见服务探测 → 弱口令/默认口令探测

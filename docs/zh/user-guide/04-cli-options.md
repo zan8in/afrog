@@ -108,10 +108,10 @@ afrog -t http://example.com -w -w-timeout 30
 
 ### `-w-favicon`
 
-在 Web 探测阶段额外抓取 favicon 并计算 hash，用于识别同一套资产或不易从标题暴露的应用。**默认关闭**，开启后每个目标会多一次请求。
+在 Web 探测阶段抓取 favicon 并计算 hash，用于识别同一套资产或不易从标题暴露的应用。**默认开启**，每个目标会多一次请求；不需要时用 `-w-favicon=false` 关闭。
 
 ```bash
-afrog -t http://example.com -w -w-favicon
+afrog -t http://example.com -w -w-favicon=false
 ```
 
 ### `-p`

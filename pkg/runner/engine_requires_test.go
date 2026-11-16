@@ -3,122 +3,33 @@ package runner
 import (
 	"testing"
 
-	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/assetgraph"
+	"github.com/zan8in/afrog/v3/pkg/portscan"
 )
 
-func TestShouldSkipRequires_Strict_NoFingerprint(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	if !shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, nil, false) {
-		t.Fatalf("expected skip when strict and no fingerprint tags")
-	}
-}
-
-func TestShouldSkipRequires_Opportunistic_NoFingerprint(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}, RequiresMode: "opportunistic"}}
-	if shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, nil, false) {
-		t.Fatalf("expected not skip when opportunistic and no fingerprint tags")
-	}
-}
-
-func TestShouldSkipRequires_Strict_Match(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]string{
-		"127.0.0.1:3306": {"mysql": ""},
-	}
-	if shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, fingerTagsByKey, false) {
-		t.Fatalf("expected not skip when requires matches target fingerprint tags")
-	}
-}
-
-// requires 命中「指纹 PoC 的 id」（而非 tag）时，同样不应跳过。
-// 例：CVE-2020-1938 写 requires: ["ajp-protocol-detect"]，而 ajp-protocol-detect 是
-// 指纹 PoC 的 id，其 tags 里并无 "ajp-protocol-detect" 这个 tag。
-func TestShouldSkipRequires_Strict_MatchFingerprintPocID(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"ajp-protocol-detect"}}}
-	fingerRequiresByKey := map[string]map[string]string{
-		"127.0.0.1:8009": {"ajp": "", "tomcat": "", "ajp-protocol-detect": ""},
-	}
-	if shouldSkipRequires("127.0.0.1:8009", p, func(s string) string { return s }, fingerRequiresByKey, false) {
-		t.Fatalf("expected not skip when requires matches fingerprint poc id")
-	}
-}
-
-func TestShouldSkipRequires_Strict_Mismatch(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]string{
-		"127.0.0.1:3306": {"redis": ""},
-	}
-	if !shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, fingerTagsByKey, false) {
-		t.Fatalf("expected skip when requires does not match target fingerprint tags")
-	}
-}
-
-func TestShouldSkipRequires_Strict_EmptyKey(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	fingerTagsByKey := map[string]map[string]string{
-		"127.0.0.1:3306": {"mysql": ""},
-	}
-	if !shouldSkipRequires("127.0.0.1:3306", p, func(string) string { return "" }, fingerTagsByKey, false) {
-		t.Fatalf("expected skip when strict and target key cannot be resolved")
-	}
-}
-
-// requires 带版本约束时，命中产品还要版本落在区间内才放行。
-func TestShouldSkipRequires_VersionConstraint(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"jquery<3.5"}}}
-
-	// 识别到的版本满足约束 → 放行。
-	old := map[string]map[string]string{"a.example:80": {"jquery": "3.4.1"}}
-	if shouldSkipRequires("a.example:80", p, func(s string) string { return s }, old, false) {
-		t.Fatal("expected not skip when version satisfies the constraint")
-	}
-	// 识别到的版本不满足 → 跳过。
-	newer := map[string]map[string]string{"a.example:80": {"jquery": "3.6.0"}}
-	if !shouldSkipRequires("a.example:80", p, func(s string) string { return s }, newer, false) {
-		t.Fatal("expected skip when version violates the constraint")
-	}
-	// 版本未知 → 放行，避免因拿不到版本而漏报。
-	unknown := map[string]map[string]string{"a.example:80": {"jquery": ""}}
-	if shouldSkipRequires("a.example:80", p, func(s string) string { return s }, unknown, false) {
-		t.Fatal("expected not skip when version is unknown")
-	}
-	// 没识别到该产品 → 跳过。
-	absent := map[string]map[string]string{"a.example:80": {"nginx": "1.24"}}
-	if !shouldSkipRequires("a.example:80", p, func(s string) string { return s }, absent, false) {
-		t.Fatal("expected skip when tech is absent")
-	}
-}
-
-func TestShouldSkipRequires_TestMode(t *testing.T) {
-	p := poc.Poc{Info: poc.Info{Requires: []string{"mysql"}}}
-	if shouldSkipRequires("127.0.0.1:3306", p, func(s string) string { return s }, nil, true) {
-		t.Fatalf("expected not skip when test mode is enabled")
-	}
-}
-
-// webTechRequires 把 -w 的技术栈翻译成 requires 词表：站点根与带路径的目标都要覆盖，
+// addWebTechFacts 把 -w 的技术栈写入画像：站点根与带路径的目标都要覆盖，
 // 无关目标不能凭空多出条目。
-func TestWebTechRequires(t *testing.T) {
+func TestAddWebTechFacts(t *testing.T) {
 	metas := map[string]WebMeta{
 		"127.0.0.1:8080": {URL: "http://127.0.0.1:8080", Technologies: []WebTech{
-			{Name: "WordPress", Version: "6.4.2", Category: "cms", RuleID: "wordpress"},
+			{Name: "WordPress", Version: "6.4.2", Category: "cms", RuleID: "wordpress", Confidence: "certain"},
 			{Name: "Apache Shiro", Category: "framework", RuleID: "apache-shiro", Confidence: "probable"},
 		}},
-		// 没有技术栈的探测结果不应产生 requires 词。
+		// 没有技术栈的探测结果不应产生标识词。
 		"127.0.0.1:9090": {URL: "http://127.0.0.1:9090"},
 	}
 	targets := []string{
 		"http://127.0.0.1:8080",
 		"http://127.0.0.1:8080/wp-login.php",
 		"http://127.0.0.1:9090",
-		"127.0.0.1:8080",
 	}
-	got := webTechRequires(targets, metas)
+	ps := assetgraph.NewProfiles()
+	addWebTechFacts(ps, targets, metas)
 
 	for _, key := range []string{"127.0.0.1:8080", "127.0.0.1:8080/wp-login.php"} {
-		set, ok := got[key]
-		if !ok {
-			t.Fatalf("missing entry for %s: %v", key, got)
+		set := ps.RequiresTokens(key)
+		if len(set) == 0 {
+			t.Fatalf("missing entry for %s", key)
 		}
 		for _, want := range []string{"wordpress", "cms", "apache-shiro", "apache shiro", "framework"} {
 			if _, ok := set[want]; !ok {
@@ -129,72 +40,98 @@ func TestWebTechRequires(t *testing.T) {
 		if set["wordpress"] != "6.4.2" {
 			t.Fatalf("key %s wordpress version = %q, want 6.4.2", key, set["wordpress"])
 		}
+		// 可信度要透传：否定证据只采信 certain 级事实。
+		certain := ps.CertainTokens(key)
+		if _, ok := certain["wordpress"]; !ok {
+			t.Fatalf("key %s: wordpress (certain) should be a certain token: %v", key, certain)
+		}
+		if _, ok := certain["apache-shiro"]; ok {
+			t.Fatalf("key %s: probable apache-shiro must not be a certain token: %v", key, certain)
+		}
 	}
-	if _, ok := got["127.0.0.1:9090"]; ok {
-		t.Fatalf("target without technologies should not appear: %v", got)
+	if ps.RequiresTokens("127.0.0.1:9090") != nil {
+		t.Fatalf("target without technologies should not appear")
 	}
-	if webTechRequires(nil, metas) != nil {
-		t.Fatal("expected nil for empty target list")
-	}
-	if webTechRequires(targets, nil) != nil {
-		t.Fatal("expected nil for empty meta list")
+
+	// 空输入不应写入任何内容。
+	empty := assetgraph.NewProfiles()
+	addWebTechFacts(empty, nil, metas)
+	addWebTechFacts(empty, targets, nil)
+	if empty.Len() != 0 {
+		t.Fatalf("expected no profiles for empty input, got %d", empty.Len())
 	}
 }
 
-// 合并 Web 技术栈后，requires: [wordpress] 应命中 WordPress 站点而跳过其它站点。
-func TestShouldSkipRequires_WithWebFingerprint(t *testing.T) {
-	metas := map[string]WebMeta{
-		"127.0.0.1:8080": {URL: "http://127.0.0.1:8080", Technologies: []WebTech{
-			{Name: "WordPress", Category: "cms", RuleID: "wordpress"},
-		}},
-	}
-	merged := webTechRequires([]string{"http://127.0.0.1:8080"}, metas)
+// FactsByHost 把 per host:port 的端口指纹结论按主机聚合，供门控把
+// 主机级结论分发给同一主机上的任意目标。
+func TestOpenPortsCollectorFactsByHost(t *testing.T) {
+	c := newOpenPortsCollector()
+	c.AddResult(&portscan.ScanResult{Host: "10.0.0.1", Port: 6379, ServiceInfo: portscan.ServiceInfo{Service: "redis", Product: "Redis", Version: "7.0.11"}})
+	c.AddResult(&portscan.ScanResult{Host: "10.0.0.1", Port: 3306, ServiceInfo: portscan.ServiceInfo{Service: "mysql", Product: "MySQL", Version: "8.0.34"}})
+	c.AddResult(&portscan.ScanResult{Host: "10.0.0.2", Port: 22, ServiceInfo: portscan.ServiceInfo{Service: "ssh"}})
 
-	p := poc.Poc{Info: poc.Info{Requires: []string{"wordpress"}}}
-	if shouldSkipRequires("http://127.0.0.1:8080", p, keyFromTargetWithPath, merged, false) {
-		t.Fatal("expected not skip when requires matches web fingerprint")
+	got := c.FactsByHost()
+	if len(got) != 2 {
+		t.Fatalf("FactsByHost hosts = %d, want 2: %v", len(got), got)
 	}
-	if !shouldSkipRequires("http://127.0.0.1:8081", p, keyFromTargetWithPath, merged, false) {
-		t.Fatal("expected skip when target has no matching web fingerprint")
+	if len(got["10.0.0.1"]) != 2 {
+		t.Fatalf("10.0.0.1 facts = %d, want 2", len(got["10.0.0.1"]))
+	}
+	if len(got["10.0.0.2"]) != 1 {
+		t.Fatalf("10.0.0.2 facts = %d, want 1", len(got["10.0.0.2"]))
 	}
 
-	// opportunistic 下也应有证据才放行：目标有 Web 指纹但不含该技术时跳过。
-	op := poc.Poc{Info: poc.Info{Requires: []string{"thinkphp"}, RequiresMode: "opportunistic"}}
-	if !shouldSkipRequires("http://127.0.0.1:8080", op, keyFromTargetWithPath, merged, false) {
-		t.Fatal("expected skip when opportunistic and web fingerprint mismatches")
+	var nilCollector *openPortsCollector
+	if nilCollector.FactsByHost() != nil {
+		t.Fatal("expected nil for a nil collector")
 	}
 }
 
-func TestShouldSkipFingerprintFilteredByMode_Strict_EmptyTargetTags(t *testing.T) {
-	global := map[string]struct{}{"redis": {}}
-	pocTags := map[string]struct{}{"redis": {}}
-	if !shouldSkipFingerprintFilteredByMode("strict", global, nil, pocTags) {
-		t.Fatalf("expected skip when strict and target has no fingerprint tags")
-	}
-}
+// addPortServiceFacts 把端口指纹写入画像：该主机上任意目标（URL 或 host:port）
+// 都能取到主机级服务结论，无结论的主机不产出词条。
+func TestAddPortServiceFacts(t *testing.T) {
+	c := newOpenPortsCollector()
+	c.AddResult(&portscan.ScanResult{Host: "10.0.0.1", Port: 6379, ServiceInfo: portscan.ServiceInfo{Service: "redis", Product: "Redis", Version: "7.0.11", Confidence: portscan.ConfidenceCertain}})
+	c.AddResult(&portscan.ScanResult{Host: "10.0.0.1", Port: 3306, ServiceInfo: portscan.ServiceInfo{Service: "mysql", Product: "MySQL Server", Version: "8.0.34"}})
 
-func TestShouldSkipFingerprintFilteredByMode_Opportunistic_EmptyTargetTags(t *testing.T) {
-	global := map[string]struct{}{"redis": {}}
-	pocTags := map[string]struct{}{"redis": {}}
-	if shouldSkipFingerprintFilteredByMode("opportunistic", global, nil, pocTags) {
-		t.Fatalf("expected not skip when opportunistic and target has no fingerprint tags")
+	targets := []string{
+		"10.0.0.1:6379",
+		"http://10.0.0.1:8080",
+		"10.0.0.9:6379",
 	}
-}
+	ps := assetgraph.NewProfiles()
+	addPortServiceFacts(ps, targets, c)
 
-func TestShouldSkipFingerprintFilteredByMode_MismatchWithEvidence(t *testing.T) {
-	global := map[string]struct{}{"redis": {}, "mysql": {}}
-	targetTags := map[string]struct{}{"mysql": {}}
-	pocTags := map[string]struct{}{"redis": {}}
-	if !shouldSkipFingerprintFilteredByMode("opportunistic", global, targetTags, pocTags) {
-		t.Fatalf("expected skip when target fingerprint tags do not match poc tags")
+	set := ps.RequiresTokens("10.0.0.1:6379")
+	if len(set) == 0 {
+		t.Fatalf("missing entry for 10.0.0.1:6379")
 	}
-}
+	for _, want := range []string{"redis", "mysql", "mysql server", "mysql-server"} {
+		if _, ok := set[want]; !ok {
+			t.Fatalf("missing token %q: %v", want, set)
+		}
+	}
+	if set["redis"] != "7.0.11" {
+		t.Fatalf("redis version = %q, want 7.0.11", set["redis"])
+	}
+	// certain 级端口事实进入高置信视图，供否定证据使用。
+	if _, ok := ps.CertainTokens("10.0.0.1:6379")["redis"]; !ok {
+		t.Fatalf("certain redis token missing: %v", ps.CertainTokens("10.0.0.1:6379"))
+	}
+	// URL 目标按 host 归一后同样继承主机级端口结论。
+	urlSet := ps.RequiresTokens("10.0.0.1:8080")
+	if urlSet["redis"] != "7.0.11" {
+		t.Fatalf("URL target should inherit host facts: %v", urlSet)
+	}
+	if ps.RequiresTokens("10.0.0.9:6379") != nil {
+		t.Fatalf("host without facts should not appear")
+	}
 
-func TestShouldSkipFingerprintFilteredByMode_NotAppSpecific(t *testing.T) {
-	global := map[string]struct{}{"redis": {}}
-	targetTags := map[string]struct{}{}
-	pocTags := map[string]struct{}{"weird": {}}
-	if shouldSkipFingerprintFilteredByMode("strict", global, targetTags, pocTags) {
-		t.Fatalf("expected not skip when poc is not app-specific")
+	// 空输入不应写入任何内容。
+	empty := assetgraph.NewProfiles()
+	addPortServiceFacts(empty, nil, c)
+	addPortServiceFacts(empty, targets, nil)
+	if empty.Len() != 0 {
+		t.Fatalf("expected no profiles for empty input, got %d", empty.Len())
 	}
 }

@@ -158,6 +158,10 @@ type ScanCreateRequest struct {
 	// 任务级超时与失败保护
 	TaskSmartTimeout bool `json:"task_smart_timeout,omitempty"`
 	NoFingerprint    bool `json:"no_fingerprint,omitempty"`
+	// GatingLevel 是 PoC 门控档位：off|safe|balanced|aggressive，空表示用引擎默认 safe。
+	GatingLevel string `json:"gating_level,omitempty"`
+	// DryRun 为真时只预演门控决策与归因，不执行任何漏洞 PoC。
+	DryRun bool `json:"dry_run,omitempty"`
 	// BreakpointOnVuln 对应 -vsb：命中首个漏洞后立即停止扫描。
 	BreakpointOnVuln bool `json:"breakpoint_on_vuln,omitempty"`
 	MonitorTargets   bool `json:"monitor_targets,omitempty"`

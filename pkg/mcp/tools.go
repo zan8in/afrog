@@ -1464,6 +1464,7 @@ func (s *Server) scanStartTool() *Tool {
 		Concurrency int    `json:"concurrency"`
 		RateLimit   int    `json:"rate_limit"`
 		TimeoutSec  int    `json:"timeout_sec"`
+		GatingLevel string `json:"gating_level"`
 	}
 	return &Tool{
 		Name:  "scan.start",
@@ -1472,12 +1473,13 @@ func (s *Server) scanStartTool() *Tool {
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"target":      map[string]any{"type": "string", "description": "目标 URL 或 host:port"},
-				"search":      map[string]any{"type": "string", "description": "技术栈/产品关键词（如 thinkphp,jquery,nacos）；命中 PoC 的 id/名称/标签。留空 = 不加关键词、跑全库所有 PoC（量大，需先征得用户同意）"},
-				"severity":    map[string]any{"type": "string", "description": "可选的级别粗筛（逗号分隔，如 high,critical）；用户没指定等级时留空，即扫描所有等级"},
-				"concurrency": map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "description": "并发数，默认由引擎决定"},
-				"rate_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": 1000, "description": "每秒请求上限，0 表示不限"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 1800, "description": "整批扫描的整体超时，默认 300 秒"},
+				"target":       map[string]any{"type": "string", "description": "目标 URL 或 host:port"},
+				"search":       map[string]any{"type": "string", "description": "技术栈/产品关键词（如 thinkphp,jquery,nacos）；命中 PoC 的 id/名称/标签。留空 = 不加关键词、跑全库所有 PoC（量大，需先征得用户同意）"},
+				"severity":     map[string]any{"type": "string", "description": "可选的级别粗筛（逗号分隔，如 high,critical）；用户没指定等级时留空，即扫描所有等级"},
+				"concurrency":  map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "description": "并发数，默认由引擎决定"},
+				"rate_limit":   map[string]any{"type": "integer", "minimum": 1, "maximum": 1000, "description": "每秒请求上限，0 表示不限"},
+				"timeout_sec":  map[string]any{"type": "integer", "minimum": 5, "maximum": 1800, "description": "整批扫描的整体超时，默认 300 秒"},
+				"gating_level": map[string]any{"type": "string", "enum": []string{"off", "safe", "balanced", "aggressive"}, "description": "指纹门控档位（对应 afrog -gating-level）：off 全量跑、safe 仅命中+兜底放行（默认）、balanced 追加语言层否定跳过、aggressive 再追加 CMS 家族否定跳过。档位只收紧「跳过」、不放宽任何放行；不确定时留空用默认 safe。"},
 			},
 			"required": []string{"target"},
 		},
@@ -1546,6 +1548,7 @@ func (s *Server) scanStartTool() *Tool {
 			spec.Severity = strings.TrimSpace(a.Severity)
 			spec.Concurrency = a.Concurrency
 			spec.RateLimit = a.RateLimit
+			spec.GatingLevel = strings.TrimSpace(a.GatingLevel)
 			if s.oob != nil {
 				spec.EnableOOB = true
 				spec.OOBAdapter = s.oob.Adapter()

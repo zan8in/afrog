@@ -1187,10 +1187,16 @@ func checkProtocolDirect(host string) (string, error) {
 	}
 
 	if strings.HasPrefix(host, HTTP_PREFIX) {
-		_, err := checkTarget(host, probeTimeout)
+		body, err := checkTarget(host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
+		}
+
+		// 用户写的 http:// 也可能踩到「TLS 端口回绝明文请求」：站点其实只认 https，
+		// 按响应内容纠正到 https，否则后续 PoC 会拿着必然失败的 http URL 空跑。
+		if utils.LooksLikeHTTPSMismatch(body) {
+			return HTTPS_PREFIX + strings.TrimPrefix(host, HTTP_PREFIX), nil
 		}
 
 		return host, nil
@@ -1204,10 +1210,15 @@ func checkProtocolDirect(host string) (string, error) {
 
 	switch {
 	case parsePort == "80":
-		_, err := checkTarget(HTTP_PREFIX+host, probeTimeout)
+		body, err := checkTarget(HTTP_PREFIX+host, probeTimeout)
 		if err != nil {
 			lastErr = err
 			return result, err
+		}
+
+		// 显式 :80 上也可能挂着 TLS 服务：明文请求被回绝时按响应内容纠正到 https。
+		if utils.LooksLikeHTTPSMismatch(body) {
+			return HTTPS_PREFIX + host, nil
 		}
 
 		return HTTP_PREFIX + host, nil
@@ -1241,7 +1252,7 @@ func checkProtocolDirect(host string) (string, error) {
 
 		body, err := checkTarget(tryFirst+host, probeTimeout)
 		if err == nil {
-			if tryFirst == HTTP_PREFIX && strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
+			if tryFirst == HTTP_PREFIX && utils.LooksLikeHTTPSMismatch(body) {
 				return HTTPS_PREFIX + host, nil
 			}
 			return tryFirst + host, nil
@@ -1250,7 +1261,7 @@ func checkProtocolDirect(host string) (string, error) {
 
 		body, err = checkTarget(trySecond+host, probeTimeout)
 		if err == nil {
-			if trySecond == HTTP_PREFIX && strings.Contains(body, "<title>400 The plain HTTP request was sent to HTTPS port</title>") {
+			if trySecond == HTTP_PREFIX && utils.LooksLikeHTTPSMismatch(body) {
 				return HTTPS_PREFIX + host, nil
 			}
 			return trySecond + host, nil

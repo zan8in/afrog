@@ -1139,6 +1139,8 @@ func buildInternalOptions(opts *Options) (*builtConfig, error) {
 		WebFavicon:                     opts.WebFavicon,
 		WebProbeTimeout:                opts.WebProbeTimeout,
 		FingerprintFilterMode:          opts.FingerprintFilterMode,
+		GatingLevel:                    opts.GatingLevel,
+		DryRun:                         opts.DryRun,
 		VulnerabilityScannerBreakpoint: opts.StopOnFirstMatch,
 		Proxy:                          opts.Proxy,
 		Header:                         opts.Headers,

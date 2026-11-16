@@ -102,6 +102,12 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	if spec.NoFingerprint {
 		args = append(args, "-nf")
 	}
+	if v := strings.TrimSpace(spec.GatingLevel); v != "" {
+		args = append(args, "-gating-level", v)
+	}
+	if spec.DryRun {
+		args = append(args, "-dry-run")
+	}
 	if spec.BreakpointOnVuln {
 		args = append(args, "-vsb")
 	}
@@ -152,8 +158,15 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	if spec.WebProbeTimeout > 0 {
 		args = append(args, "-w-timeout", strconv.Itoa(spec.WebProbeTimeout))
 	}
-	if spec.WebFavicon {
-		args = append(args, "-w-favicon")
+	if spec.WebFingerprint {
+		// favicon 抓取是 Web 探测的子行为，-w 关掉时无从谈起；-w 生效时必须显式表态：
+		// CLI 的 -w-favicon 现在默认开启，只省略 flag 等于把决定权交回子进程默认值，
+		// Web 控制台里取消勾选 favicon 就会失效。因此关闭时补一个 -w-favicon=false。
+		if spec.WebFavicon {
+			args = append(args, "-w-favicon")
+		} else {
+			args = append(args, "-w-favicon=false")
+		}
 	}
 
 	// OOB：CLI 只有 -oob <adapter> 用于选择适配器；key/domain 等凭据来自子进程的

@@ -630,3 +630,19 @@ func typesOf(events []received) []string {
 	}
 	return out
 }
+
+// fromProtoSpec 是 gRPC 面唯一的规格翻译入口：任何一端新增的字段都必须在这里落位，
+// 否则会出现「协议里有、执行时丢了」的静默降级——外部只能看到档位没生效，难以定位。
+func TestFromProtoSpec_CarriesGatingLevelAndDryRun(t *testing.T) {
+	req := fromProtoSpec(&afrogv1.ScanSpec{
+		Targets:     []string{"https://example.com"},
+		GatingLevel: "balanced",
+		DryRun:      true,
+	})
+	if len(req.Targets) != 1 || req.Targets[0] != "https://example.com" {
+		t.Fatalf("targets = %v", req.Targets)
+	}
+	if req.GatingLevel != "balanced" || !req.DryRun {
+		t.Fatalf("gating level/dry run not carried: level=%q dryRun=%v", req.GatingLevel, req.DryRun)
+	}
+}

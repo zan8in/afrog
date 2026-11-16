@@ -94,5 +94,6 @@ func EmbedReadPocMetaByPath(path string) (poc.PocMeta, error) {
 	if err := yaml.NewDecoder(file).Decode(&pm); err != nil {
 		return pm, err
 	}
+	pm.Info.FillAppliesTo(path)
 	return pm, nil
 }

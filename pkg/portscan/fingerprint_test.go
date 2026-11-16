@@ -44,6 +44,49 @@ func TestIsWebService(t *testing.T) {
 	}
 }
 
+// NormTokens 是 Web 指纹与端口指纹共用的唯一归一实现，口径必须稳定：
+// 小写化、去空白、去重，且含空格的写法额外补一条连字符变体。
+func TestNormTokens(t *testing.T) {
+	tests := []struct {
+		name     string
+		variants []string
+		want     []string
+	}{
+		{"trim and lowercase", []string{" MySQL ", "Redis"}, []string{"mysql", "redis"}},
+		{"dedup", []string{"redis", "redis", " REDIS "}, []string{"redis"}},
+		{"space variant adds hyphen", []string{"Apache Shiro"}, []string{"apache shiro", "apache-shiro"}},
+		{"skip empty", []string{"", "  ", "nginx"}, []string{"nginx"}},
+		{"no variants", nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormTokens(tt.variants...)
+			if len(got) != len(tt.want) {
+				t.Fatalf("NormTokens(%v) = %v, want %v", tt.variants, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("NormTokens(%v) = %v, want %v", tt.variants, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+// MatchTokens 同时给出服务名与产品名，供 requires: [mysql] / [mysql server] 命中。
+func TestMatchTokens(t *testing.T) {
+	got := MatchTokens("MySQL", "MySQL Server")
+	want := map[string]bool{"mysql": true, "mysql server": true, "mysql-server": true}
+	if len(got) != len(want) {
+		t.Fatalf("MatchTokens = %v, want %d tokens", got, len(want))
+	}
+	for _, tok := range got {
+		if !want[tok] {
+			t.Fatalf("unexpected token %q in %v", tok, got)
+		}
+	}
+}
+
 func TestIdentifyBuiltinBanners(t *testing.T) {
 	fp := newTestFingerprinter(t, "")
 

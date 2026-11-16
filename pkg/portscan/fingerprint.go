@@ -123,6 +123,44 @@ func IsWebService(service string) bool {
 	return strings.Contains(service, "http") || strings.Contains(service, "web")
 }
 
+// NormTokens 把若干候选标识归一成 requires 门控可用的词表：全部小写、去首尾空白、
+// 去重；含空格的写法额外补一条连字符变体（"apache shiro" -> "apache-shiro"），
+// 使 PoC 作者写 requires: [apache-shiro] 或 requires: [apache shiro] 都能命中。
+//
+// 这是 Web 指纹与端口指纹共用的唯一归一实现（pkg/webscan.MatchTokens 也走这里），
+// 避免两处各写一份导致 requires 标识词口径漂移。
+func NormTokens(variants ...string) []string {
+	tokens := make([]string, 0, len(variants)+2)
+	seen := make(map[string]struct{}, len(variants)+2)
+	add := func(s string) {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if s == "" {
+			return
+		}
+		if _, ok := seen[s]; ok {
+			return
+		}
+		seen[s] = struct{}{}
+		tokens = append(tokens, s)
+	}
+	for _, v := range variants {
+		v = strings.TrimSpace(v)
+		add(v)
+		if strings.Contains(v, " ") {
+			add(strings.ReplaceAll(v, " ", "-"))
+		}
+	}
+	return tokens
+}
+
+// MatchTokens 返回端口指纹在 PoC requires 门控里可用的标识词。
+//
+// service 是服务/协议名（redis、mysql、ssh），product 是产品名（MySQL Server）。
+// PoC 作者通常按服务名写 requires: [redis]，product 作为补充标识一并给出。
+func MatchTokens(service, product string) []string {
+	return NormTokens(service, product)
+}
+
 // builtinPriors 按需加载一次内置 ports.yaml 的端口先验。
 //
 // 单独缓存是为了让「某端口惯例上是不是 Web」这类轻量查询不必构造完整

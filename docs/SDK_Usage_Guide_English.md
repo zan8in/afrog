@@ -616,7 +616,7 @@ Adaptive per-target (`host:port`) limiting is on by default: the start rate is d
 | `WithFingerprintFilterMode(mode)` | `"strict"` (or `"opportunistic"`) |
 | `WithWebProbe(enabled)` | Web probing is on by default (matching the CLI `-w`); pass `false` to disable |
 | `WithWebProbeTimeout(seconds)` | `0`, meaning the engine default (30s); equivalent to `-w-timeout` |
-| `WithWebFavicon()` | off by default; equivalent to `-w-favicon`, costing one extra request per target |
+| `WithWebFavicon()` | on by default; equivalent to `-w-favicon`, costing one extra request per target, kept only to state the intent explicitly |
 
 ### Network
 

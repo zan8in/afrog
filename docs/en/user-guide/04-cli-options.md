@@ -108,10 +108,10 @@ afrog -t http://example.com -w -w-timeout 30
 
 ### `-w-favicon`
 
-Also fetch the favicon during web probing and compute its hash, which helps identify a shared asset set or applications that titles do not reveal. **Off by default**; each target costs one extra request.
+Fetch the favicon during web probing and compute its hash, which helps identify a shared asset set or applications that titles do not reveal. **On by default**; each target costs one extra request. Disable it with `-w-favicon=false`.
 
 ```bash
-afrog -t http://example.com -w -w-favicon
+afrog -t http://example.com -w -w-favicon=false
 ```
 
 ### `-p`

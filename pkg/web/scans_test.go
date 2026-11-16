@@ -680,6 +680,8 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 				WebFingerprint: true,
 				EnableOOB:      true,
 				OOB:            "dnslogcn",
+				GatingLevel:    " aggressive ",
+				DryRun:         true,
 			},
 			[]string{"https://example.com"},
 			"",
@@ -700,6 +702,11 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 		}
 		if !spec.EnableOOB || spec.OOBAdapter != "dnslogcn" {
 			t.Fatalf("oob options not mapped: %+v", spec)
+		}
+		// 门控档位必须带上去空白后原样下发给子进程，dry-run 必须一并透传，
+		// 否则 Web 控制台选择了档位/预演却仍按默认 safe 实际发包。
+		if spec.GatingLevel != "aggressive" || !spec.DryRun {
+			t.Fatalf("gating level/dry run not mapped: level=%q dryRun=%v", spec.GatingLevel, spec.DryRun)
 		}
 	})
 }

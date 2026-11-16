@@ -451,9 +451,9 @@ type DB struct {
 
 	// hasFavicon 记录「外置规则集里是否含 favicon 规则」。
 	//
-	// 内置规则集本身也带 favicon 规则，但那只是数据：不抓 favicon 时它永远不会参与匹配。
-	// 因此这里只看外置规则——用户在外置目录写 favicon 规则本身就说明他要抓 favicon，可以
-	// 据此自动开启抓取；否则是否额外请求 /favicon.ico 完全由 -w-favicon 控制，默认不抓。
+	// 内置规则集本身也带 favicon 规则，但那只是数据：是否抓取以 -w-favicon 为准（默认开启）。
+	// 这里额外只看外置规则——用户在外置目录写 favicon 规则本身就说明他要抓 favicon，可以
+	// 据此强制开启抓取，即便使用者显式关掉了 -w-favicon。
 	hasFavicon bool
 }
 

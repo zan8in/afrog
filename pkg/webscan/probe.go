@@ -24,6 +24,11 @@ const (
 	DefaultProbeBodyLimit = 2 << 20
 	// DefaultFaviconLimit 是 favicon 读取上限（1 MiB）。
 	DefaultFaviconLimit = 1 << 20
+	// DefaultAssetLimit 是单个静态资源（脚本/样式）读取上限（1 MiB）。
+	//
+	// 与探测正文分开取值：资源是给指纹匹配用的，而匹配侧本身也只在 512 KiB 内扫，
+	// 再多读只是浪费带宽。
+	DefaultAssetLimit = 1 << 20
 )
 
 // TLSInfo 是 https 目标的证书摘要，只保留「这家站是谁签的、什么时候过期」所需的最小字段。
@@ -94,6 +99,14 @@ func (r *ProbeResult) Response() Response {
 		Cookies:    r.Cookies,
 		RequestURL: r.FinalURL,
 	}
+}
+
+// LooksLikeHTTPSMismatch 判断一次 http 探测的响应是否在说「这里其实得用 https」。
+//
+// 判据本体在 [utils.LooksLikeHTTPSMismatch]（协议试探层与 Web 探测层共用同一份，
+// 避免两处各写一份措辞匹配而逐渐漂移）；这里只是把探测正文（[]byte）转过去。
+func LooksLikeHTTPSMismatch(body []byte) bool {
+	return utils.LooksLikeHTTPSMismatch(string(body))
 }
 
 // Prober 是可复用的 Web 探测器。
@@ -239,6 +252,58 @@ func (p *Prober) FetchFavicon(ctx context.Context, rawURL string) []byte {
 		return nil
 	}
 	return body
+}
+
+// FetchAssets 抓取首页引用的同源脚本/样式资源，返回其内容供指纹匹配。
+//
+// max 为最多抓几个（<=0 直接返回 nil）。任一资源抓取失败只跳过它，不影响其余——
+// 静态资源是「能多识别一些」的增量证据，任何一次失败都不该影响主探测结果。
+func (p *Prober) FetchAssets(ctx context.Context, baseURL string, body []byte, max int) []Asset {
+	if p == nil || max <= 0 {
+		return nil
+	}
+	refs := AssetRefs(baseURL, body, max)
+	if len(refs) == 0 {
+		return nil
+	}
+	assets := make([]Asset, 0, len(refs))
+	for _, ref := range refs {
+		if ctx != nil && ctx.Err() != nil {
+			break
+		}
+		if data := p.fetchAsset(ctx, ref); len(data) > 0 {
+			assets = append(assets, Asset{URL: ref, Body: data})
+		}
+	}
+	return assets
+}
+
+// fetchAsset 抓一个资源文件；非 2xx、为空或超限都返回 nil。
+//
+// 不做 content-type 白名单：打包器给出的类型不够可靠，误抓一个图片也只会匹配不到任何规则，
+// 却可能漏掉真脚本——宁可多抓一个、不可漏一个。
+func (p *Prober) fetchAsset(ctx context.Context, rawURL string) []byte {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil
+	}
+	p.applyHeaders(req)
+	resp, err := p.client.Do(req)
+	if err != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil
+	}
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, DefaultAssetLimit+1))
+	if len(data) == 0 || int64(len(data)) > DefaultAssetLimit {
+		return nil
+	}
+	return data
 }
 
 // applyHeaders 把自定义头与 UA 加到请求上。

@@ -20,6 +20,7 @@ import (
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/gating"
 	"github.com/zan8in/afrog/v3/pkg/log"
 	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/poc"
@@ -88,6 +89,39 @@ func keyFromTargetWithPath(target string) string {
 		path = "/" + path
 	}
 	return base + path
+}
+
+// canonicalWebURL 把 URL 形式的目标折算掉 scheme 的默认端口，得到规范写法：
+// http://x.com:80 → http://x.com，https://x.com:443 → https://x.com。
+//
+// 同一个站点常被写成带端口与不带端口两种形式（端口扫描产出的 host:port、手工输入的
+// URL 混在一起），输出统一为规范写法后，报告与目标列表里才不会 http://x.com:80 与
+// http://x.com 各占一行。
+//
+// 只处理带显式 scheme 的 URL：裸 host:port 没有 scheme，端口是必需信息，原样返回；
+// 非默认端口（如 :8080）代表另一个端点，同样不动。路径与查询串一律保留。
+func canonicalWebURL(target string) string {
+	target = strings.TrimSpace(target)
+	if !strings.Contains(target, "://") {
+		return target
+	}
+	u, err := url.Parse(target)
+	if err != nil || u == nil || u.Host == "" {
+		return target
+	}
+	scheme := strings.ToLower(u.Scheme)
+	port := strings.TrimSpace(u.Port())
+	if !((scheme == "http" && port == "80") || (scheme == "https" && port == "443")) {
+		return target
+	}
+	host := u.Hostname()
+	if strings.Contains(host, ":") {
+		// IPv6 字面量在 URL 里必须带方括号。
+		u.Host = "[" + host + "]"
+	} else {
+		u.Host = host
+	}
+	return u.String()
 }
 
 // openPortsCollector 汇总端口扫描阶段的开放端口与指纹结论。
@@ -357,15 +391,36 @@ func recordDNSObservation(rawURL string) {
 //
 // WAF/CDN 不计入摘要：它们属于站点前面的拦截层，已经由 WAF 字段单独外露，
 // 混进来只会让同一行里出现两遍 Cloudflare 之类的重复。
+//
+// 同名技术只保留一条：首页素材与抓回的静态资源是分两批匹配、再按 name+version 合并的，
+// 同一个技术可能一边给出带版本的结论、一边只给出存在性结论（如 "React 19.3" 与 "React"），
+// 直接拼接就会在同一行里说两遍。这里按名字收敛，优先保留带版本的写法（信息更全）。
 func webTechSummary(techs []WebTech) string {
 	parts := make([]string, 0, len(techs))
+	// versions 与 parts 一一对应，记录每条已选摘要所带的版本；用它判断「既有那条是否
+	// 已经带版本」，避免用具名判断（技术名本身可能含空格，如 "Ruby on Rails"）。
+	versions := make([]string, 0, len(techs))
+	index := make(map[string]int, len(techs))
 	for _, t := range techs {
 		name := strings.TrimSpace(t.Name)
 		if name == "" || isFrontLayerCategory(t.Category) {
 			continue
 		}
-		if v := strings.TrimSpace(t.Version); v != "" {
-			name += " " + v
+		key := strings.ToLower(name)
+		version := strings.TrimSpace(t.Version)
+		if i, ok := index[key]; ok {
+			// 已在列表中：techs 已按可信度降序，故既有那条更可信；仅当当前条目带版本而
+			// 既有条目不带来版本时，才用当前版本补全，其余重复一律丢弃。
+			if version != "" && versions[i] == "" {
+				versions[i] = version
+				parts[i] = name + " " + version
+			}
+			continue
+		}
+		index[key] = len(parts)
+		versions = append(versions, version)
+		if version != "" {
+			name += " " + version
 		}
 		parts = append(parts, name)
 	}
@@ -374,12 +429,22 @@ func webTechSummary(techs []WebTech) string {
 
 // webTechNames 返回识别出的技术名（不含 WAF/CDN），供报告做分布汇总。
 // 与 webTechSummary 的区别：这里只要名字，不带版本、不做拼接。
+//
+// 同样按名字去重：否则同一技术会因「首页 / 资源」两次命中而在分布统计里被重复计数。
 func webTechNames(techs []WebTech) []string {
 	names := make([]string, 0, len(techs))
+	seen := make(map[string]struct{}, len(techs))
 	for _, t := range techs {
-		if name := strings.TrimSpace(t.Name); name != "" && !isFrontLayerCategory(t.Category) {
-			names = append(names, name)
+		name := strings.TrimSpace(t.Name)
+		if name == "" || isFrontLayerCategory(t.Category) {
+			continue
 		}
+		key := strings.ToLower(name)
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		names = append(names, name)
 	}
 	if len(names) == 0 {
 		return nil
@@ -558,6 +623,51 @@ func webProbeResumeKey(raw, scheme string) string {
 		return fingerprint.KeyFromTarget(u)
 	}
 	return keyFromTargetWithPath(raw)
+}
+
+// webProbeHTTPSVariant 把候选 URL 换成 https 版（同 host:port），供「http 探测发现
+// 站点只认 https」时重探。已经是 https 或解析不出主机名时返回空串，表示无需重探。
+func webProbeHTTPSVariant(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || strings.EqualFold(u.Scheme, "https") {
+		return ""
+	}
+	u.Scheme = "https"
+	return u.String()
+}
+
+// webProbeDedupeKey 给 Web 探测候选算一个「同一站点只探一次」的去重键。
+//
+// scheme 能确定时（端口指纹给了 TLS 事实，或用户直接写了带协议的 URL），键按
+// scheme + host + 有效端口 + path 归一，默认端口折叠：http://x.com:80 与
+// http://x.com 折叠成同一条，https://x.com:443 与 https://x.com 同理；http 与
+// https 始终是两条，同一主机的两个端点都要探。裸主机名要先做协议试探才知道是
+// http 还是 https，无法与已知 scheme 的候选归一，按原样单独保留。
+func webProbeDedupeKey(raw, scheme string) string {
+	u := webProbeCandidateURL(raw, scheme)
+	if u == "" {
+		return "\x00raw\x00" + raw
+	}
+	parsed, err := url.Parse(u)
+	if err != nil || parsed == nil || parsed.Host == "" {
+		return "\x00raw\x00" + raw
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "\x00raw\x00" + raw
+	}
+	proto := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	port := strings.TrimSpace(parsed.Port())
+	if port == "" {
+		switch proto {
+		case "http":
+			port = "80"
+		case "https":
+			port = "443"
+		}
+	}
+	path := strings.TrimRight(parsed.EscapedPath(), "/")
+	return proto + "\x00" + host + "\x00" + port + "\x00" + path
 }
 
 // webProbeSkipByPrior 用内置端口先验挡掉惯例上确定不是 Web 的端口（如 22/3306/6379，
@@ -770,7 +880,10 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 		if raw == "" {
 			return
 		}
-		key := scheme + "\x00" + raw
+		// 去重键按 canonical host:port 归一（而非原始字符串）：端口扫描产出的 x.com:80
+		// 与用户输入的 http://x.com 指向同一站点，只该探一次。同一主机的 http/https
+		// 两个端点键不同，各自保留。
+		key := webProbeDedupeKey(raw, scheme)
 		if _, ok := seen[key]; ok {
 			return
 		}
@@ -888,6 +1001,11 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	}
 
 	record := func(urlStr string, meta WebMeta) {
+		// 探测用的 URL 可能带 scheme 默认端口（端口扫描产出的 host:port 拼出来就是
+		// http://x.com:80 这种形式），统一折算成规范写法，避免 http://x.com 与
+		// http://x.com:80 在报告、目标列表里各占一行。
+		urlStr = canonicalWebURL(urlStr)
+		meta.URL = urlStr
 		key := fingerprint.KeyFromTarget(urlStr)
 		if key == "" {
 			return
@@ -1050,6 +1168,17 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 					if err != nil || probe == nil {
 						continue
 					}
+					// http 探测回「明文 HTTP 请求被打到 TLS 端口」的响应时，事实是这个
+					// 站点只认 https：用 https 对同一 host:port 重探一次，命中就整体纠正到
+					// https。端口指纹给出的 scheme 与用户显式写的 http:// 都绕过了
+					// retryhttpclient 的内容纠正，只有真的看到响应才知道协议用错了；
+					// 不纠正的话，后续 PoC 会拿着一个必然失败的 http URL 空跑。
+					if alt := webProbeHTTPSVariant(u); alt != "" && webscan.LooksLikeHTTPSMismatch(probe.Body) {
+						if probe2, err2 := prober.Probe(ctx, alt); err2 == nil && probe2 != nil {
+							u = alt
+							probe = probe2
+						}
+					}
 					meta := WebMeta{
 						URL:       u,
 						Status:    probe.Status,
@@ -1064,12 +1193,22 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 						meta.Server = strings.Join(strings.Fields(it.fact.Product+" "+it.fact.Version), " ")
 					}
 					webfp := probe.Response()
-					// 抓 favicon 会多一次请求，因此默认不抓：只有显式开启 -w-favicon，或外置
-					// 规则集里写了 favicon 规则（用户意图明显）时才抓。
+					// favicon 默认抓取：/favicon.ico 的 mmh3 哈希是「按图定位同一套站」的稳定
+					// 标识，命中内置 favicon 规则（n8n、EMQX、XXL-JOB、Zabbix 等）属 certain 证据，
+					// 是少数能真正扩充否定门控依据的现成路子，代价仅一次请求。
+					// 不再需要时可用 -w-favicon=false 关掉；外置规则集里写了 favicon 规则时强制抓。
 					if runner.options.WebFavicon || matcher.HasFavicon() {
 						webfp.Favicon = prober.FetchFavicon(ctx, u)
 					}
-					applyWebFingerprint(&meta, matcher.Match(webfp))
+					res := matcher.Match(webfp)
+					// 静态资源内容探测：首页是 SPA 空壳、框架名藏在被打包哈希化的 JS 里时，
+					// 只匹配首页素材认不出框架；抓回同源脚本/样式再匹配，补上这类证据。
+					if maxAssets := runner.options.WebAssets; maxAssets > 0 {
+						if assets := prober.FetchAssets(ctx, u, probe.Body, maxAssets); len(assets) > 0 {
+							res.Merge(matcher.MatchAssets(assets))
+						}
+					}
+					applyWebFingerprint(&meta, res)
 					record(u, meta)
 				}
 			}
@@ -1160,158 +1299,92 @@ func (c *openPortsCollector) Snapshot() map[string][]int {
 	return cp
 }
 
-// shouldSkipRequires 判断目标是否因 requires 门控而跳过。
+// FactsByHost 按主机名汇总端口指纹结论，供 requires 门控按 host 聚合服务标识。
 //
-// fingerRequiresByKey 是「该目标命中的指纹标识 → 版本」，同时包含指纹 PoC 的 tag 与 id，
-// 因此 requires: [mysql]（tag）与 requires: [ajp-protocol-detect]（指纹 PoC id）都能命中。
-// 值为该标识对应的识别版本（未知记空串），供 requires 里的版本约束（如 jquery<3.5）判定：
-// 版本未知时放行，避免因为拿不到版本而漏报。
-func shouldSkipRequires(target string, p poc.Poc, keyForTarget func(string) string, fingerRequiresByKey map[string]map[string]string, testMode bool) bool {
-	if testMode {
-		return false
+// 端口事实天然是 per host:port 的，而门控查询的目标可能是 URL（如 https://x.com），
+// 两者 key 不同；按 host 聚合后，同一主机上的任意目标都能取到该主机识别出的全部服务。
+func (c *openPortsCollector) FactsByHost() map[string][]*portscan.ScanResult {
+	if c == nil {
+		return nil
 	}
-	if len(p.Info.Requires) == 0 {
-		return false
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.results) == 0 {
+		return nil
 	}
-	type requirement struct {
-		tech string
-		rv   *poc.RequireVersion
-	}
-	reqs := make([]requirement, 0, len(p.Info.Requires))
-	for _, r := range p.Info.Requires {
-		tech, rv := poc.ParseRequire(r)
-		if tech == "" {
+	out := make(map[string][]*portscan.ScanResult, len(c.results))
+	for _, r := range c.results {
+		if r == nil || r.Host == "" {
 			continue
 		}
-		reqs = append(reqs, requirement{tech: tech, rv: rv})
+		out[r.Host] = append(out[r.Host], r)
 	}
-	if len(reqs) == 0 {
-		return false
-	}
-
-	mode := strings.ToLower(strings.TrimSpace(p.Info.RequiresMode))
-	if mode == "" {
-		mode = "strict"
-	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
-	}
-
-	if len(fingerRequiresByKey) == 0 {
-		return mode == "strict"
-	}
-
-	key := ""
-	if keyForTarget != nil {
-		key = keyForTarget(target)
-	}
-	if key == "" {
-		return mode == "strict"
-	}
-
-	tts := fingerRequiresByKey[key]
-	if len(tts) == 0 {
-		return mode == "strict"
-	}
-	for _, req := range reqs {
-		version, ok := tts[req.tech]
-		if !ok {
-			continue
-		}
-		if req.rv.Satisfied(version) {
-			return false
-		}
-	}
-	return true
+	return out
 }
 
-// webTechRequires 把 -w 阶段识别出的 Web 技术栈翻译成 requires 词表。
+// addWebTechFacts 把 -w 阶段识别出的 Web 技术栈写入画像。
 //
-// requires 原本只能命中「指纹 PoC 的 tag/id」，粒度受限于指纹 PoC；接入 Web 指纹后，
-// requires: [wordpress] / [thinkphp] / [apache-shiro] 这类写法可直接命中响应里识别出的
-// 技术栈，从而跳过明显不可能命中的 PoC。
-//
-// 返回值为「标识词 → 该词对应技术栈的版本」，让 requires 里的版本约束（如 jquery<3.5）
-// 能用上 Web 指纹识别出的版本；没有解析出版本时值为空串。
-//
-// targets 是本次扫描真正会跑的目标列表，metas 是 webProbe 的原始结果（键为去掉路径的
-// host:port）。这里按 host:port 反查，使带路径的目标也能用上其站点级指纹；键仍取
-// keyFromTargetWithPath，保证与 shouldSkipRequires 的查表口径一致。
-func webTechRequires(targets []string, metas map[string]WebMeta) map[string]map[string]string {
-	if len(targets) == 0 || len(metas) == 0 {
-		return nil
+// Web 指纹是站点级的（键为去掉路径的 host:port，见 fingerprint.KeyFromTarget），而门控
+// 查询的目标可能带路径（http://h/app）：这里按站点键反查技术栈、再以带路径的目标键写入，
+// 使 requires: [wordpress] / [thinkphp] 这类写法对带路径的目标同样生效。
+func addWebTechFacts(profiles *assetgraph.Profiles, targets []string, metas map[string]WebMeta) {
+	if profiles == nil || len(targets) == 0 || len(metas) == 0 {
+		return
 	}
-	techsByKey := make(map[string][]WebTech, len(metas))
-	for k, meta := range metas {
-		if len(meta.Technologies) > 0 {
-			techsByKey[k] = meta.Technologies
-		}
-	}
-	if len(techsByKey) == 0 {
-		return nil
-	}
-	out := make(map[string]map[string]string)
 	for _, t := range targets {
-		techs, ok := techsByKey[fingerprint.KeyFromTarget(t)]
-		if !ok {
+		meta, ok := metas[fingerprint.KeyFromTarget(t)]
+		if !ok || len(meta.Technologies) == 0 {
 			continue
 		}
 		key := keyFromTargetWithPath(t)
 		if key == "" {
 			continue
 		}
-		set := out[key]
-		if set == nil {
-			set = make(map[string]string, len(techs)*3)
-			out[key] = set
-		}
-		for _, tech := range techs {
-			version := strings.TrimSpace(tech.Version)
-			for _, tok := range webscan.MatchTokens(tech.RuleID, tech.Name, tech.Category) {
-				// 同一标识词可能被多条技术栈产出：保留已解析出的版本，别被空串覆盖。
-				if cur, ok := set[tok]; ok && cur != "" {
-					continue
-				}
-				set[tok] = version
-			}
+		for _, tech := range meta.Technologies {
+			profiles.AddTech(key, assetgraph.TechFact{
+				Name:       tech.Name,
+				RuleID:     tech.RuleID,
+				Category:   tech.Category,
+				Version:    tech.Version,
+				Confidence: tech.Confidence,
+			})
 		}
 	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
 
-func shouldSkipFingerprintFilteredByMode(mode string, globalFingerTags map[string]struct{}, targetTags map[string]struct{}, pocTags map[string]struct{}) bool {
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	if mode == "" {
-		mode = "strict"
+// addPortServiceFacts 把端口扫描识别出的服务按主机写入画像。
+//
+// 这是 requires 门控此前最大的缺口：redis / mysql / weblogic 这类非 Web 资产在端口阶段
+// 就已被确认，却从未参与门控。端口事实是 per host:port 的，这里按 host 聚合后分发给该
+// 主机上的每个目标（URL 或 host:port 皆可），使同一主机任意目标都能用上这台机器识别出
+// 的服务。
+func addPortServiceFacts(profiles *assetgraph.Profiles, targets []string, facts *openPortsCollector) {
+	if profiles == nil || facts == nil || len(targets) == 0 {
+		return
 	}
-	if mode != "strict" && mode != "opportunistic" {
-		mode = "strict"
+	byHost := facts.FactsByHost()
+	if len(byHost) == 0 {
+		return
 	}
-	if len(globalFingerTags) == 0 || len(pocTags) == 0 {
-		return false
-	}
-	appSpecific := false
-	for t := range pocTags {
-		if _, ok := globalFingerTags[t]; ok {
-			appSpecific = true
-			break
+	for _, t := range targets {
+		key := keyFromTargetWithPath(t)
+		if key == "" {
+			continue
+		}
+		host, _, err := net.SplitHostPort(key)
+		if err != nil || host == "" {
+			continue
+		}
+		for _, f := range byHost[host] {
+			profiles.AddService(key, assetgraph.ServiceFact{
+				Port:       f.Port,
+				Service:    f.Service,
+				Product:    f.Product,
+				Version:    f.Version,
+				Confidence: f.Confidence.String(),
+			})
 		}
 	}
-	if !appSpecific {
-		return false
-	}
-	if len(targetTags) == 0 {
-		return mode == "strict"
-	}
-	for t := range pocTags {
-		if _, ok := targetTags[t]; ok {
-			return false
-		}
-	}
-	return true
 }
 
 func (e *Engine) AcquireChecker() *Checker {
@@ -2209,7 +2282,9 @@ func (runner *Runner) Execute() {
 		out := make([]string, 0, len(in))
 		seenLoose := make(map[string]struct{})
 		for _, raw := range in {
-			raw = strings.TrimSpace(raw)
+			// 先折算掉 scheme 默认端口：idx.URLs 里用户可能写的是 http://x.com:80，
+			// 规范化后才会与 webProbe 产出的 http://x.com 归成同一条。
+			raw = canonicalWebURL(raw)
 			if raw == "" {
 				continue
 			}
@@ -2264,6 +2339,11 @@ func (runner *Runner) Execute() {
 	}
 
 	webScanTargets := dedupWebTargets(mergeTargets(idx.URLs, resolvedHosts, webTargets, webHostPorts))
+
+	// gatingTargets 是会被 requires 门控检查的全部目标：Web 型 PoC 查 webScanTargets，
+	// 网络型 PoC 查 netTargetsStrict。端口指纹按 host 聚合后要分发给两者，
+	// 否则任一视图上的目标都拿不到该主机识别出的非 Web 服务。
+	gatingTargets := mergeTargets(webScanTargets, netTargetsStrict)
 
 	isNetOnlyPoc := func(p poc.Poc) bool {
 		hasHTTP := false
@@ -2383,39 +2463,9 @@ func (runner *Runner) Execute() {
 		}
 	}
 
-	normalizeTags := func(tags string, skipFingerprint bool) map[string]struct{} {
-		tags = strings.TrimSpace(tags)
-		if tags == "" {
-			return nil
-		}
-		out := make(map[string]struct{})
-		for _, t := range strings.Split(strings.ToLower(tags), ",") {
-			tt := strings.TrimSpace(t)
-			if tt == "" {
-				continue
-			}
-			if skipFingerprint && tt == "fingerprint" {
-				continue
-			}
-			out[tt] = struct{}{}
-		}
-		if len(out) == 0 {
-			return nil
-		}
-		return out
-	}
-
-	keyForTarget := func(target string) string {
-		return keyFromTargetWithPath(target)
-	}
-
-	// fingerTagsByKey 只放「指纹 tag」，供指纹过滤使用；
-	// fingerRequiresByKey 额外并入指纹 PoC 的 id 与 -w 识别出的 Web 技术栈，供 requires
-	// 匹配使用（作者既可能写 requires: [mysql]（tag），也可能写 requires: [ajp-protocol-detect]
-	// （指纹 PoC id），还可能写 requires: [wordpress]（Web 指纹））。
-	fingerTagsByKey := make(map[string]map[string]struct{})
-	fingerRequiresByKey := make(map[string]map[string]string)
-	globalFingerTags := make(map[string]struct{})
+	// profiles 是三源指纹的统一出口：指纹 PoC 命中、Web 技术栈、端口服务都汇入同一份
+	// 目标资产画像（pkg/assetgraph）。门控决策统一交给 pkg/gating，引擎只负责装配。
+	profiles := assetgraph.NewProfiles()
 	{
 		runner.fingerMu.Lock()
 		fingerSnap := make(map[string][]fingerprint.Hit, len(runner.fingerByKey))
@@ -2430,34 +2480,18 @@ func (runner *Runner) Execute() {
 		runner.fingerMu.Unlock()
 
 		for k, hits := range fingerSnap {
-			tagSet := make(map[string]struct{})
-			reqSet := make(map[string]string)
 			for _, h := range hits {
-				for t := range normalizeTags(h.Tags, true) {
-					tagSet[t] = struct{}{}
-					reqSet[t] = ""
-				}
-				if id := strings.ToLower(strings.TrimSpace(h.ID)); id != "" {
-					reqSet[id] = ""
-				}
-			}
-			if len(reqSet) == 0 {
-				continue
-			}
-			fingerRequiresByKey[k] = reqSet
-			if len(tagSet) == 0 {
-				continue
-			}
-			fingerTagsByKey[k] = tagSet
-			for t := range tagSet {
-				globalFingerTags[t] = struct{}{}
+				profiles.AddHit(k, assetgraph.HitFact{
+					ID:   h.ID,
+					Name: h.Name,
+					Tags: strings.Split(h.Tags, ","),
+				})
 			}
 		}
 	}
 
-	// 把 -w 识别出的 Web 技术栈并入 requires 词表：Web 指纹比指纹 PoC 更能说清
-	// 「这个站点是什么」，因此 requires: [wordpress] 这类门控才真正落地。
-	// 值带上识别出的版本，供 requires 的版本约束（如 jquery<3.5）判定。
+	// 把 -w 识别出的 Web 技术栈写入画像：Web 指纹比指纹 PoC 更能说清「这个站点是什么」，
+	// 因此 requires: [wordpress] 这类门控才真正落地；版本一并带入，供版本约束（jquery<3.5）判定。
 	if len(webScanTargets) > 0 {
 		runner.webMu.Lock()
 		webSnap := make(map[string]WebMeta, len(runner.webMetaByKey))
@@ -2465,55 +2499,26 @@ func (runner *Runner) Execute() {
 			webSnap[k] = v
 		}
 		runner.webMu.Unlock()
-
-		for k, set := range webTechRequires(webScanTargets, webSnap) {
-			reqSet := fingerRequiresByKey[k]
-			if reqSet == nil {
-				reqSet = make(map[string]string, len(set))
-				fingerRequiresByKey[k] = reqSet
-			}
-			for tok, ver := range set {
-				if cur, ok := reqSet[tok]; ok && cur != "" {
-					continue
-				}
-				reqSet[tok] = ver
-			}
-		}
+		addWebTechFacts(profiles, webScanTargets, webSnap)
 	}
 
-	pocTagsCache := make(map[string]map[string]struct{})
-	shouldSkipFingerprintFiltered := func(target string, p poc.Poc) bool {
-		if isNetOnlyPoc(p) {
-			return false
-		}
-		if len(globalFingerTags) == 0 {
-			return false
-		}
-		pt, ok := pocTagsCache[p.Id]
-		if !ok {
-			pt = normalizeTags(p.Info.Tags, true)
-			pocTagsCache[p.Id] = pt
-		}
-		if len(pt) == 0 {
-			return false
-		}
-		appSpecific := false
-		for t := range pt {
-			if _, ok := globalFingerTags[t]; ok {
-				appSpecific = true
-				break
-			}
-		}
-		if !appSpecific {
-			return false
-		}
-		key := keyForTarget(target)
-		if key == "" {
-			return false
-		}
-		tts := fingerTagsByKey[key]
-		return shouldSkipFingerprintFilteredByMode(options.FingerprintFilterMode, globalFingerTags, tts, pt)
+	// 端口指纹（-ps）识别出的服务写入画像：补上 requires 门控对非 Web 资产（redis / mysql /
+	// weblogic …）的缺口。端口事实按 host 聚合后分发，故该主机上任意目标都能命中。
+	if portFacts != nil {
+		addPortServiceFacts(profiles, gatingTargets, portFacts)
 	}
+
+	// 门控配置：TestMode（-T）一律放行；GatingLevel 控制档位（off/safe/balanced/
+	// aggressive），FingerprintFilterMode 是既有的指纹过滤子档位。三端共享同一份 Options，
+	// 逻辑只在 pkg/gating 实现一次；档位取值非法时 gating 内部归一为 safe。
+	gatingOptions := gating.Options{
+		TestMode:              options.Test,
+		Level:                 gating.Level(options.GatingLevel),
+		FingerprintFilterMode: options.FingerprintFilterMode,
+	}
+	// 归因统计：按 Decision.Source 汇总「为什么跑 / 为什么跳」，让跳过有据可查。
+	gatingStats := gating.NewStats()
+	gatingStats.SetLoaded(len(pocSlice))
 
 	runStage := func(pocs []poc.Poc, rate, concurrency int) {
 		if runner.engine == nil || atomic.LoadUint32(&runner.engine.stopped) != 0 {
@@ -2593,8 +2598,9 @@ func (runner *Runner) Execute() {
 			if atomic.LoadUint32(&runner.engine.stopped) != 0 || runner.ctx.Err() != nil {
 				break
 			}
+			netOnly := isNetOnlyPoc(pocItem)
 			targetView := webScanTargets
-			if isNetOnlyPoc(pocItem) {
+			if netOnly {
 				targetView = netTargetsStrict
 			}
 
@@ -2620,13 +2626,13 @@ func (runner *Runner) Execute() {
 					continue
 				}
 
-				if shouldSkipRequires(t, pocItem, keyForTarget, fingerRequiresByKey, runner.options.Test) {
-					runner.ScanProgress.IncrementTask(pocItem.Id, t)
-					runner.NotVulCallback()
-					continue
-				}
-
-				if shouldSkipFingerprintFiltered(t, pocItem) {
+				// 门控只在这一处决定「跑不跑」：requires 硬依赖 + 指纹过滤 + 推断式否定，
+				// 全部收敛到 pkg/gating.Decide，三端共用同一份决策与归因。
+				decision := gating.Decide(keyFromTargetWithPath(t), pocItem, netOnly, profiles, gatingOptions)
+				gatingStats.Record(decision)
+				// dry-run 只算不跑：决策照常计算并计入归因，但不排入执行队列；
+				// 跳过与预演走同一进度口径（IncrementTask + NotVulCallback）。
+				if !decision.Run || options.DryRun {
 					runner.ScanProgress.IncrementTask(pocItem.Id, t)
 					runner.NotVulCallback()
 					continue
@@ -2711,9 +2717,33 @@ func (runner *Runner) Execute() {
 
 	runner.finalizeOOBPendings()
 
+	// 归因报告：dry-run 必定打印（这是它的产出），常规扫描仅在 -debug 下打印。
+	runner.printGatingStats(gatingStats)
+
 	if options.PocExecutionDurationMonitor && runner.engine != nil {
 		runner.engine.pedmSummary(options)
 	}
+}
+
+// printGatingStats 打印门控归因报告（按 Decision.Source 汇总「为什么跑 / 为什么跳」）。
+//
+// dry-run 下必定打印——预览门控结果本就是它的产出；常规扫描仅在 -debug 下打印，避免
+// 污染默认输出的静默风格。SDK 模式下归因交给调用方的事件流，不在终端打印。
+func (runner *Runner) printGatingStats(stats *gating.Stats) {
+	if stats == nil || runner.options == nil || runner.options.SDKMode {
+		return
+	}
+	debug := runner.options.Debug
+	dryRun := runner.options.DryRun
+	if !debug && !dryRun {
+		return
+	}
+	runner.clearProgressLine()
+	if dryRun {
+		gologger.Print().Msgf("%s", log.Op(log.LevelInfo, utils.StageVulnScan,
+			"dry-run", "只预演门控决策，未执行任何漏洞 PoC"))
+	}
+	gologger.Print().Msgf("%s", stats.Report())
 }
 
 func (runner *Runner) exec(tap *TransData) {

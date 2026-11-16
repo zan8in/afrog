@@ -120,6 +120,7 @@ func TestBuildArgs(t *testing.T) {
 				"-p", "80,443",
 				"-Pn",
 				"-w",
+				"-w-favicon=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -267,6 +268,40 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-aggressive",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			name: "gating level and dry run",
+			spec: &Spec{
+				Targets:     []string{"http://a.example"},
+				GatingLevel: "aggressive",
+				DryRun:      true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-gating-level", "aggressive",
+				"-dry-run",
+				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			// 执行器只做 trim，不校验档位取值：取值归一由 CLI 侧负责（off→off，非法→safe）。
+			// 这里只钉住「带空白的档位会被清理后再下发」，避免把归一逻辑在两个地方各写一遍。
+			name: "gating level whitespace trimmed",
+			spec: &Spec{
+				Targets:     []string{"http://a.example"},
+				GatingLevel: "  balanced  ",
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-gating-level", "balanced",
 				"-w=false",
 				"-json-stream",
 				"-disable-output-html",

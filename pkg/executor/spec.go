@@ -37,6 +37,11 @@ type Spec struct {
 	// 任务级超时与失败保护
 	TaskSmartTimeout bool
 	NoFingerprint    bool
+	// GatingLevel 对应 -gating-level：off|safe|balanced|aggressive。
+	// 空表示交给引擎默认（safe）。
+	GatingLevel string
+	// DryRun 对应 -dry-run：只预演门控决策与归因，不执行任何漏洞 PoC。
+	DryRun bool
 	// BreakpointOnVuln 对应 -vsb：命中首个漏洞即停止。
 	BreakpointOnVuln bool
 	MonitorTargets   bool

@@ -70,6 +70,8 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		Smart:             req.Smart,
 		TaskSmartTimeout:  req.TaskSmartTimeout,
 		NoFingerprint:     req.NoFingerprint,
+		GatingLevel:       strings.TrimSpace(req.GatingLevel),
+		DryRun:            req.DryRun,
 		BreakpointOnVuln:  req.BreakpointOnVuln,
 		MonitorTargets:    req.MonitorTargets,
 		BruteMaxRequests:  req.BruteMaxRequests,

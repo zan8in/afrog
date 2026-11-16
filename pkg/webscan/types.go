@@ -7,8 +7,6 @@
 package webscan
 
 import (
-	"strings"
-
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 )
 
@@ -46,24 +44,7 @@ type Technology struct {
 // requires: [wordpress]（id/name），也能写 requires: [apache-shiro]（连字符写法）或
 // requires: [cms]（分类）。
 func MatchTokens(ruleID, name, category string) []string {
-	tokens := make([]string, 0, 4)
-	add := func(s string) {
-		s = strings.ToLower(strings.TrimSpace(s))
-		if s == "" {
-			return
-		}
-		for _, existing := range tokens {
-			if existing == s {
-				return
-			}
-		}
-		tokens = append(tokens, s)
-	}
-	add(ruleID)
-	add(name)
-	add(strings.ReplaceAll(name, " ", "-"))
-	add(category)
-	return tokens
+	return portscan.NormTokens(ruleID, name, category)
 }
 
 // MatchTokens 返回该技术在 requires 门控里可用的标识词。
@@ -99,4 +80,52 @@ type Result struct {
 	Confidence Confidence
 	// FaviconHash 是 favicon 的 mmh3 哈希，未抓取时为空。
 	FaviconHash string
+}
+
+// Asset 是一份被抓回来的页面静态资源（脚本或样式表），其内容参与指纹匹配。
+//
+// 存在的意义：SPA 打包后脚本文件名被哈希化（/assets/index-a1b2.js），地址里不含框架名，
+// 真正的框架标识在文件内容里。抓回内容再匹配，才能在首页为 SPA 空壳、响应头又被 CDN
+// 剥离时不至于一无所获。
+type Asset struct {
+	// URL 是资源的绝对地址，用于在证据里标出「命中来自哪个资源」。
+	URL string
+	// Body 是资源内容（受抓取上限限制）。
+	Body []byte
+}
+
+// Merge 把另一份匹配结果并入本结果：按 name+version 去重、保留可信度更高的一条，
+// 并抬高整体可信度。两份结果通常来自首页素材与静态资源内容，缺一不可。
+//
+// FaviconHash 只认已有值：静态资源匹配不产出 favicon 哈希，不该把首页抓到的覆盖掉。
+func (r *Result) Merge(o Result) {
+	if r == nil {
+		return
+	}
+	if o.Confidence > r.Confidence {
+		r.Confidence = o.Confidence
+	}
+	if r.FaviconHash == "" {
+		r.FaviconHash = o.FaviconHash
+	}
+	if len(o.Technologies) == 0 {
+		return
+	}
+	index := make(map[string]int, len(r.Technologies)+len(o.Technologies))
+	for i := range r.Technologies {
+		t := &r.Technologies[i]
+		index[t.Name+"\x00"+t.Version] = i
+	}
+	for _, t := range o.Technologies {
+		key := t.Name + "\x00" + t.Version
+		if i, ok := index[key]; ok {
+			if t.Confidence > r.Technologies[i].Confidence {
+				r.Technologies[i] = t
+			}
+			continue
+		}
+		index[key] = len(r.Technologies)
+		r.Technologies = append(r.Technologies, t)
+	}
+	sortTechnologies(r.Technologies)
 }

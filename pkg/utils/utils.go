@@ -41,6 +41,34 @@ func IsURL(input string) bool {
 	return true
 }
 
+// LooksLikeHTTPSMismatch 判断一次 http 探测的响应是否在说「这里其实得用 https」。
+//
+// 典型形态：明文 HTTP 请求打到了 TLS 端口上，服务端回 400，正文里带
+// "The plain HTTP request was sent to HTTPS port"（nginx 及其衍生的默认页）；
+// Go 标准库的 HTTP 服务端则回 "Client sent an HTTP request to an HTTPS server."。
+// 这两句都只在「协议用错了」时出现，据此可断定同一 host:port 应当改用 https。
+//
+// 匹配刻意放宽为「大小写不敏感 + 子串」：真实响应里这段文案常被包在 title/h1、
+// 前后夹着空白或换行，钉死完整 title 字面量会漏掉措辞稍异的落地实现。
+//
+// 放在 utils 是因为协议层（retryhttpclient 的协议试探）与 Web 探测层（webscan）
+// 都要用同一份判据，utils 是两者唯一的公共依赖。
+func LooksLikeHTTPSMismatch(body string) bool {
+	if body == "" {
+		return false
+	}
+	lower := strings.ToLower(body)
+	for _, marker := range []string{
+		"the plain http request was sent to https port",
+		"client sent an http request to an https server",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // ReadFromPathOrURL reads and returns the contents of a file or url.
 func ReadFromPathOrURL(templatePath string) (data []byte, err error) {
 	if IsURL(templatePath) {

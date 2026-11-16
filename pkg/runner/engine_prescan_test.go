@@ -1,7 +1,10 @@
 package runner
 
 import (
+	"bufio"
 	"context"
+	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,8 +16,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/zan8in/afrog/v3/pkg/assetgraph"
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/fingerprint"
+	"github.com/zan8in/afrog/v3/pkg/gating"
 	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
 	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
@@ -293,6 +298,21 @@ func TestWebTechSummaryAndConfidenceLabel(t *testing.T) {
 	}
 	if got := webTechSummary(nil); got != "" {
 		t.Fatalf("empty webTechSummary = %q", got)
+	}
+
+	// 同名技术（首页与资源两批命中、按 name+version 合并后会并存）在摘要里只出现一次，
+	// 并优先保留带版本的写法；技术名自身含空格时不能被误判为「已带版本」。
+	dup := []WebTech{
+		{Name: "React", Version: "19.3"},
+		{Name: "React"},
+		{Name: "Ruby on Rails"},
+		{Name: "Ruby on Rails", Version: "7.1"},
+	}
+	if got := webTechSummary(dup); got != "React 19.3, Ruby on Rails 7.1" {
+		t.Fatalf("deduped webTechSummary = %q", got)
+	}
+	if got := webTechNames(dup); len(got) != 2 || got[0] != "React" || got[1] != "Ruby on Rails" {
+		t.Fatalf("deduped webTechNames = %v", got)
 	}
 
 	labels := map[string]string{
@@ -725,16 +745,17 @@ func TestWebProbeResumeReusesConclusionsEndToEnd(t *testing.T) {
 	}
 	r2.webMu.Unlock()
 
-	merged := webTechRequires([]string{target}, snap)
-	if _, ok := merged[key]["wordpress"]; !ok {
-		t.Fatalf("resumed fingerprint did not produce token wordpress: %#v", merged)
+	profiles := assetgraph.NewProfiles()
+	addWebTechFacts(profiles, []string{target}, snap)
+	if _, ok := profiles.RequiresTokens(key)["wordpress"]; !ok {
+		t.Fatalf("resumed fingerprint did not produce token wordpress")
 	}
 	hit := poc.Poc{Info: poc.Info{Requires: []string{"wordpress"}}}
-	if shouldSkipRequires(target, hit, keyFromTargetWithPath, merged, false) {
+	if !gating.Decide(key, hit, false, profiles, gating.Options{}).Run {
 		t.Fatal("requires: [wordpress] was skipped even though the resumed fingerprint matches")
 	}
 	miss := poc.Poc{Info: poc.Info{Requires: []string{"thinkphp"}}}
-	if !shouldSkipRequires(target, miss, keyFromTargetWithPath, merged, false) {
+	if gating.Decide(key, miss, false, profiles, gating.Options{}).Run {
 		t.Fatal("requires: [thinkphp] should still be skipped for a WordPress site")
 	}
 
@@ -774,5 +795,277 @@ func TestWebProbeResumeReusesConclusionsEndToEnd(t *testing.T) {
 	}
 	if got := atomic.LoadInt32(&hits); got != afterBareFirst {
 		t.Fatalf("bare resume re-probed the target: requests %d -> %d", afterBareFirst, got)
+	}
+}
+
+// TestLooksLikeHTTPSMismatch 钉住「http 响应在说该站点只认 https」的判定：
+// 大小写、外层包裹标签、前后空白都不该影响识别，普通响应不得误判。
+func TestLooksLikeHTTPSMismatch(t *testing.T) {
+	yes := [][]byte{
+		[]byte("<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head></html>"),
+		[]byte("The plain HTTP request was sent to HTTPS port\n"),
+		[]byte("  the PLAIN http request was sent to https port  "),
+		[]byte("<p>Client sent an HTTP request to an HTTPS server.</p>"),
+	}
+	for _, body := range yes {
+		if !webscan.LooksLikeHTTPSMismatch(body) {
+			t.Fatalf("expected mismatch for %q", body)
+		}
+	}
+	no := [][]byte{
+		nil,
+		[]byte(""),
+		[]byte("<html><head><title>Welcome</title></head></html>"),
+		[]byte("502 Bad Gateway"),
+		[]byte("the request was sent to the server"),
+	}
+	for _, body := range no {
+		if webscan.LooksLikeHTTPSMismatch(body) {
+			t.Fatalf("unexpected mismatch for %q", body)
+		}
+	}
+}
+
+// TestWebProbeCorrectsHTTPSOnlySite 串起「http 探测回『明文请求打到了 TLS 端口』
+// 就改用 https 重探并纠正协议」这条链路。
+//
+// 模拟服务端在同一 host:port 上同时承载明文与 TLS：明文回 400 特征页、TLS 回 200。
+// 站点最终必须被记成 https，且明文只探一次（纠正的代价是一次重探，只发生在踩坑的目标上）。
+func TestWebProbeCorrectsHTTPSOnlySite(t *testing.T) {
+	// 借 httptest 的 TLS 服务端取一份可用证书，供下面「同端口双协议」复用；
+	// 客户端 InsecureSkipVerify，证书内容不影响断言。
+	tmp := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	cert := tmp.TLS.Certificates[0]
+	tmp.Close()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+
+	// TLS 服务端要读的 ClientHello 首字节已被 bufio.Peek 缓冲，这里把缓冲读透传
+	// 回去（peekConn 先吐缓冲），否则握手会丢掉第一个字节。
+	replay := func(c net.Conn, r *bufio.Reader) net.Conn {
+		return &peekConn{Conn: c, r: r}
+	}
+
+	var httpHits, tlsHits int32
+	wantBody := "ok"
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				br := bufio.NewReader(c)
+				first, err := br.Peek(1)
+				if err != nil {
+					return
+				}
+				if first[0] == 0x16 { // TLS ClientHello
+					atomic.AddInt32(&tlsHits, 1)
+					tc := tls.Server(replay(c, br), &tls.Config{Certificates: []tls.Certificate{cert}})
+					if err := tc.Handshake(); err != nil {
+						return
+					}
+					if _, err := http.ReadRequest(bufio.NewReader(tc)); err != nil {
+						return
+					}
+					fmt.Fprintf(tc, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s", len(wantBody), wantBody)
+					return
+				}
+				atomic.AddInt32(&httpHits, 1)
+				// 先把请求读完再回，避免带着未读数据关连接触发 RST 丢响应。
+				if _, err := http.ReadRequest(br); err != nil {
+					return
+				}
+				body := "<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head></html>"
+				fmt.Fprintf(c, "HTTP/1.1 400 Bad Request\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s", len(body), body)
+			}(conn)
+		}
+	}()
+
+	host, portStr, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatalf("split host port: %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+	hostPort := net.JoinHostPort(host, portStr)
+
+	facts := newOpenPortsCollector()
+	facts.AddResult(&portscan.ScanResult{
+		Host: host, Port: port,
+		ServiceInfo: portscan.ServiceInfo{Service: "http"},
+	})
+
+	r := &Runner{
+		options: &config.Options{
+			Timeout:         5,
+			Retries:         0,
+			MaxRespBodySize: 2,
+			RateLimit:       10,
+			Concurrency:     1,
+			SDKMode:         true,
+			Silent:          true,
+			WebProbeTimeout: 5,
+		},
+		ctx:          context.Background(),
+		webURLByKey:  make(map[string]string),
+		webMetaByKey: make(map[string]WebMeta),
+	}
+
+	out := r.webProbe(context.Background(), targets.BuildTargetIndex([]string{hostPort}), facts)
+	if len(out) != 1 || !strings.HasPrefix(out[0], "https://") {
+		t.Fatalf("expected site corrected to https, got %#v", out)
+	}
+	if got := atomic.LoadInt32(&httpHits); got != 1 {
+		t.Fatalf("expected exactly 1 plain http probe, got %d", got)
+	}
+	if atomic.LoadInt32(&tlsHits) == 0 {
+		t.Fatal("expected a https retry after the plain-HTTP rejection")
+	}
+
+	r.webMu.Lock()
+	meta, ok := r.webMetaByKey[fingerprint.KeyFromTarget(out[0])]
+	r.webMu.Unlock()
+	if !ok {
+		t.Fatalf("no web meta recorded for %q", out[0])
+	}
+	if meta.Status != http.StatusOK {
+		t.Fatalf("meta.Status = %d, want 200 from the https probe", meta.Status)
+	}
+	if meta.TLS == nil {
+		t.Fatal("the https probe should carry tls info")
+	}
+}
+
+// peekConn 让已被 bufio.Peek 缓冲的字节也能被后续读取方（如 tls.Server）看到。
+type peekConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *peekConn) Read(b []byte) (int, error) { return c.r.Read(b) }
+
+func TestCanonicalWebURL(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"http://x.com:80", "http://x.com"},
+		{"http://x.com:80/", "http://x.com/"},
+		{"https://x.com:443", "https://x.com"},
+		{"https://x.com:443/admin?a=1", "https://x.com/admin?a=1"},
+		{"http://x.com", "http://x.com"},
+		{"https://x.com", "https://x.com"},
+		// 非默认端口代表另一个端点，保持原样。
+		{"http://x.com:8080", "http://x.com:8080"},
+		{"https://x.com:8443/admin", "https://x.com:8443/admin"},
+		{"https://x.com:80", "https://x.com:80"},
+		{"http://x.com:443", "http://x.com:443"},
+		// 裸 host:port 没有 scheme，端口是必需信息。
+		{"x.com:80", "x.com:80"},
+		{"example.com", "example.com"},
+		{"http://[::1]:80", "http://[::1]"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		if got := canonicalWebURL(tt.in); got != tt.want {
+			t.Fatalf("canonicalWebURL(%q)=%q want=%q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestWebProbeDedupeKey(t *testing.T) {
+	// 同一站点的不同写法要归成同一条：默认端口折叠、scheme 保持不变。
+	if webProbeDedupeKey("http://x.com:80", "") != webProbeDedupeKey("http://x.com", "") {
+		t.Fatal("http://x.com:80 and http://x.com should share a dedupe key")
+	}
+	if webProbeDedupeKey("https://x.com:443", "") != webProbeDedupeKey("https://x.com", "") {
+		t.Fatal("https://x.com:443 and https://x.com should share a dedupe key")
+	}
+	// 同一主机的 http 与 https 是两个端点，必须保持两条。
+	if webProbeDedupeKey("http://x.com", "") == webProbeDedupeKey("https://x.com", "") {
+		t.Fatal("http and https endpoints must not be merged")
+	}
+	// 端口指纹给出的 scheme 与显式 URL 指向同一站点，应归成同一条。
+	if webProbeDedupeKey("x.com:80", "http") != webProbeDedupeKey("http://x.com", "") {
+		t.Fatal("host:port with http fact should fold into http://x.com")
+	}
+	// scheme 未知的裸主机名无法与显式 URL 归一，单独保留。
+	if webProbeDedupeKey("x.com", "") == webProbeDedupeKey("http://x.com", "") {
+		t.Fatal("bare host must stay independent from explicit URL")
+	}
+	// 不同路径是不同探测点，不能合并。
+	if webProbeDedupeKey("http://x.com/admin", "") == webProbeDedupeKey("http://x.com", "") {
+		t.Fatal("different paths must not be merged")
+	}
+}
+
+func TestWebProbeDedupesDuplicateTargetWritings(t *testing.T) {
+	retryhttpclient.Init(&retryhttpclient.Options{
+		Proxy:           "",
+		Timeout:         5,
+		Retries:         0,
+		MaxRespBodySize: 2,
+	})
+
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+		_, _ = w.Write([]byte(`<html><head><title>Dedup</title></head><body>ok</body></html>`))
+	}))
+	defer srv.Close()
+
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server url: %v", err)
+	}
+	host, portStr, err := net.SplitHostPort(parsed.Host)
+	if err != nil {
+		t.Fatalf("split host port: %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+	hostPort := net.JoinHostPort(host, portStr)
+
+	// 端口指纹说这个端口是 http，显式 URL 写法与 host:port 写法指向同一站点。
+	facts := newOpenPortsCollector()
+	facts.AddResult(&portscan.ScanResult{
+		Host: host, Port: port,
+		ServiceInfo: portscan.ServiceInfo{Service: "http"},
+	})
+
+	r := &Runner{
+		options: &config.Options{
+			Timeout:         5,
+			Retries:         0,
+			MaxRespBodySize: 2,
+			RateLimit:       10,
+			Concurrency:     1,
+			SDKMode:         true,
+			Silent:          true,
+			WebProbeTimeout: 5,
+		},
+		ctx:          context.Background(),
+		webURLByKey:  make(map[string]string),
+		webMetaByKey: make(map[string]WebMeta),
+	}
+
+	idx := targets.BuildTargetIndex([]string{"http://" + hostPort, hostPort})
+	out := r.webProbe(context.Background(), idx, facts)
+	if len(out) != 1 {
+		t.Fatalf("expected one probe result after dedupe, got %#v", out)
+	}
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Fatalf("expected exactly 1 request for duplicate writings, got %d", got)
 	}
 }

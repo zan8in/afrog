@@ -137,17 +137,23 @@ const (
 
 // 以下开始是 信息部分
 type Info struct {
-	Name           string         `yaml:"name"`
-	Author         string         `yaml:"author"`
-	Severity       string         `yaml:"severity"`
-	Verified       bool           `yaml:"verified"`
-	Description    string         `yaml:"description"`
-	Reference      []string       `yaml:"reference"`
-	Affected       string         `yaml:"affected"`  // 影响版本
-	Solutions      string         `yaml:"solutions"` // 解决方案
-	Tags           string         `yaml:"tags"`      // 标签
-	Requires       []string       `yaml:"requires"`
-	RequiresMode   string         `yaml:"requires-mode"`
+	Name         string   `yaml:"name"`
+	Author       string   `yaml:"author"`
+	Severity     string   `yaml:"severity"`
+	Verified     bool     `yaml:"verified"`
+	Description  string   `yaml:"description"`
+	Reference    []string `yaml:"reference"`
+	Affected     string   `yaml:"affected"`  // 影响版本
+	Solutions    string   `yaml:"solutions"` // 解决方案
+	Tags         string   `yaml:"tags"`      // 标签
+	Requires     []string `yaml:"requires"`
+	RequiresMode string   `yaml:"requires-mode"`
+	// AppliesTo 是软适用性标识：声明「这条 PoC 适用于哪些技术」。
+	//
+	// 与 requires 的区别是语义而非形式：requires 是硬依赖（命中即放行），
+	// applies-to 只做减法——仅当画像里有明确反面证据时才据此跳过，绝不用于肯定放行。
+	// 缺省时由加载期自动推断（见 FillAppliesTo/InferAppliesTo），显式声明优先。
+	AppliesTo      []string       `yaml:"applies-to"`
 	Classification Classification `yaml:"classification"`
 	Created        string         `yaml:"created"` // create time
 }
@@ -164,6 +170,7 @@ func (i *Info) UnmarshalYAML(unmarshal func(any) error) error {
 		Solutions      string         `yaml:"solutions"`
 		Tags           string         `yaml:"tags"`
 		Requires       any            `yaml:"requires"`
+		AppliesTo      any            `yaml:"applies-to"`
 		RequiresMode   string         `yaml:"requires-mode"`
 		RequiresMode2  string         `yaml:"requiresMode"`
 		RequiresMode3  string         `yaml:"requires_mode"`
@@ -188,6 +195,7 @@ func (i *Info) UnmarshalYAML(unmarshal func(any) error) error {
 	i.Created = tmp.Created
 
 	i.Requires = normalizeRequires(tmp.Requires)
+	i.AppliesTo = normalizeRequires(tmp.AppliesTo)
 	i.RequiresMode = firstNonEmpty(tmp.RequiresMode, tmp.RequiresMode2, tmp.RequiresMode3)
 	return nil
 }
@@ -438,6 +446,7 @@ func LocalReadPocByPath(pocYaml string) (Poc, error) {
 	if err := yaml.NewDecoder(file).Decode(&poc); err != nil {
 		return poc, err
 	}
+	poc.Info.FillAppliesTo(pocYaml)
 	return poc, nil
 }
 
@@ -724,6 +733,7 @@ func LocalReadPocMetaByPath(pocYaml string) (PocMeta, error) {
 	if err := yaml.NewDecoder(file).Decode(&pm); err != nil {
 		return pm, err
 	}
+	pm.Info.FillAppliesTo(pocYaml)
 	return pm, nil
 }
 

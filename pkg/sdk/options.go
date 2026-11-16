@@ -56,6 +56,19 @@ const (
 	FingerprintOpportunistic = "opportunistic"
 )
 
+// GatingLevel values select how aggressively the asset-profile driven PoC gating
+// trims PoCs. See pkg/gating for the decision model.
+const (
+	// GatingOff disables gating entirely: every PoC runs (full scan).
+	GatingOff = "off"
+	// GatingSafe keeps only the existing gates (requires + fingerprint filter).
+	GatingSafe = "safe"
+	// GatingBalanced additionally enables language-layer inferred negative evidence.
+	GatingBalanced = "balanced"
+	// GatingAggressive additionally enables CMS-family inferred negative evidence.
+	GatingAggressive = "aggressive"
+)
+
 // Options is the complete scanner configuration.
 //
 // Build it with NewOptions and the With* functions rather than filling the
@@ -120,14 +133,23 @@ type Options struct {
 	FingerprintFilterMode string
 	DefaultAccept         bool
 
+	// GatingLevel selects the asset-profile driven PoC gating level
+	// (GatingOff/GatingSafe/GatingBalanced/GatingAggressive). Empty means GatingSafe.
+	GatingLevel string
+
+	// DryRun makes the scan compute and report PoC gating decisions without
+	// executing any vulnerability PoC. Recon stages still run so the profile
+	// the decisions depend on can be built.
+	DryRun bool
+
 	// WebFingerprintDir optionally points at a directory containing rules.yaml
 	// that overrides the built-in web fingerprint set used by the -w stage.
 	WebFingerprintDir string
 
 	// WebFavicon makes the -w stage fetch /favicon.ico so that favicon rules
-	// can match. It costs one extra request per target, so it is off by
-	// default; the built-in rule set already carries favicon rules, they are
-	// simply never used unless fetching is enabled.
+	// can match. On by default (same as the CLI): one extra request per target,
+	// but favicon hits are certain evidence and therefore the cheapest way to
+	// widen what the negative gating can rule out.
 	WebFavicon bool
 
 	// WebProbeTimeout is the per-request timeout of the -w stage in seconds,
@@ -374,6 +396,8 @@ func NewOptions() *Options {
 		AutoReqLimit:           true,
 		DefaultAccept:          true,
 		FingerprintFilterMode:  FingerprintStrict,
+		GatingLevel:            GatingSafe,
+		WebFavicon:             true,
 		IncludeRequestResponse: true,
 		StreamBuffer:           DefaultStreamBuffer,
 		PortScan: PortScanOptions{
@@ -457,6 +481,17 @@ func (o *Options) validate() error {
 		o.FingerprintFilterMode = FingerprintOpportunistic
 	default:
 		o.FingerprintFilterMode = FingerprintStrict
+	}
+
+	switch strings.ToLower(strings.TrimSpace(o.GatingLevel)) {
+	case GatingOff:
+		o.GatingLevel = GatingOff
+	case GatingBalanced:
+		o.GatingLevel = GatingBalanced
+	case GatingAggressive:
+		o.GatingLevel = GatingAggressive
+	default:
+		o.GatingLevel = GatingSafe
 	}
 
 	if o.OOB.Enabled && strings.TrimSpace(o.OOB.Adapter) == "" {
@@ -930,6 +965,29 @@ func WithFingerprintFilterMode(mode string) Option {
 	}
 }
 
+// WithGatingLevel selects the asset-profile driven PoC gating level.
+// Valid values are GatingOff, GatingSafe, GatingBalanced and GatingAggressive.
+func WithGatingLevel(level string) Option {
+	return func(o *Options) error {
+		switch strings.ToLower(strings.TrimSpace(level)) {
+		case GatingOff, GatingSafe, GatingBalanced, GatingAggressive:
+			o.GatingLevel = strings.ToLower(strings.TrimSpace(level))
+			return nil
+		default:
+			return fmt.Errorf("%w: unknown gating level %q", ErrInvalidOptions, level)
+		}
+	}
+}
+
+// WithDryRun makes the scan compute and report PoC gating decisions without
+// executing any vulnerability PoC, so the gating outcome can be previewed.
+func WithDryRun() Option {
+	return func(o *Options) error {
+		o.DryRun = true
+		return nil
+	}
+}
+
 // WithWebProbe enables or disables the web probing (-w) stage.
 // Enabled by default; pass false to disable.
 func WithWebProbe(enabled bool) Option {
@@ -949,9 +1007,9 @@ func WithWebFingerprintDir(dir string) Option {
 // enables the favicon rules of the web fingerprint set at the cost of one
 // extra request per target.
 //
-// It is equivalent to the CLI's -w-favicon. Pointing WithWebFingerprintDir at
-// a directory whose rules.yaml has favicon rules also enables fetching
-// automatically, so this option is only needed for the built-in rules.
+// It is equivalent to the CLI's -w-favicon and is already the default, so this
+// option is only kept for explicitness. Pointing WithWebFingerprintDir at a
+// directory whose rules.yaml has favicon rules also forces fetching on.
 func WithWebFavicon() Option {
 	return func(o *Options) error { o.WebFavicon = true; return nil }
 }

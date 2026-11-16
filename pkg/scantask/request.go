@@ -46,6 +46,12 @@ type Request struct {
 	WebProbeTimeout int
 	WebFavicon      bool
 
+	// 门控与预演
+	// GatingLevel 是 PoC 门控档位：off|safe|balanced|aggressive，空表示用引擎默认 safe。
+	GatingLevel string
+	// DryRun 为真时只预演门控决策与归因，不执行任何漏洞 PoC。
+	DryRun bool
+
 	// OOB
 	EnableOOB  bool
 	OOBAdapter string
@@ -128,6 +134,8 @@ func BuildSpec(req Request) (*executor.Spec, func(), error) {
 		WebFingerprint:    req.WebFingerprint,
 		WebProbeTimeout:   req.WebProbeTimeout,
 		WebFavicon:        req.WebFavicon,
+		GatingLevel:       strings.TrimSpace(req.GatingLevel),
+		DryRun:            req.DryRun,
 		EnableOOB:         req.EnableOOB,
 		OOBAdapter:        strings.TrimSpace(req.OOBAdapter),
 		NoSaveDB:          req.NoSaveDB,

@@ -2,6 +2,9 @@ package retryhttpclient
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -44,5 +47,33 @@ func TestCheckProtocolMemoCacheAndReset(t *testing.T) {
 	probeMu.Unlock()
 	if ok {
 		t.Fatal("expected probeMemos to be cleared by ResetCheckProtocolCache")
+	}
+}
+
+// TestCheckProtocolDirectCorrectsHTTPSOnly 钉住协议试探的「内容纠正」：
+// 明文 HTTP 打到 TLS 端口时服务端会回「The plain HTTP request was sent to HTTPS port」，
+// 无论候选带不带显式 http:// 前缀，都应按响应内容纠正到 https。
+func TestCheckProtocolDirectCorrectsHTTPSOnly(t *testing.T) {
+	if err := Init(&Options{Timeout: 5, Retries: 0, MaxRespBodySize: 2}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head></html>"))
+	}))
+	defer srv.Close()
+
+	hostPort := strings.TrimPrefix(srv.URL, "http://")
+	want := "https://" + hostPort
+
+	// 显式 http:// 前缀：以前会原样返回 http，站点只认 https 则全部 PoC 空跑。
+	if got, err := checkProtocolDirect("http://" + hostPort); err != nil || got != want {
+		t.Fatalf("explicit http: got (%q, %v), want %q", got, err, want)
+	}
+
+	// 裸 host:port（端口非 80/443）走 default 分支，同样纠正。
+	if got, err := checkProtocolDirect(hostPort); err != nil || got != want {
+		t.Fatalf("bare host:port: got (%q, %v), want %q", got, err, want)
 	}
 }

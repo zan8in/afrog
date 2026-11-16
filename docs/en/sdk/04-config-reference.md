@@ -67,7 +67,7 @@ Adaptive per-target (`host:port`) limiting is on by default (same as the CLI): t
 | `WithFingerprintFilterMode(mode)` | `"strict"`, optional `"opportunistic"` |
 | `WithWebProbe()` | enabled by default (matching the CLI `-w`); pass `false` to disable |
 | `WithWebProbeTimeout(seconds)` | `0`, meaning the engine default (30s); equivalent to `-w-timeout` |
-| `WithWebFavicon()` | off by default; equivalent to `-w-favicon`, costing one extra request per target |
+| `WithWebFavicon()` | on by default (matching the CLI `-w-favicon`), costing one extra request per target; the option is kept only to state the intent explicitly |
 
 ## Network
 

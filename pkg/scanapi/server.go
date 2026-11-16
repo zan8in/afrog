@@ -336,6 +336,8 @@ func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 		TaskName:          spec.GetTaskName(),
 		Labels:            spec.GetLabels(),
 		NodeSelector:      spec.GetNodeSelector(),
+		GatingLevel:       spec.GetGatingLevel(),
+		DryRun:            spec.GetDryRun(),
 	}
 }
 

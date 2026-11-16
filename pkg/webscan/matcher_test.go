@@ -1,6 +1,9 @@
 package webscan
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -169,8 +172,9 @@ func TestMatchFaviconRule(t *testing.T) {
 	}
 }
 
-// 内置规则集带了 favicon 规则，但抓取与否必须由 -w-favicon 决定：内置规则不能自动开启
-// 抓取，只有外置规则集里写了 favicon 规则才自动开启。
+// 内置规则集带了 favicon 规则，但 HasFavicon 只反映「外置规则集是否有 favicon 规则」：
+// 内置规则不参与自动开启判定（是否抓取由 -w-favicon 控制，默认开启），只有外置规则集里
+// 写了 favicon 规则才算「用户意图」，即便显式关掉 -w-favicon 也要强制抓。
 func TestFaviconRulesDoNotAutoEnableBuiltinFetch(t *testing.T) {
 	db, err := LoadDB("")
 	if err != nil {
@@ -646,6 +650,81 @@ func TestGapFilledFrontendLibraries(t *testing.T) {
 	}
 }
 
+// TestFrameworkContentMarkers 覆盖「内容型判据」：SPA 首页为空间、脚本名被哈希化时，
+// 只剩页面内联脚本与打包产物内容里还留着框架痕迹。此类判据一律记为 probable。
+func TestFrameworkContentMarkers(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name, body, wantRule string
+	}{
+		{"nextjs-pages-data", `<script id="__NEXT_DATA__" type="application/json">{}</script>`, "nextjs"},
+		{"nextjs-app-payload", `<script>self.__next_f.push([1,"x"])</script>`, "nextjs"},
+		{"nuxt-data", `<script>window.__NUXT__={}</script>`, "nuxtjs"},
+		{"nuxt-assets", `<link href="/_nuxt/entry.a1b2.js">`, "nuxtjs"},
+		{"vite-dev-client", `<script type="module" src="/@vite/client"></script>`, "vite"},
+		{"vite-build-runtime", `<script>const x=__vite__mapDeps([])</script>`, "vite"},
+		{"sveltekit-global", `<script>__sveltekit_1a2b3c.start()</script>`, "sveltekit"},
+		{"sveltekit-attr", `<a data-sveltekit-preload-data="hover" href="/x">x</a>`, "sveltekit"},
+		{"angular-view-encapsulation", `<style>[_ngcontent-abc-c12]{color:red}</style>`, "angular"},
+		{"angular-ssr", `<app-root ng-server-context="ssr"></app-root>`, "angular"},
+		{"angular-ivy-runtime", `<script>ɵɵdefineComponent({})</script>`, "angular"},
+		{"react-error-prefix", `<script>throw Error("Minified React error #130")</script>`, "react"},
+		{"swiper-version", `<script src="/js/swiper@8.4.5.min.js"></script>`, "swiper"},
+		{"swiper-bundle", `<link href="/js/swiper-bundle.min.css" rel="stylesheet">`, "swiper"},
+		{"swiper-init", `<script>new Swiper('.hero', {})</script>`, "swiper"},
+		{"swiper-dom", `<div class="swiper-wrapper"></div>`, "swiper"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(Response{Body: []byte(tc.body)})
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Confidence != ConfidenceProbable {
+				t.Errorf("%s confidence = %s, want probable", tc.wantRule, got.Confidence)
+			}
+		})
+	}
+}
+
+// TestFrameworkContentMarkersInAssets 确认内容型判据在「只喂正文」的资源匹配路径同样生效
+// （MatchAssets 只把资源内容当正文，不喂响应头、URL）。
+func TestFrameworkContentMarkersInAssets(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	assets := []Asset{
+		{URL: "https://cdn.example/assets/index-a1b2c3.js", Body: []byte(`var x=__vite__mapDeps([]);ɵɵdefineComponent({})`)},
+	}
+	res := m.MatchAssets(assets)
+	names := make(map[string]bool, len(res.Technologies))
+	for _, tech := range res.Technologies {
+		names[tech.Name] = true
+		if tech.Confidence != ConfidenceProbable {
+			t.Errorf("%s confidence = %s, want probable", tech.Name, tech.Confidence)
+		}
+		if !strings.HasPrefix(tech.Evidence, "asset ") {
+			t.Errorf("%s evidence = %q, want asset prefix", tech.Name, tech.Evidence)
+		}
+	}
+	for _, want := range []string{"Vite", "Angular"} {
+		if !names[want] {
+			t.Errorf("%s not detected from asset content: %+v", want, res.Technologies)
+		}
+	}
+}
+
 // 收紧后的弱判据必须落在 probable，避免以 certain 结论输出。
 func TestTightenedRulesUseProbable(t *testing.T) {
 	m, err := LoadMatcher("")
@@ -867,6 +946,38 @@ func TestTechnologyEvidence(t *testing.T) {
 	}
 }
 
+// TestFetchAssets 覆盖资源抓取的 HTTP 路径：同源脚本抓回内容、非 2xx 资源跳过、
+// max=0 直接不抓。这是「抓取」与「匹配」之间唯一的一段网络代码，必须单独钉住。
+func TestFetchAssets(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/js/app.js":
+			_, _ = w.Write([]byte("/*! vue.runtime.esm-bundler */"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	p := NewProber(ProbeOptions{})
+	body := []byte(`<html><head>` +
+		`<script src="/js/app.js"></script>` +
+		`<script src="/js/missing.js"></script>` +
+		`</head></html>`)
+
+	assets := p.FetchAssets(context.Background(), srv.URL+"/", body, 5)
+	if len(assets) != 1 {
+		t.Fatalf("assets = %+v, want only the 2xx one", assets)
+	}
+	if !strings.Contains(string(assets[0].Body), "vue.runtime") {
+		t.Fatalf("asset body = %q", assets[0].Body)
+	}
+
+	if got := p.FetchAssets(context.Background(), srv.URL+"/", body, 0); got != nil {
+		t.Fatalf("max=0 should not fetch: %+v", got)
+	}
+}
+
 func hasTech(res Result, name string) bool {
 	for _, tech := range res.Technologies {
 		if tech.Name == name {
@@ -874,4 +985,130 @@ func hasTech(res Result, name string) bool {
 		}
 	}
 	return false
+}
+
+// TestAssetRefs 钉住静态资源地址抽取：只收同站、按类型过滤、去重并按 max 截断。
+//
+// 同站过滤是安全属性——抓第三方 CDN 会给目标之外的站点发请求；rel/as 过滤是成本属性——
+// preload 覆盖字体/图片，全抓会把请求花在无关二进制上。
+func TestAssetRefs(t *testing.T) {
+	body := []byte(`<html><head>
+<script src="/js/app.a1b2.js"></script>
+<script src="https://static.example.com/js/vendor.js"></script>
+<script src="https://cdn.other.com/lib.js"></script>
+<script src="/js/app.a1b2.js"></script>
+<link rel="modulepreload" href="/assets/index-x.js">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="preload" as="image" href="/img/hero.png">
+<link rel="preload" as="script" href="/js/lazy.js">
+</head></html>`)
+
+	got := AssetRefs("https://www.example.com/", body, 10)
+	want := []string{
+		"https://www.example.com/js/app.a1b2.js",
+		"https://static.example.com/js/vendor.js",
+		"https://www.example.com/assets/index-x.js",
+		"https://www.example.com/css/site.css",
+		"https://www.example.com/js/lazy.js",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("AssetRefs = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("AssetRefs[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+
+	if capped := AssetRefs("https://www.example.com/", body, 2); len(capped) != 2 {
+		t.Fatalf("max not honored: %v", capped)
+	}
+	if none := AssetRefs("https://www.example.com/", body, 0); none != nil {
+		t.Fatalf("max=0 should disable: %v", none)
+	}
+}
+
+// TestSameSite 钉住「同站」判定：同 host 或同注册域算同站，跨注册域不算；
+// 用 PSL 而非「取末两段」，故 .co.uk 这类多段后缀不会被误判。
+func TestSameSite(t *testing.T) {
+	cases := []struct {
+		base, abs string
+		want      bool
+	}{
+		{"www.example.com", "www.example.com", true},
+		{"www.example.com", "static.example.com", true},
+		{"www.example.com", "example.com", true},
+		{"www.example.com", "cdn.other.com", false},
+		{"a.example.co.uk", "b.example.co.uk", true},
+		{"a.example.co.uk", "b.example.co.jp", false},
+		{"127.0.0.1", "127.0.0.1", true},
+		{"127.0.0.1", "127.0.0.2", false},
+		{"www.example.com", "", false},
+	}
+	for _, c := range cases {
+		if got := sameSite(c.base, c.abs); got != c.want {
+			t.Fatalf("sameSite(%q, %q) = %v, want %v", c.base, c.abs, got, c.want)
+		}
+	}
+}
+
+// TestMatchAssets 钉住两件与「资源内容 ≠ 站点身份」直接相关的纪律：
+// 命中可信度一律压到 probable（因而不会进入 gating 的 CertainTokens 产生否定跳过），
+// 且证据里必须带上「来自哪个资源」。
+func TestMatchAssets(t *testing.T) {
+	db := &DB{Rules: []*Rule{{
+		ID:       "vue",
+		Name:     "Vue.js",
+		Category: "js-framework",
+		Match:    []MatchRule{{Source: SourceBody, Pattern: `vue\.runtime`, Confidence: "certain"}},
+	}}}
+	if err := db.compile(); err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	m := NewMatcher(db)
+
+	res := m.MatchAssets([]Asset{{
+		URL:  "https://h.example/assets/index-a1b2.js",
+		Body: []byte("var x=1;/*vue.runtime.esm-bundler*/"),
+	}})
+	if len(res.Technologies) != 1 {
+		t.Fatalf("technologies = %+v", res.Technologies)
+	}
+	tech := res.Technologies[0]
+	if tech.Name != "Vue.js" {
+		t.Fatalf("name = %q, want Vue.js", tech.Name)
+	}
+	if tech.Confidence != ConfidenceProbable {
+		t.Fatalf("confidence = %v, want probable (asset content must not be certain)", tech.Confidence)
+	}
+	if !strings.Contains(tech.Evidence, "/assets/index-a1b2.js") {
+		t.Fatalf("evidence should point at the asset: %q", tech.Evidence)
+	}
+}
+
+// TestResultMergeDedupKeepsHigherConfidence：首页素材认出的 certain 结论，不该被
+// 资源内容匹配出的 probable 同名结论覆盖；新结论则追加进来。
+func TestResultMergeDedupKeepsHigherConfidence(t *testing.T) {
+	r := Result{
+		Technologies: []Technology{{Name: "Vue.js", Confidence: ConfidenceCertain, RuleID: "vue"}},
+		Confidence:   ConfidenceCertain,
+	}
+	r.Merge(Result{
+		Technologies: []Technology{
+			{Name: "Vue.js", Confidence: ConfidenceProbable, RuleID: "vue", Evidence: "asset /a.js: body: vue"},
+			{Name: "Webpack", Confidence: ConfidenceProbable, RuleID: "webpack"},
+		},
+		Confidence: ConfidenceProbable,
+	})
+	if len(r.Technologies) != 2 {
+		t.Fatalf("technologies = %+v, want 2", r.Technologies)
+	}
+	for _, tech := range r.Technologies {
+		if tech.Name == "Vue.js" && tech.Confidence != ConfidenceCertain {
+			t.Fatalf("Vue.js confidence = %v, want certain (dedup must keep the stronger one)", tech.Confidence)
+		}
+	}
+	if r.Confidence != ConfidenceCertain {
+		t.Fatalf("overall confidence = %v, want certain", r.Confidence)
+	}
 }

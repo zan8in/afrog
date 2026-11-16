@@ -95,6 +95,12 @@ message ScanSpec {
   // no_save_db 为真时命中不写入执行节点的 result 表（CLI 对应 -no-save-db）：
   // 只在事件流里出现，漏洞报告与台账保持干净，用于测试性、不重要的扫描。
   bool no_save_db = 33;
+
+  // 指纹门控档位（对应 -gating-level）：off | safe | balanced | aggressive。
+  // 空 = 执行节点默认档（safe）。档位只控制"减法"（跳过），不放宽任何"加法"。
+  string gating_level = 34;
+  // dry_run 为真时只预演门控决策、不发包（对应 -dry-run），用于人工校验跳过归因。
+  bool dry_run = 35;
 }
 
 // -------------------- 事件 --------------------
