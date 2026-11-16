@@ -125,6 +125,20 @@ requires: [jquery<3.5]
 
 > 版本来自 Web 指纹阶段解析出的产品版本。指纹 PoC（由 `info.tags` / `info.id` 命中的技术）目前不产出具体版本，因此针对这类标识的版本约束会始终按「版本未知」放行。
 
+## 关键词检索也能命中 requires
+
+`-s` 关键词检索（以及 `-p` 列表、MCP 的 `poc.search`）的检索范围**包含 `requires`**：只要 `id`、`name`、`tags`、`requires` 任一字段子串命中任一关键词即算命中（逗号分隔即多关键词 OR）。
+
+这条覆盖有实际意义：`-s jquery` 不只是搜标题含 jquery 的 PoC，也能搜到「依赖 jquery」的 PoC——包括在 `requires` 里带版本约束的写法：
+
+```yaml
+requires: [jquery<3.5]
+```
+
+搜 `jquery` 或版本号 `3.5` 都能命中，方便按「某技术栈 / 某个受影响版本」反查 PoC。
+
+三端（`afrog -s`、`-p` 列表、`poc.search`）共用同一份检索口径，同一个关键词在各入口命中结果一致。
+
 ## 怎么判定允许执行
 
 规则很简单：

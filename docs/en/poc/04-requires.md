@@ -125,6 +125,20 @@ Versions are compared segment by segment on `.`, sharing the semantics of the CE
 
 > Versions come from the product version parsed during the web fingerprint stage. Fingerprint PoCs (technologies matched via `info.tags` / `info.id`) do not currently produce a concrete version, so a version constraint on those identifiers always passes as "version unknown".
 
+## Keyword search also matches `requires`
+
+Keyword search (`-s`), the `-p` list, and MCP `poc.search` **include `requires`** in their search scope: a PoC matches when any keyword is a substring of any of `id`, `name`, `tags`, or `requires` (comma-separated means multi-keyword OR).
+
+This is useful in practice: `-s jquery` does not only find PoCs whose title mentions jquery, it also finds PoCs that *depend on* jquery — including entries that carry a version constraint:
+
+```yaml
+requires: [jquery<3.5]
+```
+
+Searching `jquery` or the version number `3.5` both match, which makes it easy to reverse-lookup PoCs by "a technology / an affected version".
+
+All three entry points (`afrog -s`, the `-p` list, and `poc.search`) share the same search semantics, so the same keyword yields consistent results everywhere.
+
 ## How execution is allowed
 
 The rule is simple:
