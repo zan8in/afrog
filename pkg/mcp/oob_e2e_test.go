@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,10 +15,14 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/config"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/evidence"
+	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/observation"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 	"github.com/zan8in/afrog/v3/pkg/ref"
 )
+
+// oobE2EPocID 既是这份反向 PoC 的 id，也是 scan.start 按 -s 选中它的关键词。
+const oobE2EPocID = "mcp-oob-e2e"
 
 // 反向 PoC 的端到端验收：全离线地走完「提议 → 执行 → 真的回连 → 落证据 → 观测回读」。
 //
@@ -28,8 +31,9 @@ import (
 //     外加一个 /hit 供假靶标登记回连；
 //  2. 假靶标：收到带 {{oob.HTTP}} 的请求后「被利用」，真的去访问那个反连地址 ——
 //     也就是说它把回连登记到平台上，模拟一次真实的带外回连；
-//  3. 工具面：走 verify.poc 的正式链路（SDK + 引擎 OOB 轮询 + finalize），
-//     凭据只从 afrog-config.yaml 的 reverse 段取，与 CLI 的 -oob alphalog 完全同口径。
+//  3. 工具面：走 scan.start 的正式链路（按 -s 选中反向 PoC），扫描在独立子进程里执行
+//     （引擎 OOB 轮询 + finalize），凭据只从 afrog-config.yaml 的 reverse 段取，
+//     与 CLI 的 -oob alphalog 完全同口径。
 //
 // 它锁的是整条语义：配了反连后端，反向 PoC 就必须真出证据，而不是静默返回「没命中」。
 
@@ -100,11 +104,9 @@ func newOOBCallbackTarget(t *testing.T, platform *fakeAlphalogPlatform) *httptes
 	return srv
 }
 
-// writeOOBE2EPoc 落一份与 pocs/oob-http.yaml 同形态的反向 PoC。
-func writeOOBE2EPoc(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "mcp-oob-e2e.yaml")
-	body := `id: mcp-oob-e2e
+// oobE2EPocYAML 是一份与 pocs/oob-http.yaml 同形态的反向 PoC。
+func oobE2EPocYAML() string {
+	return `id: ` + oobE2EPocID + `
 info:
   name: mcp oob e2e
   author: afrog-test
@@ -117,16 +119,24 @@ rules:
     expression: oobCheck(oob.ProtocolHTTP, 3)
 expression: r0()
 `
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatalf("write oob poc: %v", err)
-	}
-	return path
+}
+
+// installOOBE2EPoc 把反向 PoC 落到临时 HOME 的 pocs-my，让 scan.start 的 -s 能选中它。
+func installOOBE2EPoc(t *testing.T) {
+	t.Helper()
+	installPoc(t, oobE2EPocID, oobE2EPocYAML())
 }
 
 // newOOBE2EServer 装配工具面：HOME 指向临时目录，afrog-config.yaml 里同时写 curated 开关
-// 与 reverse.alphalog 凭据——SDK 侧就是靠这份凭据去连假平台的。
+// 与 reverse.alphalog 凭据——子进程就是靠这份凭据去连假平台的。
 func newOOBE2EServer(t *testing.T, policyYAML, apiURL string) (*Server, *oobSource) {
 	t.Helper()
+
+	// 必须在切 HOME 之前构建：go 的模块缓存挂在 HOME 下。
+	var ex executor.Executor
+	if subprocessEnabled() {
+		ex = subprocessExecutor(t)
+	}
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -159,15 +169,17 @@ func newOOBE2EServer(t *testing.T, policyYAML, apiURL string) (*Server, *oobSour
 	}
 	t.Cleanup(concrete.Close)
 
-	return New(Options{Policy: p, OOB: src}), concrete
+	return New(Options{Policy: p, OOB: src, Executor: ex}), concrete
 }
 
 // 端到端：反向 PoC 必须凭真实回连拿到证据，并把这次回连写进观测流。
 func TestOOBEndToEndAcceptance(t *testing.T) {
+	requireSubprocess(t)
 	platform := newFakeAlphalogPlatform(t)
 	target := newOOBCallbackTarget(t, platform)
 
 	s, _ := newOOBE2EServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n", platform.srv.URL)
+	installOOBE2EPoc(t)
 
 	if err := sqlite.NewWebSqliteDB(); err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -179,17 +191,16 @@ func TestOOBEndToEndAcceptance(t *testing.T) {
 		t.Fatalf("normalize target: %v", err)
 	}
 
-	out, err := s.tools["verify.poc"].Handler(context.Background(),
-		mustJSON(t, map[string]any{"poc_path": writeOOBE2EPoc(t), "target": endpoint, "timeout_sec": 30}))
-	if err != nil {
-		t.Fatalf("verify.poc: %v", err)
-	}
+	out := runTool(t, s, "scan.start", map[string]any{
+		"target": endpoint, "search": oobE2EPocID, "timeout_sec": 30,
+	})
 	res, ok := out.(map[string]any)
 	if !ok {
 		t.Fatalf("result = %#v, want a map", out)
 	}
 	if res["found"] != true {
-		t.Fatalf("found = %v, want true: the target called back, so the reverse PoC must confirm", res["found"])
+		t.Fatalf("found = %v, want true: the target called back, so the reverse PoC must confirm (status=%v error=%v)",
+			res["found"], res["status"], res["error"])
 	}
 
 	items, _ := res["results"].([]map[string]any)

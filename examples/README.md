@@ -61,11 +61,11 @@ afrog mcp -listen 127.0.0.1:16870
 go run ./examples/mcp_agent -limit 5
 ```
 
-Pass `-draft <file> -target <url>` to run the draft → verify loop instead
-(needs a `safe` policy, since `verify.poc` sends traffic):
+Pass `-draft <file> -target <url>` to run the draft → submit loop instead
+(needs a `safe` policy, since `poc.submit` sends traffic):
 
-传入 `-draft <file> -target <url>` 则走「草稿 → 验证」闭环
-（需要 `safe` 及以上策略，因为 `verify.poc` 会发包）：
+传入 `-draft <file> -target <url>` 则走「草稿 → 实跑取证据」闭环
+（需要 `safe` 及以上策略，因为 `poc.submit` 会发包）：
 
 ```sh
 go run ./examples/mcp_agent -draft ./draft.yaml -target http://127.0.0.1:8080

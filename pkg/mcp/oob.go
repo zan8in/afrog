@@ -28,8 +28,8 @@ var errOOBUnavailable = errors.New("oob not configured: set agent.oob and the re
 // 定义成窄接口而不是直接暴露 runner.OOBManager：工具面只依赖这三件事，单测因此可以
 // 用假实现，不必起真的反连平台。
 type OOBSource interface {
-	// Adapter 返回反连平台的适配器名（如 alphalog）；verify.poc 把它交给 SDK，
-	// 让 SDK 用同一套「适配器名 + 配置里的 reverse 凭据」去接反连平台。
+	// Adapter 返回反连平台的适配器名（如 alphalog）；scan.start / poc.submit 把它下发给
+	// 子进程，让子进程用同一套「适配器名 + 配置里的 reverse 凭据」去接反连平台。
 	Adapter() string
 	// Payload 铸一组新的反连地址，并开始监听回连。
 	Payload() (OOBPayload, error)
@@ -172,14 +172,38 @@ func (s *oobSource) Close() {
 // waitOOB 给 Wait 套一层取消：OOBManager.Wait 本身不认 ctx，调用方被取消时不该干等满超时。
 //
 // 取消后等待协程仍会跑到 timeout 才退出——它有界（最多一个 timeout），不泄漏。
+//
+// 这是工具面里唯一会长时间阻塞的调用，因此顺便按秒上报进度：客户端据此能区分
+// 「还在等回连」和「卡死了」。没有进度通道（未带 progressToken 或传输不支持）时
+// 这条路径完全不做额外工作。
 func waitOOB(ctx context.Context, src OOBSource, filter, filterType string, timeout time.Duration) bool {
 	done := make(chan bool, 1)
 	go func() { done <- src.Wait(filter, filterType, timeout) }()
-	select {
-	case ok := <-done:
-		return ok
-	case <-ctx.Done():
-		return false
+
+	report := progressFrom(ctx)
+	if report == nil {
+		select {
+		case ok := <-done:
+			return ok
+		case <-ctx.Done():
+			return false
+		}
+	}
+
+	start := time.Now()
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case ok := <-done:
+			return ok
+		case <-ctx.Done():
+			return false
+		case <-tick.C:
+			elapsed := time.Since(start)
+			report(elapsed.Seconds(), timeout.Seconds(),
+				fmt.Sprintf("waiting for %s callback on %s", filterType, filter))
+		}
 	}
 }
 
@@ -194,7 +218,8 @@ const (
 func (s *Server) actOOBPayloadTool() *Tool {
 	return &Tool{
 		Name:        "act.oob_payload",
-		Description: "【需要 exec 能力】铸一组带外（反连）地址并开始监听回连。把 dns / http 注入目标请求后，用 act.oob_wait 等回连；需要 afrog-config.yaml 配置 agent.oob 与 reverse 凭据。",
+		Title:       "铸反连地址",
+		Description: "【需要 exec 能力】铸一组带外（反连）地址并开始监听回连。把 dns / http 注入目标请求后，用 act.oob_wait 等回连；需要 afrog-config.yaml 配置 agent.oob 与 reverse 凭据。用于命令执行、XXE、SSRF 这类「目标不回显、只能靠回连确认」的验证。",
 		InputSchema: map[string]any{
 			"type":       "object",
 			"properties": map[string]any{},
@@ -227,7 +252,8 @@ func (s *Server) actOOBWaitTool() *Tool {
 	}
 	return &Tool{
 		Name:        "act.oob_wait",
-		Description: "【需要 exec 能力】等待 act.oob_payload 铸出的反连地址回连。命中返回 hit=true 与证据，并把这次回连写进观测流（oob_hit）；超时返回 hit=false。",
+		Title:       "等待反连回连",
+		Description: "【需要 exec 能力】等待 act.oob_payload 铸出的反连地址回连。命中返回 hit=true 与证据，并把这次回连写进观测流（oob_hit）；超时返回 hit=false（只代表这段时间没有回连，不等于漏洞不存在）。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

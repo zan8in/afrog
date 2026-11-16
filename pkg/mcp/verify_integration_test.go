@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,14 +9,20 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 )
 
-const verifyHitMarker = "AFROG_MCP_VERIFY_HIT"
+const (
+	verifyHitMarker = "AFROG_MCP_VERIFY_HIT"
+	// verifyHitID 是这份命中 PoC 的 id：scan.start 用 -s 按 id 选中它。
+	verifyHitID = "mcp-verify-hit"
+)
 
 // newIntegrationServer 构建一个可验证的 MCP 服务端：HOME 指向临时目录并关掉 curated
 // 源，测试因此只跑本地 PoC，既不访问网络，也不会碰用户的 afrog-config.yaml。
+//
+// 它不注入扫描执行器：只用于「不真正发包」的用例（策略拒绝、只读回读）。需要真跑扫描
+// 的用例改用 newSubprocessServer。
 func newIntegrationServer(t *testing.T, policyYAML string) *Server {
 	t.Helper()
 
@@ -39,11 +44,9 @@ func newIntegrationServer(t *testing.T, policyYAML string) *Server {
 	return New(Options{Policy: p})
 }
 
-func writeHitPoc(t *testing.T) string {
-	t.Helper()
-
-	path := filepath.Join(t.TempDir(), "mcp-verify-hit.yaml")
-	body := `id: mcp-verify-hit
+// hitPocYAML 是一份最小命中 PoC 的 YAML 原文：目标返回的正文里带 verifyHitMarker 即命中。
+func hitPocYAML() string {
+	return `id: ` + verifyHitID + `
 info:
   name: mcp verify hit
   author: afrog-test
@@ -56,46 +59,44 @@ rules:
     expression: response.status == 200 && response.body.bcontains(b"` + verifyHitMarker + `")
 expression: r0()
 `
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+}
+
+func writeHitPoc(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), verifyHitID+".yaml")
+	if err := os.WriteFile(path, []byte(hitPocYAML()), 0o644); err != nil {
 		t.Fatalf("write poc: %v", err)
 	}
 	return path
 }
 
-// verify.poc 的真实命中路径曾经因为 SDK 的首命中停止语义整体失效（fail-closed），
-// 这里直接驱动工具处理器，锁住「参数 → SDK → 证据 → 返回值」这条链路。
-func TestVerifyPocToolReturnsEvidenceOnRealHit(t *testing.T) {
+// scan.start 的真实命中路径：按 -s 关键词选中 PoC，一次子进程跑出可重放证据。
+func TestScanStartToolReturnsEvidenceOnRealHit(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("<html>" + verifyHitMarker + "</html>"))
 	}))
 	t.Cleanup(srv.Close)
 
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 20\n  duration: 2m\n")
-	args, err := json.Marshal(map[string]any{"poc_path": writeHitPoc(t), "target": srv.URL})
-	if err != nil {
-		t.Fatalf("marshal args: %v", err)
-	}
+	s := newSubprocessServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
+	installPoc(t, verifyHitID, hitPocYAML())
 
-	out, err := s.tools["verify.poc"].Handler(context.Background(), args)
-	if err != nil {
-		t.Fatalf("verify.poc: %v", err)
-	}
-
+	out := runTool(t, s, "scan.start", map[string]any{"target": srv.URL, "search": verifyHitID})
 	res, ok := out.(map[string]any)
 	if !ok {
 		t.Fatalf("unexpected result type %T", out)
 	}
 	if res["found"] != true {
-		t.Fatalf("found = %v, want true", res["found"])
+		t.Fatalf("found = %v, want true (status=%v error=%v)", res["found"], res["status"], res["error"])
 	}
 	items, ok := res["results"].([]map[string]any)
-	if !ok || len(items) != 1 {
-		t.Fatalf("results = %#v, want one item", res["results"])
+	if !ok || len(items) == 0 {
+		t.Fatalf("results = %#v, want at least one hit", res["results"])
 	}
 
-	ev, ok := items[0]["evidence"].(*evidence.Evidence)
-	if !ok || ev == nil {
+	ev := firstEvidence(items)
+	if ev == nil {
 		t.Fatalf("evidence missing: %#v", items[0]["evidence"])
 	}
 	if !strings.HasPrefix(ev.ID, "evd_") {
@@ -108,21 +109,18 @@ func TestVerifyPocToolReturnsEvidenceOnRealHit(t *testing.T) {
 		t.Fatalf("evidence replay = %+v, want a deterministic command", ev.Replay)
 	}
 
-	// 单规则 PoC 估算 1 次请求：预算必须从 20 扣到 19。
-	if got := s.gate.Budget().Remaining(); got != 19 {
-		t.Fatalf("budget remaining = %d, want 19", got)
+	// 预留额度按关键词估算，必须真的扣掉：剩余不再是 50。
+	if got := s.gate.Budget().Remaining(); got >= 50 {
+		t.Fatalf("budget remaining = %d, want it consumed by the scan", got)
 	}
 }
 
-// 默认只读策略下 verify.poc 必须被拒绝，且拒绝不能扣预算。
-func TestVerifyPocToolDeniedByReadOnlyPolicy(t *testing.T) {
+// 默认只读策略下 scan.start 必须被拒绝，且拒绝不能扣预算。
+func TestScanStartToolDeniedByReadOnlyPolicy(t *testing.T) {
 	s := newIntegrationServer(t, "mode: readonly\n")
-	args, err := json.Marshal(map[string]any{"poc_path": writeHitPoc(t), "target": "http://127.0.0.1:1"})
-	if err != nil {
-		t.Fatalf("marshal args: %v", err)
-	}
 
-	if _, err := s.tools["verify.poc"].Handler(context.Background(), args); err == nil ||
+	if _, err := s.tools["scan.start"].Handler(context.Background(),
+		mustJSON(t, map[string]any{"target": "http://127.0.0.1:1", "search": verifyHitID})); err == nil ||
 		!strings.Contains(err.Error(), "policy denied") {
 		t.Fatalf("err = %v, want a policy denial", err)
 	}

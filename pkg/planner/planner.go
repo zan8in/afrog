@@ -46,7 +46,9 @@ const (
 type Action struct {
 	Name   string `json:"name"`
 	Target string `json:"target"`
-	PocID  string `json:"poc_id,omitempty"`
+	// Search 是 scan.start 的技术栈关键词（逗号分隔），即 afrog 的 -s 入参。
+	// probe.fingerprint 等无参动作留空。
+	Search string `json:"search,omitempty"`
 }
 
 // Proposal 是一条提议，带依据与解释。
@@ -59,7 +61,7 @@ type Proposal struct {
 	// Severity 是候选 PoC 的等级；未知时为空。
 	Severity string `json:"severity,omitempty"`
 	// RequiresOOB 表示这条提议靠带外（反连）回连下结论：执行它需要反连平台，
-	// 否则 verify.poc 会 fail-closed。调用方据此先补配置，或改选别的候选。
+	// 否则 scan.start 会 fail-closed。调用方据此先补配置，或改选别的提议。
 	RequiresOOB bool `json:"requires_oob,omitempty"`
 	// Rationale 是一句人话结论，直接可以展示给使用者。
 	Rationale string `json:"rationale"`
@@ -130,11 +132,16 @@ func Build(opts Options) (*Plan, error) {
 	return out, nil
 }
 
-// candidateProposals 把「端点 → 技术栈 → 候选 PoC」压成 verify.poc 提议。
+// candidateProposals 把「端点 → 技术栈 → 候选 PoC」压成按源站合并的 scan.start 提议。
 //
-// 归并口径是「PoC + origin」：同一个 PoC 在同一个 origin 上不该被提议多次——
-// PoC 自己会拼路径，按端点逐条提议只会把同一件事重复 N 遍。返回的 excluded 是
-// 历史上已经出过结果行、被跳过的组合数。
+// 归并口径是 origin：同一个源站上的候选不再逐个 PoC 提一条，而是合成一条「按该源站
+// 识别出的技术栈关键词、一次并发跑完整批 PoC」的 scan.start——这正是 afrog -s 的用法。
+// 逐个 PoC 串行验证既慢，又会让「单跑一个漏洞 PoC 被指纹门控跳过」，与 afrog 的两阶段
+// 扫描相悖。Search 因此取技术栈名而非 PoC id：-s 命中 id/名称/标签，且指纹 PoC 一律
+// 被保留，于是指纹阶段照常运行、requires 按真实指纹放行。
+//
+// 返回的 excluded 是「已有结论、不再提议」的候选组合数（PoC + 源站）：同一个源站上若
+// 还有未出结论的候选 PoC，该源站仍会提议——-s 会把它们一起跑。
 func candidateProposals(projectID, subject string, under bool) ([]Proposal, int, error) {
 	rows, err := sqlite.SelectTechCandidates(subject, under)
 	if err != nil {
@@ -169,12 +176,12 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 	meta := pocMetadata
 	type group struct {
 		origin      string
-		pocID       string
 		score       int
 		severity    string
 		requiresOOB bool
 		techs       map[string]struct{}
 		points      map[string]struct{}
+		pocs        map[string]struct{}
 	}
 	groups := make(map[string]*group, len(rows))
 	excluded := 0
@@ -185,27 +192,36 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 		if pocID == "" || origin == "" {
 			continue
 		}
-		key := proposalKey(pocID, origin)
-		if _, ok := concluded[key]; ok {
+		if _, ok := concluded[proposalKey(pocID, origin)]; ok {
 			excluded++
 			continue
 		}
-		g := groups[key]
+		g := groups[origin]
 		if g == nil {
-			item, _ := meta(pocID)
-			severity := strings.ToLower(strings.TrimSpace(item.Severity))
-			score := scoreCandidateBase + severityWeight(severity)*10
-			if item.Verified {
-				score += scoreVerifiedBonus
-			}
 			g = &group{
-				origin: origin, pocID: pocID, score: score, severity: severity,
-				requiresOOB: pocNeedsOOB(pocID),
-				techs:       make(map[string]struct{}, 2),
-				points:      make(map[string]struct{}, 2),
+				origin: origin,
+				techs:  make(map[string]struct{}, 2),
+				points: make(map[string]struct{}, 2),
+				pocs:   make(map[string]struct{}, 4),
 			}
-			groups[key] = g
+			groups[origin] = g
 		}
+		item, _ := meta(pocID)
+		severity := strings.ToLower(strings.TrimSpace(item.Severity))
+		score := scoreCandidateBase + severityWeight(severity)*10
+		if item.Verified {
+			score += scoreVerifiedBonus
+		}
+		if score > g.score {
+			g.score = score
+		}
+		if severityWeight(severity) > severityWeight(g.severity) {
+			g.severity = severity
+		}
+		if pocNeedsOOB(pocID) {
+			g.requiresOOB = true
+		}
+		g.pocs[pocID] = struct{}{}
 		if tech != "" {
 			g.techs[tech] = struct{}{}
 		}
@@ -215,8 +231,14 @@ func candidateProposals(projectID, subject string, under bool) ([]Proposal, int,
 	out := make([]Proposal, 0, len(groups))
 	for _, g := range groups {
 		techs := sortedKeys(g.techs)
+		search := strings.Join(techs, ",")
+		if search == "" {
+			// 没有技术栈名可做关键词时退回候选 PoC id：-s 同样命中 PoC id，
+			// 且不能为空——空关键词会退化成全库扫描。
+			search = strings.Join(sortedKeys(g.pocs), ",")
+		}
 		out = append(out, Proposal{
-			Action:      Action{Name: "verify.poc", Target: g.origin, PocID: g.pocID},
+			Action:      Action{Name: "scan.start", Target: g.origin, Search: search},
 			Category:    CategoryCandidatePoc,
 			Score:       g.score,
 			Severity:    g.severity,
@@ -280,7 +302,7 @@ func unknownTechProposals(subject string, under bool) ([]Proposal, error) {
 	return out, nil
 }
 
-// sortProposals 固定排序：分数降序 → 动作名 → 目标 → PoC id。
+// sortProposals 固定排序：分数降序 → 动作名 → 目标 → 关键词。
 // 后面的字段保证任何输入都得到唯一顺序，重跑不会抖动。
 func sortProposals(items []Proposal) {
 	sort.Slice(items, func(i, j int) bool {
@@ -294,7 +316,7 @@ func sortProposals(items []Proposal) {
 		if a.Action.Target != b.Action.Target {
 			return a.Action.Target < b.Action.Target
 		}
-		return a.Action.PocID < b.Action.PocID
+		return a.Action.Search < b.Action.Search
 	})
 }
 
@@ -341,9 +363,9 @@ func severityWeight(severity string) int {
 
 func candidateRationale(techs []string) string {
 	if len(techs) == 0 {
-		return "该端点识别出的技术栈有现成 PoC，按同一套 requires 准入语义成为候选。"
+		return "该源站识别出的技术栈有现成 PoC，按同一套 requires 准入语义成为候选。"
 	}
-	return "端点使用 " + strings.Join(techs, "、") + "，其 requires 声明的 PoC 是候选；候选不是结论，需 verify 确认。"
+	return "源站使用 " + strings.Join(techs, "、") + "，其 requires 声明的 PoC 是候选；用 scan.start 按这批关键词一次并发跑完，候选不是结论。"
 }
 
 func techNodes(techs []string) []string {

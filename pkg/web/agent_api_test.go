@@ -105,7 +105,7 @@ func TestAgentStateHandlerRequiresSubject(t *testing.T) {
 	}
 }
 
-// /api/v1/plan/next 与 MCP plan.next 同语义：图上的候选 PoC 变成 verify.poc 提议。
+// /api/v1/plan/next 与 MCP plan.next 同语义：图上的候选 PoC 改成按源站合并的 scan.start 提议。
 func TestAgentPlanHandler(t *testing.T) {
 	withAgentFixture(t)
 	t.Setenv("AFROG_CURATED_DISABLED", "1")
@@ -132,7 +132,7 @@ func TestAgentPlanHandler(t *testing.T) {
 		t.Fatalf("proposals = %+v, want 1", plan.Proposals)
 	}
 	got := plan.Proposals[0]
-	if got.Action.Name != "verify.poc" || got.Action.PocID != "poc-a" ||
+	if got.Action.Name != "scan.start" || got.Action.Search != "nginx" ||
 		got.Action.Target != "http://a.example" {
 		t.Fatalf("proposal = %+v", got)
 	}

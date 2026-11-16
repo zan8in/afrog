@@ -20,7 +20,7 @@ func TestPocSubmitToolStagesVerifiedCandidate(t *testing.T) {
 	}))
 	t.Cleanup(target.Close)
 
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
+	s := newSubprocessServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
 	if err := sqlite.NewWebSqliteDB(); err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestPocSubmitToolRejectsCandidateWithoutEvidence(t *testing.T) {
 	}))
 	t.Cleanup(target.Close)
 
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
+	s := newSubprocessServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
 	if err := sqlite.NewWebSqliteDB(); err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}

@@ -177,3 +177,48 @@ func TestStreamableHTTPRequiresToken(t *testing.T) {
 		t.Fatalf("status = %d, want 401", resp.StatusCode)
 	}
 }
+
+// Origin 校验是防 DNS rebinding 的：浏览器带来的跨站 Origin 必须被挡在门外，
+// 而 curl / 原生客户端（不带 Origin）不受影响。
+func TestStreamableHTTPOriginGuard(t *testing.T) {
+	ts := httptest.NewServer(newHTTPMux(newTestServer(), ""))
+	defer ts.Close()
+
+	status := func(origin, host string) int {
+		req, err := http.NewRequest(http.MethodPost, ts.URL+"/mcp", strings.NewReader(
+			`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+		if err != nil {
+			t.Fatalf("new request: %v", err)
+		}
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		if host != "" {
+			req.Host = host
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("post: %v", err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	cases := []struct {
+		name         string
+		origin, host string
+		want         int
+	}{
+		{"no origin", "", "", http.StatusOK},
+		{"loopback origin", "http://127.0.0.1:3000", "", http.StatusOK},
+		{"localhost origin", "http://localhost:3000", "", http.StatusOK},
+		{"same host as request", "http://scan.corp.example", "scan.corp.example", http.StatusOK},
+		{"foreign origin", "https://evil.example", "scan.corp.example", http.StatusForbidden},
+		{"opaque null origin", "null", "scan.corp.example", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		if got := status(tc.origin, tc.host); got != tc.want {
+			t.Errorf("%s: status = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}

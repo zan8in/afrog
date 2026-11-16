@@ -25,6 +25,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/drafter"
 	"github.com/zan8in/afrog/v3/pkg/evidence"
+	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/judge"
 	"github.com/zan8in/afrog/v3/pkg/learner"
 	"github.com/zan8in/afrog/v3/pkg/observation"
@@ -33,7 +34,6 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
-	"github.com/zan8in/afrog/v3/pkg/sdk"
 	"github.com/zan8in/afrog/v3/pkg/webscan"
 	"gopkg.in/yaml.v2"
 )
@@ -54,6 +54,7 @@ var nowFunc = time.Now
 
 func (s *Server) buildTools() map[string]*Tool {
 	tools := []*Tool{
+		s.serverStatusTool(),
 		s.observeFindingsTool(),
 		s.observeEvidenceTool(),
 		s.observeStateTool(),
@@ -65,7 +66,7 @@ func (s *Server) buildTools() map[string]*Tool {
 		s.probeHTTPTool(),
 		s.probePortTool(),
 		s.probeFingerprintTool(),
-		s.verifyPocTool(),
+		s.scanStartTool(),
 		s.verifyReplayTool(),
 		s.actBruteTool(),
 		s.actOOBPayloadTool(),
@@ -82,6 +83,106 @@ func (s *Server) buildTools() map[string]*Tool {
 	return out
 }
 
+// --- server.status ---
+
+func (s *Server) serverStatusTool() *Tool {
+	return &Tool{
+		Name:        "server.status",
+		Title:       "查看服务状态",
+		Description: "只读：返回本次会话的策略档位、剩余请求额度与空闲到期时间、作用域白/黑名单，以及服务与协议版本。它不发包也不扣额度。挑 PoC 前想确认「现在什么档位、还能发多少包」，或想知道某主机在不在作用域内，先调它——比撞上 403 / 429 再回头猜要省事。",
+		InputSchema: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+			"required":   []string{},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"server": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"name":    map[string]any{"type": "string"},
+						"version": map[string]any{"type": "string"},
+					},
+				},
+				"protocol_version": map[string]any{"type": "string", "description": "本服务默认协商到的 MCP 协议版本"},
+				"policy": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"mode":        map[string]any{"type": "string", "enum": []string{"readonly", "safe", "full"}},
+						"destructive": map[string]any{"type": "boolean", "description": "是否允许破坏性动作"},
+						"audit":       map[string]any{"type": "boolean", "description": "是否为每次判定落审计"},
+						"allow":       map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "白名单动作模式；为空表示不按名单限制"},
+						"deny":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "黑名单动作模式；命中即拒"},
+						"scope": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"allow_hosts": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+								"deny_hosts":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+								"deny_paths":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+							},
+						},
+					},
+				},
+				"budget": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"requests_remaining":  map[string]any{"type": "integer", "description": "本会话可用的剩余请求数；-1 表示不限"},
+						"requests_limit":      map[string]any{"type": "integer", "description": "本会话的请求额度上限"},
+						"idle_window_seconds": map[string]any{"type": "integer", "description": "空闲窗口长度（秒）；0 表示不限时"},
+						"expires_at":          map[string]any{"type": "string", "description": "空闲到期时间（RFC3339）；空表示不限时。到时仍未再发包即视作开新会话、额度补满"},
+					},
+				},
+			},
+		},
+		Handler: func(ctx context.Context, _ json.RawMessage) (any, error) {
+			if err := s.gate.Take(policy.Action{Name: "server.status"}, 0); err != nil {
+				return nil, err
+			}
+			p := s.gate.Policy()
+			b := s.gate.Budget()
+
+			expiresAt := ""
+			if d := b.Deadline(); !d.IsZero() {
+				expiresAt = d.UTC().Format(time.RFC3339)
+			}
+			// nil 切片会被序列化成 null；统一成空数组，让 schema 里的 array 名副其实。
+			list := func(v []string) []string {
+				if v == nil {
+					return []string{}
+				}
+				return v
+			}
+
+			return map[string]any{
+				"server": map[string]any{
+					"name":    s.info.Name,
+					"version": s.info.Version,
+				},
+				"protocol_version": ProtocolVersion,
+				"policy": map[string]any{
+					"mode":        string(p.Mode),
+					"destructive": p.Destructive,
+					"audit":       p.Audit,
+					"allow":       list(p.Allow),
+					"deny":        list(p.Deny),
+					"scope": map[string]any{
+						"allow_hosts": list(p.Scope.AllowHosts),
+						"deny_hosts":  list(p.Scope.DenyHosts),
+						"deny_paths":  list(p.Scope.DenyPaths),
+					},
+				},
+				"budget": map[string]any{
+					"requests_remaining":  b.Remaining(),
+					"requests_limit":      p.Limits.Requests,
+					"idle_window_seconds": int(p.Limits.Duration.Duration() / time.Second),
+					"expires_at":          expiresAt,
+				},
+			}, nil
+		},
+	}
+}
+
 // --- observe.findings ---
 
 func (s *Server) observeFindingsTool() *Tool {
@@ -95,16 +196,17 @@ func (s *Server) observeFindingsTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.findings",
-		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。",
+		Title:       "列出漏洞结论",
+		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。想知道「已经扫出什么」时先调它；返回为空只说明本地还没有这类数据，不代表目标没有漏洞。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"project_id": map[string]any{"type": "string", "description": "项目 ID；留空表示全局"},
-				"status":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "pending/confirmed/false_positive/fixed"},
-				"severity":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-				"keyword":    map[string]any{"type": "string"},
-				"page":       map[string]any{"type": "integer", "minimum": 1},
-				"limit":      map[string]any{"type": "integer", "minimum": 1, "maximum": 200},
+				"status":     map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"pending", "confirmed", "false_positive", "fixed"}}, "description": "台账状态；留空为全部"},
+				"severity":   map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"info", "low", "medium", "high", "critical"}}, "description": "严重级别；留空为全部"},
+				"keyword":    map[string]any{"type": "string", "description": "按目标 / 标题模糊匹配"},
+				"page":       map[string]any{"type": "integer", "minimum": 1, "description": "页码，默认 1"},
+				"limit":      map[string]any{"type": "integer", "minimum": 1, "maximum": 200, "description": "每页条数，默认 50"},
 			},
 			"required": []string{},
 		},
@@ -153,7 +255,8 @@ func (s *Server) observeEvidenceTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.evidence",
-		Description: "按 result 主键或证据内容寻址 ID（evd_ 前缀）取一条可重放证据。",
+		Title:       "取证据",
+		Description: "按 result 主键或证据内容寻址 ID（evd_ 前缀）取一条可重放证据。拿到的 evd_ id 可原样交给 verify.replay 复测；没有证据的旧命中原样返回未找到，属预期行为。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -179,7 +282,7 @@ func (s *Server) observeEvidenceTool() *Tool {
 				return nil, err
 			}
 			if ev == nil {
-				return nil, fmt.Errorf("evidence not found for %q", id)
+				return nil, fmt.Errorf("evidence not found for %q (ids come from observe.findings evidence[] or a result id; evidence is only stored for PoCs that actually fired)", id)
 			}
 			return ev, nil
 		},
@@ -197,7 +300,8 @@ func (s *Server) observeStateTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.state",
-		Description: "以某个资产（id 或地址）为根，返回攻击面子图：上下游资产、端点与参数、技术栈与候选 PoC（tech:/poc: 派生节点）、被动覆盖与命中数。",
+		Title:       "读攻击面子图",
+		Description: "以某个资产（id 或地址）为根，返回攻击面子图：上下游资产、端点与参数、技术栈与候选 PoC（tech:/poc: 派生节点）、被动覆盖与命中数。tech: 节点就是技术栈，可把它的关键词交给 poc.search 找同族 PoC；poc: 节点是已给出的候选。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -243,7 +347,8 @@ func (s *Server) observeObservationsTool() *Tool {
 	}
 	return &Tool{
 		Name:        "observe.observations",
-		Description: "按 seq 游标增量拉取观测流（开放端口 / Web 指纹 / HTTP 事务 / 被动代理流量 / TLS 证书 / 带外回连 / DNS 解析）。只读、零预算；next_seq 直接作为下次的 since_seq。",
+		Title:       "拉观测流",
+		Description: "按 seq 游标增量拉取观测流（开放端口 / Web 指纹 / HTTP 事务 / 被动代理流量 / TLS 证书 / 带外回连 / DNS 解析）。只读、零预算；next_seq 直接作为下次的 since_seq。需要「过程事实」而不只是结论时用它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -296,7 +401,8 @@ func (s *Server) planNextTool() *Tool {
 	}
 	return &Tool{
 		Name:        "plan.next",
-		Description: "给出下一步的 Action 提议（verify.poc / probe.fingerprint），按确定性分数排序；候选与未知面都带依据。只读、零预算，执行仍需 verify.*/probe.* 过策略门控。",
+		Title:       "提议下一步",
+		Description: "给出下一步的 Action 提议（scan.start / probe.fingerprint），按确定性分数排序；候选与未知面都带依据。只读、零预算，执行仍需 scan.*/probe.* 过策略门控。不确定下一步做什么时调它；若 proposals 为空，说明该主体还没有可复现的候选（例如尚未探测过指纹或端点），此时先 probe.fingerprint / probe.http 补观测，或直接用 poc.search 检索 PoC，而不是就此停下。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -306,6 +412,38 @@ func (s *Server) planNextTool() *Tool {
 				"limit":         map[string]any{"type": "integer", "minimum": 1, "maximum": planner.MaxLimit, "description": "提议数上限，默认 20"},
 			},
 			"required": []string{},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"project_id": map[string]any{"type": "string"},
+				"subject":    map[string]any{"type": "string"},
+				"proposals": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"action": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":   map[string]any{"type": "string", "description": "scan.start / probe.fingerprint"},
+									"target": map[string]any{"type": "string"},
+									"search": map[string]any{"type": "string", "description": "scan.start 的技术栈关键词；对 probe.fingerprint 为空"},
+								},
+							},
+							"category":     map[string]any{"type": "string"},
+							"score":        map[string]any{"type": "integer"},
+							"severity":     map[string]any{"type": "string"},
+							"requires_oob": map[string]any{"type": "boolean"},
+							"rationale":    map[string]any{"type": "string"},
+							"evidence":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+						},
+					},
+				},
+				"truncated": map[string]any{"type": "boolean"},
+				"excluded":  map[string]any{"type": "integer", "description": "已有结论、不再提议的数量"},
+			},
+			"required": []string{"proposals", "truncated", "excluded"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -449,15 +587,39 @@ func (s *Server) pocSearchTool() *Tool {
 	}
 	return &Tool{
 		Name:        "poc.search",
-		Description: "按关键词与严重级别检索 PoC，返回 id、名称、级别与本地路径。",
+		Title:       "检索 PoC",
+		Description: "按关键词与严重级别检索本机已有的 PoC，返回真实存在的 id、名称、级别与本地路径，并带 total（命中总数）与 truncated（是否被 limit 截断）。**它等价于 `afrog -pl -s <keyword>`：用来在扫描前预检「本机有没有这个技术栈的 PoC」——结果为空就别扫，说明 afrog 没有该指纹/产品的漏洞。** 选检口径按优先级：① 有指纹/产品线索时，keyword 用技术栈关键词（jquery、thinkphp、shiro）——这是命中率最高的方式，命中后把同一关键词交给 scan.start 并发扫描；② 还没有线索时先用 plan.next，它会按攻击面决定是先做 probe.fingerprint 还是直接给出候选关键词；③ severity 只是「按级别粗筛」的兜底手段，它与目标是否真的跑那个产品无关，别把它当默认策略。truncated=true 时应继续收窄条件。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签 / 作者"},
-				"severity": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 200},
+				"keyword":  map[string]any{"type": "string", "description": "匹配 id / 名称 / 标签 / 作者；首选指纹类关键词，如 jquery、thinkphp"},
+				"severity": map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"info", "low", "medium", "high", "critical"}}, "description": "按级别粗筛；仅作兜底，不能替代按指纹检索"},
+				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 200, "description": "返回条数上限，默认 50"},
 			},
 			"required": []string{},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"items": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":       map[string]any{"type": "string"},
+							"name":     map[string]any{"type": "string"},
+							"severity": map[string]any{"type": "string"},
+							"tags":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+							"path":     map[string]any{"type": "string"},
+							"source":   map[string]any{"type": "string"},
+						},
+					},
+				},
+				"count":     map[string]any{"type": "integer", "description": "本次返回条数"},
+				"total":     map[string]any{"type": "integer", "description": "命中总数"},
+				"truncated": map[string]any{"type": "boolean", "description": "命中数超过 limit 被截断"},
+			},
+			"required": []string{"items", "count", "total", "truncated"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -481,7 +643,7 @@ var draftIDRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 // pocDraftTool 校验模型产出的 PoC 草稿，不发包。
 //
 // 分工：草稿由模型写，afrog 只负责结构校验、能力等级与请求量估算，并可选落盘，
-// 让 verify.poc 能直接拿着 poc_path 去验证。判定是否漏洞仍然只发生在 verify.poc。
+// 让 poc.submit 能直接拿着 poc_path 在真实目标上受限实跑取证据。判定是否漏洞仍然只发生在实跑。
 func (s *Server) pocDraftTool() *Tool {
 	type args struct {
 		Yaml    string `json:"yaml"`
@@ -490,7 +652,8 @@ func (s *Server) pocDraftTool() *Tool {
 	}
 	return &Tool{
 		Name:        "poc.draft",
-		Description: "校验一份 PoC 草稿（yaml 字符串或本地 poc_path），返回结构、能力等级与请求量估算；save=true 时落盘并给出可直接交给 verify.poc 的 poc_path。不发送任何请求。",
+		Title:       "校验 PoC 草稿",
+		Description: "校验一份 PoC 草稿（yaml 字符串或本地 poc_path），返回结构、能力等级与请求量估算；save=true 时落盘并给出可直接交给 poc.submit 实跑的 poc_path。不发送任何请求。自己写新 PoC 时先经它校验，不要直接把未经校验的 yaml 丢给 poc.submit。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -668,7 +831,8 @@ func (s *Server) pocSubmitTool() *Tool {
 	}
 	return &Tool{
 		Name:        "poc.submit",
-		Description: "在一台真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（afrog poc approve/reject）。实跑会发包。",
+		Title:       "提交 PoC 候选",
+		Description: "在一台真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（afrog poc approve/reject）。实跑会发包。草稿需先经 poc.draft 校验落盘；入库只能由人在 CLI 决定，模型没有直接写入 PoC 目录的路径。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -689,7 +853,7 @@ func (s *Server) pocSubmitTool() *Tool {
 			}
 			pocPath := strings.TrimSpace(a.PocPath)
 			if pocPath == "" {
-				return nil, fmt.Errorf("poc_path is required")
+				return nil, fmt.Errorf("poc_path is required (run poc.draft with save=true to persist this draft and get a poc_path)")
 			}
 
 			pocPath, pocData, cleanup, err := resolvePoc("", pocPath)
@@ -722,17 +886,18 @@ func (s *Server) pocSubmitTool() *Tool {
 			if timeout <= 0 {
 				timeout = 60 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
+			run, err := s.runPocScan(ctx, "poc.submit", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
 			if err != nil {
 				return nil, err
 			}
-			ev := firstEvidence(out)
+			ev := firstEvidence(run.Results)
 			if ev == nil {
 				return map[string]any{
 					"submitted": false,
 					"reason":    "sandbox run produced no evidence; the candidate did not reproduce on the target",
 					"target":    target,
-					"results":   out,
+					"status":    run.Status,
+					"results":   run.Results,
 				}, nil
 			}
 
@@ -769,7 +934,8 @@ func (s *Server) probeHTTPTool() *Tool {
 	}
 	return &Tool{
 		Name:        "probe.http",
-		Description: "发起一次受限的 HTTP 请求（单次、可重放），用于确认端点行为。",
+		Title:       "发单次 HTTP 请求",
+		Description: "发起一次受限的 HTTP 请求（单次、可重放），用于确认端点行为。适合核对状态码/响应特征；这次往返会写进观测流，供 observe.observations 复查。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -872,7 +1038,8 @@ func (s *Server) probePortTool() *Tool {
 	}
 	return &Tool{
 		Name:        "probe.port",
-		Description: "对单个主机做受限端口探测，返回开放端口与服务指纹。ports 支持 top100/top1000、单端口、区间（如 8000-8100），留空为 top100；单次最多 1000 个端口，按端口数扣预算。",
+		Title:       "端口探测",
+		Description: "对单个主机做受限端口探测，返回开放端口与服务指纹。ports 支持 top100/top1000、单端口、区间（如 8000-8100），留空为 top100；单次最多 1000 个端口，按端口数扣预算。目标没有 Web 面，或想先看有哪些服务时用它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1063,7 +1230,8 @@ func (s *Server) probeFingerprintTool() *Tool {
 	}
 	return &Tool{
 		Name:        "probe.fingerprint",
-		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。默认不发 favicon 请求。",
+		Title:       "识别 Web 指纹",
+		Description: "对单个 URL 做一次 Web 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。默认不发 favicon 请求。**拿到技术栈后，先用 poc.search 预检（等价 afrog -pl -s），有结果再把该技术栈关键词交给 scan.start 并发扫描** —— 这是「先识别指纹、再找漏洞」的主路径。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1267,27 +1435,64 @@ func fetchFavicon(ctx context.Context, base *url.URL) []byte {
 	return data
 }
 
-// --- verify.poc ---
+// --- scan.start ---
 
-func (s *Server) verifyPocTool() *Tool {
+// scanStartTool 用一次子进程并发跑完「某技术栈（关键词）下的全部 PoC」。
+//
+// 这是取代「逐个 verify」的主入口。选择权交回 afrog 的 -s：关键词命中 id/名称/标签，
+// 且指纹 PoC 无论关键词如何都会被保留——于是指纹阶段照常运行、requires 按真实指纹
+// 放行，既避免「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成
+// 一次并发扫描。整批扫描交给独立子进程，规避 sdk 的进程级全局状态串扰。
+func (s *Server) scanStartTool() *Tool {
 	type args struct {
-		PocID      string `json:"poc_id"`
-		PocPath    string `json:"poc_path"`
-		Target     string `json:"target"`
-		TimeoutSec int    `json:"timeout_sec"`
+		Target      string `json:"target"`
+		Search      string `json:"search"`
+		Severity    string `json:"severity"`
+		Concurrency int    `json:"concurrency"`
+		RateLimit   int    `json:"rate_limit"`
+		TimeoutSec  int    `json:"timeout_sec"`
 	}
 	return &Tool{
-		Name:        "verify.poc",
-		Description: "用单个 PoC 验证单个目标，返回可重放证据。可按 poc_id 或本地 yaml 路径指定。",
+		Name:  "scan.start",
+		Title: "按技术栈并发扫描",
+		Description: "用一次子进程并发跑完某个技术栈（关键词）下的全部 PoC，返回可重放证据——这是取代逐个验证的主入口。search 传技术栈/产品关键词（thinkphp、jquery、shiro…，逗号分隔可多个）：afrog 按 -s 选 PoC（命中 id/名称/标签），且指纹 PoC 无论关键词如何都被保留，于是指纹阶段照常运行、requires 按真实指纹放行。因此既不会出现「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。执行前可先用 poc.search(keyword=…) 预检「本机有没有该技术栈的 PoC」（等价 afrog -pl -s），结果为空就别扫。severity 只是按级别粗筛的兜底，不能替代按指纹检索。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"poc_id":      map[string]any{"type": "string"},
-				"poc_path":    map[string]any{"type": "string", "description": "本地 PoC YAML 路径，优先于 poc_id"},
 				"target":      map[string]any{"type": "string", "description": "目标 URL 或 host:port"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 300},
+				"search":      map[string]any{"type": "string", "description": "技术栈/产品关键词（如 thinkphp,jquery,nacos）；命中 PoC 的 id/名称/标签"},
+				"severity":    map[string]any{"type": "string", "description": "可选的级别粗筛（逗号分隔，如 high,critical）；仅作兜底"},
+				"concurrency": map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "description": "并发数，默认由引擎决定"},
+				"rate_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": 1000, "description": "每秒请求上限，0 表示不限"},
+				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 1800, "description": "整批扫描的整体超时，默认 300 秒"},
 			},
-			"required": []string{"target"},
+			"required": []string{"target", "search"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"target": map[string]any{"type": "string"},
+				"search": map[string]any{"type": "string"},
+				"status": map[string]any{"type": "string", "description": "completed / timeout / failed / cancelled"},
+				"found":  map[string]any{"type": "boolean", "description": "是否有命中"},
+				"results": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"poc_id":     map[string]any{"type": "string"},
+							"poc_name":   map[string]any{"type": "string"},
+							"severity":   map[string]any{"type": "string"},
+							"target":     map[string]any{"type": "string"},
+							"extractors": map[string]any{"type": "object"},
+							"evidence":   map[string]any{"type": "object", "description": "原生证据（id/digest/steps/replay）"},
+						},
+					},
+				},
+				"summary": map[string]any{"type": "object", "description": "子进程汇总：executed / found / by_severity / elapsed_ms"},
+				"error":   map[string]any{"type": "string"},
+			},
+			"required": []string{"target", "search", "status", "found", "results"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -1298,46 +1503,57 @@ func (s *Server) verifyPocTool() *Tool {
 			if target == "" {
 				return nil, fmt.Errorf("target is required")
 			}
-			if strings.TrimSpace(a.PocID) == "" && strings.TrimSpace(a.PocPath) == "" {
-				return nil, fmt.Errorf("poc_id or poc_path is required")
+			search := strings.TrimSpace(a.Search)
+			if search == "" {
+				return nil, fmt.Errorf("search is required: pass the technology/product keyword (e.g. thinkphp,jquery); precheck availability with poc.search(keyword=...) which is the equivalent of `afrog -pl -s`")
 			}
 
-			pocPath, pocData, cleanup, err := resolvePoc(a.PocID, a.PocPath)
-			if err != nil {
-				return nil, err
-			}
-			defer cleanup()
-
-			// 预算按 PoC 实际可能发出的请求数预留，而不是固定拍一个数。
-			// 含无法静态计数的 brute 时按上限保守预留：爆破应走 act.brute。
-			est := analyzePoc(pocData)
-			reserve := est.Requests
-			if est.Uncountable {
-				reserve = maxVerifyReserve
-			}
 			if err := s.gate.Take(policy.Action{
-				Name:       "verify.poc",
-				Target:     target,
-				Capability: capability.Declarative,
-			}, reserve); err != nil {
+				Name:   "scan.start",
+				Target: target,
+			}, estimateKeywordReserve(search)); err != nil {
 				return nil, err
 			}
 
 			timeout := time.Duration(a.TimeoutSec) * time.Second
 			if timeout <= 0 {
-				timeout = 60 * time.Second
+				timeout = 300 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
+
+			spec := baseScanSpec(target, search)
+			spec.Severity = strings.TrimSpace(a.Severity)
+			spec.Concurrency = a.Concurrency
+			spec.RateLimit = a.RateLimit
+			if s.oob != nil {
+				spec.EnableOOB = true
+				spec.OOBAdapter = s.oob.Adapter()
+			}
+
+			run, err := s.runScanSpec(ctx, mcpTaskID("scan.start"), spec, timeout)
 			if err != nil {
 				return nil, err
 			}
-			return map[string]any{
-				"found":   len(out) > 0,
-				"results": out,
-				"target":  target,
-			}, nil
+			return scanRunResult(target, search, run), nil
 		},
 	}
+}
+
+// scanRunResult 把一次扫描的产物整理成工具返回。
+func scanRunResult(target, search string, run *scanRun) map[string]any {
+	out := map[string]any{
+		"target":  target,
+		"search":  search,
+		"status":  run.Status,
+		"found":   len(run.Results) > 0,
+		"results": run.Results,
+	}
+	if run.Summary != nil {
+		out["summary"] = run.Summary
+	}
+	if run.Error != "" {
+		out["error"] = run.Error
+	}
+	return out
 }
 
 // --- verify.replay ---
@@ -1355,7 +1571,8 @@ func (s *Server) verifyReplayTool() *Tool {
 	}
 	return &Tool{
 		Name:        "verify.replay",
-		Description: "按证据 id（evd_ 前缀）或 result id 重放一次，返回新证据并比对 digest 是否一致。target 留空沿用证据里的目标。",
+		Title:       "重放证据",
+		Description: "按证据 id（evd_ 前缀）或 result id 重放一次，返回新证据并比对 digest 是否一致。target 留空沿用证据里的目标。用来复核旧结论是否仍然成立：重放成功但 digest 变了，说明目标行为或 PoC 已经变化。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1381,7 +1598,7 @@ func (s *Server) verifyReplayTool() *Tool {
 				return nil, err
 			}
 			if expected == nil {
-				return nil, fmt.Errorf("evidence not found for %q", id)
+				return nil, fmt.Errorf("evidence not found for %q (ids come from observe.findings evidence[] or a result id; evidence is only stored for PoCs that actually fired)", id)
 			}
 
 			pocPath, pocData, cleanup, err := resolveEvidencePoc(expected.PocID, a.PocPath)
@@ -1395,7 +1612,7 @@ func (s *Server) verifyReplayTool() *Tool {
 				target = expected.Target
 			}
 			if target == "" {
-				return nil, fmt.Errorf("target is required: evidence has none")
+				return nil, fmt.Errorf("target is required: this evidence has no target, pass one explicitly")
 			}
 
 			est := analyzePoc(pocData)
@@ -1415,12 +1632,12 @@ func (s *Server) verifyReplayTool() *Tool {
 			if timeout <= 0 {
 				timeout = 60 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, 0, est.NeedsOOB)
+			run, err := s.runPocScan(ctx, "verify.replay", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
 			if err != nil {
 				return nil, err
 			}
 
-			actual := firstEvidence(out)
+			actual := firstEvidence(run.Results)
 			consistent := replayMatches(expected, actual)
 			res := map[string]any{
 				"poc_id":     expected.PocID,
@@ -1442,7 +1659,7 @@ func (s *Server) verifyReplayTool() *Tool {
 }
 
 // resolveEvidencePoc 按证据的 poc_id 找本地 PoC：先查仓库，再查模型草稿目录。
-// 草稿路径让「模型写、verify.poc 验证、verify.replay 复核」这条链路真正闭环。
+// 草稿路径让「模型写、poc.submit 实跑、verify.replay 复核」这条链路真正闭环。
 func resolveEvidencePoc(pocID, pocPath string) (string, []byte, func(), error) {
 	if strings.TrimSpace(pocPath) != "" {
 		return resolvePoc("", pocPath)
@@ -1515,7 +1732,8 @@ func (s *Server) actBruteTool() *Tool {
 	}
 	return &Tool{
 		Name:        "act.brute",
-		Description: "【破坏性】用带 brute 字典的 PoC 对目标做弱口令/字典尝试。默认策略拒绝，需先授予 full 模式且 destructive=true。",
+		Title:       "弱口令爆破",
+		Description: "【破坏性】用带 brute 字典的 PoC 对目标做弱口令/字典尝试。默认策略拒绝，需先授予 full 模式且 destructive=true。只在授权目标上、且确认需要爆破时使用；普通漏洞验证用 scan.start 即可。",
 		// 目录里显式标出「破坏性 + exec 级」：它是唯一默认即被拒的写工具。
 		Capability:  capability.Exec,
 		Destructive: true,
@@ -1540,7 +1758,7 @@ func (s *Server) actBruteTool() *Tool {
 				return nil, fmt.Errorf("target is required")
 			}
 			if strings.TrimSpace(a.PocID) == "" && strings.TrimSpace(a.PocPath) == "" {
-				return nil, fmt.Errorf("poc_id or poc_path is required")
+				return nil, fmt.Errorf("poc_id or poc_path is required (pass a poc_id from poc.search, or a poc_path from poc.draft with save=true)")
 			}
 
 			pocPath, pocData, cleanup, err := resolvePoc(a.PocID, a.PocPath)
@@ -1572,14 +1790,15 @@ func (s *Server) actBruteTool() *Tool {
 			if timeout <= 0 {
 				timeout = 120 * time.Second
 			}
-			out, err := s.runSinglePoc(ctx, target, pocPath, timeout, maxReq, analyzePoc(pocData).NeedsOOB)
+			run, err := s.runPocScan(ctx, "act.brute", target, pocPath, pocData, maxReq, analyzePoc(pocData).NeedsOOB, timeout)
 			if err != nil {
 				return nil, err
 			}
 			return map[string]any{
-				"found":        len(out) > 0,
-				"results":      out,
+				"found":        len(run.Results) > 0,
+				"results":      run.Results,
 				"target":       target,
+				"status":       run.Status,
 				"max_requests": maxReq,
 			}, nil
 		},
@@ -1599,7 +1818,8 @@ func (s *Server) judgeBriefTool() *Tool {
 	}
 	return &Tool{
 		Name:        "judge.brief",
-		Description: "按 result id 或 evd_ 证据 id 取一条命中的研判材料：证据链、同目标周边观测、攻击面子图与已有研判意见。只读、零预算。",
+		Title:       "取研判材料",
+		Description: "按 result id 或 evd_ 证据 id 取一条命中的研判材料：证据链、同目标周边观测、攻击面子图与已有研判意见。只读、零预算。要给出「这条命中到底靠不靠谱」的判断前，先取它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1634,7 +1854,8 @@ func (s *Server) judgeRecordTool() *Tool {
 	}
 	return &Tool{
 		Name:        "judge.record",
-		Description: "记录一条研判意见（likely_true/likely_false/uncertain）到 judgement 表，作为 advisory 供人工复核；不修改漏洞台账。",
+		Title:       "记录研判意见",
+		Description: "记录一条研判意见（likely_true/likely_false/uncertain）到 judgement 表，作为 advisory 供人工复核；不修改漏洞台账。结论来自研判材料，不要凭空写死。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1684,7 +1905,8 @@ func (s *Server) learnBriefTool() *Tool {
 	}
 	return &Tool{
 		Name:        "learn.brief",
-		Description: "取调优素材：流水线指标（含自动入库率）、最近终审决议（含驳回原因）与待审调优建议。只读、零预算。",
+		Title:       "取调优素材",
+		Description: "取调优素材：流水线指标（含自动入库率）、最近终审决议（含驳回原因）与待审调优建议。只读、零预算。要给流水线提改进建议前，先取它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1718,7 +1940,8 @@ func (s *Server) learnRecordTool() *Tool {
 	}
 	return &Tool{
 		Name:        "learn.record",
-		Description: "记录一条调优建议（rule/threshold/other）到 learn_suggestion 表，供人工审阅；不自动应用任何 diff。",
+		Title:       "记录调优建议",
+		Description: "记录一条调优建议（rule/threshold/other）到 learn_suggestion 表，供人工审阅；不自动应用任何 diff。建议要基于 learn.brief 的素材，不要空谈。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1757,99 +1980,58 @@ func (s *Server) learnRecordTool() *Tool {
 	}
 }
 
-// runSinglePoc 串行执行一个 PoC 对单个目标，返回归一化结果。
+// runPocScan 用一次子进程在单目标上跑「一个具体 PoC」，返回归一化命中。
 //
-// SDK 内部有进程级全局状态，不支持并行扫描，因此这里用 verifyMu 串行化。
+// PoC 走 -ap（追加语义）挂在内置库之上、再用 -s 以 PoC id 作关键词选中它，而不是用
+// -P（独占语义）：
+//   - -P 只加载这一个 PoC，指纹阶段就没有指纹 PoC 可跑，requires 门控会把这次验证
+//     整个跳过——那是一个说不清楚的假阴性；
+//   - -ap + -s 下指纹 PoC 一律被过滤规则保留，指纹阶段照常运行、requires 按真实指纹
+//     放行；再叠加 -w（Web 指纹），requires 的两条准入来源都在。
 //
-// needsOOB 由调用方从 analyzePoc 得到：反向 PoC 的回连判定依赖反连平台，SDK 的
-// SDKMode 会在缺 OOB 时把这些 PoC 直接记成「未命中」。那是一个说不清楚的假阴性，
-// 所以这里改成两条明确路径：有 OOB 就真的接上，没有就报错，绝不下空结论。
-func (s *Server) runSinglePoc(ctx context.Context, target, pocPath string, timeout time.Duration, maxRequests int, needsOOB bool) ([]map[string]any, error) {
-	runCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	s.verifyMu.Lock()
-	defer s.verifyMu.Unlock()
-
-	opts := []sdk.Option{
-		sdk.WithTargets(target),
-		sdk.WithPocPaths(pocPath),
-		sdk.WithPocPathsOnly(),
-		sdk.WithConcurrency(1),
-		sdk.WithRateLimit(10),
-		sdk.WithTimeout(int(timeout.Seconds())),
-		sdk.WithFingerprintDisabled(),
-		// 单 PoC 验证不需要 Web 探测：它会产生预算之外的额外请求，
-		// 还会把 webprobe 汇总写进 result 表，污染「只跑一个 PoC」的语义。
-		sdk.WithWebProbe(false),
-		sdk.WithStopOnFirstMatch(),
+// 这与 scan.start 的 -s 口径一致，也是 afrog 自己的推荐用法。SDK 的 HTTP 客户端、
+// 限速器与探测缓存都是进程级全局状态，同进程并发 scanner 会互相污染，所以整批交给
+// 独立子进程执行。
+//
+// needsOOB 为真时接上反连平台；缺 OOB 直接报错，绝不下空结论。bruteMax > 0 时下发
+// -brute-max-requests，只约束 YAML brute 字典。
+func (s *Server) runPocScan(ctx context.Context, tool, target, pocPath string, pocData []byte, bruteMax int, needsOOB bool, timeout time.Duration) (*scanRun, error) {
+	spec := &executor.Spec{
+		Targets:        []string{strings.TrimSpace(target)},
+		AppendPocs:     []string{pocPath},
+		Search:         pocSearchKeyword(pocPath, pocData),
+		WebFingerprint: true,
+	}
+	if bruteMax > 0 {
+		spec.BruteMaxRequests = bruteMax
 	}
 	if needsOOB {
 		if s.oob == nil {
 			return nil, fmt.Errorf("this PoC verifies out of band: %w", errOOBUnavailable)
 		}
-		// 只给适配器名：凭据由 SDK 自己从 afrog-config.yaml 的 reverse 段取，
+		// 只给适配器名：凭据由子进程自己从 afrog-config.yaml 的 reverse 段取，
 		// 与 CLI 的 -oob 口径一致，这里不再复制一份凭据读取逻辑。
-		opts = append(opts, sdk.WithOOB(sdk.OOBOptions{Adapter: s.oob.Adapter()}))
+		spec.EnableOOB = true
+		spec.OOBAdapter = s.oob.Adapter()
 	}
-	if maxRequests > 0 {
-		opts = append(opts, sdk.WithBruteMaxRequests(maxRequests))
-	}
-
-	scanner, err := sdk.New(runCtx, opts...)
-	if err != nil {
-		return nil, err
-	}
-	defer scanner.Close()
-
-	if err := scanner.Execute(runCtx); err != nil && runCtx.Err() == nil {
-		return nil, err
-	}
-
-	results := scanner.Results()
-	out := make([]map[string]any, 0, len(results))
-	for _, r := range results {
-		// verify.* 是 Agent 主动触发的动作，按设计稿只在这里记 http_transaction，
-		// 与引擎侧「扫描阶段的事实」不重复。
-		for _, ex := range r.Exchanges {
-			request := ex.Request
-			if strings.TrimSpace(request) == "" {
-				request = describeRequest(ex.Method, ex.URL, ex.RequestHeaders)
-			}
-			response := ex.Response
-			if strings.TrimSpace(response) == "" {
-				response = ex.ResponseBody
-			}
-			recordHTTPObservation(r.PocID, ex.Method, ex.URL, ex.StatusCode, ex.Matched, ex.LatencyMs, request, response)
-		}
-		out = append(out, map[string]any{
-			"poc_id":     r.PocID,
-			"poc_name":   r.PocName,
-			"severity":   r.Severity,
-			"target":     r.FullTarget,
-			"evidence":   r.Evidence,
-			"exchanges":  sanitizeExchanges(r.Exchanges),
-			"extractors": r.Extractors,
-		})
-	}
-	return out, nil
+	return s.runScanSpec(ctx, mcpTaskID(tool), spec, timeout)
 }
 
-func sanitizeExchanges(in []sdk.Exchange) []map[string]any {
-	out := make([]map[string]any, 0, len(in))
-	for _, ex := range in {
-		out = append(out, map[string]any{
-			"method":        ex.Method,
-			"url":           ex.URL,
-			"status_code":   ex.StatusCode,
-			"matched":       ex.Matched,
-			"latency_ms":    ex.LatencyMs,
-			"request":       clampText(ex.Request, toolBodyLimit),
-			"response":      clampText(ex.Response, toolBodyLimit),
-			"response_body": clampText(ex.ResponseBody, toolBodyLimit),
-		})
+// pocSearchKeyword 取 -s 用的关键词：优先用 PoC 自身的 id，退回文件名。
+//
+// 关键词为空会让 -s 失效、变成全库扫描，因此这里必须有非空兜底。
+func pocSearchKeyword(pocPath string, pocData []byte) string {
+	if len(pocData) > 0 {
+		var meta poc.PocMeta
+		if err := yaml.Unmarshal(pocData, &meta); err == nil {
+			if id := strings.TrimSpace(meta.Id); id != "" {
+				return id
+			}
+		}
 	}
-	return out
+	name := filepath.Base(pocPath)
+	name = strings.TrimSuffix(strings.TrimSuffix(name, ".yaml"), ".yml")
+	return strings.TrimSpace(name)
 }
 
 // resolvePoc 优先使用显式路径；否则按 id 取出 YAML 落到临时文件。
@@ -1860,7 +2042,7 @@ func resolvePoc(pocID, pocPath string) (string, []byte, func(), error) {
 	if p := strings.TrimSpace(pocPath); p != "" {
 		data, err := os.ReadFile(p)
 		if err != nil {
-			return "", nil, func() {}, fmt.Errorf("poc_path not readable: %w", err)
+			return "", nil, func() {}, fmt.Errorf("poc_path not readable: %w (need a readable local PoC file; your own PoCs should be saved first via poc.draft with save=true, which returns a poc_path)", err)
 		}
 		return p, data, func() {}, nil
 	}
@@ -1868,7 +2050,7 @@ func resolvePoc(pocID, pocPath string) (string, []byte, func(), error) {
 	id := strings.TrimSpace(pocID)
 	data, err := pocsrepo.ReadYamlByID(id)
 	if err != nil {
-		return "", nil, func() {}, fmt.Errorf("poc %q not found: %w", id, err)
+		return "", nil, func() {}, fmt.Errorf("poc %q not found: %w (poc_id must be a real id returned by poc.search; do not invent ids)", id, err)
 	}
 	f, err := os.CreateTemp("", "afrog-verify-*.yaml")
 	if err != nil {

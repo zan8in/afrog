@@ -3,8 +3,8 @@
 // 它跑的是设计文档里的主流程：
 //  1. observe.findings 拿一条命中；
 //  2. observe.evidence 读它的可重放证据；
-//  3. 可选：verify.poc 单独复测一次；
-//  4. 可选：poc.draft 校验一份草稿，再交给 verify.poc 验证（-draft）。
+//  3. 可选：scan.start 按技术栈/关键词并发复测一次；
+//  4. 可选：poc.draft 校验一份草稿，再交给 poc.submit 实跑取证据（-draft）。
 //
 // 运行前先起服务（默认只读策略即可，读证据与校验草稿都不需要发包）：
 //
@@ -13,7 +13,7 @@
 // 然后执行：
 //
 //	go run ./examples/mcp_agent -project <project_id>
-//	go run ./examples/mcp_agent -verify -poc <poc_id> -target <target>
+//	go run ./examples/mcp_agent -scan -keyword <tech> -target <target>
 //	go run ./examples/mcp_agent -draft ./draft.yaml -target http://127.0.0.1:8080
 package main
 
@@ -175,10 +175,10 @@ func main() {
 	token := flag.String("token", os.Getenv("AFROG_MCP_TOKEN"), "访问 token；服务端未开启鉴权时留空")
 	project := flag.String("project", "", "只看某个项目的命中；留空为全局")
 	limit := flag.Int("limit", 5, "拉取的命中条数")
-	verify := flag.Bool("verify", false, "是否在最后用 verify.poc 复测一次")
-	poc := flag.String("poc", "", "-verify 时要跑的 PoC id")
-	target := flag.String("target", "", "verify.poc 的目标；-draft 时必填")
-	draft := flag.String("draft", "", "本地 PoC 草稿路径：先 poc.draft 校验并落盘，再 verify.poc 验证")
+	scan := flag.Bool("scan", false, "是否在最后用 scan.start 按关键词并发复测一次")
+	keyword := flag.String("keyword", "", "-scan 时传给 scan.start 的技术栈/关键词（如 thinkphp）")
+	target := flag.String("target", "", "scan.start 的目标；-draft 时必填")
+	draft := flag.String("draft", "", "本地 PoC 草稿路径：先 poc.draft 校验并落盘，再 poc.submit 实跑取证据")
 	flag.Parse()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -241,23 +241,23 @@ func main() {
 		fmt.Println("\n第一条命中没有证据（可能是证据功能上线前的历史数据）。")
 	}
 
-	if *verify {
-		if strings.TrimSpace(*poc) == "" || strings.TrimSpace(*target) == "" {
-			fail("-verify", fmt.Errorf("需要同时提供 -poc 与 -target"))
+	if *scan {
+		if strings.TrimSpace(*keyword) == "" || strings.TrimSpace(*target) == "" {
+			fail("-scan", fmt.Errorf("需要同时提供 -keyword 与 -target"))
 		}
-		out, err := client.callTool(ctx, "verify.poc", map[string]any{
-			"poc_id": *poc,
+		out, err := client.callTool(ctx, "scan.start", map[string]any{
 			"target": *target,
+			"search": *keyword,
 		})
 		if err != nil {
-			fail("verify.poc", err)
+			fail("scan.start", err)
 		}
 		fmt.Printf("\n复测结果:\n%s\n", out)
 	}
 }
 
-// runDraftFlow 走「模型写草稿 → afrog 校验 → afrog 验证」的闭环：
-// 草稿只做结构与成本校验，判定与证据仍然由 verify.poc 产生。
+// runDraftFlow 走「模型写草稿 → afrog 校验 → afrog 实跑」的闭环：
+// 草稿只做结构与成本校验，判定与证据仍然由 poc.submit 的受限实跑产生。
 func runDraftFlow(ctx context.Context, client *rpcClient, path, target string) {
 	if strings.TrimSpace(target) == "" {
 		fail("-draft", fmt.Errorf("需要同时提供 -target"))
@@ -297,11 +297,11 @@ func runDraftFlow(ctx context.Context, client *rpcClient, path, target string) {
 		fail("poc.draft", fmt.Errorf("服务端没有返回 poc_path"))
 	}
 
-	out, err := client.callTool(ctx, "verify.poc", map[string]any{"poc_path": draft.PocPath, "target": target})
+	out, err := client.callTool(ctx, "poc.submit", map[string]any{"poc_path": draft.PocPath, "target": target})
 	if err != nil {
-		fail("verify.poc", err)
+		fail("poc.submit", err)
 	}
-	fmt.Printf("\n验证结果:\n%s\n", out)
+	fmt.Printf("\n实跑结果:\n%s\n", out)
 }
 
 func firstNonEmpty(v, fallback string) string {

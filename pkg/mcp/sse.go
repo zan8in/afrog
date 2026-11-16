@@ -128,11 +128,24 @@ func (h *sseHandler) handleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, notify := h.srv.handle(r.Context(), &req)
+	resp, notify := h.srv.handle(r.Context(), &req, h.notifyFn(ch))
 	if !notify && resp != nil {
 		h.deliver(ch, resp)
 	}
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// notifyFn 让一次调用在跑的过程中把服务端通知（目前只有 notifications/progress）
+// 推进该会话的事件流：SSE 是长连接，中途有地方塞通知，这是它相对 Streamable
+// HTTP 的优势。
+func (h *sseHandler) notifyFn(ch chan []byte) notifyFunc {
+	return func(method string, params any) {
+		b, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})
+		if err != nil {
+			return
+		}
+		h.deliverRaw(ch, b)
+	}
 }
 
 func (h *sseHandler) deliver(ch chan []byte, resp *response) {
@@ -140,10 +153,14 @@ func (h *sseHandler) deliver(ch chan []byte, resp *response) {
 	if err != nil {
 		return
 	}
+	h.deliverRaw(ch, b)
+}
+
+func (h *sseHandler) deliverRaw(ch chan []byte, b []byte) {
 	select {
 	case ch <- b:
 	case <-time.After(5 * time.Second):
-		// 客户端读得太慢时丢弃单条响应，避免阻塞 HTTP 处理协程；
+		// 客户端读得太慢时丢弃单条消息，避免阻塞 HTTP 处理协程；
 		// MCP 客户端会因超时重试请求。
 	}
 }

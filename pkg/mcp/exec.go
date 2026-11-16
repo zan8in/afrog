@@ -1,0 +1,225 @@
+package mcp
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/zan8in/afrog/v3/pkg/evidence"
+	"github.com/zan8in/afrog/v3/pkg/executor"
+	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
+)
+
+// scanRun 是一次子进程扫描的产物。
+type scanRun struct {
+	// Results 是归一化后的命中，字段与旧 verify.* 的 results 保持同构；
+	// evidence 里是原生证据对象（id/digest/steps/replay）。
+	Results []map[string]any
+	// Status 取值 completed / timeout / failed / cancelled，与子进程 done 事件同源。
+	Status string
+	// Summary 是子进程给出的汇总（executed/found/by_severity/elapsed_ms）。
+	Summary *scanstream.Summary
+	// Error 是任务级错误文本，出错时有值。
+	Error string
+}
+
+// baseScanSpec 是所有 MCP 扫描共享的底座。
+//
+// 单目标、按关键词选 PoC、默认开 Web 指纹：MCP 的动作是「对一个已知目标做按需检测」，
+// 不是资产发现——所以不开端口扫描与主机发现。Web 指纹（-w）能独立满足
+// requires: [thinkphp] 这类门控，是 -s 之外的第二条准入来源。
+func baseScanSpec(target, search string) *executor.Spec {
+	return &executor.Spec{
+		Targets:        []string{strings.TrimSpace(target)},
+		Search:         strings.TrimSpace(search),
+		WebFingerprint: true,
+	}
+}
+
+// runScanSpec 用一次子进程跑完 spec，收集命中与汇总。
+//
+// 所有真正发包的扫描都走这里：SDK 的 HTTP 客户端、限速器与协议探测缓存都是进程级
+// 全局状态，同进程并发 scanner 会互相污染参数，拉起独立子进程是唯一干净的做法。
+// 子进程 stdout 是 NDJSON 事件流，命中自带原生证据（id/digest/steps/replay），
+// 与进程内 SDK 等价。
+//
+// 返回的 error 只表示「拉不起来」（执行器或二进制不可用）；运行期问题（超时、子进程
+// 报错）编码进 scanRun.Status / Error，让调用方仍能拿到已经产出的命中。
+func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.Spec, timeout time.Duration) (*scanRun, error) {
+	ex, err := s.scanExecutor()
+	if err != nil {
+		return nil, err
+	}
+
+	runCtx := ctx
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		runCtx, cancel = context.WithCancel(ctx)
+	}
+	defer cancel()
+
+	h, err := ex.Start(runCtx, taskID, spec)
+	if err != nil {
+		return nil, err
+	}
+
+	run := &scanRun{}
+	for ev := range h.Events() {
+		switch ev.Type {
+		case scanstream.TypeResult:
+			if ev.Result == nil {
+				continue
+			}
+			run.Results = append(run.Results, resultFromStream(ev.Result))
+		case scanstream.TypeDone:
+			if ev.Done != nil {
+				run.Status = ev.Done.Status
+				run.Summary = ev.Done.Summary
+			}
+		case scanstream.TypeError:
+			if ev.Error != nil {
+				run.Error = ev.Error.Message
+			}
+		}
+	}
+
+	switch {
+	case ctx.Err() == context.Canceled:
+		run.Status = "cancelled"
+	case runCtx.Err() == context.DeadlineExceeded:
+		run.Status = "timeout"
+		run.Error = fmt.Sprintf("scan exceeded timeout after %s", timeout)
+	case run.Status == "" && run.Error != "":
+		run.Status = "failed"
+	case run.Status == "":
+		if perr := h.Err(); perr != nil {
+			run.Status = "failed"
+			run.Error = perr.Error()
+		} else {
+			run.Status = "completed"
+		}
+	}
+	return run, nil
+}
+
+// resultFromStream 把一条结果事件归一化，字段与旧 verify.* 的 results 保持同构，
+// 并顺手把证据里的每次往返写进观测流。
+func resultFromStream(r *scanstream.ResultEvent) map[string]any {
+	var native *evidence.Evidence
+	if r.Evidence != nil {
+		native = r.Evidence.Native
+	}
+	recordEvidenceObservations(native)
+
+	item := map[string]any{
+		"poc_id":   r.PocID,
+		"poc_name": r.PocName,
+		"severity": r.Severity,
+		"target":   r.Target,
+		"evidence": native,
+	}
+	if r.Evidence != nil {
+		item["extractors"] = r.Evidence.Extractors
+		item["exchanges"] = sanitizeStreamExchanges(r.Evidence.Exchanges)
+	}
+	return item
+}
+
+func sanitizeStreamExchanges(in []scanstream.Exchange) []map[string]any {
+	out := make([]map[string]any, 0, len(in))
+	for _, ex := range in {
+		out = append(out, map[string]any{
+			"matched":  ex.Matched,
+			"request":  clampText(ex.Request, toolBodyLimit),
+			"response": clampText(ex.Response, toolBodyLimit),
+		})
+	}
+	return out
+}
+
+// recordEvidenceObservations 把原生命中证据里的每次请求/响应写进观测流。
+//
+// 只记 Agent 主动触发的动作（scan.start / verify.* / act.*）——它们量级可控；
+// 全量扫描里每个 PoC 的请求不进流，其价值已由 evidence 覆盖。
+func recordEvidenceObservations(ev *evidence.Evidence) {
+	if ev == nil {
+		return
+	}
+	for _, st := range ev.Steps {
+		req := st.Request
+		if strings.TrimSpace(req.URL) == "" {
+			continue
+		}
+		recordHTTPObservation(ev.PocID, req.Method, req.URL, st.Response.Status, st.Matched,
+			st.Response.LatencyMs, describeEvidenceRequest(req), st.Response.Body)
+	}
+}
+
+func describeEvidenceRequest(req evidence.Request) string {
+	method := strings.TrimSpace(req.Method)
+	if method == "" {
+		method = "GET"
+	}
+	var sb strings.Builder
+	sb.WriteString(method)
+	sb.WriteByte(' ')
+	sb.WriteString(req.URL)
+	if h := strings.TrimSpace(req.Headers); h != "" {
+		sb.WriteByte('\n')
+		sb.WriteString(h)
+	}
+	return sb.String()
+}
+
+// mcpTaskID 为一次工具发起的扫描生成任务 ID：子进程据此把写库结果归属到该任务，
+// observe.findings 才能按任务回看这批结论。
+func mcpTaskID(tool string) string {
+	name := strings.NewReplacer(".", "-", " ", "-").Replace(strings.TrimSpace(tool))
+	if name == "" {
+		name = "scan"
+	}
+	return fmt.Sprintf("mcp-%s-%d", name, time.Now().UnixNano())
+}
+
+// estimateKeywordReserve 估算「按关键词扫一批」需要预留多少请求额度。
+//
+// 口径：命中各关键词的 PoC 数 × 单个 PoC 的保守请求数，落在
+// [defaultVerifyReserve, maxVerifyReserve] 内。它只用于预算预留，不影响实际执行；
+// 关键词为空的兜底由调用方决定，这里按「全库」不估，直接返回下限。
+func estimateKeywordReserve(search string) int {
+	keywords := splitKeywords(search)
+	if len(keywords) == 0 {
+		return defaultVerifyReserve
+	}
+	count := 0
+	for _, kw := range keywords {
+		items, err := pocsrepo.ListMeta(pocsrepo.ListOptions{Source: "all", Q: kw})
+		if err != nil {
+			continue
+		}
+		count += len(items)
+	}
+	reserve := count * defaultVerifyReserve
+	if reserve < defaultVerifyReserve {
+		reserve = defaultVerifyReserve
+	}
+	if reserve > maxVerifyReserve {
+		reserve = maxVerifyReserve
+	}
+	return reserve
+}
+
+// splitKeywords 把逗号分隔的关键词表切成非空小写切片。
+func splitKeywords(search string) []string {
+	out := make([]string, 0)
+	for _, v := range strings.Split(search, ",") {
+		if k := strings.ToLower(strings.TrimSpace(v)); k != "" {
+			out = append(out, k)
+		}
+	}
+	return out
+}

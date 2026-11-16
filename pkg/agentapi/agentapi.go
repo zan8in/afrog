@@ -96,9 +96,15 @@ func Plan(opts planner.Options) (*planner.Plan, error) {
 }
 
 // PocSearchResult 是 PoC 检索结果。
+//
+// Count 是本次返回的条数，Total 是命中总数，Truncated 表示命中数超过 limit 被截断。
+// 三者都给出来，调用方才分得清「本地只有这么多」和「还有很多但被截断了」——后者应当
+// 继续收窄条件，而不是把手里这批当成全集。
 type PocSearchResult struct {
-	Items []map[string]any `json:"items"`
-	Count int              `json:"count"`
+	Items     []map[string]any `json:"items"`
+	Count     int              `json:"count"`
+	Total     int              `json:"total"`
+	Truncated bool             `json:"truncated"`
 }
 
 // SearchPocs 按关键词与级别检索 PoC。
@@ -112,14 +118,18 @@ func SearchPocs(keyword string, severity []string, limit int) (*PocSearchResult,
 		return nil, err
 	}
 
+	total := len(items)
+
 	if limit <= 0 {
 		limit = 50
 	}
 	if limit > 200 {
 		limit = 200
 	}
+	truncated := false
 	if len(items) > limit {
 		items = items[:limit]
+		truncated = true
 	}
 
 	out := make([]map[string]any, 0, len(items))
@@ -133,5 +143,5 @@ func SearchPocs(keyword string, severity []string, limit int) (*PocSearchResult,
 			"source":   string(it.Source),
 		})
 	}
-	return &PocSearchResult{Items: out, Count: len(out)}, nil
+	return &PocSearchResult{Items: out, Count: len(out), Total: total, Truncated: truncated}, nil
 }

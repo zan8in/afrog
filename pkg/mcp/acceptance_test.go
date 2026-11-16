@@ -15,9 +15,10 @@ import (
 	db2 "github.com/zan8in/afrog/v3/pkg/db"
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/evidence"
+	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/planner"
 	"github.com/zan8in/afrog/v3/pkg/ref"
-	"github.com/zan8in/afrog/v3/pkg/sdk"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
 
 // 端到端验收回归（设计稿 §12）。
@@ -26,7 +27,7 @@ import (
 // 统计四项指标：
 //  1. 端到端成功率（目标 → 可重放证据）           ≥ 90%
 //  2. Evidence 重放一致率                          ≥ 99%
-//  3. 误报率不高于旧引擎（同语料，verify.poc vs 直连 SDK 扫描）
+//  3. 误报率不高于旧引擎（同语料，agent 的 scan.start vs CLI 单 PoC 直跑）
 //  4. 旧 CLI / SDK / gRPC 零破坏（由全量 go test / build 覆盖，本文件不重复）
 //
 // token 成本无对照基线，不在本回归范围内。
@@ -183,32 +184,37 @@ func newAcceptanceTarget(t *testing.T, cases []acceptanceCase) *httptest.Server 
 	return srv
 }
 
-// legacyMatchCount 用旧引擎（直连 SDK，即既有 CLI 的检测路径）跑同一份语料，
-// 作为误报率对照基线：agent 路径新增的命中数必须不高于它。
+// legacyMatchCount 用「旧引擎口径」跑同一份语料，作为误报率对照基线：只加载这一份 PoC
+// （-P 独占 + -nf 关指纹），与既有 CLI 单 PoC 检测路径一致；agent 路径新增的命中数必须
+// 不高于它。
+//
+// 它同样走子进程执行器：SDK 的进程级全局状态正是这一轮要规避的东西，测试口径必须与线上一致。
 func legacyMatchCount(t *testing.T, target, pocPath string) int {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ex := subprocessExecutor(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	scanner, err := sdk.New(ctx,
-		sdk.WithTargets(target),
-		sdk.WithPocPaths(pocPath),
-		sdk.WithPocPathsOnly(),
-		sdk.WithConcurrency(1),
-		sdk.WithRateLimit(10),
-		sdk.WithTimeout(20),
-		sdk.WithFingerprintDisabled(),
-		sdk.WithWebProbe(false),
-	)
+	h, err := ex.Start(ctx, mcpTaskID("acceptance-legacy"), &executor.Spec{
+		Targets:       []string{target},
+		PocFile:       pocPath,
+		NoFingerprint: true,
+		Concurrency:   1,
+		RateLimit:     10,
+		TimeoutSeconds: 20,
+	})
 	if err != nil {
-		t.Fatalf("legacy sdk.New: %v", err)
+		t.Fatalf("legacy executor start: %v", err)
 	}
-	defer scanner.Close()
 
-	if err := scanner.Execute(ctx); err != nil && ctx.Err() == nil {
-		t.Fatalf("legacy scan: %v", err)
+	count := 0
+	for ev := range h.Events() {
+		if ev.Type == scanstream.TypeResult {
+			count++
+		}
 	}
-	return len(scanner.Results())
+	return count
 }
 
 // acceptanceReport 是验收结论的机器可读形态，供报告引用。
@@ -230,10 +236,10 @@ type acceptanceReport struct {
 }
 
 func TestAgentNativeAcceptanceE2E(t *testing.T) {
+	requireSubprocess(t)
 	cases := buildAcceptanceCorpus()
-	target := newAcceptanceTarget(t, cases)
 
-	s := newIntegrationServer(t, fmt.Sprintf("mode: safe\nbudget:\n  requests: %d\n  duration: 2m\n", acceptanceBudgetRequests))
+	s := newSubprocessServer(t, fmt.Sprintf("mode: safe\nbudget:\n  requests: %d\n  duration: 2m\n", acceptanceBudgetRequests))
 	if err := db2.NewSnowFlake(); err != nil {
 		t.Fatalf("snowflake: %v", err)
 	}
@@ -242,22 +248,12 @@ func TestAgentNativeAcceptanceE2E(t *testing.T) {
 	}
 	t.Cleanup(sqlite.CloseX)
 
-	// 把语料 PoC 落到临时 HOME 的 pocs-my，使 verify.poc / verify.replay 能按 poc_id 解析——
-	// 这条链路必须与真实使用一致，而不是用 poc_path 走捷径。
-	pocDir := filepath.Join(os.Getenv("HOME"), ".config", "afrog", "pocs-my")
-	if err := os.MkdirAll(pocDir, 0o700); err != nil {
-		t.Fatalf("mkdir pocs-my: %v", err)
-	}
+	// 把语料 PoC 落到临时 HOME 的 pocs-my：scan.start 靠 -s 选中它们，verify.replay 也按
+	// poc_id 回查它们——这条链路必须与真实使用一致，而不是用 poc_path 走捷径。
 	for _, c := range cases {
-		if err := os.WriteFile(filepath.Join(pocDir, c.id+".yaml"), []byte(c.yaml), 0o600); err != nil {
-			t.Fatalf("write poc %s: %v", c.id, err)
-		}
+		installPoc(t, c.id, c.yaml)
 	}
-
-	endpoint, err := ref.NormalizeEndpoint(target.URL)
-	if err != nil {
-		t.Fatalf("normalize target: %v", err)
-	}
+	pocDir := pocsMyDir(t)
 
 	rep := acceptanceReport{
 		Suite:         "afrog agent-native e2e acceptance",
@@ -276,13 +272,22 @@ func TestAgentNativeAcceptanceE2E(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			pocPath := filepath.Join(pocDir, c.id+".yaml")
 
+			// 每条用例起一个独立靶标：源站（origin）唯一，plan.next 才能把这条技术栈合并成
+			// 唯一一条 scan.start 提议，扫描也只会命中本条用例的 PoC。
+			srv := newAcceptanceTarget(t, []acceptanceCase{c})
+			endpoint, err := ref.NormalizeEndpoint(srv.URL)
+			if err != nil {
+				t.Fatalf("normalize target: %v", err)
+			}
+
 			// 0) 种攻击面图：端点 → 技术栈 → 候选 PoC，plan.next 才有依据可提议。
-			tech := "accept-" + c.id
+			// 技术栈关键词直接用 PoC id，使 scan.start 的 -s 恰好选中它。
+			tech := c.id
 			if err := sqlite.EnsureTechGraph(endpoint, []string{tech}, map[string][]string{tech: {c.id}}); err != nil {
 				t.Fatalf("seed tech graph: %v", err)
 			}
 
-			// 1) plan.next 必须就这条用例给出 verify.poc 提议。
+			// 1) plan.next 必须就这条用例给出 scan.start 提议（按源站合并、带技术栈关键词）。
 			planOut, err := s.tools["plan.next"].Handler(context.Background(),
 				mustJSON(t, map[string]any{"subject": endpoint, "limit": planner.MaxLimit}))
 			if err != nil {
@@ -292,26 +297,22 @@ func TestAgentNativeAcceptanceE2E(t *testing.T) {
 			if !ok {
 				t.Fatalf("plan.next returned %T", planOut)
 			}
-			proposed := false
+			var action planner.Action
 			for _, p := range plan.Proposals {
-				if p.Action.Name == "verify.poc" && p.Action.PocID == c.id {
-					proposed = true
+				if p.Action.Name == "scan.start" && p.Action.Search == tech {
+					action = p.Action
 					break
 				}
 			}
-			if !proposed {
-				t.Fatalf("plan.next did not propose %s on %s", c.id, endpoint)
+			if action.Name == "" {
+				t.Fatalf("plan.next did not propose scan.start for %s on %s", c.id, endpoint)
 			}
 
-			// 2) 执行提议：verify.poc 产出（或判定没有）证据。
-			verified, err := s.tools["verify.poc"].Handler(context.Background(),
-				mustJSON(t, map[string]any{"poc_id": c.id, "target": endpoint}))
-			if err != nil {
-				t.Fatalf("verify.poc: %v", err)
-			}
-			res, ok := verified.(map[string]any)
+			// 2) 执行提议：scan.start 一次并发跑完该技术栈的 PoC，产出（或判定没有）证据。
+			out := runTool(t, s, "scan.start", map[string]any{"target": action.Target, "search": action.Search})
+			res, ok := out.(map[string]any)
 			if !ok {
-				t.Fatalf("verify.poc returned %T", verified)
+				t.Fatalf("scan.start returned %T", out)
 			}
 			found, _ := res["found"].(bool)
 

@@ -550,8 +550,8 @@ func (poc *Poc) IsHTTPType() bool {
 // NeedsOOB 判断一个 PoC 是否需要带外（反连）验证。
 //
 // 「需要」不等于「命中」：这里看的是 PoC 有没有引用反连地址或带外判定函数。
-// 判定口径只有这一份——配置侧的 PoC 分流、执行侧的引擎分支、工具面的 verify.poc
-// 都必须问同一个问题，否则会出现「分流说不需要、执行时又拿不到反连地址」的错配。
+// 判定口径只有这一份——配置侧的 PoC 分流、执行侧的引擎分支、工具面的 scan.start /
+// poc.submit 都必须问同一个问题，否则会出现「分流说不需要、执行时又拿不到反连地址」的错配。
 func (p *Poc) NeedsOOB() bool {
 	if p == nil {
 		return false

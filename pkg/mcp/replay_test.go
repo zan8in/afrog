@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -42,8 +41,8 @@ func TestReplayMatchesUsesContentAddress(t *testing.T) {
 	}
 }
 
-// 完整链路：草稿落盘 → verify.poc 产出证据 → 落库 → verify.replay 只凭证据 id 复核。
-// 这里同时验证了「按 poc_id 从 drafts 目录回查 PoC」，否则草稿来源的证据无法重放。
+// 完整链路：PoC 落 pocs-my → scan.start 产出证据 → 落库 → verify.replay 只凭证据 id 复核。
+// 重放时 verify.replay 会按证据里的 poc_id 从仓库回查 PoC，否则重放无法复现。
 func TestVerifyReplayToolMatchesStoredEvidence(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -51,7 +50,7 @@ func TestVerifyReplayToolMatchesStoredEvidence(t *testing.T) {
 	}))
 	t.Cleanup(target.Close)
 
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 50\n  duration: 2m\n")
+	s := newSubprocessServer(t, "mode: safe\nbudget:\n  requests: 200\n  duration: 2m\n")
 	if err := db2.NewSnowFlake(); err != nil {
 		t.Fatalf("snowflake: %v", err)
 	}
@@ -60,40 +59,20 @@ func TestVerifyReplayToolMatchesStoredEvidence(t *testing.T) {
 	}
 	t.Cleanup(sqlite.CloseX)
 
-	// 1. 模型草稿落盘，后面 verify.replay 只能靠 poc_id 找回它。
-	draftYAML, err := os.ReadFile(writeHitPoc(t))
-	if err != nil {
-		t.Fatalf("read poc: %v", err)
-	}
-	saved, err := s.tools["poc.draft"].Handler(context.Background(), mustJSON(t, map[string]any{
-		"yaml": string(draftYAML),
-		"save": true,
-	}))
-	if err != nil {
-		t.Fatalf("poc.draft: %v", err)
-	}
-	draftPath, _ := saved.(map[string]any)["poc_path"].(string)
-	if draftPath == "" {
-		t.Fatalf("poc.draft returned no path: %+v", saved)
-	}
+	// 1. PoC 落 pocs-my：scan.start 的 -s 按 id 选中它，verify.replay 也按 id 回查它。
+	installPoc(t, verifyHitID, hitPocYAML())
 
-	// 2. 验证一次，拿到真实证据。
-	verified, err := s.tools["verify.poc"].Handler(context.Background(), mustJSON(t, map[string]any{
-		"poc_path": draftPath,
-		"target":   target.URL,
-	}))
-	if err != nil {
-		t.Fatalf("verify.poc: %v", err)
-	}
-	ev := firstEvidence(verified.(map[string]any)["results"].([]map[string]any))
+	scanned := runTool(t, s, "scan.start", map[string]any{"target": target.URL, "search": verifyHitID})
+	items, _ := scanned.(map[string]any)["results"].([]map[string]any)
+	ev := firstEvidence(items)
 	if ev == nil {
-		t.Fatal("verify.poc produced no evidence")
+		t.Fatalf("scan.start produced no evidence: %+v", scanned)
 	}
 	if err := sqlite.InsertEvidence(ev, 9001, "task-replay"); err != nil {
 		t.Fatalf("insert evidence: %v", err)
 	}
 
-	// 3. 重放：只给证据 id，target 与 PoC 都由证据带出。
+	// 2. 重放：只给证据 id，target 与 PoC 都由证据带出。
 	res, err := s.tools["verify.replay"].Handler(context.Background(), mustJSON(t, map[string]any{"id": ev.ID}))
 	if err != nil {
 		t.Fatalf("verify.replay: %v", err)
@@ -110,7 +89,7 @@ func TestVerifyReplayToolMatchesStoredEvidence(t *testing.T) {
 		t.Fatalf("consistent replay should not carry a reason: %+v", replayed)
 	}
 
-	// 4. 旧证据（目标行为已变）必须被标记为不一致，而不是继续当成事实。
+	// 3. 旧证据（目标行为已变）必须被标记为不一致，而不是继续当成事实。
 	stale := &evidence.Evidence{
 		ID:         "evd_stale",
 		Digest:     "sha256:stale",
