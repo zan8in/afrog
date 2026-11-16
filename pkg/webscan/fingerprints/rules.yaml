@@ -14,9 +14,11 @@
 #   match     规则列表，按顺序取第一个命中的
 #
 # match 字段：
-#   source     匹配素材：header | body | title | favicon
+#   source     匹配素材：header | body | title | favicon | scriptSrc | scripts |
+#              css | html | text | url | meta | cookies
 #   header     source 为 header 时指定具体响应头；留空表示匹配整个响应头块
-#   pattern    正则（.NET 语法，支持 lookahead/lookbehind 与 (?<name>...) 具名组）
+#   key        source 为 meta / cookies 时指定键名
+#   pattern    正则（Go RE2 语法，支持 (?<name>...) 具名组；不支持 lookahead/lookbehind）
 #   confidence 覆盖本条 pattern 的可信度：certain | probable
 #   version    版本模板，支持 $1..$9 与 ${name}
 #   cpe        本条 pattern 的 CPE 模板，留空时回落到规则级 cpe
@@ -1880,6 +1882,21 @@
   match:
     - source: favicon
       pattern: "^-187813927$"
+    # 部署信息接口的响应头里带 SY8044 标识（Poc: seeyon-detect.yaml）。
+    - source: header
+      header: server
+      pattern: '(?i)\bSY8044\b'
+    # 登录页出现的产品标识；单看偏泛，记 probable。
+    - source: body
+      pattern: '(?i)seeyonProductId'
+      confidence: probable
+    - source: body
+      pattern: '(?i)/seeyon/common/'
+      confidence: probable
+    # 致远 A8 独立部署路径（Poc: seeyon-yyoa-detect.yaml）。
+    - source: body
+      pattern: '(?i)/yyoa/seeyonoa/common'
+      confidence: probable
 
 - id: zabbix
   name: Zabbix
@@ -1975,3 +1992,1086 @@
     # 声明了 Web App Manifest，是 PWA 的确定性标记。
     - source: body
       pattern: '(?i)<link[^>]+rel=["'']manifest["'']'
+
+# ======================== 覆盖面补齐（社区库缺失） ========================
+#
+# 下面这些技术在 Wappalyzer 社区库里查无对应规则（或只有极弱判据），但判据就在
+# 服务端可见的响应头 / 正文 / 标题里。判据强度的处理原则与全文件一致：厂商专属的
+# 头/Cookie/路径/标题记 certain，仅凭泛化关键词或共享件的记 probable（软命中）。
+
+# ---- 面板 / 运维 ----
+
+- id: webmin
+  name: Webmin
+  category: panel
+  cpe: cpe:/a:webmin:webmin
+  match:
+    - source: title
+      pattern: '(?i)\bWebmin\b'
+    # MiniServ 是 Webmin/Usermin 自带的 Web 服务器；单看它无法区分二者，故 probable。
+    - source: header
+      header: server
+      pattern: '(?i)\bMiniServ/[\d.]+'
+      confidence: probable
+
+- id: rundeck
+  name: Rundeck
+  category: automation
+  cpe: cpe:/a:rundeck:rundeck
+  match:
+    - source: body
+      pattern: '(?i)\brundeck\b'
+
+- id: jumpserver
+  name: JumpServer
+  category: panel
+  cpe: cpe:/a:fit2cloud:jumpserver
+  match:
+    - source: body
+      pattern: '(?i)\bjumpserver\b'
+
+- id: netbox
+  name: NetBox
+  category: network-management
+  cpe: cpe:/a:netbox:netbox
+  match:
+    - source: body
+      pattern: '(?i)\bnetbox\b'
+
+# ---- 可观测性 / 大数据 / 调度 ----
+
+- id: jaeger
+  name: Jaeger
+  category: monitoring
+  cpe: cpe:/a:jaegertracing:jaeger
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Jaeger'
+    - source: body
+      pattern: '(?i)\bjaeger-ui\b'
+      confidence: probable
+
+- id: victoriametrics
+  name: VictoriaMetrics
+  category: monitoring
+  cpe: cpe:/a:victoriametrics:victoriametrics
+  match:
+    - source: body
+      pattern: '(?i)\bvictoriametrics\b'
+
+- id: apache-spark
+  name: Apache Spark
+  category: big-data
+  cpe: cpe:/a:apache:spark
+  match:
+    # Spark 各角色的 Web UI 标题形如 “Spark Master at spark://…”。
+    - source: title
+      pattern: '(?i)\bSpark (?:Master|Worker|History|Application)\b'
+
+- id: apache-flink
+  name: Apache Flink
+  category: big-data
+  cpe: cpe:/a:apache:flink
+  match:
+    - source: title
+      pattern: '(?i)\bApache Flink\b'
+    - source: body
+      pattern: '(?i)\bApache Flink\b'
+      confidence: probable
+
+- id: hadoop
+  name: Apache Hadoop
+  category: big-data
+  cpe: cpe:/a:apache:hadoop
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)\bApache Hadoop\b'
+    - source: title
+      pattern: '(?i)\b(?:NameNode|DataNode|ResourceManager|HDFS)\b'
+
+- id: airflow
+  name: Apache Airflow
+  category: scheduler
+  cpe: cpe:/a:apache:airflow
+  match:
+    - source: title
+      pattern: '(?i)\bAirflow\b'
+    - source: body
+      pattern: '(?i)\bAirflow\b'
+      confidence: probable
+
+- id: metabase
+  name: Metabase
+  category: bi
+  cpe: cpe:/a:metabase:metabase
+  match:
+    - source: body
+      pattern: '(?i)<title>\s*Metabase'
+    - source: body
+      pattern: '(?i)\bMetabase\b'
+      confidence: probable
+
+- id: nifi
+  name: Apache NiFi
+  category: automation
+  cpe: cpe:/a:apache:nifi
+  match:
+    - source: body
+      pattern: '(?i)\bApache NiFi\b'
+    - source: body
+      pattern: '(?i)\bNiFi\b'
+      confidence: probable
+
+# ---- 搜索 / 数据库 ----
+
+- id: apache-solr
+  name: Apache Solr
+  category: search
+  cpe: cpe:/a:apache:solr
+  match:
+    # Solr 管理台标题固定为 “Solr Admin”。
+    - source: title
+      pattern: '(?i)\bSolr Admin\b'
+    - source: body
+      pattern: '(?i)\bSolrCore\b'
+      confidence: probable
+
+- id: clickhouse
+  name: ClickHouse
+  category: database
+  cpe: cpe:/a:yandex:clickhouse
+  softmatch: true
+  match:
+    # ClickHouse 的 HTTP 接口在响应上带 X-ClickHouse-* 系列头；后缀为空即存在性判据。
+    - source: header
+      header: x-clickhouse-query-id
+    - source: header
+      header: x-clickhouse-summary
+    - source: body
+      pattern: '(?i)DB::Exception'
+
+# ---- 网络设备 / 安全网关 ----
+
+- id: mikrotik-routeros
+  name: MikroTik RouterOS
+  category: network-device
+  cpe: cpe:/o:mikrotik:routeros
+  match:
+    - source: title
+      pattern: '(?i)\bRouterOS\b'
+    - source: header
+      header: server
+      pattern: '(?i)\bMikroTik\b'
+      confidence: probable
+
+- id: sonicwall
+  name: SonicWall
+  category: network-device
+  match:
+    - source: body
+      pattern: '(?i)\bSonicWall\b'
+    - source: body
+      pattern: '(?i)/sonicui/'
+      confidence: probable
+
+- id: fortinet-fortigate
+  name: Fortinet FortiGate
+  category: network-device
+  match:
+    - source: body
+      pattern: '(?i)\bFortiGate\b'
+    - source: body
+      pattern: '(?i)ftnt-fortinet-grid'
+      confidence: probable
+
+- id: paloalto-globalprotect
+  name: Palo Alto Networks GlobalProtect
+  category: network-device
+  match:
+    - source: body
+      pattern: '(?i)\bGlobalProtect\b'
+    - source: body
+      pattern: '(?i)Palo Alto Networks'
+      confidence: probable
+
+- id: cisco-asa
+  name: Cisco Adaptive Security Appliance
+  category: network-device
+  match:
+    # ASA 的 WebVPN/AnyConnect 门户资源路径以 /+CSCOE+/ 开头，是专属标识。
+    - source: body
+      pattern: '(?i)/\+CSCOE\+/'
+      confidence: probable
+    - source: body
+      pattern: '(?i)\bCisco ASDM\b'
+      confidence: probable
+
+# ---- 容器 / 编排 / 代理 ----
+
+- id: docker-registry
+  name: Docker Registry
+  category: registry
+  match:
+    # Registry v2 在 /v2/ 响应上必带该头。
+    - source: header
+      header: docker-distribution-api-version
+      pattern: '(?i)registry'
+
+- id: kubernetes-apiserver
+  name: Kubernetes API Server
+  category: container
+  cpe: cpe:/a:kubernetes:kubernetes
+  softmatch: true
+  match:
+    # apiserver 在手写响应上会带该 PodSecurity/admission 相关头。
+    - source: header
+      header: x-kubernetes-pf-flowschema-uid
+    # 未授权/无路由时返回标准的 Status 对象。
+    - source: body
+      pattern: '(?i)"kind"\s*:\s*"Status"'
+
+- id: haproxy
+  name: HAProxy
+  category: load-balancer
+  cpe: cpe:/a:haproxy:haproxy
+  softmatch: true
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bhaproxy\b'
+    # HAProxy 默认配置里用 SERVERID Cookie 做后端粘性。
+    - source: cookies
+      key: SERVERID
+
+# ---- Web 框架 / 运行时 ----
+
+- id: remix
+  name: Remix
+  category: framework
+  match:
+    # Remix 在首页内联脚本里直出这两个全局变量之一。
+    - source: body
+      pattern: '(?i)__remixContext|__remixManifest'
+
+- id: vitepress
+  name: VitePress
+  category: static-site
+  match:
+    - source: meta
+      key: generator
+      pattern: '(?i)^VitePress(?: v?(?<version>[\d.]+))?'
+      version: ${version}
+
+- id: jupyter
+  name: Jupyter
+  category: notebook
+  cpe: cpe:/a:jupyter:notebook
+  match:
+    - source: body
+      pattern: '(?i)\bJupyter(?:Lab| Notebook|Hub)\b'
+
+# ==================== 国内应用 / OA / ERP（社区库缺失） ====================
+#
+# 用友、金蝶、蓝凌、深信服等国内厂商在 Wappalyzer 社区库里查无对应规则。判据全部取自
+# 仓库内自带 PoC 的真实字面量（登录页固定片段、产品标识、厂商专属路径），未臆造。强度
+# 仍按全文件原则：厂商专属的标题/标识/关键词记 certain，仅凭路径片段的记 probable。
+
+# ---- 用友 ----
+
+- id: yonyou-iuap
+  name: 用友 iuap
+  category: erp
+  match:
+    # iuap/yonBIP 工作台登录页的固定片段（Poc: yonyou-yonbip-detect.yaml）。
+    - source: body
+      pattern: "pageTitle = '欢迎登录';"
+
+- id: yonyou-mobsm
+  name: 用友移动系统管理
+  category: erp
+  match:
+    # 登录页内联脚本里的固定路径（Poc: yonyou-mobsm-detect.yaml）。
+    - source: body
+      pattern: '"/mobsm/html/index.jsp";'
+
+- id: yonyou-u8crm
+  name: 用友 U8 CRM
+  category: erp
+  match:
+    - source: body
+      pattern: '(?i)用友U8CRM'
+
+- id: yonyou-grp-u8
+  name: 用友 GRP-U8
+  category: erp
+  softmatch: true
+  match:
+    # GRP-U8 门户资源路径，单独出现仅作 probable。
+    - source: body
+      pattern: '(?i)R9iPortal/'
+
+- id: yonyou-nc
+  name: 用友 NC
+  category: erp
+  softmatch: true
+  match:
+    # NC / UAP 全系共用的 servlet 命名空间前缀。
+    - source: body
+      pattern: '(?i)/servlet/~ic/'
+
+# ---- 金蝶 ----
+
+- id: kingdee-k3cloud
+  name: 金蝶云星空
+  category: erp
+  match:
+    - source: title
+      pattern: '金蝶云星空'
+    - source: favicon
+      pattern: '^-1629133697$'
+      confidence: probable
+
+- id: kingdee-eas
+  name: 金蝶 EAS
+  category: erp
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)/easportal/'
+
+# ---- 蓝凌 OA ----
+
+- id: landray-oa
+  name: 蓝凌 OA
+  category: oa
+  match:
+    # 登录页输入框 DOM id；lui_ 是蓝凌自研前端前缀（Poc: landray-oa-panel.yaml）。
+    - source: body
+      pattern: 'lui_login_input_username'
+
+# ---- 深信服 ----
+
+- id: sangfor-logcenter
+  name: 深信服 日志中心
+  category: security
+  match:
+    # 行为感知系统 / 日志中心前端配置里的固定片段（Poc: sangfor-logcent-rce.yaml）。
+    - source: body
+      pattern: 'isHighPerformance : !!SFIsHighPerformance,'
+
+- id: sangfor-ngaf
+  name: 深信服 NGAF
+  category: security
+  match:
+    - source: title
+      pattern: '(?i)SANGFOR\s*\|\s*NGAF'
+    - source: body
+      pattern: '(?i)LogInOut\.php'
+      confidence: probable
+
+# ==================== 公开指纹库差集补充（FingerprintHub v4） ====================
+#
+# 下列规则全部来自 0x727/FingerprintHub（MIT 许可）的 web_fingerprint_v4 社区判据，并与 afrog
+# 现有规则集（人工精选 rules.yaml + Wappalyzer 社区库）做过双向差集，均为 afrog 此前不具备的
+# 技术。判据只取页面级 / 响应级标识（标题、厂商专属长字面量、favicon mmh3、专属响应头），
+# 不做主动路径探测；厂商专属标识记 certain，仅凭通用路径片段或社区弱判据的记 probable。
+#
+# 注意：favicon 判据必须是 mmh3 有符号十进制（Shodan 口径）。社区库里以 32 位 md5 十六进制
+# 给出的 favicon 判据无法用于本引擎，已在下文改用其它页面级判据。
+
+# ---- 国产 OA / ERP / 政企应用 ----
+
+- id: weaver-ecology
+  name: 泛微 e-cology
+  category: oa
+  match:
+    # e-cology8/9 前端固定脚本路径，泛微专属。
+    - source: body
+      pattern: '(?i)/theme/ecology8/jquery/js/zdialog_wev8\.js'
+
+- id: weaver-e-mobile
+  name: 泛微 e-mobile
+  category: oa
+  match:
+    - source: body
+      pattern: '(?i)content="weaver e-mobile"'
+
+- id: landray-eis
+  name: 蓝凌 EIS
+  category: oa
+  match:
+    # 蓝凌自研前端框架 landray.common.js 的固定引用路径。
+    - source: body
+      pattern: '(?i)/scripts/jquery\.landray\.common\.js'
+
+- id: landray-ekp
+  name: 蓝凌 EKP
+  category: oa
+  match:
+    # 蓝凌 EKP 默认 favicon 的 mmh3 哈希。
+    - source: favicon
+      pattern: '^831854882$'
+
+- id: jinher-oa
+  name: 金和协同管理平台
+  category: oa
+  match:
+    # 金和 OA 桌面端登录入口的 servlet 命名空间。
+    - source: body
+      pattern: '(?i)jhsoft\.web\.login'
+
+- id: seeyon-m3
+  name: 致远 M3
+  category: oa
+  match:
+    - source: title
+      pattern: '(?i)M3 Server v2\.0'
+
+- id: yonyou-u8
+  name: 用友 U8
+  category: erp
+  softmatch: true
+  match:
+    # U8 / U8+ 登录页的固定 DOM id，单独出现仅作 probable。
+    - source: body
+      pattern: '(?i)login_main_bg'
+    - source: body
+      pattern: '(?i)login_owner'
+
+- id: yonyou-u8cloud
+  name: 用友 U8 cloud
+  category: erp
+  match:
+    - source: body
+      pattern: '开启U8 cloud云端之旅'
+
+- id: yonyou-ksoa
+  name: 用友 KSOA
+  category: erp
+  softmatch: true
+  match:
+    # KSOA 门户首页按钮的固定内联事件片段。
+    - source: body
+      pattern: '(?i)onmouseout="this\.className='
+
+- id: yonyou-ism
+  name: 用友 ISM
+  category: erp
+  match:
+    # ISM 登录页内联脚本里的设备像素计算片段。
+    - source: body
+      pattern: '(?i)screen\.deviceYDpi'
+
+- id: yonyou-shop
+  name: 用友商城
+  category: erp
+  match:
+    - source: body
+      pattern: '(?i)/shopfront/shoppingcar/gotoshoppingcartajax\.action'
+
+- id: yonbip
+  name: 用友 BIP
+  category: erp
+  softmatch: true
+  match:
+    - source: body
+      pattern: '数字化工作台'
+
+- id: kingdee
+  name: 金蝶
+  category: erp
+  match:
+    # 金蝶通用前端入口对象。
+    - source: body
+      pattern: '(?i)kingdee\.entryRole'
+
+- id: hongfan-ioffice
+  name: 红帆 iOffice
+  category: oa
+  match:
+    - source: title
+      pattern: '(?i)ioffice\.net'
+
+- id: rockoa-oa
+  name: 信呼 OA
+  category: oa
+  match:
+    - source: body
+      pattern: '信呼开发团队'
+
+- id: dzzoffice
+  name: DzzOffice
+  category: oa
+  match:
+    - source: body
+      pattern: '(?i)dzz/scripts/dzz_min\.js'
+
+- id: qiyuesuo
+  name: 契约锁电子签章
+  category: oa
+  match:
+    - source: body
+      pattern: '(?i)qyswebapp'
+
+- id: weihong-oa
+  name: 微宏 OA
+  category: oa
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)/wh/serverlogin\.jsp'
+
+# ---- 中间件 / 应用服务器 ----
+
+- id: apache-activemq
+  name: Apache ActiveMQ
+  category: mq
+  match:
+    - source: title
+      pattern: '(?i)Apache ActiveMQ'
+
+- id: apache-dubbo
+  name: Apache Dubbo
+  category: api-gateway
+  match:
+    # Dubbo 控制台 / 服务端在鉴权时回带的基础认证 realm。
+    - source: header
+      header: www-authenticate
+      pattern: '(?i)basic realm="dubbo"'
+
+- id: apache-skywalking
+  name: Apache SkyWalking
+  category: monitoring
+  match:
+    - source: body
+      pattern: '(?i)Sorry but SkyWalking'
+
+- id: eureka-server
+  name: Netflix Eureka Server
+  category: service-discovery
+  match:
+    - source: body
+      pattern: '(?i)eureka/css/wro\.css'
+
+- id: rocketmq-console
+  name: RocketMQ Console
+  category: mq
+  match:
+    - source: title
+      pattern: '(?i)rocketmq-console-ng'
+
+- id: kafka-ui
+  name: Kafka UI
+  category: mq
+  match:
+    - source: title
+      pattern: '(?i)UI for Apache Kafka'
+
+- id: kafka-center
+  name: Kafka Center
+  category: mq
+  match:
+    - source: title
+      pattern: '(?i)Kafka Center'
+
+- id: kafka-manager
+  name: Kafka Manager
+  category: mq
+  softmatch: true
+  match:
+    - source: body
+      pattern: '2af62f58ee2baf495c9b3a9a1c30ce03-favicon\.png'
+
+- id: apache-axis2
+  name: Apache Axis2
+  category: framework
+  match:
+    - source: body
+      pattern: '(?i)axis2-web/css/axis-style\.css'
+
+- id: apache-oozie
+  name: Apache Oozie
+  category: big-data
+  match:
+    - source: body
+      pattern: '(?i)href="/oozie">Oozie Console'
+
+- id: apache-archiva
+  name: Apache Archiva
+  category: registry
+  match:
+    - source: body
+      pattern: '(?i)/archiva\.css'
+
+- id: apache-mesos
+  name: Apache Mesos
+  category: automation
+  match:
+    - source: body
+      pattern: '(?i)/static/img/mesos_logo\.png'
+
+- id: apache-kylin
+  name: Apache Kylin
+  category: big-data
+  match:
+    - source: body
+      pattern: '(?i)content="1;url=kylin"'
+
+- id: apache-ambari
+  name: Apache Ambari
+  category: big-data
+  softmatch: true
+  match:
+    - source: title
+      pattern: '(?i)\bAmbari\b'
+
+- id: apache-cocoon
+  name: Apache Cocoon
+  category: framework
+  match:
+    # Cocoon 生成的响应必带该版本头。
+    - source: header
+      header: x-cocoon-version
+
+- id: apache-guacamole
+  name: Apache Guacamole
+  category: remote-desktop
+  match:
+    - source: body
+      pattern: '(?i)Guacamole - Clientless Remote Desktop'
+
+- id: openfire
+  name: Openfire
+  category: instant-messaging
+  match:
+    - source: title
+      pattern: '(?i)Openfire Admin Console'
+    - source: title
+      pattern: 'Openfire 管理界面'
+      confidence: probable
+
+- id: shardingsphere-elasticjob-ui
+  name: Apache ShardingSphere ElasticJob UI
+  category: scheduler
+  match:
+    # ElasticJob-Lite UI 默认 favicon 的 mmh3 哈希。
+    - source: favicon
+      pattern: '^816588900$'
+
+- id: wildfly
+  name: WildFly
+  category: web-server
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)WildFly Project'
+
+# ---- 网络 / 安全设备 ----
+
+- id: ruijie-rgos
+  name: 锐捷 RGOS
+  category: network-device
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)RGOS HTTP-Server'
+
+- id: ruijie-eweb
+  name: 锐捷 eWeb 网管系统
+  category: network-management
+  match:
+    - source: body
+      pattern: 'mark="login\.copyright">锐捷网络'
+
+- id: ruijie-sslvpn
+  name: 锐捷 SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)rjsslvpn_encookie'
+
+- id: huawei-ssl-vpn
+  name: 华为 SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)SVN_GETLOGINCONTEXTVALUE\('
+
+- id: huawei-fusioncompute
+  name: 华为 FusionCompute
+  category: virtualization
+  match:
+    - source: body
+      pattern: '(?i)/omsportal/'
+
+- id: huawei-esight
+  name: 华为 eSight
+  category: network-management
+  match:
+    - source: body
+      pattern: '(?i)eSight_login_copy_right_font'
+
+- id: h3c-imc
+  name: H3C iMC
+  category: network-management
+  match:
+    - source: body
+      pattern: '(?i)/imc/login\.jsf'
+
+- id: h3c-secpath-audit
+  name: H3C SecPath 运维审计系统
+  category: security
+  match:
+    - source: title
+      pattern: 'H3C SecPath 运维审计系统'
+
+- id: sangfor-ssl-vpn
+  name: 深信服 SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)/por/login_psw\.csp'
+
+- id: qi-an-xin-vpn
+  name: 奇安信 VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)qianxinvpn'
+    - source: body
+      pattern: '卸载奇安信VPN'
+      confidence: probable
+
+- id: qax-secfox
+  name: 奇安信 SecFox
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)mtokenplugin'
+
+- id: nsfocus-vpn
+  name: 绿盟 SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)/logo_login_nsfocus\.png'
+
+- id: leadsec-ssl-vpn
+  name: 网御 SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)/ssl/down/usbkey\.exe'
+
+- id: topsec-vpn
+  name: 天融信 VPN
+  category: security
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\btopwebserver\b'
+    - source: body
+      pattern: '(?i)/vone/pub/pda\.html'
+      confidence: probable
+    - source: body
+      pattern: '(?i)/portal_default/index\.html'
+      confidence: probable
+
+- id: wangshen-vpn
+  name: 网神 VPN
+  category: security
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)admin/js/virtual_keyboard\.js'
+
+- id: cisco-ssl-vpn
+  name: Cisco SSL VPN
+  category: security
+  match:
+    # WebVPN 门户会自动种下该 Cookie。
+    - source: cookies
+      key: webvpncontext
+
+- id: fortinet-sslvpn
+  name: Fortinet SSL VPN
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)/sslvpn/portal\.html'
+
+- id: fortitoken
+  name: FortiToken
+  category: security
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)FortiToken'
+
+- id: sophos-web-appliance
+  name: Sophos Web Appliance
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)login_swa\.jpg'
+
+- id: freenas
+  name: FreeNAS
+  category: storage
+  match:
+    - source: body
+      pattern: '(?i)images/ui/freenas-logo\.png'
+
+- id: mikrotik-httpproxy
+  name: MikroTik HttpProxy
+  category: proxy
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bMikrotik HttpProxy\b'
+
+- id: profense-firewall
+  name: Profense Firewall
+  category: waf
+  match:
+    - source: header
+      header: server
+      pattern: '(?i)\bprofense\b'
+
+- id: anheng-mingyu-waf
+  name: 安恒明御 WAF
+  category: waf
+  match:
+    - source: body
+      pattern: '明御web应用防火墙'
+
+- id: hikvision-isecure-center
+  name: 海康威视综合安防管理平台
+  category: security
+  match:
+    - source: body
+      pattern: '(?i)/portal/conf/icon/logo\.png'
+
+- id: dahua-smart-park
+  name: 大华智慧园区综合管理平台
+  category: security
+  match:
+    - source: body
+      pattern: 'dss助手'
+
+# ---- CMS / 建站 / 报表 ----
+
+- id: pbootcms
+  name: PbootCMS
+  category: cms
+  match:
+    # PbootCMS 默认会话 Cookie 名。
+    - source: cookies
+      key: pbootsystem
+
+- id: jeesite
+  name: JeeSite
+  category: cms
+  match:
+    - source: cookies
+      key: jeesite.session.id
+
+- id: jeecms
+  name: JEECMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/r/cms/www/'
+
+- id: duomicms
+  name: 多米 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)duomicms_member'
+
+- id: aspcms
+  name: ASPCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/inc/aspcms_advjs\.asp'
+
+- id: cmseasy
+  name: CmsEasy
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)content="CMSEasy'
+
+- id: espcms
+  name: ESPCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/templates/default/style/tempates_div\.css'
+
+- id: siteserver
+  name: SiteServer CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)SiteServer CMS'
+
+- id: jspxcms
+  name: Jspxcms
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)Powered by Jspxcms'
+
+- id: cms4j
+  name: CMS4J
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/cms4jadmin/login\.jsp'
+
+- id: 08cms
+  name: 08CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)typeof\(_08cms\)'
+
+- id: feifeicms
+  name: 飞飞 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)navbar-feifeicms'
+
+- id: 74cms
+  name: 骑士 CMS (74CMS)
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)content="74cms\.com'
+
+- id: twcms
+  name: TWCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/twcms/theme/default/css/global\.css'
+
+- id: wuzhicms
+  name: 五指 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)content="wuzhicms'
+
+- id: chanzhicms
+  name: 蝉知 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)chanzhi\.js'
+
+- id: hdwiki
+  name: HDWiki
+  category: wiki
+  match:
+    - source: body
+      pattern: '(?i)content="HDWiki'
+
+- id: tpshop
+  name: TPshop
+  category: ecommerce
+  match:
+    - source: body
+      pattern: '(?i)tpshop_config'
+
+- id: shopnc
+  name: ShopNC
+  category: ecommerce
+  match:
+    - source: body
+      pattern: '(?i)copyright 2007-2014 ShopNC'
+
+- id: niushop
+  name: Niushop
+  category: ecommerce
+  softmatch: true
+  match:
+    - source: body
+      pattern: '(?i)niushop'
+
+- id: taocms
+  name: TaoCMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)/taocms/code/calendar\.js'
+
+- id: qibosoft
+  name: 齐博 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)Powered by Qibosoft V1\.0'
+
+- id: jizhicms
+  name: 极致 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '极致CMS建站系统'
+
+- id: xunruicms
+  name: 迅睿 CMS
+  category: cms
+  match:
+    - source: body
+      pattern: '(?i)alt="xunruicms"'
+
+- id: zzzcms
+  name: ZZZCMS
+  category: cms
+  match:
+    # 首页底部版权链接（PHP 版 ZZZCMS）。
+    - source: body
+      pattern: '(?i)zzzcms\.com[\x27"]>ZZZCMS'
+    # 登录入口路径。
+    - source: body
+      pattern: '(?i)/inc/showuserlogin\.php\?style=h'
+      confidence: probable
+
+- id: smartbi
+  name: Smartbi
+  category: bi
+  match:
+    - source: body
+      pattern: '(?i)smartbi\.gcf\.gcfutil'
+
+- id: finereport
+  name: 帆软 FineReport
+  category: bi
+  match:
+    - source: body
+      pattern: '(?i)finereport/decision'
+    - source: body
+      pattern: '(?i)content="FineReport--Web Reporting Tool"'
+      confidence: probable
+
+- id: aj-report
+  name: AJ-Report
+  category: bi
+  match:
+    - source: title
+      pattern: '(?i)\bAJ-Report\b'
+
+- id: jsherp
+  name: JshERP
+  category: erp
+  match:
+    # JshERP 默认 favicon 的 mmh3 哈希。
+    - source: favicon
+      pattern: '^-1298131932$'

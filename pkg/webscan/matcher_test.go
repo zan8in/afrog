@@ -1025,6 +1025,96 @@ func TestFetchAssets(t *testing.T) {
 	}
 }
 
+// TestCoverageGapFingerprints 覆盖本轮为「社区库缺失」补齐的指纹规则。
+//
+// 判据全部来自服务端可见素材（响应头 / 正文 / 标题 / Cookie / meta），不依赖执行 JS。
+// 断言两件事：能命中，且可信度与判据强度一致（专属头/路径/Cookie 记 certain，
+// 泛化关键词或共享件记 probable）。
+func TestCoverageGapFingerprints(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name     string
+		resp     Response
+		wantRule string
+		wantVer  string
+		wantConf Confidence
+	}{
+		{"webmin-title", Response{Body: []byte("<html><head><title>Webmin 2.105</title></head></html>")}, "webmin", "", ConfidenceCertain},
+		{"webmin-miniserv", Response{Headers: map[string]string{"server": "MiniServ/1.984"}}, "webmin", "", ConfidenceProbable},
+		{"rundeck", Response{Body: []byte("<html><head><title>Rundeck</title></head></html>")}, "rundeck", "", ConfidenceCertain},
+		{"jumpserver", Response{Body: []byte(`<div id="jumpserver-app">x</div>`)}, "jumpserver", "", ConfidenceCertain},
+		{"netbox", Response{Body: []byte("<html><head><title>NetBox</title></head></html>")}, "netbox", "", ConfidenceCertain},
+		{"jaeger", Response{Body: []byte("<html><head><title>Jaeger UI</title></head></html>")}, "jaeger", "", ConfidenceCertain},
+		{"victoriametrics", Response{Body: []byte(`<title>VictoriaMetrics</title>`)}, "victoriametrics", "", ConfidenceCertain},
+		{"apache-spark", Response{Body: []byte("<html><head><title>Spark Master at spark://h:7077</title></head></html>")}, "apache-spark", "", ConfidenceCertain},
+		{"apache-flink", Response{Body: []byte("<html><head><title>Apache Flink Dashboard</title></head></html>")}, "apache-flink", "", ConfidenceCertain},
+		{"hadoop", Response{Body: []byte("<html><head><title>NameNode</title></head></html>")}, "hadoop", "", ConfidenceProbable},
+		{"airflow", Response{Body: []byte("<html><head><title>Airflow</title></head></html>")}, "airflow", "", ConfidenceCertain},
+		{"metabase", Response{Body: []byte("<html><head><title>Metabase</title></head></html>")}, "metabase", "", ConfidenceCertain},
+		{"nifi", Response{Body: []byte("<html><head><title>Apache NiFi</title></head></html>")}, "nifi", "", ConfidenceCertain},
+		{"apache-solr", Response{Body: []byte("<html><head><title>Solr Admin</title></head></html>")}, "apache-solr", "", ConfidenceCertain},
+		{"clickhouse-header", Response{Headers: map[string]string{"x-clickhouse-query-id": "a1b2"}}, "clickhouse", "", ConfidenceProbable},
+		{"clickhouse-exception", Response{Body: []byte("Code: 62. DB::Exception: Syntax error")}, "clickhouse", "", ConfidenceProbable},
+		{"mikrotik", Response{Body: []byte("<html><head><title>RouterOS</title></head></html>")}, "mikrotik-routeros", "", ConfidenceCertain},
+		{"sonicwall", Response{Body: []byte("<html><head><title>SonicWall</title></head></html>")}, "sonicwall", "", ConfidenceCertain},
+		{"fortigate", Response{Body: []byte("<html><head><title>FortiGate</title></head></html>")}, "fortinet-fortigate", "", ConfidenceCertain},
+		{"globalprotect", Response{Body: []byte(`<div id="globalprotect">GlobalProtect Portal</div>`)}, "paloalto-globalprotect", "", ConfidenceCertain},
+		{"cisco-asa", Response{Body: []byte(`<a href="/+CSCOE+/logon.html">login</a>`)}, "cisco-asa", "", ConfidenceProbable},
+		{"docker-registry", Response{Headers: map[string]string{"docker-distribution-api-version": "registry/2.0"}}, "docker-registry", "", ConfidenceCertain},
+		{"k8s-apiserver-header", Response{Headers: map[string]string{"x-kubernetes-pf-flowschema-uid": "abc"}}, "kubernetes-apiserver", "", ConfidenceProbable},
+		{"k8s-apiserver-status", Response{Body: []byte(`{"kind":"Status","apiVersion":"v1","status":"Failure"}`)}, "kubernetes-apiserver", "", ConfidenceProbable},
+		{"haproxy-server", Response{Headers: map[string]string{"server": "HAProxy"}}, "haproxy", "", ConfidenceProbable},
+		{"haproxy-cookie", Response{Cookies: []string{"SERVERID=node1; Path=/"}}, "haproxy", "", ConfidenceProbable},
+		{"remix", Response{Body: []byte(`<script>window.__remixContext={}</script>`)}, "remix", "", ConfidenceCertain},
+		{"vitepress", Response{Body: []byte(`<meta name="generator" content="VitePress v1.5.0">`)}, "vitepress", "1.5.0", ConfidenceCertain},
+		{"jupyter", Response{Body: []byte("<html><head><title>JupyterLab</title></head></html>")}, "jupyter", "", ConfidenceCertain},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Version != tc.wantVer {
+				t.Errorf("%s version = %q, want %q", tc.wantRule, got.Version, tc.wantVer)
+			}
+			if got.Confidence != tc.wantConf {
+				t.Errorf("%s confidence = %s, want %s", tc.wantRule, got.Confidence, tc.wantConf)
+			}
+		})
+	}
+
+	// 普通站点（nginx 静态页）不得被这批规则误报。
+	plain := m.Match(Response{
+		StatusCode: 200,
+		Headers:    map[string]string{"server": "nginx/1.25.3", "content-type": "text/html"},
+		Body:       []byte("<html><head><title>Hello</title></head><body>ok</body></html>"),
+	})
+	guarded := map[string]bool{
+		"webmin": true, "rundeck": true, "jumpserver": true, "netbox": true, "jaeger": true,
+		"victoriametrics": true, "apache-spark": true, "apache-flink": true, "hadoop": true,
+		"airflow": true, "metabase": true, "nifi": true, "apache-solr": true, "clickhouse": true,
+		"mikrotik-routeros": true, "sonicwall": true, "fortinet-fortigate": true,
+		"paloalto-globalprotect": true, "cisco-asa": true, "docker-registry": true,
+		"kubernetes-apiserver": true, "haproxy": true, "remix": true, "vitepress": true, "jupyter": true,
+	}
+	for _, tech := range plain.Technologies {
+		if guarded[tech.RuleID] {
+			t.Fatalf("plain response reported %s (%s): %+v", tech.Name, tech.RuleID, tech)
+		}
+	}
+}
+
 func hasTech(res Result, name string) bool {
 	for _, tech := range res.Technologies {
 		if tech.Name == name {
@@ -1032,6 +1122,234 @@ func hasTech(res Result, name string) bool {
 		}
 	}
 	return false
+}
+
+// TestDomesticAppFingerprints 覆盖本轮补齐的国内应用 / OA / ERP 指纹规则。
+//
+// 判据全部取自仓库内自带 PoC 的真实字面量（见规则注释里的 Poc 文件名），不依赖执行 JS。
+// 断言两件事：能命中，且可信度与判据强度一致——厂商专属的标题/DOM id/关键词记 certain，
+// 仅凭路径片段的记 probable。
+func TestDomesticAppFingerprints(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		name     string
+		resp     Response
+		wantRule string
+		wantConf Confidence
+	}{
+		{"yonyou-iuap", Response{Body: []byte(`<script>var pageTitle = '欢迎登录';</script>`)}, "yonyou-iuap", ConfidenceCertain},
+		{"yonyou-mobsm", Response{Body: []byte(`<script>a="/mobsm/login/home",b="/mobsm/html/index.jsp";</script>`)}, "yonyou-mobsm", ConfidenceCertain},
+		{"yonyou-u8crm", Response{Body: []byte("<html><head><title>用友U8CRM</title></head></html>")}, "yonyou-u8crm", ConfidenceCertain},
+		{"yonyou-grp-u8", Response{Body: []byte(`<script src="/R9iPortal/js/x.js"></script>`)}, "yonyou-grp-u8", ConfidenceProbable},
+		{"yonyou-nc", Response{Body: []byte(`<form action="/servlet/~ic/nc.bs.framework.x">`)}, "yonyou-nc", ConfidenceProbable},
+		{"kingdee-k3cloud", Response{Body: []byte("<html><head><title>金蝶云星空</title></head></html>")}, "kingdee-k3cloud", ConfidenceCertain},
+		{"kingdee-eas", Response{Body: []byte(`<a href="/easportal/autoLogin.jsp">登录</a>`)}, "kingdee-eas", ConfidenceProbable},
+		{"landray-oa", Response{Body: []byte(`<input id="lui_login_input_username" type="text">`)}, "landray-oa", ConfidenceCertain},
+		{"sangfor-logcenter", Response{Body: []byte(`<script>var c={isHighPerformance : !!SFIsHighPerformance,};</script>`)}, "sangfor-logcenter", ConfidenceCertain},
+		{"sangfor-ngaf", Response{Body: []byte("<html><head><title>SANGFOR | NGAF</title></head></html>")}, "sangfor-ngaf", ConfidenceCertain},
+		{"seeyon-server", Response{Headers: map[string]string{"server": "SY8044"}}, "seeyon", ConfidenceCertain},
+		{"seeyon-product", Response{Body: []byte(`<script>var seeyonProductId="A8";</script>`)}, "seeyon", ConfidenceProbable},
+		{"seeyon-yyoa", Response{Body: []byte(`<script src="/yyoa/seeyonoa/common/x.js"></script>`)}, "seeyon", ConfidenceProbable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			var got *Technology
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.wantRule {
+					got = &res.Technologies[i]
+					break
+				}
+			}
+			if got == nil {
+				t.Fatalf("%s not detected: %+v", tc.wantRule, res.Technologies)
+			}
+			if got.Confidence != tc.wantConf {
+				t.Errorf("%s confidence = %s, want %s", tc.wantRule, got.Confidence, tc.wantConf)
+			}
+		})
+	}
+
+	// 普通站点（nginx 静态页）不得被这批规则误报。
+	plain := m.Match(Response{
+		StatusCode: 200,
+		Headers:    map[string]string{"server": "nginx/1.25.3", "content-type": "text/html"},
+		Body:       []byte("<html><head><title>Hello</title></head><body>ok</body></html>"),
+	})
+	guarded := map[string]bool{
+		"yonyou-iuap": true, "yonyou-mobsm": true, "yonyou-u8crm": true, "yonyou-grp-u8": true,
+		"yonyou-nc": true, "kingdee-k3cloud": true, "kingdee-eas": true, "landray-oa": true,
+		"sangfor-logcenter": true, "sangfor-ngaf": true,
+	}
+	for _, tech := range plain.Technologies {
+		if guarded[tech.RuleID] {
+			t.Fatalf("plain response reported %s (%s): %+v", tech.Name, tech.RuleID, tech)
+		}
+	}
+}
+
+// TestFingerprintHubGapRules 覆盖从 FingerprintHub v4 取差集补齐的指纹规则（见 rules.yaml 末尾
+// 「公开指纹库差集补充」段）。逐条验证「命中 + 可信度」。
+//
+// favicon 判据依赖真实图标字节，无法在单测里构造出指定 mmh3，故 landray-ekp /
+// shardingsphere-elasticjob-ui / jsherp 只纳入误报守卫，不在命中用例里断言。
+func TestFingerprintHubGapRules(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	cases := []struct {
+		rule     string
+		resp     Response
+		wantConf Confidence
+	}{
+		// ---- 国产 OA / ERP / 政企应用 ----
+		{"weaver-ecology", Response{Body: []byte(`<script src="/theme/ecology8/jquery/js/zdialog_wev8.js"></script>`)}, ConfidenceCertain},
+		{"weaver-e-mobile", Response{Body: []byte(`<meta name="generator" content="weaver e-mobile">`)}, ConfidenceCertain},
+		{"landray-eis", Response{Body: []byte(`<script src="/scripts/jquery.landray.common.js"></script>`)}, ConfidenceCertain},
+		{"jinher-oa", Response{Body: []byte(`<iframe src="/c6/jhsoft.web.login"></iframe>`)}, ConfidenceCertain},
+		{"seeyon-m3", Response{Body: []byte(`<title>M3 Server v2.0</title>`)}, ConfidenceCertain},
+		{"yonyou-u8", Response{Body: []byte(`<body id="login_main_bg">`)}, ConfidenceProbable},
+		{"yonyou-u8cloud", Response{Body: []byte(`<h1>开启U8 cloud云端之旅</h1>`)}, ConfidenceCertain},
+		{"yonyou-ksoa", Response{Body: []byte(`<a onmouseout="this.className='btn btnoff'">x</a>`)}, ConfidenceProbable},
+		{"yonyou-ism", Response{Body: []byte(`<script>var h=sHeight*window.screen.deviceYDpi;</script>`)}, ConfidenceCertain},
+		{"yonyou-shop", Response{Body: []byte(`<script>$.post("/shopfront/shoppingcar/gotoshoppingcartajax.action")</script>`)}, ConfidenceCertain},
+		{"yonbip", Response{Body: []byte(`<div>数字化工作台</div>`)}, ConfidenceProbable},
+		{"kingdee", Response{Body: []byte(`<script>var x=kingdee.entryRole;</script>`)}, ConfidenceCertain},
+		{"hongfan-ioffice", Response{Body: []byte(`<title>ioffice.net</title>`)}, ConfidenceCertain},
+		{"rockoa-oa", Response{Body: []byte(`<div>信呼开发团队</div>`)}, ConfidenceCertain},
+		{"dzzoffice", Response{Body: []byte(`<script src="/dzz/scripts/dzz_min.js"></script>`)}, ConfidenceCertain},
+		{"qiyuesuo", Response{Body: []byte(`<div class="qyswebapp"></div>`)}, ConfidenceCertain},
+		{"weihong-oa", Response{Body: []byte(`<form action="/wh/serverlogin.jsp">`)}, ConfidenceProbable},
+		// ---- 中间件 / 应用服务器 ----
+		{"apache-activemq", Response{Body: []byte(`<title>Apache ActiveMQ</title>`)}, ConfidenceCertain},
+		{"apache-dubbo", Response{Headers: map[string]string{"www-authenticate": `Basic realm="dubbo"`}}, ConfidenceCertain},
+		{"apache-skywalking", Response{Body: []byte(`Sorry but SkyWalking doesn't work`)}, ConfidenceCertain},
+		{"eureka-server", Response{Body: []byte(`<link href="eureka/css/wro.css">`)}, ConfidenceCertain},
+		{"rocketmq-console", Response{Body: []byte(`<title>rocketmq-console-ng</title>`)}, ConfidenceCertain},
+		{"kafka-ui", Response{Body: []byte(`<title>UI for Apache Kafka</title>`)}, ConfidenceCertain},
+		{"kafka-center", Response{Body: []byte(`<title>Kafka Center</title>`)}, ConfidenceCertain},
+		{"kafka-manager", Response{Body: []byte(`<img src="vassets/images/2af62f58ee2baf495c9b3a9a1c30ce03-favicon.png">`)}, ConfidenceProbable},
+		{"apache-axis2", Response{Body: []byte(`<link href="axis2-web/css/axis-style.css">`)}, ConfidenceCertain},
+		{"apache-oozie", Response{Body: []byte(`<a href="/oozie">Oozie Console</a>`)}, ConfidenceCertain},
+		{"apache-archiva", Response{Body: []byte(`<link href="/archiva.css">`)}, ConfidenceCertain},
+		{"apache-mesos", Response{Body: []byte(`<img src="/static/img/mesos_logo.png">`)}, ConfidenceCertain},
+		{"apache-kylin", Response{Body: []byte(`<meta http-equiv="refresh" content="1;url=kylin">`)}, ConfidenceCertain},
+		{"apache-ambari", Response{Body: []byte(`<title>Ambari</title>`)}, ConfidenceProbable},
+		{"apache-cocoon", Response{Headers: map[string]string{"x-cocoon-version": "2.1"}}, ConfidenceCertain},
+		{"apache-guacamole", Response{Body: []byte(`<title>Guacamole - Clientless Remote Desktop</title>`)}, ConfidenceCertain},
+		{"openfire", Response{Body: []byte(`<title>Openfire Admin Console</title>`)}, ConfidenceCertain},
+		{"wildfly", Response{Body: []byte(`<h3>Welcome to WildFly Project</h3>`)}, ConfidenceProbable},
+		// ---- 网络 / 安全设备 ----
+		{"ruijie-rgos", Response{Headers: map[string]string{"server": "RGOS HTTP-Server"}}, ConfidenceCertain},
+		{"ruijie-eweb", Response{Body: []byte(`<span class="resource" mark="login.copyright">锐捷网络</span>`)}, ConfidenceCertain},
+		{"ruijie-sslvpn", Response{Body: []byte(`<script>document.cookie="rjsslvpn_encookie=yes;"</script>`)}, ConfidenceCertain},
+		{"huawei-ssl-vpn", Response{Body: []byte(`<script>SVN_GETLOGINCONTEXTVALUE();</script>`)}, ConfidenceCertain},
+		{"huawei-fusioncompute", Response{Body: []byte(`<a href="/omsportal/">登录</a>`)}, ConfidenceCertain},
+		{"huawei-esight", Response{Body: []byte(`<div class="esight_login_copy_right_font"></div>`)}, ConfidenceCertain},
+		{"h3c-imc", Response{Body: []byte(`<form action="/imc/login.jsf">`)}, ConfidenceCertain},
+		{"h3c-secpath-audit", Response{Body: []byte(`<title>登录-H3C SecPath 运维审计系统</title>`)}, ConfidenceCertain},
+		{"sangfor-ssl-vpn", Response{Body: []byte(`<script>location.href="/por/login_psw.csp";</script>`)}, ConfidenceCertain},
+		{"qi-an-xin-vpn", Response{Body: []byte(`<div>qianxinvpn</div>`)}, ConfidenceCertain},
+		{"qax-secfox", Response{Body: []byte(`<object id=mtokenplugin></object>`)}, ConfidenceCertain},
+		{"nsfocus-vpn", Response{Body: []byte(`<img src="/logo_login_nsfocus.png">`)}, ConfidenceCertain},
+		{"leadsec-ssl-vpn", Response{Body: []byte(`<a href="/ssl/down/usbkey.exe">下载</a>`)}, ConfidenceCertain},
+		{"topsec-vpn", Response{Headers: map[string]string{"server": "topwebserver"}}, ConfidenceCertain},
+		{"wangshen-vpn", Response{Body: []byte(`<script src="admin/js/virtual_keyboard.js"></script>`)}, ConfidenceProbable},
+		{"cisco-ssl-vpn", Response{Cookies: []string{"webvpncontext=abc; Path=/"}}, ConfidenceCertain},
+		{"fortinet-sslvpn", Response{Body: []byte(`<iframe src="/sslvpn/portal.html">`)}, ConfidenceCertain},
+		{"fortitoken", Response{Body: []byte(`<div>FortiToken</div>`)}, ConfidenceProbable},
+		{"sophos-web-appliance", Response{Body: []byte(`background:url(resources/images/en/login_swa.jpg)`)}, ConfidenceCertain},
+		{"freenas", Response{Body: []byte(`<img src="/images/ui/freenas-logo.png">`)}, ConfidenceCertain},
+		{"mikrotik-httpproxy", Response{Headers: map[string]string{"server": "Mikrotik HttpProxy"}}, ConfidenceCertain},
+		{"profense-firewall", Response{Headers: map[string]string{"server": "profense"}}, ConfidenceCertain},
+		{"anheng-mingyu-waf", Response{Body: []byte(`<div>明御web应用防火墙</div>`)}, ConfidenceCertain},
+		{"hikvision-isecure-center", Response{Body: []byte(`<img src="/portal/conf/icon/logo.png">`)}, ConfidenceCertain},
+		{"dahua-smart-park", Response{Body: []byte(`<span>dss助手</span>`)}, ConfidenceCertain},
+		// ---- CMS / 建站 / 报表 ----
+		{"pbootcms", Response{Cookies: []string{"pbootsystem=abc; Path=/"}}, ConfidenceCertain},
+		{"jeesite", Response{Cookies: []string{"jeesite.session.id=abc; Path=/"}}, ConfidenceCertain},
+		{"jeecms", Response{Body: []byte(`<script src="/r/cms/www/js/x.js"></script>`)}, ConfidenceCertain},
+		{"duomicms", Response{Body: []byte(`<a href="/duomicms_member/login.php">`)}, ConfidenceCertain},
+		{"aspcms", Response{Body: []byte(`<script src="/inc/aspcms_advjs.asp"></script>`)}, ConfidenceCertain},
+		{"cmseasy", Response{Body: []byte(`<meta name="generator" content="CmsEasy">`)}, ConfidenceCertain},
+		{"espcms", Response{Body: []byte(`<link href="/templates/default/style/tempates_div.css">`)}, ConfidenceCertain},
+		{"siteserver", Response{Body: []byte(`<div>Powered by SiteServer CMS</div>`)}, ConfidenceCertain},
+		{"jspxcms", Response{Body: []byte(`<div>- Powered by Jspxcms</div>`)}, ConfidenceCertain},
+		{"cms4j", Response{Body: []byte(`<a href="/cms4jadmin/login.jsp">`)}, ConfidenceCertain},
+		{"08cms", Response{Body: []byte(`<script>typeof(_08cms)</script>`)}, ConfidenceCertain},
+		{"feifeicms", Response{Body: []byte(`<a data-target="#navbar-feifeicms">`)}, ConfidenceCertain},
+		{"74cms", Response{Body: []byte(`<meta name="keywords" content="74cms.com">`)}, ConfidenceCertain},
+		{"twcms", Response{Body: []byte(`<link href="/twcms/theme/default/css/global.css">`)}, ConfidenceCertain},
+		{"wuzhicms", Response{Body: []byte(`<meta name="generator" content="wuzhicms">`)}, ConfidenceCertain},
+		{"chanzhicms", Response{Body: []byte(`<script src="/js/chanzhi.js"></script>`)}, ConfidenceCertain},
+		{"hdwiki", Response{Body: []byte(`<meta name="generator" content="HDWiki">`)}, ConfidenceCertain},
+		{"tpshop", Response{Body: []byte(`<script>var tpshop_config={};</script>`)}, ConfidenceCertain},
+		{"shopnc", Response{Body: []byte(`<div>Copyright 2007-2014 ShopNC Inc</div>`)}, ConfidenceCertain},
+		{"niushop", Response{Body: []byte(`<div>niushop</div>`)}, ConfidenceProbable},
+		{"taocms", Response{Body: []byte(`<script src="/taocms/code/calendar.js"></script>`)}, ConfidenceCertain},
+		{"qibosoft", Response{Body: []byte(`<div>Powered by Qibosoft V1.0</div>`)}, ConfidenceCertain},
+		{"jizhicms", Response{Body: []byte(`<div>极致CMS建站系统</div>`)}, ConfidenceCertain},
+		{"xunruicms", Response{Body: []byte(`<img alt="xunruicms" src="x">`)}, ConfidenceCertain},
+		{"zzzcms", Response{Body: []byte(`<a href='http://zzzcms.com'>ZZZCMS</a>`)}, ConfidenceCertain},
+		{"smartbi", Response{Body: []byte(`<script>gcfUtil = jsLoader.resolve('smartbi.gcf.gcfUtil');</script>`)}, ConfidenceCertain},
+		{"finereport", Response{Body: []byte(`<a href="/finereport/decision?op=fr_dialog">`)}, ConfidenceCertain},
+		{"aj-report", Response{Body: []byte(`<title>AJ-Report</title>`)}, ConfidenceCertain},
+	}
+	for _, tc := range cases {
+		t.Run(tc.rule, func(t *testing.T) {
+			res := m.Match(tc.resp)
+			for i := range res.Technologies {
+				if res.Technologies[i].RuleID == tc.rule {
+					if res.Technologies[i].Confidence != tc.wantConf {
+						t.Errorf("%s confidence = %s, want %s", tc.rule, res.Technologies[i].Confidence, tc.wantConf)
+					}
+					return
+				}
+			}
+			t.Fatalf("%s not detected: %+v", tc.rule, res.Technologies)
+		})
+	}
+
+	// 普通站点（nginx 静态页）不得被这批规则误报。
+	plain := m.Match(Response{
+		StatusCode: 200,
+		Headers:    map[string]string{"server": "nginx/1.25.3", "content-type": "text/html"},
+		Body:       []byte("<html><head><title>Hello</title></head><body>ok</body></html>"),
+	})
+	guarded := map[string]bool{
+		"weaver-ecology": true, "weaver-e-mobile": true, "landray-eis": true, "landray-ekp": true,
+		"jinher-oa": true, "seeyon-m3": true, "yonyou-u8": true, "yonyou-u8cloud": true,
+		"yonyou-ksoa": true, "yonyou-ism": true, "yonyou-shop": true, "yonbip": true,
+		"kingdee": true, "hongfan-ioffice": true, "rockoa-oa": true, "dzzoffice": true,
+		"qiyuesuo": true, "weihong-oa": true,
+		"apache-activemq": true, "apache-dubbo": true, "apache-skywalking": true, "eureka-server": true,
+		"rocketmq-console": true, "kafka-ui": true, "kafka-center": true, "kafka-manager": true,
+		"apache-axis2": true, "apache-oozie": true, "apache-archiva": true, "apache-mesos": true,
+		"apache-kylin": true, "apache-ambari": true, "apache-cocoon": true, "apache-guacamole": true,
+		"openfire": true, "shardingsphere-elasticjob-ui": true, "wildfly": true,
+		"ruijie-rgos": true, "ruijie-eweb": true, "ruijie-sslvpn": true, "huawei-ssl-vpn": true,
+		"huawei-fusioncompute": true, "huawei-esight": true, "h3c-imc": true, "h3c-secpath-audit": true,
+		"sangfor-ssl-vpn": true, "qi-an-xin-vpn": true, "qax-secfox": true, "nsfocus-vpn": true,
+		"leadsec-ssl-vpn": true, "topsec-vpn": true, "wangshen-vpn": true, "cisco-ssl-vpn": true,
+		"fortinet-sslvpn": true, "fortitoken": true, "sophos-web-appliance": true, "freenas": true,
+		"mikrotik-httpproxy": true, "profense-firewall": true, "anheng-mingyu-waf": true,
+		"hikvision-isecure-center": true, "dahua-smart-park": true,
+		"pbootcms": true, "jeesite": true, "jeecms": true, "duomicms": true, "aspcms": true,
+		"cmseasy": true, "espcms": true, "siteserver": true, "jspxcms": true, "cms4j": true,
+		"08cms": true, "feifeicms": true, "74cms": true, "twcms": true, "wuzhicms": true,
+		"chanzhicms": true, "hdwiki": true, "tpshop": true, "shopnc": true, "niushop": true,
+		"taocms": true, "qibosoft": true, "jizhicms": true, "xunruicms": true, "zzzcms": true,
+		"smartbi": true, "finereport": true, "aj-report": true, "jsherp": true,
+	}
+	for _, tech := range plain.Technologies {
+		if guarded[tech.RuleID] {
+			t.Fatalf("plain response reported %s (%s): %+v", tech.Name, tech.RuleID, tech)
+		}
+	}
 }
 
 // TestAssetRefs 钉住静态资源地址抽取：只收同站、按类型过滤、去重并按 max 截断。
