@@ -41,7 +41,7 @@ func TestGateAllowsAndConsumesBudget(t *testing.T) {
 	}
 }
 
-// 零成本动作（读库、校验草稿）只校验时间预算，不消耗请求额度。
+// 零成本动作（读库、校验草稿）不消耗请求额度，也不受空闲超时限制。
 func TestGateZeroCostAction(t *testing.T) {
 	p := &Policy{Mode: ModeReadOnly, Limits: Limits{Requests: 3, Duration: Duration(time.Minute)}}
 	g := NewGate(p, NewBudget(p.Limits, time.Now()), nil)

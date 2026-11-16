@@ -30,12 +30,15 @@ type agentScopeState struct {
 }
 
 type agentBudgetState struct {
-	// Requests 是策略里配置的单会话请求上限；Remaining 是本进程当前剩余。
-	Requests  int    `json:"requests"`
+	// Requests 是策略里配置的会话请求额度，空闲超时后自动补满；
+	// Remaining 是本进程当前会话还剩多少。
+	Requests int `json:"requests"`
+	// Duration 是策略里配置的空闲窗口。
 	Duration  string `json:"duration"`
 	Remaining int    `json:"remaining"`
 	Unlimited bool   `json:"unlimited"`
-	// Deadline 是会话预算的截止时间（RFC3339）；无时间限制时为空。
+	// Deadline 是空闲窗口的到期时间（RFC3339）；无时间限制时为空。
+	// 有消耗额度的调用成功即顺延，超过它就意味着下一次调用会开新会话。
 	Deadline string `json:"deadline,omitempty"`
 }
 
@@ -43,12 +46,12 @@ type agentPolicyState struct {
 	Mode string `json:"mode"`
 	// MaxCapability 是当前档位可达的最高 PoC 能力等级（只读→declarative，
 	// safe→network，full→exec），给使用者一个「现在能跑到哪一档」的直观印象。
-	MaxCapability string          `json:"max_capability"`
-	Allow         []string        `json:"allow"`
-	Deny          []string        `json:"deny"`
-	Destructive   bool            `json:"destructive"`
-	Audit         bool            `json:"audit"`
-	Scope         agentScopeState `json:"scope"`
+	MaxCapability string           `json:"max_capability"`
+	Allow         []string         `json:"allow"`
+	Deny          []string         `json:"deny"`
+	Destructive   bool             `json:"destructive"`
+	Audit         bool             `json:"audit"`
+	Scope         agentScopeState  `json:"scope"`
 	Budget        agentBudgetState `json:"budget"`
 	// PolicyPath / AuditPath 是当前生效的策略与审计文件路径（留空=只读默认/不记录）。
 	PolicyPath string `json:"policy_path"`

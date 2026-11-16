@@ -31,9 +31,9 @@ const (
 const (
 	// DefaultMode 默认只读：一个刚被拉起的 MCP 服务不应该自动获得发包能力。
 	DefaultMode = ModeReadOnly
-	// DefaultRequests 是单次会话默认的请求预算。
+	// DefaultRequests 是一次会话默认的请求额度；持续使用会滚动续期，空闲后才重置。
 	DefaultRequests = 5000
-	// DefaultDuration 是单次会话默认的时间预算。
+	// DefaultDuration 是默认的空闲窗口：连续这么久没有消耗额度的调用，即判定会话结束。
 	DefaultDuration = 10 * time.Minute
 )
 
@@ -73,9 +73,11 @@ func (d Duration) MarshalYAML() (interface{}, error) {
 // Duration 返回标准库时长。
 func (d Duration) Duration() time.Duration { return time.Duration(d) }
 
-// Limits 是单次会话的资源预算。
+// Limits 是一次会话的资源预算。
 type Limits struct {
-	Requests int      `yaml:"requests"`
+	// Requests 是一次会话的请求额度；连续 Duration 空闲后自动补满。
+	Requests int `yaml:"requests"`
+	// Duration 是空闲窗口：只要有消耗额度的调用成功就顺延，连续空闲这么久即开新会话。
 	Duration Duration `yaml:"duration"`
 	// Tokens 预留给后续 AI 规划器，P1 阶段不参与判定。
 	Tokens int `yaml:"tokens"`
@@ -151,7 +153,7 @@ func (p *Policy) withDefaults() *Policy {
 
 // Action 是一次待判定的动作。
 type Action struct {
-	// Name 形如 observe.evidence / probe.http / verify.poc / act.brute。
+	// Name 形如 observe.evidence / probe.http / scan.start / act.brute。
 	Name string
 	// Target 是动作触达的目标，可为空（纯本地查询）。
 	Target string
@@ -214,10 +216,12 @@ func (p *Policy) modeAllows(name string) (string, bool) {
 }
 
 // isReadOnly 判断一个动作是否「不对外发包」。judge.* 与 learn.* 只读写本机 advisory
-// 数据（研判意见、调优建议），与 poc.draft 的落盘同源，因此也归入只读档。
+// 数据（研判意见、调优建议），与 poc.draft 的落盘同源，因此也归入只读档；
+// server.* 只读自身运行状态（策略档位、剩余额度、作用域），同样不算发包。
 func isReadOnly(name string) bool {
 	return strings.HasPrefix(name, "observe.") || strings.HasPrefix(name, "plan.") ||
 		strings.HasPrefix(name, "judge.") || strings.HasPrefix(name, "learn.") ||
+		strings.HasPrefix(name, "server.") ||
 		name == "poc.search" || name == "poc.draft"
 }
 

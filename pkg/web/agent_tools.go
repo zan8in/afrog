@@ -53,7 +53,8 @@ var (
 
 // agentTools 惰性装配共享的工具面：策略、预算、审计只构建一次，所有 /api/v1/call
 // 请求复用同一个 Server。写动作的预算因此是「进程级会话」预算，与 `afrog mcp
-// -listen` 的语义一致，不会因为请求分散到多次 HTTP 调用而各自重置。
+// -listen` 的语义一致，不会因为请求分散到多次 HTTP 调用而各自重置；连续空闲超过
+// 策略里的 duration 后才自动开新会话，把额度补满。
 func agentTools() (*mcp.Server, error) {
 	agentToolMu.Lock()
 	defer agentToolMu.Unlock()
