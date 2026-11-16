@@ -44,7 +44,10 @@ type Request struct {
 	WebFingerprint    bool
 	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用引擎默认值。
 	WebProbeTimeout int
-	WebFavicon      bool
+	// WebFavicon 开启 favicon 抓取（每个目标多一次请求），默认开启。
+	// 用指针区分「未设置」与「显式关闭」：nil 表示交回子进程默认值（开启），
+	// 显式 false 才下发 -w-favicon=false。
+	WebFavicon *bool
 
 	// 门控与预演
 	// GatingLevel 是 PoC 门控档位：off|safe|balanced|aggressive，空表示用引擎默认 safe。

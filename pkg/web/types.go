@@ -145,8 +145,10 @@ type ScanCreateRequest struct {
 	WebProbe       bool `json:"webprobe,omitempty"`
 	WebFingerprint bool `json:"web_fingerprint,omitempty"`
 	// WebProbeTimeout 是单次 Web 探测请求/证书获取的超时（秒）；0 表示用引擎默认值。
-	WebProbeTimeout int  `json:"web_probe_timeout,omitempty"`
-	WebFavicon      bool `json:"web_favicon,omitempty"`
+	WebProbeTimeout int `json:"web_probe_timeout,omitempty"`
+	// WebFavicon 对应 -w-favicon：Web 探测时抓取 /favicon.ico 做哈希指纹。默认开启，
+	// 用指针区分「未设置」与「显式关闭」：nil 表示用子进程默认值（开启），显式 false 关闭。
+	WebFavicon *bool `json:"web_favicon,omitempty"`
 	// WebAssets 对应 -w-assets：Web 探测时最多抓几个同源脚本/样式做内容指纹。
 	// 用指针区分「未设置」与显式的 0：nil 表示用子进程默认值（10，即默认开启），
 	// 显式 0 表示关闭。

@@ -329,15 +329,16 @@ func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 		SkipHostDiscovery: spec.GetSkipHostDiscovery(),
 		WebFingerprint:    spec.GetWebFingerprint(),
 		WebProbeTimeout:   int(spec.GetWebProbeTimeout()),
-		WebFavicon:        spec.GetWebFavicon(),
-		EnableOOB:         spec.GetEnableOob(),
-		OOBAdapter:        spec.GetOobAdapter(),
-		NoSaveDB:          spec.GetNoSaveDb(),
-		TaskName:          spec.GetTaskName(),
-		Labels:            spec.GetLabels(),
-		NodeSelector:      spec.GetNodeSelector(),
-		GatingLevel:       spec.GetGatingLevel(),
-		DryRun:            spec.GetDryRun(),
+		// 指针直传：nil 表示协议里未设置（交回子进程默认值＝开启），显式 false 才关闭。
+		WebFavicon:   spec.WebFavicon,
+		EnableOOB:    spec.GetEnableOob(),
+		OOBAdapter:   spec.GetOobAdapter(),
+		NoSaveDB:     spec.GetNoSaveDb(),
+		TaskName:     spec.GetTaskName(),
+		Labels:       spec.GetLabels(),
+		NodeSelector: spec.GetNodeSelector(),
+		GatingLevel:  spec.GetGatingLevel(),
+		DryRun:       spec.GetDryRun(),
 	}
 }
 

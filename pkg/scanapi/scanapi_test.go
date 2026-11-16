@@ -646,3 +646,24 @@ func TestFromProtoSpec_CarriesGatingLevelAndDryRun(t *testing.T) {
 		t.Fatalf("gating level/dry run not carried: level=%q dryRun=%v", req.GatingLevel, req.DryRun)
 	}
 }
+
+// web_favicon 是三态：协议里未设置（nil）必须与「显式 false」区分开，
+// 否则远端节点扫描会把默认开启的 favicon 静默关掉。
+func TestFromProtoSpec_WebFaviconTriState(t *testing.T) {
+	no, yes := false, true
+
+	unset := fromProtoSpec(&afrogv1.ScanSpec{Targets: []string{"https://example.com"}})
+	if unset.WebFavicon != nil {
+		t.Fatalf("unset favicon should stay nil, got %v", *unset.WebFavicon)
+	}
+
+	off := fromProtoSpec(&afrogv1.ScanSpec{Targets: []string{"https://example.com"}, WebFavicon: &no})
+	if off.WebFavicon == nil || *off.WebFavicon {
+		t.Fatalf("explicit false should be carried, got %v", off.WebFavicon)
+	}
+
+	on := fromProtoSpec(&afrogv1.ScanSpec{Targets: []string{"https://example.com"}, WebFavicon: &yes})
+	if on.WebFavicon == nil || !*on.WebFavicon {
+		t.Fatalf("explicit true should be carried, got %v", on.WebFavicon)
+	}
+}

@@ -9,6 +9,8 @@ import (
 	"testing"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 func TestBuildArgs(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -112,6 +114,7 @@ func TestBuildArgs(t *testing.T) {
 				Ports:             "80,443",
 				SkipHostDiscovery: true,
 				WebFingerprint:    true,
+				WebFavicon:        boolPtr(false),
 			},
 			want: []string{
 				"-t", "http://a.example",
@@ -150,7 +153,7 @@ func TestBuildArgs(t *testing.T) {
 				Targets:         []string{"http://a.example"},
 				WebFingerprint:  true,
 				WebProbeTimeout: 20,
-				WebFavicon:      true,
+				WebFavicon:      boolPtr(true),
 			},
 			want: []string{
 				"-t", "http://a.example",
@@ -158,6 +161,22 @@ func TestBuildArgs(t *testing.T) {
 				"-w",
 				"-w-timeout", "20",
 				"-w-favicon",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			// 未设置 favicon（nil）时省略 flag，交回子进程默认值（开启），
+			// 避免把默认开启的能力静默关掉。
+			name: "web probe favicon unset defers to default",
+			spec: &Spec{
+				Targets:        []string{"http://a.example"},
+				WebFingerprint: true,
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-w",
 				"-json-stream",
 				"-disable-output-html",
 			},

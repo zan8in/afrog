@@ -159,13 +159,15 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 		args = append(args, "-w-timeout", strconv.Itoa(spec.WebProbeTimeout))
 	}
 	if spec.WebFingerprint {
-		// favicon 抓取是 Web 探测的子行为，-w 关掉时无从谈起；-w 生效时必须显式表态：
-		// CLI 的 -w-favicon 现在默认开启，只省略 flag 等于把决定权交回子进程默认值，
-		// Web 控制台里取消勾选 favicon 就会失效。因此关闭时补一个 -w-favicon=false。
-		if spec.WebFavicon {
-			args = append(args, "-w-favicon")
-		} else {
-			args = append(args, "-w-favicon=false")
+		// favicon 抓取是 Web 探测的子行为，-w 关掉时无从谈起。它默认开启，因此只在调用方
+		// 显式表态时才下发：nil 省略，让子进程用自己的默认值（开启）；显式 false 才补
+		// -w-favicon=false（Web 控制台取消勾选即走这里）。
+		if spec.WebFavicon != nil {
+			if *spec.WebFavicon {
+				args = append(args, "-w-favicon")
+			} else {
+				args = append(args, "-w-favicon=false")
+			}
 		}
 		// 静态资源抓取同理默认开启（10 个）。它是数值而非开关，0 恰好是合法取值（关闭），
 		// 所以用指针区分「未设置」与「显式 0」：未设置时省略，让子进程用自己的默认值。

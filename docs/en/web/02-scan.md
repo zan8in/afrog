@@ -44,6 +44,18 @@ When you need finer control, expand "Advanced"; these parameters are exactly the
 
 The "PoC and scope" group lets you **manually select which PoCs to run** (searchable, multi-select); if you select none, they are recommended automatically by severity.
 
+### Web probing defaults
+
+Three capabilities in the "Port scan, web probing and fingerprinting" group are **on by default**; each console switch maps to one command-line flag:
+
+| Console switch | CLI flag | Default | How to disable |
+| --- | --- | --- | --- |
+| Web fingerprinting | `-w` | on | Turn the switch off (same as `-w=false`); the whole web-probing round is skipped |
+| favicon fingerprint | `-w-favicon` | on | Turn the switch off (same as `-w-favicon=false`); saves one request per target |
+| Static asset fingerprinting | `-w-assets` | `10` | Set the value to `0` (same as `-w-assets=0`); saves up to ten requests per target |
+
+The favicon and static-asset switches only appear while web fingerprinting is on. Disabling them only saves those extra requests and does not change the matching policy: their hits are recorded as `probable` evidence used to widen the `requires` admission of PoCs, so nothing gets missed by turning them off. See [CLI options](../user-guide/04-cli-options.md) for the full description of each.
+
 ## AI recommended parameters
 
 After pasting the targets, click "AI recommended parameters". Based on the scale and type of the targets (URL / IP / CIDR / domain) and the current intent, the AI returns 2–4 reasons and organizes concurrency, rate, timeout, smart concurrency, port scan, web fingerprint, severity, and so on into a ready-to-use configuration. Click "Apply recommended parameters" at the bottom of the drawer to write them back into the form (you can still fine-tune them by hand afterwards).

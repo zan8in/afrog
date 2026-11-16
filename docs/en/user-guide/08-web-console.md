@@ -88,7 +88,7 @@ The scan intent decides how many PoCs run:
 | Standard scan | Full PoC set, runs in the background, breadth first |
 | Re-test diff | Compare against the project's previous scan to see what got fixed (member) |
 
-Open **Advanced** when you need finer control: concurrency, rate, timeout, proxy, OOB, port scan, web probe, PoC scope, severity filters — all identical to the CLI flags.
+Open **Advanced** when you need finer control: concurrency, rate, timeout, proxy, OOB, port scan, web probe, PoC scope, severity filters — all identical to the CLI flags. **Web probing (`-w`), the favicon fingerprint (`-w-favicon`) and static-asset fingerprinting (`-w-assets`, 10 assets by default) are all on by default**, and each can be switched off right in the console; see [CLI options](./04-cli-options.md) for what each one does and how to disable it.
 
 A re-test diff needs the task to belong to a project: the project is how "the previous scan" is found.
 
