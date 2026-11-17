@@ -12,6 +12,10 @@
 #   cpe       默认 CPE，可被 match 覆盖；支持 $1 / ${name} 引用捕获组
 #   softmatch true 表示该规则特征偏弱，命中记为 probable 而不是 certain
 #   match     规则列表，按顺序取第一个命中的
+#   search_tags 检索别名（可选）：本技术的 id/name 在 PoC 语料里搜不到时的补救词，
+#              写 PoC tags/requires 里真实在用的关键词，如 apache-httpd 写 [apache]。
+#              只在 suggested_search（检索建议）生效，不参与 requires 门控，故可写得宽一些。
+#              必须手写：不能靠拆 id/name 得到（拆 element-plus 得 plus 是纯噪声）。
 #
 # match 字段：
 #   source     匹配素材：header | body | title | favicon | scriptSrc | scripts |
@@ -66,6 +70,7 @@
       version: ${version}
 
 - id: apache-httpd
+  search_tags: [apache, httpd]
   name: Apache httpd
   category: web-server
   cpe: cpe:/a:apache:http_server
@@ -249,6 +254,7 @@
       pattern: '\S'
 
 - id: azure-front-door
+  search_tags: [azure]
   name: Azure Front Door
   category: cdn
   match:
@@ -378,6 +384,7 @@
 # match 取第一条命中，故强判据必须排在弱判据之前，避免弱判据抢先降级结论。
 
 - id: huawei-cloud-waf
+  search_tags: [huawei]
   name: Huawei Cloud WAF
   category: waf
   match:
@@ -464,6 +471,7 @@
       pattern: '(?i)bluedon web application firewall'
 
 - id: tencent-cloud-waf
+  search_tags: [tencent]
   name: Tencent Cloud WAF
   category: waf
   match:
@@ -481,6 +489,7 @@
       pattern: '(?i)\bsafeline\b'
 
 - id: nsfocus-waf
+  search_tags: [nsfocus]
   name: NSFOCUS WAF
   category: waf
   match:
@@ -525,6 +534,7 @@
       pattern: '\S'
 
 - id: tencent-cloud-cdn
+  search_tags: [tencent]
   name: Tencent Cloud CDN
   category: cdn
   softmatch: true
@@ -1304,6 +1314,7 @@
       pattern: '(?i)<title>\s*Consul'
 
 - id: vault
+  search_tags: [hashicorp]
   name: HashiCorp Vault
   category: secrets
   cpe: cpe:/a:hashicorp:vault
@@ -1318,6 +1329,7 @@
       pattern: '\S'
 
 - id: rabbitmq-management
+  search_tags: [rabbitmq]
   name: RabbitMQ Management
   category: mq
   cpe: cpe:/a:pivotal_software:rabbitmq
@@ -1679,6 +1691,7 @@
       pattern: '(?i)\bBIGipServer[^\s=]*='
 
 - id: citrix-netscaler
+  search_tags: [citrix]
   name: Citrix NetScaler
   category: load-balancer
   match:
@@ -1707,6 +1720,7 @@
       pattern: '(?i)Gerrit Code Review'
 
 - id: kubernetes-dashboard
+  search_tags: [kubernetes]
   name: Kubernetes Dashboard
   category: panel
   cpe: cpe:/a:kubernetes:dashboard
@@ -1732,6 +1746,7 @@
       pattern: '(?i)com\.sun\.faces'
 
 - id: zabbix-web
+  search_tags: [zabbix]
   name: Zabbix Web
   category: monitoring
   match:
@@ -1930,6 +1945,7 @@
       pattern: "^1624375939$"
 
 - id: owa
+  search_tags: [exchange]
   name: Microsoft Exchange OWA
   category: mail
   match:
@@ -2176,6 +2192,7 @@
       confidence: probable
 
 - id: fortinet-fortigate
+  search_tags: [fortinet]
   name: Fortinet FortiGate
   category: network-device
   match:
@@ -2196,6 +2213,7 @@
       confidence: probable
 
 - id: cisco-asa
+  search_tags: [cisco]
   name: Cisco Adaptive Security Appliance
   category: network-device
   match:
@@ -2219,6 +2237,7 @@
       pattern: '(?i)registry'
 
 - id: kubernetes-apiserver
+  search_tags: [kubernetes]
   name: Kubernetes API Server
   category: container
   cpe: cpe:/a:kubernetes:kubernetes
@@ -2353,6 +2372,7 @@
 # ---- 深信服 ----
 
 - id: sangfor-logcenter
+  search_tags: [sangfor, 深信服]
   name: 深信服 日志中心
   category: security
   match:
@@ -2422,6 +2442,7 @@
       pattern: '(?i)jhsoft\.web\.login'
 
 - id: seeyon-m3
+  search_tags: [seeyon, 致远]
   name: 致远 M3
   category: oa
   match:
@@ -2456,6 +2477,7 @@
       pattern: '(?i)onmouseout="this\.className='
 
 - id: yonyou-ism
+  search_tags: [yonyou, 用友]
   name: 用友 ISM
   category: erp
   match:
@@ -2464,6 +2486,7 @@
       pattern: '(?i)screen\.deviceYDpi'
 
 - id: yonyou-shop
+  search_tags: [yonyou, 用友]
   name: 用友商城
   category: erp
   match:
@@ -2532,6 +2555,7 @@
       pattern: '(?i)Apache ActiveMQ'
 
 - id: apache-dubbo
+  search_tags: [dubbo]
   name: Apache Dubbo
   category: api-gateway
   match:
@@ -2541,6 +2565,7 @@
       pattern: '(?i)basic realm="dubbo"'
 
 - id: apache-skywalking
+  search_tags: [skywalking]
   name: Apache SkyWalking
   category: monitoring
   match:
@@ -2555,6 +2580,7 @@
       pattern: '(?i)eureka/css/wro\.css'
 
 - id: rocketmq-console
+  search_tags: [rocketmq]
   name: RocketMQ Console
   category: mq
   match:
@@ -2562,6 +2588,7 @@
       pattern: '(?i)rocketmq-console-ng'
 
 - id: kafka-ui
+  search_tags: [kafka]
   name: Kafka UI
   category: mq
   match:
@@ -2576,6 +2603,7 @@
       pattern: '(?i)Kafka Center'
 
 - id: kafka-manager
+  search_tags: [kafka]
   name: Kafka Manager
   category: mq
   softmatch: true
@@ -2584,6 +2612,7 @@
       pattern: '2af62f58ee2baf495c9b3a9a1c30ce03-favicon\.png'
 
 - id: apache-axis2
+  search_tags: [axis2]
   name: Apache Axis2
   category: framework
   match:
@@ -2635,6 +2664,7 @@
       header: x-cocoon-version
 
 - id: apache-guacamole
+  search_tags: [guacamole]
   name: Apache Guacamole
   category: remote-desktop
   match:
@@ -2670,6 +2700,7 @@
 # ---- 网络 / 安全设备 ----
 
 - id: ruijie-rgos
+  search_tags: [ruijie, 锐捷]
   name: 锐捷 RGOS
   category: network-device
   match:
@@ -2685,6 +2716,7 @@
       pattern: 'mark="login\.copyright">锐捷网络'
 
 - id: ruijie-sslvpn
+  search_tags: [ruijie, 锐捷]
   name: 锐捷 SSL VPN
   category: security
   match:
@@ -2692,6 +2724,7 @@
       pattern: '(?i)rjsslvpn_encookie'
 
 - id: huawei-ssl-vpn
+  search_tags: [huawei, 华为]
   name: 华为 SSL VPN
   category: security
   match:
@@ -2699,6 +2732,7 @@
       pattern: '(?i)SVN_GETLOGINCONTEXTVALUE\('
 
 - id: huawei-fusioncompute
+  search_tags: [huawei, 华为]
   name: 华为 FusionCompute
   category: virtualization
   match:
@@ -2720,6 +2754,7 @@
       pattern: '(?i)/imc/login\.jsf'
 
 - id: h3c-secpath-audit
+  search_tags: [h3c]
   name: H3C SecPath 运维审计系统
   category: security
   match:
@@ -2727,6 +2762,7 @@
       pattern: 'H3C SecPath 运维审计系统'
 
 - id: sangfor-ssl-vpn
+  search_tags: [sangfor, 深信服]
   name: 深信服 SSL VPN
   category: security
   match:
@@ -2744,6 +2780,7 @@
       confidence: probable
 
 - id: qax-secfox
+  search_tags: [奇安信]
   name: 奇安信 SecFox
   category: security
   match:
@@ -2751,6 +2788,7 @@
       pattern: '(?i)mtokenplugin'
 
 - id: nsfocus-vpn
+  search_tags: [nsfocus, 绿盟]
   name: 绿盟 SSL VPN
   category: security
   match:
@@ -2758,6 +2796,7 @@
       pattern: '(?i)/logo_login_nsfocus\.png'
 
 - id: leadsec-ssl-vpn
+  search_tags: [leadsec]
   name: 网御 SSL VPN
   category: security
   match:
@@ -2765,6 +2804,7 @@
       pattern: '(?i)/ssl/down/usbkey\.exe'
 
 - id: topsec-vpn
+  search_tags: [topsec, 天融信]
   name: 天融信 VPN
   category: security
   match:
@@ -2787,6 +2827,7 @@
       pattern: '(?i)admin/js/virtual_keyboard\.js'
 
 - id: cisco-ssl-vpn
+  search_tags: [cisco]
   name: Cisco SSL VPN
   category: security
   match:
@@ -2795,6 +2836,7 @@
       key: webvpncontext
 
 - id: fortinet-sslvpn
+  search_tags: [fortinet]
   name: Fortinet SSL VPN
   category: security
   match:
@@ -2840,6 +2882,7 @@
       pattern: '(?i)\bprofense\b'
 
 - id: anheng-mingyu-waf
+  search_tags: [mingyu]
   name: 安恒明御 WAF
   category: waf
   match:

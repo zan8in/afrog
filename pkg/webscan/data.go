@@ -415,6 +415,19 @@ type Rule struct {
 	SoftMatch bool        `yaml:"softmatch,omitempty" json:"softmatch,omitempty"`
 	Match     []MatchRule `yaml:"match" json:"match"`
 
+	// SearchTags 是检索别名，只用于把本技术接回 PoC 语料里真实使用的关键词。
+	//
+	// 专治「死词」：规则的 id/name 未必是 PoC 作者写在 tags/requires 里的词——
+	// apache-httpd 这条规则，PoC 侧认的是 apache（实测 80+ 条命中），而
+	// apache-httpd / apache httpd 在语料里一条都搜不到。此处手写别名把两者对上。
+	//
+	// 只在 suggested_search（检索建议）生效，不进 requires 门控：门控要精确（错放一条
+	// 就多一次探测请求），检索要召回广。两者角色冲突，故不给同一份词表。
+	//
+	// 必须手写、不可自动拆词：拆 apache-httpd 得到 apache 尚可，拆
+	// azure-front-door 得 door、element-plus 得 plus 就是纯噪声。
+	SearchTags []string `yaml:"search_tags,omitempty" json:"search_tags,omitempty"`
+
 	order int
 }
 
@@ -540,8 +553,10 @@ func LoadDB(dir string) (*DB, error) {
 //   - 若另立一条，同一个 Vue.js 会出现两条记录；
 //   - 若整条丢弃，社区集里精选集没有的判据（如 Cloudflare 的 cf-cache-status）就被白白浪费。
 //
-// 「同一条技术」有两种等价判定：同 id，或同技术名（id 不同）。前者是社区沿用我们 id 的
-// 情况，后者是 id 命名习惯不同的情况（如 nextjs vs next-js），两者一视同仁。
+// 「同一条技术」有三种等价判定：同 id，同技术名（id 不同），或同 CPE 产品（id 与名都不同）。
+// 前者是社区沿用我们 id 的情况，中者是 id 命名习惯不同的情况（如 nextjs vs next-js），
+// 末者是两库各叫各的、但 CPE 指向同一个产品的情况（如精选 apache-httpd 与社区
+// apache-http-server 都是 Apache HTTP Server，名也各写各的），三者一视同仁。
 func loadBuiltinRules() ([]*Rule, error) {
 	var curated []*Rule
 	if err := unmarshalEmbedded(builtinRulesFile, &curated); err != nil {
@@ -557,15 +572,24 @@ func loadBuiltinRules() ([]*Rule, error) {
 
 	byID := make(map[string]*Rule, len(curated))
 	byName := make(map[string]*Rule, len(curated))
+	byCPE := make(map[string]*Rule, len(curated))
 	for _, r := range curated {
 		byID[r.ID] = r
 		byName[ruleNameKey(r.Name)] = r
+		if k := cpeProductKey(r.CPE); k != "" {
+			byCPE[k] = r
+		}
 	}
 
 	for _, r := range community {
 		host, ok := byID[r.ID]
 		if !ok {
 			host, ok = byName[ruleNameKey(r.Name)]
+		}
+		if !ok {
+			if k := cpeProductKey(r.CPE); k != "" {
+				host, ok = byCPE[k]
+			}
 		}
 		if ok {
 			// 社区判据来自众包数据，强度不如人工精调，统一压到 probable：
@@ -578,6 +602,9 @@ func loadBuiltinRules() ([]*Rule, error) {
 		}
 		byID[r.ID] = r
 		byName[ruleNameKey(r.Name)] = r
+		if k := cpeProductKey(r.CPE); k != "" {
+			byCPE[k] = r
+		}
 		merged = append(merged, r)
 	}
 	return merged, nil
@@ -586,6 +613,30 @@ func loadBuiltinRules() ([]*Rule, error) {
 // ruleNameKey 是合并规则时用的「技术名」归一化键：忽略大小写与首尾空白。
 func ruleNameKey(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
+}
+
+// cpeProductKey 把 CPE 归一成「厂商:产品」小写键，用来判定两库里的规则是不是同一个产品。
+//
+// 兼容两种写法：URI 绑定 "cpe:/a:apache:http_server" 与 2.3 格式
+// "cpe:2.3:a:apache:http_server:*:..."。产品段按 CPE 规范写作下划线，故连字符也折成下划线，
+// 避免 http_server 与 http-server 被当成两个产品。
+//
+// 返回空串表示无法判定（CPE 缺失或格式不认识），调用方必须跳过、不得据此合并——
+// 宁可漏合并，也不能把两个不同产品并成一条。
+func cpeProductKey(cpe string) string {
+	parts := strings.Split(strings.TrimSpace(cpe), ":")
+	switch {
+	case len(parts) >= 5 && parts[0] == "cpe" && parts[1] == "2.3":
+		return cpeSegment(parts[3]) + ":" + cpeSegment(parts[4])
+	case len(parts) >= 4 && parts[0] == "cpe" && strings.HasPrefix(parts[1], "/"):
+		return cpeSegment(parts[2]) + ":" + cpeSegment(parts[3])
+	}
+	return ""
+}
+
+// cpeSegment 归一 CPE 的单个字段：小写、去空白、连字符折成下划线。
+func cpeSegment(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), "-", "_")
 }
 
 func unmarshalEmbedded(name string, out interface{}) error {

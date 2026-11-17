@@ -168,6 +168,28 @@ func TestProbeFingerprintToolMatchesTech(t *testing.T) {
 	}
 }
 
+// apache-httpd 这类规则的 id/name 在 PoC 语料里是死词（没人这么写），靠 search_tags
+// 手写别名接回真实关键词（apache）。这里验证别名一路流到 suggested_search。
+func TestProbeFingerprintSuggestedSearchCarriesSearchTags(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Server", "Apache/2.4.41 (Unix)")
+		_, _ = w.Write([]byte(`<html><head><title>It works!</title></head><body>ok</body></html>`))
+	}))
+	t.Cleanup(srv.Close)
+
+	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 20\n  duration: 2m\n")
+	out, err := s.tools["probe.fingerprint"].Handler(context.Background(), mustJSON(t, map[string]any{
+		"url": srv.URL,
+	}))
+	if err != nil {
+		t.Fatalf("probe.fingerprint: %v", err)
+	}
+	suggested, _ := out.(map[string]any)["suggested_search"].(string)
+	if !strings.Contains(suggested, "apache") {
+		t.Fatalf("suggested_search = %q, want it to carry the search_tag apache", suggested)
+	}
+}
+
 // 首页识别不出任何技术栈时，应自动补抓一次 /favicon.ico 再匹配（多一次请求、多一次预算）。
 func TestProbeFingerprintAutoFetchesFaviconWhenNoTech(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

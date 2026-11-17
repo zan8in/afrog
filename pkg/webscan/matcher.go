@@ -350,6 +350,7 @@ func (m *Matcher) matchRule(rule *Rule, mat material, hits, hitsCI []bool) (Tech
 				Confidence: mr.confidenceFor(rule),
 				RuleID:     rule.ID,
 				Evidence:   evidenceFor(mr, ""),
+				SearchTags: rule.SearchTags,
 			}, true
 		}
 		if text == "" {
@@ -380,6 +381,7 @@ func (m *Matcher) matchRule(rule *Rule, mat material, hits, hitsCI []bool) (Tech
 			Confidence: mr.confidenceFor(rule),
 			RuleID:     rule.ID,
 			Evidence:   evidenceFor(mr, groups.match[0]),
+			SearchTags: rule.SearchTags,
 		}, true
 	}
 	return Technology{}, false

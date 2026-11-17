@@ -615,9 +615,9 @@ func (s *Server) pocSearchTool() *Tool {
 						},
 					},
 				},
-				"count":     map[string]any{"type": "integer", "description": "本次返回条数"},
-				"total":     map[string]any{"type": "integer", "description": "命中总数"},
-				"truncated": map[string]any{"type": "boolean", "description": "命中数超过 limit 被截断"},
+				"count":      map[string]any{"type": "integer", "description": "本次返回条数"},
+				"total":      map[string]any{"type": "integer", "description": "命中总数"},
+				"truncated":  map[string]any{"type": "boolean", "description": "命中数超过 limit 被截断"},
 				"conclusion": map[string]any{"type": "string", "description": "has_poc（本机有该关键词的 PoC）/ no_poc_for_keyword（本机没有，别据此判定目标无漏洞）"},
 				"guidance":   map[string]any{"type": "string", "description": "total 为 0 时给出的下一步建议"},
 			},
@@ -1333,9 +1333,9 @@ func (s *Server) probeFingerprintTool() *Tool {
 			techs := make([]map[string]any, 0, len(matched.Technologies))
 			waf := make([]string, 0, 2)
 			cdn := make([]string, 0, 2)
-			// suggested_search 是本工具交给模型的关键词：把每条技术栈的 requires 标识词
-			// （规则 id、技术名及其连字符写法）拼成逗号串，可原样透传给 poc.search(keyword=)
-			// 与 scan.start(search=)。用 MatchTokens 而不是只用名称，是为了让「检索口径」与
+			// searchTokens 是本工具交给模型的关键词：把每条技术栈的 requires 标识词
+			// 与手写检索别名拼成逗号串，可原样透传给 poc.search(keyword=) 与
+			// scan.start(search=)。用 MatchTokens 而不是只用名称，是为了让「检索口径」与
 			// afrog 自身的 requires 门控一致——模型不必再猜关键词（那一步最容易乱编：
 			// 识别出 jQuery 却去搜 wordpress、nginx 之类根本没识别到的产品）。
 			//
@@ -1344,6 +1344,17 @@ func (s *Server) probeFingerprintTool() *Tool {
 			// 违背本工具面「按需、可解释」的定位。规则 id 才是 PoC requires 里真正书写的词。
 			searchTokens := make([]string, 0, len(matched.Technologies)*2)
 			seenToken := make(map[string]struct{}, len(matched.Technologies)*2)
+			addToken := func(tok string) {
+				tok = strings.ToLower(strings.TrimSpace(tok))
+				if tok == "" {
+					return
+				}
+				if _, ok := seenToken[tok]; ok {
+					return
+				}
+				seenToken[tok] = struct{}{}
+				searchTokens = append(searchTokens, tok)
+			}
 			for _, t := range matched.Technologies {
 				techs = append(techs, map[string]any{
 					"name":       t.Name,
@@ -1358,11 +1369,12 @@ func (s *Server) probeFingerprintTool() *Tool {
 					if tok == category {
 						continue
 					}
-					if _, ok := seenToken[tok]; ok {
-						continue
-					}
-					seenToken[tok] = struct{}{}
-					searchTokens = append(searchTokens, tok)
+					addToken(tok)
+				}
+				// SearchTags 是手写的检索别名，专治 id/name 在 PoC 语料里搜不到的死词
+				// （如 apache-httpd → apache）。它只影响这里的检索建议，不进 requires 门控。
+				for _, tok := range t.SearchTags {
+					addToken(tok)
 				}
 				switch strings.ToLower(t.Category) {
 				case "waf":
@@ -1467,8 +1479,8 @@ func (s *Server) scanStartTool() *Tool {
 		GatingLevel string `json:"gating_level"`
 	}
 	return &Tool{
-		Name:  "scan.start",
-		Title: "按技术栈并发扫描",
+		Name:        "scan.start",
+		Title:       "按技术栈并发扫描",
 		Description: "用一次子进程并发跑完某个技术栈（关键词）下的全部 PoC，返回可重放证据——这是取代逐个验证的主入口。search 传技术栈/产品关键词（thinkphp、jquery、shiro…，逗号分隔可多个）：afrog 按 -s 选 PoC（命中 id/名称/标签）。**search 留空表示不加关键词、跑全库所有 PoC**——这是「没有任何指纹线索」时的兜底，请求量与耗时都大得多，只在 plan.next 也给不出关键词、且已征得用户同意「用 afrog 扫描全部漏洞」时才用。带关键词时，命中该关键词的指纹 PoC 不受 severity 限制也会被保留（关键词是硬前提：关键词不命中的指纹 PoC 同样会被滤掉），于是指纹阶段照常运行、requires 按真实指纹放行——既不会出现「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不为 N 个候选发 N 次串行请求。执行前先用 poc.search(keyword=…) 预检「本机有没有该技术栈的 PoC」（等价 afrog -pl -s；probe.fingerprint 返回的 suggested_search 可直接透传），结果为空就别扫。severity 只是按级别粗筛的兜底：用户没有指定等级时留空（即扫描所有等级），不要无理由默认塞 high,critical。",
 		InputSchema: map[string]any{
 			"type": "object",
@@ -1583,7 +1595,7 @@ func scanRunResult(target, search string, run *scanRun, matched int) map[string]
 		// library 是「本机 PoC 库对这个关键词的覆盖」：matched_pocs 为库中匹配数，
 		// executed_pocs 为实际执行数。两者一起看，才能分清「没 PoC」与「有 PoC 没命中」。
 		"library": map[string]any{
-			"matched_pocs": matched,
+			"matched_pocs":  matched,
 			"executed_pocs": executed,
 		},
 	}

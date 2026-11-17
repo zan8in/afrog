@@ -410,6 +410,42 @@ func TestTechnologyMatchTokens(t *testing.T) {
 	}
 }
 
+// SearchTags 是手写的检索别名：把 id/name 在 PoC 语料里搜不到的死词接回真实用词。
+// 它只透传给 suggested_search，绝不进 requires 门控——apache 太宽，放进门控会凭空放大扫描面。
+func TestSearchTagsFlowIntoTechnology(t *testing.T) {
+	m, err := LoadMatcher("")
+	if err != nil {
+		t.Fatalf("LoadMatcher: %v", err)
+	}
+	res := m.Match(Response{
+		StatusCode: 200,
+		Headers:    map[string]string{"server": "Apache/2.4.41 (Unix)"},
+	})
+	var got *Technology
+	for i := range res.Technologies {
+		if res.Technologies[i].RuleID == "apache-httpd" {
+			got = &res.Technologies[i]
+		}
+	}
+	if got == nil {
+		t.Fatalf("expected apache-httpd, got %+v", res.Technologies)
+	}
+	found := false
+	for _, tag := range got.SearchTags {
+		if tag == "apache" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("apache-httpd SearchTags = %v, want to contain apache", got.SearchTags)
+	}
+	for _, tok := range got.MatchTokens() {
+		if tok == "apache" {
+			t.Fatalf("检索别名 apache 混进了 requires 门控词表: %v", got.MatchTokens())
+		}
+	}
+}
+
 // 内置规则集里的技术栈都应能产出 requires 词，避免出现「识别得出却门控不上」。
 func TestBuiltinRulesProduceMatchTokens(t *testing.T) {
 	db, err := LoadDB("")
@@ -423,6 +459,59 @@ func TestBuiltinRulesProduceMatchTokens(t *testing.T) {
 		}
 		if tokens[0] != strings.ToLower(r.ID) {
 			t.Fatalf("rule %s first token = %q, want its id", r.ID, tokens[0])
+		}
+	}
+}
+
+// cpeProductKey 要能认下两种 CPE 写法，并在无法判定时返回空串（宁可漏合并）。
+func TestCPEProductKey(t *testing.T) {
+	tests := []struct {
+		cpe  string
+		want string
+	}{
+		{"cpe:/a:apache:http_server", "apache:http_server"},
+		{"cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*", "apache:http_server"},
+		{"cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*", "apache:tomcat"},
+		// 连字符折成下划线，避免同一产品被当成两个。
+		{"cpe:2.3:a:f5:nginx-Plus:*:*:*:*:*:*:*:*", "f5:nginx_plus"},
+		{"", ""},
+		{"not-a-cpe", ""},
+		{"cpe:/a:apache", ""},
+	}
+	for _, tc := range tests {
+		if got := cpeProductKey(tc.cpe); got != tc.want {
+			t.Fatalf("cpeProductKey(%q) = %q, want %q", tc.cpe, got, tc.want)
+		}
+	}
+}
+
+// 同一产品跨两库只留一条：精选 apache-httpd 与社区 apache-http-server 都是 Apache HTTP
+// Server，名也各写各的，只能靠 CPE 归并；否则探测输出里会出现两个产品、多个拼写变体，
+// 交给模型当检索关键词全是死词。
+func TestBuiltinRulesMergeSameProductByCPE(t *testing.T) {
+	db, err := LoadDB("")
+	if err != nil {
+		t.Fatalf("LoadDB: %v", err)
+	}
+	byID := make(map[string]*Rule, len(db.Rules))
+	for _, r := range db.Rules {
+		byID[r.ID] = r
+	}
+	// 社区侧 id 应被并入精选侧，不再独立存在。
+	for _, id := range []string{"apache-http-server", "microsoft-asp-net"} {
+		if _, ok := byID[id]; ok {
+			t.Fatalf("社区规则 %s 应并入精选规则，实际仍在", id)
+		}
+	}
+	// 精选侧 id 保留，且词表里不再出现社区拼写。
+	for _, id := range []string{"apache-httpd", "aspnet"} {
+		if _, ok := byID[id]; !ok {
+			t.Fatalf("精选规则 %s 缺失", id)
+		}
+	}
+	for _, tok := range MatchTokens("apache-httpd", "Apache httpd", "web-server") {
+		if tok == "apache-http-server" || tok == "apache http server" {
+			t.Fatalf("apache-httpd 的词表里不应再出现社区拼写 %q", tok)
 		}
 	}
 }

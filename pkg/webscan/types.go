@@ -36,6 +36,11 @@ type Technology struct {
 	// RuleID 回答「哪条规则」，Evidence 回答「规则在哪里命中的」，两者互补，
 	// 让识别结论可复核（尤其是 probable 的弱判据）。
 	Evidence string
+	// SearchTags 是规则的检索别名，来自 Rule.SearchTags。
+	//
+	// 与 MatchTokens 的区别：MatchTokens 是 requires 门控词表（含 id/name/category，
+	// 要求精确），SearchTags 只用于检索建议（把死词接回语料真实用词，要求召回广）。
+	SearchTags []string
 }
 
 // MatchTokens 返回一条 Web 指纹在 PoC requires 门控里可用的标识词，全部小写、去重。
