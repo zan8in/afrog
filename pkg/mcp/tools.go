@@ -1046,9 +1046,9 @@ func (s *Server) probeHTTPTool() *Tool {
 
 // --- probe.port ---
 
-// maxProbePorts 是单次端口探测的端口数上限：工具调用应当短小，全端口扫描
-// 走 CLI / 扫描任务，不要从一次 MCP 调用里发起。
-const maxProbePorts = 1000
+// maxProbePorts 是单次端口探测的端口数上限，直接取满端口空间 65535，
+// 使 `-p full` / `-p 1-65535` 这类全量表达式也能从一次 MCP 调用发起。
+const maxProbePorts = 65535
 
 func (s *Server) probePortTool() *Tool {
 	type args struct {
@@ -1059,12 +1059,12 @@ func (s *Server) probePortTool() *Tool {
 	return &Tool{
 		Name:        "probe.port",
 		Title:       "端口探测",
-		Description: "对单个主机做受限端口探测，返回开放端口与服务指纹。ports 支持 top100/top1000、单端口、区间（如 8000-8100），留空为 top100；单次最多 1000 个端口，按端口数扣预算。目标没有 Web 面，或想先看有哪些服务时用它。",
+		Description: "对单个主机做受限 TCP 端口探测（connect 扫描），返回开放端口与服务指纹；服务信息取自被动 banner 抓取，不发主动服务探针。ports 语义对齐 afrog 的 `-p`：支持单端口（如 3306）、区间（如 8000-8100）、逗号组合（如 80,443,8080-8090），以及关键字 top（常用端口集）与 full（全端口 65535）；单次最多 65535 个端口，超出直接报错，按表达式端口数扣预算。用法：用户只说「扫端口」而没给范围时，ports 留空即可——等价于 afrog 的 `-ps`（默认按 top 常用端口集扫）；用户指明了要扫哪些端口时，按上面的 `-p` 语法填 ports。注意：top100 / top1000 这类写法不是有效关键字（会扫不到任何端口），请用 top / full 或显式列出。目标没有 Web 面、或想先摸清暴露了哪些服务时用它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"host":        map[string]any{"type": "string", "description": "主机、host:port 或 URL"},
-				"ports":       map[string]any{"type": "string", "description": "端口表达式，默认 top100"},
+				"ports":       map[string]any{"type": "string", "description": "端口表达式，语法同 afrog 的 -p：单端口（3306）、区间（8000-8100）、逗号组合（80,443）或关键字 top/full；留空等价于 -ps 的默认（top 常用端口集）"},
 				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 600, "description": "整体超时，默认 120 秒"},
 			},
 			"required": []string{"host"},
@@ -1081,7 +1081,8 @@ func (s *Server) probePortTool() *Tool {
 
 			spec := strings.TrimSpace(a.Ports)
 			if spec == "" {
-				spec = "top100"
+				// 未指定端口范围时等价于 afrog 的 -ps 默认端口集（top）。
+				spec = "top"
 			}
 			count, err := countProbePorts(spec)
 			if err != nil {
@@ -1184,49 +1185,21 @@ func probeHost(raw string) (string, error) {
 	return strings.Trim(raw, "[]"), nil
 }
 
-// countProbePorts 静态数出一次探测会发起多少个连接，用于预算预留。
+// countProbePorts 数出一次探测会发起多少个连接，用于预算预留与上限校验。
+// 直接复用引擎自身的端口解析器（portscan.NewPortIterator），保证「计数」与
+// 「实际扫描的端口集合」永远一致，避免两套解析规则各写一份、各自漂移。
 func countProbePorts(spec string) (int, error) {
-	spec = strings.ToLower(strings.TrimSpace(spec))
-	switch spec {
-	case "", "top", "top100":
-		return 100, nil
-	case "full", "all":
-		return 65535, nil
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		spec = "top"
 	}
-
-	total := 0
-	for _, tok := range strings.FieldsFunc(spec, func(r rune) bool {
-		return r == ',' || r == ' ' || r == '\t' || r == '\n'
-	}) {
-		tok = strings.TrimSpace(tok)
-		if tok == "" {
-			continue
-		}
-		if strings.HasPrefix(tok, "top") {
-			n, err := strconv.Atoi(strings.TrimPrefix(tok, "top"))
-			if err != nil || n <= 0 {
-				return 0, fmt.Errorf("invalid port token %q", tok)
-			}
-			total += n
-			continue
-		}
-		if i := strings.IndexByte(tok, '-'); i > 0 {
-			lo, errLo := strconv.Atoi(tok[:i])
-			hi, errHi := strconv.Atoi(tok[i+1:])
-			if errLo != nil || errHi != nil || lo <= 0 || hi > 65535 || lo > hi {
-				return 0, fmt.Errorf("invalid port range %q", tok)
-			}
-			total += hi - lo + 1
-			continue
-		}
-		n, err := strconv.Atoi(tok)
-		if err != nil || n <= 0 || n > 65535 {
-			return 0, fmt.Errorf("invalid port %q", tok)
-		}
-		total++
+	iter, err := portscan.NewPortIterator(spec)
+	if err != nil {
+		return 0, err
 	}
+	total := iter.Total()
 	if total == 0 {
-		return 0, fmt.Errorf("ports is empty")
+		return 0, fmt.Errorf("ports %q resolved to no ports", spec)
 	}
 	return total, nil
 }

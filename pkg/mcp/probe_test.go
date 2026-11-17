@@ -17,9 +17,9 @@ func TestCountProbePorts(t *testing.T) {
 		spec string
 		want int
 	}{
-		{"", 100},
-		{"top100", 100},
-		{"top1000", 1000},
+		// 留空等价于 -ps 的默认端口集（top）。
+		{"", 640},
+		{"top", 640},
 		{"full", 65535},
 		{"80", 1},
 		{"80,443", 2},
@@ -36,7 +36,9 @@ func TestCountProbePorts(t *testing.T) {
 		}
 	}
 
-	for _, bad := range []string{"abc", "0", "70000", "8000-7999", "topabc"} {
+	// top100 / top1000 这类 top<N> 不是有效关键字：引擎会解析出 0 个端口，
+	// 计数侧必须报错而不是静默按 0 扣预算。
+	for _, bad := range []string{"abc", "0", "70000", "8000-7999", "topabc", "top100", "top1000"} {
 		if _, err := countProbePorts(bad); err == nil {
 			t.Fatalf("countProbePorts(%q) should fail", bad)
 		}
@@ -98,18 +100,21 @@ func TestProbePortToolFindsListener(t *testing.T) {
 	}
 }
 
-// 全端口扫描不该从一次 MCP 调用里发起：超限要在扣预算之前拒绝。
-func TestProbePortToolRejectsTooManyPorts(t *testing.T) {
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 20000\n  duration: 2m\n")
+// maxProbePorts 即整个端口空间（65535），而任何单个端口表达式去重后最多也就是
+// 65535 个端口，所以「超出上限」这一分支不会被任何合法表达式触发。这里验证边界：
+// 全端口表达式能通过上限校验，随后由预算兜住——预算不足时在扣减前就失败、且不扣
+// 额度，也就不会真的去扫 65535 个端口。
+func TestProbePortToolFullRangeWithinPortLimit(t *testing.T) {
+	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 100\n  duration: 2m\n")
 
 	_, err := s.tools["probe.port"].Handler(context.Background(), mustJSON(t, map[string]any{
 		"host":  "127.0.0.1",
-		"ports": "1-2000",
+		"ports": "full",
 	}))
-	if err == nil || !strings.Contains(err.Error(), "above the") {
-		t.Fatalf("err = %v, want the port limit", err)
+	if err == nil || !strings.Contains(err.Error(), "budget") {
+		t.Fatalf("err = %v, want the budget gate (full range is within the port limit)", err)
 	}
-	if got := s.gate.Budget().Remaining(); got != 20000 {
+	if got := s.gate.Budget().Remaining(); got != 100 {
 		t.Fatalf("budget touched by rejected call: %d", got)
 	}
 }
