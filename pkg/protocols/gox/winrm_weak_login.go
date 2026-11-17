@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	urlutil "github.com/zan8in/pins/url"
 )
 
@@ -121,12 +122,21 @@ func newWinRMClients(endpoint string, dialTimeout, headerTimeout time.Duration) 
 		return nil, fmt.Errorf("invalid winrm endpoint: %s", endpoint)
 	}
 
+	baseDialer := &net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: 30 * time.Second,
+	}
 	tr := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   dialTimeout,
-			KeepAlive: 30 * time.Second,
-		}).DialContext,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			key := breakerKeyOfAddress(address)
+			if err := retryhttpclient.HostBreakerWait(key); err != nil {
+				return nil, err
+			}
+			c, derr := baseDialer.DialContext(ctx, network, address)
+			retryhttpclient.HostBreakerObserve(key, derr == nil, retryhttpclient.IsHostBreakerCanceled(ctx))
+			return c, derr
+		},
 		TLSHandshakeTimeout:   dialTimeout,
 		ResponseHeaderTimeout: headerTimeout,
 		ExpectContinueTimeout: 1 * time.Second,

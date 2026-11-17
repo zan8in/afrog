@@ -70,7 +70,7 @@ func telnet_weak_login(target string, variableMap map[string]any) error {
 }
 
 func telnetAuthAttempt(host, username, password string) (ok bool, noAuth bool) {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false, false
 	}
@@ -154,7 +154,7 @@ func telnet_env_user_root(target string, variableMap map[string]any) error {
 }
 
 func telnetEnvAuthAttempt(host, username, password, envValue string) (bool, string) {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false, err.Error()
 	}

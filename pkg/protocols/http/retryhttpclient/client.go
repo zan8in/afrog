@@ -449,10 +449,10 @@ func urlHostPortKey(u *url.URL) string {
 	return host + ":" + port
 }
 
+// WaitHostPort 是网络型路径建连前的统一闸门：先过 host:port 熔断，再做每目标
+// 限速。目标已被判定失联时直接返回 hostBreakerSuppressedError，调用方据此跳过，
+// 避免每个 PoC 各自等满超时。
 func WaitHostPort(ctx context.Context, host string, port string) error {
-	if reqLimiter == nil {
-		return nil
-	}
 	host = strings.TrimSpace(host)
 	port = strings.TrimSpace(port)
 	if host == "" {
@@ -460,6 +460,13 @@ func WaitHostPort(ctx context.Context, host string, port string) error {
 	}
 	if port == "" {
 		port = "80"
+	}
+	// 网络型路径（tcp/ssl/js-net/js-ssh/gox）共用 HTTP 侧的 host:port 熔断。
+	if err := HostBreakerWait(net.JoinHostPort(host, port)); err != nil {
+		return err
+	}
+	if reqLimiter == nil {
+		return nil
 	}
 	start := time.Now()
 	err := reqLimiter.get(net.JoinHostPort(host, port)).Wait(ctx)

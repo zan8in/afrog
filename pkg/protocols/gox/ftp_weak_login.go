@@ -3,7 +3,6 @@ package gox
 import (
 	"bufio"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -62,7 +61,7 @@ func ftp_weak_login(target string, variableMap map[string]any) error {
 }
 
 func ftpAuthAttempt(host, username, password string) bool {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false
 	}

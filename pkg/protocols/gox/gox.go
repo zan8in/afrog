@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptrace"
 	"reflect"
@@ -130,6 +131,28 @@ func hasPort(host string) bool {
 		return true
 	}
 	return strings.Count(host, ":") == 1
+}
+
+// breakerKeyOfAddress 从 host:port 地址提取熔断键；无法解析时返回空串，表示本次
+// 建连不参与熔断。
+func breakerKeyOfAddress(address string) string {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(address))
+	if err != nil {
+		return ""
+	}
+	return retryhttpclient.HostBreakerKey(host, port)
+}
+
+// dialTCPBreaker 建立 TCP 连接，并复用 HTTP 侧同一套 host:port 熔断口径：目标处于
+// 熔断期时直接返回错误、不产生任何网络开销；建连结果作为一次可达性观测回报给熔断器。
+func dialTCPBreaker(address string, timeout time.Duration) (net.Conn, error) {
+	key := breakerKeyOfAddress(address)
+	if err := retryhttpclient.HostBreakerWait(key); err != nil {
+		return nil, err
+	}
+	conn, err := net.DialTimeout("tcp", address, timeout)
+	retryhttpclient.HostBreakerObserve(key, err == nil, false)
+	return conn, err
 }
 
 type HTTPSender interface {

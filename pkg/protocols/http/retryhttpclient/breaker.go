@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,6 +20,11 @@ import (
 // 仍失败就再次熔断。判定口径只看「有没有拿到 HTTP 响应」：404/403/500 都算
 // 拿到了响应，它们只说明服务在跑，与可达性无关。
 // 阈值与冷却时长保持可变，便于测试压缩时间；生产路径只用默认值。
+//
+// 同一个 host:port 熔断表也被非 HTTP 的网络型路径（tcp/ssl 的 netxclient、
+// javascript 的 afrog/net 与 afrog/ssh、gox 弱口令）共用：这些路径在建连前用
+// HostBreakerWait 短路、建连后用 HostBreakerObserve 回报可达性，使一台被打成
+// 黑洞的主机在任一协议上先被发现失联后，其余协议的任务也能一起被挡住。
 var (
 	// hostBreakerThreshold 连续多少次无响应即熔断。
 	hostBreakerThreshold = 5
@@ -187,4 +194,41 @@ func requestCanceled(req *http.Request) bool {
 		return false
 	}
 	return errors.Is(req.Context().Err(), context.Canceled)
+}
+
+// HostBreakerKey 归一化 host:port 作为熔断键，与 HTTP 侧 urlHostPortKey 口径一致。
+// host 为空（无法判定目标）时返回空串，表示该次调用不参与熔断。
+func HostBreakerKey(host, port string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return ""
+	}
+	port = strings.TrimSpace(port)
+	if port == "" {
+		port = "80"
+	}
+	return net.JoinHostPort(host, port)
+}
+
+// HostBreakerWait 供网络型路径（tcp/ssl/js-net/js-ssh/gox）在建连前调用：host:port
+// 处于熔断期时返回 hostBreakerSuppressedError，调用方据此直接跳过，不再产生任何
+// 网络开销。key 由 HostBreakerKey 生成。
+func HostBreakerWait(key string) error {
+	return reqBreaker.wait(key)
+}
+
+// HostBreakerObserve 供网络型路径在建连后调用，回报一次可达性观测。
+//
+// reachable 对原始 TCP/TLS 而言就是「连接建立成功」：连上即说明这台主机还活着，
+// 静默不回应某个探测报文的服务（协议不匹配）也仍然是活的，不能算不可达。
+// canceled 表示失败来自上层主动取消（用户中断、任务硬超时），这类失败不能当作
+// 目标不可达的证据，不计入熔断。
+func HostBreakerObserve(key string, reachable, canceled bool) {
+	reqBreaker.observe(key, reachable, canceled)
+}
+
+// IsHostBreakerCanceled 判断错误是否源于上下文被上层主动取消，供网络型路径区分
+// 「取消」与「真实失联」两种失败。
+func IsHostBreakerCanceled(ctx context.Context) bool {
+	return ctx != nil && errors.Is(ctx.Err(), context.Canceled)
 }

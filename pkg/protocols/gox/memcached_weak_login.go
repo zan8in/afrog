@@ -92,7 +92,7 @@ func resolveMemcachedAddress(target string) (string, error) {
 
 // memcachedUnauthAttempt tries to get stats without authentication
 func memcachedUnauthAttempt(host string) bool {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false
 	}
@@ -121,7 +121,7 @@ func memcachedUnauthAttempt(host string) bool {
 
 // memcachedSASLAuthAttempt tries to authenticate using SASL PLAIN
 func memcachedSASLAuthAttempt(host, username, password string) bool {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false
 	}

@@ -3,7 +3,6 @@ package gox
 import (
 	"bufio"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -77,7 +76,7 @@ func resolvePOP3Address(target string) (string, error) {
 }
 
 func pop3AuthAttempt(host, username, password string) bool {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false
 	}

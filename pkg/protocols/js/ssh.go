@@ -135,7 +135,9 @@ func (c *sshClientModule) ConnectSSHInfoMode(host string, port any) map[string]a
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(p))
+	breakerKey := retryhttpclient.HostBreakerKey(host, strconv.Itoa(p))
 	conn, err := (&net.Dialer{Timeout: c.timeoutOf()}).DialContext(ctx, "tcp", addr)
+	retryhttpclient.HostBreakerObserve(breakerKey, err == nil, retryhttpclient.IsHostBreakerCanceled(ctx))
 	if err != nil {
 		c.setErr(err)
 		return empty
@@ -188,7 +190,9 @@ func (c *sshClientModule) Connect(host string, port any, username, password stri
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(p))
+	breakerKey := retryhttpclient.HostBreakerKey(host, strconv.Itoa(p))
 	conn, err := (&net.Dialer{Timeout: c.timeoutOf()}).DialContext(ctx, "tcp", addr)
+	retryhttpclient.HostBreakerObserve(breakerKey, err == nil, retryhttpclient.IsHostBreakerCanceled(ctx))
 	if err != nil {
 		c.setErr(err)
 		return false

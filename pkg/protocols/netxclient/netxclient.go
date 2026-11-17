@@ -247,6 +247,7 @@ func NewConnSession(address string, conf Config, variableMap map[string]any) (*C
 	var c net.Conn
 	var err error
 
+	ckey := breakerKey(address)
 	if network == "ssl" {
 		tlsCfg := &tls.Config{InsecureSkipVerify: true}
 		if host, _, ok := parseHostPort(address); ok {
@@ -258,6 +259,7 @@ func NewConnSession(address string, conf Config, variableMap map[string]any) (*C
 	} else {
 		c, err = dialer.Dial("tcp", address)
 	}
+	retryhttpclient.HostBreakerObserve(ckey, err == nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -277,6 +279,15 @@ func minDuration(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
+}
+
+// breakerKey 返回 address 对应的 host:port 熔断键；address 无法解析时返回空串，
+// 表示本次建连不参与熔断。与 http 侧共用同一套 host:port 口径。
+func breakerKey(address string) string {
+	if host, port, ok := parseHostPort(address); ok {
+		return retryhttpclient.HostBreakerKey(host, port)
+	}
+	return ""
 }
 
 func (nc *NetClient) Request(data, dataType string, variableMap map[string]any) error {
@@ -532,7 +543,9 @@ func (nc *NetClient) sendReceiveTCP(payload []byte) ([]byte, error) {
 		dialer.Timeout = nc.config.DialTimeout
 	}
 
+	ckey := breakerKey(nc.address)
 	conn, err := dialer.Dial("tcp", nc.address)
+	retryhttpclient.HostBreakerObserve(ckey, err == nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -633,6 +646,7 @@ func (nc *NetClient) sendReceiveTLS(payload []byte) ([]byte, error) {
 	}
 
 	conn, err := tls.DialWithDialer(dialer, "tcp", nc.address, tlsCfg)
+	retryhttpclient.HostBreakerObserve(breakerKey(nc.address), err == nil, false)
 	if err != nil {
 		return nil, err
 	}

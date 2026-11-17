@@ -220,19 +220,21 @@ func (c *tcpClient) Connect(host string, port any) bool {
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(p))
+	breakerKey := retryhttpclient.HostBreakerKey(host, strconv.Itoa(p))
 	conn, err := (&net.Dialer{Timeout: c.dialTimeout()}).DialContext(ctx, "tcp", addr)
+	if err == nil && c.useTLS {
+		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true})
+		if herr := tlsConn.HandshakeContext(ctx); herr != nil {
+			_ = conn.Close()
+			err = herr
+		} else {
+			conn = tlsConn
+		}
+	}
+	retryhttpclient.HostBreakerObserve(breakerKey, err == nil, retryhttpclient.IsHostBreakerCanceled(ctx))
 	if err != nil {
 		c.setErr(err)
 		return false
-	}
-	if c.useTLS {
-		tlsConn := tls.Client(conn, &tls.Config{InsecureSkipVerify: true})
-		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			_ = conn.Close()
-			c.setErr(err)
-			return false
-		}
-		conn = tlsConn
 	}
 	c.conn = conn
 	c.reader = bufio.NewReader(conn)

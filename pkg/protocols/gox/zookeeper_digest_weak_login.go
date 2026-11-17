@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/zan8in/afrog/v3/pkg/protocols/http/retryhttpclient"
 	urlutil "github.com/zan8in/pins/url"
 )
 
@@ -103,8 +104,14 @@ func resolveZooKeeperAddress(target string) (string, error) {
 
 func zookeeperCreateEphemeral(host string, digest string, connectTimeout, sessionTimeout time.Duration) (bool, bool, error) {
 	conn, events, err := zk.Connect([]string{host}, sessionTimeout, zk.WithDialer(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		key := breakerKeyOfAddress(address)
+		if err := retryhttpclient.HostBreakerWait(key); err != nil {
+			return nil, err
+		}
 		d := &net.Dialer{Timeout: connectTimeout}
-		return d.Dial(network, address)
+		c, derr := d.Dial(network, address)
+		retryhttpclient.HostBreakerObserve(key, derr == nil, false)
+		return c, derr
 	}), zk.WithLogger(zkNoopLogger{}))
 	if err != nil {
 		return false, false, err

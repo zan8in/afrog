@@ -134,7 +134,7 @@ func smtpDial(host string) (net.Conn, error) {
 		}
 		return tlsConn, nil
 	}
-	return net.DialTimeout("tcp", host, 5*time.Second)
+	return dialTCPBreaker(host, 5*time.Second)
 }
 
 func smtpIsTLS(conn net.Conn) bool {

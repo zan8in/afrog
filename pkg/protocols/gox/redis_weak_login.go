@@ -3,7 +3,6 @@ package gox
 import (
 	"bufio"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -87,7 +86,7 @@ func redis_weak_login(target string, variableMap map[string]any) error {
 }
 
 func redisIsAuthRequired(address string) (bool, error) {
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+	conn, err := dialTCPBreaker(address, 5*time.Second)
 	if err != nil {
 		return false, err
 	}
@@ -119,7 +118,7 @@ func redisIsAuthRequired(address string) (bool, error) {
 }
 
 func redisAuthAttempt(address, password string) bool {
-	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+	conn, err := dialTCPBreaker(address, 5*time.Second)
 	if err != nil {
 		return false
 	}

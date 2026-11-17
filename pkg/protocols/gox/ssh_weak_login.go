@@ -2,7 +2,6 @@ package gox
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -62,7 +61,7 @@ func ssh_weak_login(target string, variableMap map[string]any) error {
 }
 
 func sshAuthAttempt(host, username, password string) bool {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false
 	}

@@ -69,7 +69,7 @@ func vnc_weak_login(target string, variableMap map[string]any) error {
 }
 
 func vncAuthAttempt(host, password string) (bool, bool) {
-	conn, err := net.DialTimeout("tcp", host, 5*time.Second)
+	conn, err := dialTCPBreaker(host, 5*time.Second)
 	if err != nil {
 		return false, false
 	}
