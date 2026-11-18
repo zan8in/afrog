@@ -310,36 +310,49 @@ func (s *Server) curatedAvailable() bool {
 // fromProtoSpec 把协议规格翻译成控制面请求。
 func fromProtoSpec(spec *afrogv1.ScanSpec) scantask.Request {
 	return scantask.Request{
-		Targets:           spec.GetTargets(),
-		PocSource:         spec.GetPocSource(),
-		PocFile:           spec.GetPocFile(),
-		PocIDs:            spec.GetPocIds(),
-		Search:            spec.GetSearch(),
-		Severity:          spec.GetSeverity(),
-		Concurrency:       int(spec.GetConcurrency()),
-		RateLimit:         int(spec.GetRateLimit()),
-		TimeoutSeconds:    int(spec.GetTimeoutSeconds()),
-		Retries:           int(spec.GetRetries()),
-		Smart:             spec.GetSmart(),
-		Proxy:             spec.GetProxy(),
-		Headers:           spec.GetHeaders(),
-		FollowRedirects:   spec.GetFollowRedirects(),
-		PortScan:          spec.GetPortScan(),
+		Targets:         spec.GetTargets(),
+		PocSource:       spec.GetPocSource(),
+		PocFile:         spec.GetPocFile(),
+		PocIDs:          spec.GetPocIds(),
+		Search:          spec.GetSearch(),
+		Severity:        spec.GetSeverity(),
+		Concurrency:     int(spec.GetConcurrency()),
+		RateLimit:       int(spec.GetRateLimit()),
+		TimeoutSeconds:  int(spec.GetTimeoutSeconds()),
+		Retries:         int(spec.GetRetries()),
+		Smart:           spec.GetSmart(),
+		Proxy:           spec.GetProxy(),
+		Headers:         spec.GetHeaders(),
+		FollowRedirects: spec.GetFollowRedirects(),
+		// 前置阶段开关一律指针直传：nil 表示协议里未设置（交回子进程默认值），
+		// 显式 true/false 才覆盖。默认值只在 CLI flag 定义处存在一份。
+		PortScan:          spec.PortScan,
 		Ports:             spec.GetPorts(),
-		SkipHostDiscovery: spec.GetSkipHostDiscovery(),
-		WebFingerprint:    spec.GetWebFingerprint(),
+		SkipHostDiscovery: spec.SkipHostDiscovery,
+		ReportStates:      spec.ReportStates,
+		WebFingerprint:    spec.WebFingerprint,
 		WebProbeTimeout:   int(spec.GetWebProbeTimeout()),
-		// 指针直传：nil 表示协议里未设置（交回子进程默认值＝开启），显式 false 才关闭。
-		WebFavicon:   spec.WebFavicon,
-		EnableOOB:    spec.GetEnableOob(),
-		OOBAdapter:   spec.GetOobAdapter(),
-		NoSaveDB:     spec.GetNoSaveDb(),
-		TaskName:     spec.GetTaskName(),
-		Labels:       spec.GetLabels(),
-		NodeSelector: spec.GetNodeSelector(),
-		GatingLevel:  spec.GetGatingLevel(),
-		DryRun:       spec.GetDryRun(),
+		WebFavicon:        spec.WebFavicon,
+		WebAssets:         int32PtrToIntPtr(spec.WebAssets),
+		EnableOOB:         spec.GetEnableOob(),
+		OOBAdapter:        spec.GetOobAdapter(),
+		NoSaveDB:          spec.GetNoSaveDb(),
+		TaskName:          spec.GetTaskName(),
+		Labels:            spec.GetLabels(),
+		NodeSelector:      spec.GetNodeSelector(),
+		GatingLevel:       spec.GetGatingLevel(),
+		DryRun:            spec.GetDryRun(),
 	}
+}
+
+// int32PtrToIntPtr 把协议的 *int32 收敛为执行器规格用的 *int，nil 原样保留（未设置）。
+// 用于 web_assets 这类「0 是合法值、必须区分未设置」的数值开关。
+func int32PtrToIntPtr(v *int32) *int {
+	if v == nil {
+		return nil
+	}
+	i := int(*v)
+	return &i
 }
 
 // fromProtoActions 把协议动作翻译成控制面批量。

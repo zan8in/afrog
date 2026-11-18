@@ -58,14 +58,20 @@ type Spec struct {
 	Headers         []string
 	FollowRedirects bool
 
-	// 前置阶段
-	PortScan          bool
+	// 前置阶段开关统一为三态：nil = 未设置（省略 flag，交回子进程默认值，默认值只在
+	// CLI flag 定义处存在一份）、显式 &true / &false = 显式开启 / 关闭。
+	// 端口预扫描（-ps）与跳过主机发现（-Pn）CLI 默认关闭，故 nil 即关闭。
+	PortScan          *bool
 	Ports             string
-	SkipHostDiscovery bool
+	SkipHostDiscovery *bool
 	// ReportStates 对应 -ps-states：把 closed / filtered 端口也作为结果上报。
-	// 默认关闭，只上报开放端口；这些非开放端口仅用于展示，不会进入后续扫描目标。
-	ReportStates   bool
-	WebFingerprint bool
+	// 仅当 PortScan 显式开启时生效；nil 表示交回子进程默认值（关闭）。这些非开放端口
+	// 仅用于展示，不会进入后续扫描目标。
+	ReportStates *bool
+	// WebFingerprint 控制 Web 探测（-w）阶段。用指针区分「未设置」与「显式关闭」：
+	// nil 表示交回子进程默认值（CLI 的 -w 默认开启），只有显式 false 才下发 -w=false。
+	// 这样默认值只在 CLI flag 定义处存在一份，各入口无需各自硬编码默认值。
+	WebFingerprint *bool
 	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用 CLI 默认值。
 	WebProbeTimeout int
 	// WebFavicon 开启 favicon 抓取（每个目标多一次请求）。用指针区分「未设置」与「显式关闭」：
@@ -103,3 +109,7 @@ type Spec struct {
 	Labels       []string
 	NodeSelector string
 }
+
+// BoolPtr 返回 v 的指针，便于给三态开关字段（如 WebFingerprint）显式赋值：
+// nil = 未设置（交回子进程默认值），&true / &false = 显式开启 / 关闭。
+func BoolPtr(v bool) *bool { return &v }

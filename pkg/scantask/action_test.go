@@ -104,8 +104,8 @@ func TestSubmitBatch_PortScanBatch(t *testing.T) {
 	}
 	waitStatus(t, rig, snap.ID, StatusRunning, 10*time.Second)
 	spec := rig.exec.spec(t, snap.ID)
-	if !spec.PortScan {
-		t.Fatal("spec.PortScan = false, want true")
+	if spec.PortScan == nil || !*spec.PortScan {
+		t.Fatalf("spec.PortScan = %v, want explicit true", spec.PortScan)
 	}
 	if len(spec.Targets) != 2 {
 		t.Fatalf("spec.Targets = %v, want 2", spec.Targets)

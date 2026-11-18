@@ -146,12 +146,12 @@ func (b Batch) deriveRequest() (Request, error) {
 		if len(b.Actions) != len(targets) {
 			return Request{}, ErrHeterogeneousBatch
 		}
-		req.PortScan = true
+		req.PortScan = executor.BoolPtr(true)
 	case ActionWebFingerprint:
 		if len(b.Actions) != len(targets) {
 			return Request{}, ErrHeterogeneousBatch
 		}
-		req.WebFingerprint = true
+		req.WebFingerprint = executor.BoolPtr(true)
 	default:
 		return Request{}, ErrUnknownActionKind
 	}

@@ -1125,8 +1125,8 @@ func logScanStart(id string, req ScanCreateRequest, targets []string) {
 	if req.OutputHTML {
 		logParts = append(logParts, fmt.Sprintf("output_html=true output_file=%s", req.OutputFile))
 	}
-	if req.WebProbe || req.WebFingerprint {
-		logParts = append(logParts, fmt.Sprintf("webprobe=%t", req.WebProbe || req.WebFingerprint))
+	if req.WebProbe != nil || req.WebFingerprint != nil {
+		logParts = append(logParts, fmt.Sprintf("webprobe=%t", *resolveWebProbe(req)))
 	}
 	if req.SkipHostDisc {
 		logParts = append(logParts, fmt.Sprintf("skip_host_discovery=%t", req.SkipHostDisc))

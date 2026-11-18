@@ -135,30 +135,47 @@ func buildArgs(taskID string, spec *Spec) (args []string, cleanup func(), err er
 	// FollowRedirects：CLI 没有对应 flag，Options 里也没有该字段，实际行为由子进程
 	// 的 afrog-config.yaml 决定，这里不做映射。
 
-	if spec.PortScan {
-		args = append(args, "-ps")
-		if v := strings.TrimSpace(spec.Ports); v != "" {
-			args = append(args, "-p", v)
-		}
-		if spec.ReportStates {
-			args = append(args, "-ps-states")
+	// 端口预扫描（-ps）是三态：nil 省略 flag，交回子进程默认值（CLI 的 -ps 默认关闭）；
+	// 显式 true/false 才下发。默认值只在 CLI flag 定义处存在一份。
+	if spec.PortScan != nil {
+		if *spec.PortScan {
+			args = append(args, "-ps")
+			if v := strings.TrimSpace(spec.Ports); v != "" {
+				args = append(args, "-p", v)
+			}
+			// -ps-states 是三态，且只在端口预扫描开启时才有意义；默认关闭，故只在
+			// 显式 true 时下发。
+			if spec.ReportStates != nil && *spec.ReportStates {
+				args = append(args, "-ps-states")
+			}
+		} else {
+			args = append(args, "-ps=false")
 		}
 	}
-	if spec.SkipHostDiscovery {
-		args = append(args, "-Pn")
+	// 跳过主机发现（-Pn）同样是三态，约定与 -ps 一致。
+	if spec.SkipHostDiscovery != nil {
+		if *spec.SkipHostDiscovery {
+			args = append(args, "-Pn")
+		} else {
+			args = append(args, "-Pn=false")
+		}
 	}
-	if spec.WebFingerprint {
-		args = append(args, "-w")
-	} else {
-		// CLI 的 -w 现在默认开启，因此「不要 Web 探测」必须显式关掉：
-		// 只省略这个 flag 等于把决定权交回子进程默认值，Web 控制台里关闭探测会失效。
-		args = append(args, "-w=false")
+	// Web 探测（-w）是三态：nil 省略该 flag，交回子进程默认值（CLI 的 -w 默认开启）；
+	// 只有显式 false 才下发 -w=false。默认值因此只在 CLI flag 定义处存在一份。
+	if spec.WebFingerprint != nil {
+		if *spec.WebFingerprint {
+			args = append(args, "-w")
+		} else {
+			args = append(args, "-w=false")
+		}
 	}
 	// 探测阶段的细粒度参数：0/未开启时省略，让子进程用自己的默认值。
 	if spec.WebProbeTimeout > 0 {
 		args = append(args, "-w-timeout", strconv.Itoa(spec.WebProbeTimeout))
 	}
-	if spec.WebFingerprint {
+	// favicon / assets 是 Web 探测的子行为，探测被显式关闭（-w=false）时无从谈起；
+	// nil（未设置＝默认开启）与显式 true 时才下发。
+	if spec.WebFingerprint == nil || *spec.WebFingerprint {
 		// favicon 抓取是 Web 探测的子行为，-w 关掉时无从谈起。它默认开启，因此只在调用方
 		// 显式表态时才下发：nil 省略，让子进程用自己的默认值（开启）；显式 false 才补
 		// -w-favicon=false（Web 控制台取消勾选即走这里）。

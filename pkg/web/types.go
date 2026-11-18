@@ -141,9 +141,12 @@ type ScanCreateRequest struct {
 	OutputFile string `json:"output_file,omitempty"`
 	// NoSaveDB 为真时子进程不把命中写入 result 表：只在控制台/事件流展示，
 	// 漏洞报告与台账保持干净。用于测试性、不重要的扫描；默认（缺省）写库。
-	NoSaveDB       bool `json:"no_save_db,omitempty"`
-	WebProbe       bool `json:"webprobe,omitempty"`
-	WebFingerprint bool `json:"web_fingerprint,omitempty"`
+	NoSaveDB bool `json:"no_save_db,omitempty"`
+	// WebProbe / WebFingerprint 控制 Web 探测（-w）阶段；webprobe 是 web_fingerprint
+	// 的兼容别名。缺省（未下发）即开启——与 CLI 的 -w 默认开启、前端「Web 指纹识别」
+	// 开关默认打开保持一致，只有显式下发 false 才关闭。用指针区分「未设置」与「显式关闭」。
+	WebProbe       *bool `json:"webprobe,omitempty"`
+	WebFingerprint *bool `json:"web_fingerprint,omitempty"`
 	// WebProbeTimeout 是单次 Web 探测请求/证书获取的超时（秒）；0 表示用引擎默认值。
 	WebProbeTimeout int `json:"web_probe_timeout,omitempty"`
 	// WebFavicon 对应 -w-favicon：Web 探测时抓取 /favicon.ico 做哈希指纹。默认开启，

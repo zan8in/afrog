@@ -34,7 +34,7 @@ func baseScanSpec(target, search string) *executor.Spec {
 	return &executor.Spec{
 		Targets:        []string{strings.TrimSpace(target)},
 		Search:         strings.TrimSpace(search),
-		WebFingerprint: true,
+		WebFingerprint: executor.BoolPtr(true),
 	}
 }
 

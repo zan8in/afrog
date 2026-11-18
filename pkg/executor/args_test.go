@@ -21,12 +21,12 @@ func TestBuildArgs(t *testing.T) {
 		{
 			name: "single target",
 			spec: &Spec{Targets: []string{"http://a.example"}},
-			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "target whitespace trimmed",
 			spec: &Spec{Targets: []string{"  http://a.example  ", "", "   "}},
-			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "poc file severity search",
@@ -42,7 +42,6 @@ func TestBuildArgs(t *testing.T) {
 				"-s", "tomcat",
 				"-S", "high,critical",
 				"-auto-req-limit=false",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -58,7 +57,6 @@ func TestBuildArgs(t *testing.T) {
 				"-ap", "/home/u/.config/afrog/pocs-curated",
 				"-ap", "/home/u/.config/afrog/pocs-my",
 				"-auto-req-limit=false",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -83,7 +81,6 @@ func TestBuildArgs(t *testing.T) {
 				"-mhe", "5",
 				"-smart",
 				"-auto-req-limit=false",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -101,7 +98,6 @@ func TestBuildArgs(t *testing.T) {
 				"-proxy", "http://127.0.0.1:8080",
 				"-H", "X-A: 1",
 				"-H", "Cookie: a=b",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -110,10 +106,10 @@ func TestBuildArgs(t *testing.T) {
 			name: "port scan and web probe",
 			spec: &Spec{
 				Targets:           []string{"http://a.example"},
-				PortScan:          true,
+				PortScan:          boolPtr(true),
 				Ports:             "80,443",
-				SkipHostDiscovery: true,
-				WebFingerprint:    true,
+				SkipHostDiscovery: boolPtr(true),
+				WebFingerprint:    boolPtr(true),
 				WebFavicon:        boolPtr(false),
 			},
 			want: []string{
@@ -132,9 +128,9 @@ func TestBuildArgs(t *testing.T) {
 			name: "port scan reporting non-open states",
 			spec: &Spec{
 				Targets:      []string{"http://a.example"},
-				PortScan:     true,
+				PortScan:     boolPtr(true),
 				Ports:        "80,443",
-				ReportStates: true,
+				ReportStates: boolPtr(true),
 			},
 			want: []string{
 				"-t", "http://a.example",
@@ -142,7 +138,6 @@ func TestBuildArgs(t *testing.T) {
 				"-ps",
 				"-p", "80,443",
 				"-ps-states",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -151,7 +146,7 @@ func TestBuildArgs(t *testing.T) {
 			name: "web probe tuning",
 			spec: &Spec{
 				Targets:         []string{"http://a.example"},
-				WebFingerprint:  true,
+				WebFingerprint:  boolPtr(true),
 				WebProbeTimeout: 20,
 				WebFavicon:      boolPtr(true),
 			},
@@ -171,12 +166,28 @@ func TestBuildArgs(t *testing.T) {
 			name: "web probe favicon unset defers to default",
 			spec: &Spec{
 				Targets:        []string{"http://a.example"},
-				WebFingerprint: true,
+				WebFingerprint: boolPtr(true),
 			},
 			want: []string{
 				"-t", "http://a.example",
 				"-auto-req-limit=false",
 				"-w",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			// 显式关闭 Web 探测（Web 控制台取消勾选）必须下发 -w=false：CLI 的 -w
+			// 默认开启，省略 flag 等于开启，所以关掉必须显式表达。
+			name: "web probe explicitly disabled",
+			spec: &Spec{
+				Targets:        []string{"http://a.example"},
+				WebFingerprint: boolPtr(false),
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -193,7 +204,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-auto-req-limit=false",
-				"-w=false",
 				"-oob", "dnslogcn",
 				"-json-stream",
 				"-disable-output-html",
@@ -205,19 +215,49 @@ func TestBuildArgs(t *testing.T) {
 				Targets:   []string{"http://a.example"},
 				EnableOOB: true,
 			},
-			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-w=false", "-json-stream", "-disable-output-html"},
+			want: []string{"-t", "http://a.example", "-auto-req-limit=false", "-json-stream", "-disable-output-html"},
 		},
 		{
 			name: "port scan without custom ports",
 			spec: &Spec{
 				Targets:  []string{"http://a.example"},
-				PortScan: true,
+				PortScan: boolPtr(true),
 			},
 			want: []string{
 				"-t", "http://a.example",
 				"-auto-req-limit=false",
 				"-ps",
-				"-w=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			// 前置阶段开关是三态：未设置（nil）省略 flag，交回子进程默认值（关闭）；
+			// 只有显式 false 才下发 -ps=false / -Pn=false，用于覆盖配置文件里的开启。
+			name: "pre-scan switches explicitly disabled",
+			spec: &Spec{
+				Targets:           []string{"http://a.example"},
+				PortScan:          boolPtr(false),
+				SkipHostDiscovery: boolPtr(false),
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
+				"-ps=false",
+				"-Pn=false",
+				"-json-stream",
+				"-disable-output-html",
+			},
+		},
+		{
+			// 未设置（nil）时省略全部前置阶段 flag，交回子进程默认值。
+			name: "pre-scan switches unset defer to default",
+			spec: &Spec{
+				Targets: []string{"http://a.example"},
+			},
+			want: []string{
+				"-t", "http://a.example",
+				"-auto-req-limit=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -231,7 +271,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-rlt", "25",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -245,7 +284,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-auto-req-limit",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -259,7 +297,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-polite",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -273,7 +310,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-balanced",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -287,7 +323,6 @@ func TestBuildArgs(t *testing.T) {
 			want: []string{
 				"-t", "http://a.example",
 				"-aggressive",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -304,7 +339,6 @@ func TestBuildArgs(t *testing.T) {
 				"-auto-req-limit=false",
 				"-gating-level", "aggressive",
 				"-dry-run",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -321,7 +355,6 @@ func TestBuildArgs(t *testing.T) {
 				"-t", "http://a.example",
 				"-auto-req-limit=false",
 				"-gating-level", "balanced",
-				"-w=false",
 				"-json-stream",
 				"-disable-output-html",
 			},
@@ -365,7 +398,7 @@ func TestBuildArgs_MultipleTargetsUsesFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildArgs: %v", err)
 	}
-	if len(args) != 6 || args[0] != "-T" || args[2] != "-auto-req-limit=false" || args[3] != "-w=false" || args[4] != "-json-stream" || args[5] != "-disable-output-html" {
+	if len(args) != 5 || args[0] != "-T" || args[2] != "-auto-req-limit=false" || args[3] != "-json-stream" || args[4] != "-disable-output-html" {
 		t.Fatalf("unexpected args: %v", args)
 	}
 	path := args[1]
@@ -394,7 +427,7 @@ func TestBuildArgs_AlwaysIncludesJSONStream(t *testing.T) {
 	specs := []*Spec{
 		{Targets: []string{"http://a.example"}},
 		{Targets: []string{"http://a.example", "http://b.example"}},
-		{Targets: []string{"http://a.example"}, PortScan: true, EnableOOB: true, WebFingerprint: true},
+		{Targets: []string{"http://a.example"}, PortScan: boolPtr(true), EnableOOB: true, WebFingerprint: boolPtr(true)},
 	}
 	for i, spec := range specs {
 		args, cleanup, err := buildArgs("t", spec)

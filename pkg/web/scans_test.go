@@ -664,6 +664,7 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 	})
 
 	t.Run("request options are carried over", func(t *testing.T) {
+		webFingerprint := true
 		spec := buildScanSpec(
 			ScanCreateRequest{
 				Concurrency:    30,
@@ -677,7 +678,7 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 				Ports:          "80,443",
 				SkipHostDisc:   true,
 				ReportStates:   true,
-				WebFingerprint: true,
+				WebFingerprint: &webFingerprint,
 				EnableOOB:      true,
 				OOB:            "dnslogcn",
 				GatingLevel:    " aggressive ",
@@ -694,11 +695,13 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 		if spec.MaxHostError != 4 || spec.Proxy != "http://127.0.0.1:8080" || !spec.Smart {
 			t.Fatalf("network options not mapped: %+v", spec)
 		}
-		if !spec.PortScan || spec.Ports != "80,443" || !spec.SkipHostDiscovery || !spec.ReportStates {
+		if spec.PortScan == nil || !*spec.PortScan || spec.Ports != "80,443" ||
+			spec.SkipHostDiscovery == nil || !*spec.SkipHostDiscovery ||
+			spec.ReportStates == nil || !*spec.ReportStates {
 			t.Fatalf("pre-scan options not mapped: %+v", spec)
 		}
-		if !spec.WebFingerprint {
-			t.Fatalf("web fingerprint not mapped: %+v", spec)
+		if spec.WebFingerprint == nil || !*spec.WebFingerprint {
+			t.Fatalf("web fingerprint not mapped: %+v", spec.WebFingerprint)
 		}
 		if !spec.EnableOOB || spec.OOBAdapter != "dnslogcn" {
 			t.Fatalf("oob options not mapped: %+v", spec)
@@ -707,6 +710,60 @@ func TestBuildScanSpec_PocScopeMatchesCLISemantics(t *testing.T) {
 		// 否则 Web 控制台选择了档位/预演却仍按默认 safe 实际发包。
 		if spec.GatingLevel != "aggressive" || !spec.DryRun {
 			t.Fatalf("gating level/dry run not mapped: level=%q dryRun=%v", spec.GatingLevel, spec.DryRun)
+		}
+	})
+
+	// webprobe / web_fingerprint 缺省（未下发）必须「交回子进程默认值」（即开启）：前端
+	// 「Web 指纹识别」开关默认打开，字段无变化时不会出现在请求体里。因此这里必须是 nil
+	// （省略 -w，由 CLI 的 -w 默认值决定＝开启），而不是硬编码 &true；硬编码会把默认值
+	// 复制到 Web 端，CLI 改默认时又会不同步。
+	t.Run("web probe defaults to engine default", func(t *testing.T) {
+		spec := buildScanSpec(ScanCreateRequest{}, []string{"https://example.com"}, "", nil, false)
+		if spec.WebFingerprint != nil {
+			t.Fatalf("WebFingerprint = %v, want nil (defer to the -w default) when the request omits webprobe/web_fingerprint", *spec.WebFingerprint)
+		}
+	})
+
+	t.Run("web probe honours explicit false", func(t *testing.T) {
+		off := false
+		spec := buildScanSpec(ScanCreateRequest{WebProbe: &off}, []string{"https://example.com"}, "", nil, false)
+		if spec.WebFingerprint == nil || *spec.WebFingerprint {
+			t.Fatalf("WebFingerprint = %v, want explicit false when webprobe=false is sent", spec.WebFingerprint)
+		}
+	})
+
+	t.Run("web probe honours explicit true", func(t *testing.T) {
+		on := true
+		spec := buildScanSpec(ScanCreateRequest{WebFingerprint: &on}, []string{"https://example.com"}, "", nil, false)
+		if spec.WebFingerprint == nil || !*spec.WebFingerprint {
+			t.Fatalf("WebFingerprint = %v, want explicit true when web_fingerprint=true is sent", spec.WebFingerprint)
+		}
+	})
+
+	// 端口预扫描等「默认关闭」的开关同样是三态：请求未下发时必须是 nil（省略 flag，
+	// 交回子进程默认值），而不是硬编码 &false——否则 Web 端又会复制一份默认值。
+	t.Run("pre-scan switches default to engine default", func(t *testing.T) {
+		spec := buildScanSpec(ScanCreateRequest{}, []string{"https://example.com"}, "", nil, false)
+		if spec.PortScan != nil || spec.SkipHostDiscovery != nil || spec.ReportStates != nil {
+			t.Fatalf("pre-scan switches = %v/%v/%v, want nil when unset",
+				spec.PortScan, spec.SkipHostDiscovery, spec.ReportStates)
+		}
+	})
+
+	t.Run("pre-scan switches honour explicit enable", func(t *testing.T) {
+		spec := buildScanSpec(
+			ScanCreateRequest{
+				PortScanCompat: true,
+				SkipHostDisc:   true,
+				ReportStates:   true,
+			},
+			[]string{"https://example.com"}, "", nil, false,
+		)
+		if spec.PortScan == nil || !*spec.PortScan ||
+			spec.SkipHostDiscovery == nil || !*spec.SkipHostDiscovery ||
+			spec.ReportStates == nil || !*spec.ReportStates {
+			t.Fatalf("pre-scan switches = %v/%v/%v, want explicit true",
+				spec.PortScan, spec.SkipHostDiscovery, spec.ReportStates)
 		}
 	})
 }

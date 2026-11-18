@@ -37,17 +37,26 @@ type Request struct {
 	Headers         []string
 	FollowRedirects bool
 
-	// 前置阶段
-	PortScan          bool
+	// 前置阶段开关统一为三态（nil = 未设置，交回子进程默认值），与 CLI 的
+	// -ps / -Pn / -ps-states 默认关闭一致，也与 -w / -w-favicon 的默认开启一致。
+	PortScan          *bool
 	Ports             string
-	SkipHostDiscovery bool
-	WebFingerprint    bool
+	SkipHostDiscovery *bool
+	// ReportStates 对应 -ps-states：把 closed / filtered 端口也作为结果上报。仅在
+	// PortScan 开启时生效；nil 表示交回子进程默认值（关闭）。
+	ReportStates *bool
+	// WebFingerprint 控制 Web 探测（-w）：nil 表示未设置（交回子进程默认值＝开启），
+	// 显式 false 才关闭。与 CLI/gRPC/SDK/Web 的默认值语义保持一致。
+	WebFingerprint *bool
 	// WebProbeTimeout 是单次 Web 探测请求与证书获取的超时（秒），0 表示用引擎默认值。
 	WebProbeTimeout int
 	// WebFavicon 开启 favicon 抓取（每个目标多一次请求），默认开启。
 	// 用指针区分「未设置」与「显式关闭」：nil 表示交回子进程默认值（开启），
 	// 显式 false 才下发 -w-favicon=false。
 	WebFavicon *bool
+	// WebAssets 对应 -w-assets：Web 探测时最多抓几个同源脚本/样式做内容指纹。
+	// 用指针区分「未设置」（nil，引擎默认 10）与显式 0（关闭）、N（最多 N 个）。
+	WebAssets *int
 
 	// 门控与预演
 	// GatingLevel 是 PoC 门控档位：off|safe|balanced|aggressive，空表示用引擎默认 safe。
@@ -134,9 +143,11 @@ func BuildSpec(req Request) (*executor.Spec, func(), error) {
 		PortScan:          req.PortScan,
 		Ports:             strings.TrimSpace(req.Ports),
 		SkipHostDiscovery: req.SkipHostDiscovery,
+		ReportStates:      req.ReportStates,
 		WebFingerprint:    req.WebFingerprint,
 		WebProbeTimeout:   req.WebProbeTimeout,
 		WebFavicon:        req.WebFavicon,
+		WebAssets:         req.WebAssets,
 		GatingLevel:       strings.TrimSpace(req.GatingLevel),
 		DryRun:            req.DryRun,
 		EnableOOB:         req.EnableOOB,

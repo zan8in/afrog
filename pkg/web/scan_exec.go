@@ -76,14 +76,14 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 		MonitorTargets:    req.MonitorTargets,
 		BruteMaxRequests:  req.BruteMaxRequests,
 		MaxRespBodySize:   req.MaxRespBodySize,
-		PortScan:          req.PortScan || req.PortScanCompat,
+		PortScan:          boolTriState(req.PortScan || req.PortScanCompat),
 		Ports:             strings.TrimSpace(req.Ports),
-		SkipHostDiscovery: req.SkipHostDisc,
-		ReportStates:      req.ReportStates,
+		SkipHostDiscovery: boolTriState(req.SkipHostDisc),
+		ReportStates:      boolTriState(req.ReportStates),
 		OutputHTML:        req.OutputHTML,
 		OutputFile:        strings.TrimSpace(req.OutputFile),
 		NoSaveDB:          req.NoSaveDB,
-		WebFingerprint:    req.WebProbe || req.WebFingerprint,
+		WebFingerprint:    resolveWebProbe(req),
 		WebProbeTimeout:   req.WebProbeTimeout,
 		WebFavicon:        req.WebFavicon,
 		WebAssets:         req.WebAssets,
@@ -125,6 +125,30 @@ func buildScanSpec(req ScanCreateRequest, targets []string, pocPath string, appe
 	}
 
 	return spec
+}
+
+// resolveWebProbe 把 Web 探测（-w）相关的两个请求字段收敛为一个三态值。
+//
+// 与 CLI 的 -w 默认开启一致：两个字段都未下发（nil）时返回 nil，表示「交回子进程
+// 默认值」（即开启），默认值只在 CLI flag 定义处存在一份；任一显式置 true 返回 &true；
+// 只有显式下发 false 才返回 &false 关闭。webprobe 是 web_fingerprint 的兼容别名，二者取「或」。
+func resolveWebProbe(req ScanCreateRequest) *bool {
+	if req.WebProbe == nil && req.WebFingerprint == nil {
+		return nil
+	}
+	v := (req.WebProbe != nil && *req.WebProbe) || (req.WebFingerprint != nil && *req.WebFingerprint)
+	return &v
+}
+
+// boolTriState 把 Web 请求里「只能表示开启」的布尔开关收敛成三态：false 视为未设置
+// （nil，交回子进程默认值），true 才显式下发。用于 -ps / -Pn / -ps-states 这类 CLI
+// 默认关闭的开关——前端只是一个勾选框，没有「显式关闭」语义，与 gRPC 的 optional
+// 三态共用同一个「未设置即省略」约定。
+func boolTriState(v bool) *bool {
+	if !v {
+		return nil
+	}
+	return executor.BoolPtr(true)
 }
 
 // normalizeReqLimit 把请求节流的五种写法收敛为互斥的一组：

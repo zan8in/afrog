@@ -2038,7 +2038,7 @@ func (s *Server) runPocScan(ctx context.Context, tool, target, pocPath string, p
 		Targets:        []string{strings.TrimSpace(target)},
 		AppendPocs:     []string{pocPath},
 		Search:         pocSearchKeyword(pocPath, pocData),
-		WebFingerprint: true,
+		WebFingerprint: executor.BoolPtr(true),
 	}
 	if bruteMax > 0 {
 		spec.BruteMaxRequests = bruteMax
