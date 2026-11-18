@@ -7,7 +7,7 @@ info:
   verified: true
   tags: tomcat,default-login
   created: 2023/06/24
-  requires: [tomcat-manager]
+  requires: [tomcat]
 
 set:
   randstr: randomLowercase(6)
@@ -29,8 +29,9 @@ rules:
     request:
       method: GET
       path: "{{p}}"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
-    stop_if_mismatch: true
+    expression: |
+      (response.status == 401 || response.status == 403) &&
+      response.raw_header.ibcontains(b'Manager Application')
   r1:
     brute:
       mode: clusterbomb
@@ -67,13 +68,13 @@ rules:
       path: "{{p}}"
       headers:
         Authorization: "Basic {{base64(username + ':' + password)}}"
-    expression: |
-      response.status == 200 &&
-      response.headers["set-cookie"].contains("JSESSIONID") &&
-      (
-        response.body.bcontains(b"Tomcat Manager Application") ||
-        response.body.bcontains(b"<title>/manager</title>") ||
-        response.body.bcontains(b"<title>/host-manager</title>") ||
-        response.body.bcontains(b"manager-gui")
-      )
+      follow_redirects: true
+    expression: response.status >= 200 && response.status < 400
+    extractors:
+      - name: username
+        type: literal
+        value: "{{username}}"
+      - name: password
+        type: literal
+        value: "{{password}}"
 expression: r0() && r1()
