@@ -104,6 +104,33 @@ func buildResultEvent(res *result.Result) *scanstream.ResultEvent {
 	return ev
 }
 
+// fingerprintResultEvent 组装一条指纹命中的结果事件。
+//
+// full 是引擎保留的完整 result（可能为 nil，例如直接调用 runner 的场景），有它时
+// 连同原生证据一起下发：指纹 PoC（tags 含 fingerprint，如 nginx-detect）的证据在
+// 引擎侧已经生成，若事件流不带上，消费事件流的 verify.replay 就会把「证据缺失」
+// 判成「未复现」。
+func fingerprintResultEvent(targetKey string, hit fingerprint.Hit, full *result.Result) *scanstream.ResultEvent {
+	sev := strings.TrimSpace(hit.Severity)
+	if sev == "" {
+		sev = "info"
+	}
+	name := strings.TrimSpace(hit.Name)
+	if name == "" {
+		name = strings.TrimSpace(hit.ID)
+	}
+	ev := &scanstream.ResultEvent{
+		Target:   targetKey,
+		PocID:    hit.ID,
+		PocName:  name,
+		Severity: sev,
+	}
+	if full != nil {
+		ev.Evidence = buildResultEvidence(full)
+	}
+	return ev
+}
+
 // ShouldReportFingerprint 判断某个指纹命中是否应该计入报告 / 台账 / 事件流。
 //
 // -S 指定了严重级别时只有匹配的级别会上报；未指定则全部上报。
@@ -295,26 +322,17 @@ func Attach(w *scanstream.Writer, options *config.Options, r *runner.Runner, tas
 			prevFingerprint(targetKey, hits)
 		}
 		for _, hit := range hits {
-			sev := strings.TrimSpace(hit.Severity)
-			if sev == "" {
-				sev = "info"
-			}
-			if !ShouldReportFingerprint(options, sev) {
+			// full 是引擎在 setFingerprintResult 里保留的完整 result（含原生证据）。
+			// 指纹 PoC 的事件此前只有结论没有证据，消费事件流的 verify.replay 会把
+			// 「证据没下发」误判成「未复现」，所以这里把证据一并带上。
+			ev := fingerprintResultEvent(targetKey, hit, r.FingerprintResult(targetKey, hit.ID))
+			if !ShouldReportFingerprint(options, ev.Severity) {
 				continue
 			}
-			name := strings.TrimSpace(hit.Name)
-			if name == "" {
-				name = strings.TrimSpace(hit.ID)
-			}
 			statMu.Lock()
-			bySeverity[sev]++
+			bySeverity[ev.Severity]++
 			statMu.Unlock()
-			w.Result(&scanstream.ResultEvent{
-				Target:   targetKey,
-				PocID:    hit.ID,
-				PocName:  name,
-				Severity: sev,
-			})
+			w.Result(ev)
 		}
 	}
 

@@ -101,6 +101,34 @@ func TestAttach_FingerprintHonoursSeverityFilter(t *testing.T) {
 	}
 }
 
+// 指纹命中的事件必须带上引擎已经生成好的原生证据：verify.replay 消费事件流，
+// 缺了证据就会把 nginx-detect 这类指纹 PoC 的重放误判成「未复现」。
+func TestFingerprintResultEventCarriesNativeEvidence(t *testing.T) {
+	native := &evidence.Evidence{
+		ID:         "evd_fp",
+		Digest:     "sha256:fp",
+		PocID:      "nginx-detect",
+		Target:     "http://a.example",
+		Confidence: string(evidence.Certain),
+		Steps:      []evidence.Step{{Role: evidence.RoleConfirm, Matched: true}},
+	}
+	full := &result.Result{IsVul: true, Target: "http://a.example", FullTarget: "http://a.example", Evidence: native}
+
+	ev := fingerprintResultEvent("a.example:80", fingerprint.Hit{ID: "nginx-detect", Name: "Nginx检测", Severity: "info"}, full)
+	if ev == nil || ev.PocID != "nginx-detect" || ev.Target != "a.example:80" || ev.Severity != "info" {
+		t.Fatalf("unexpected fingerprint event: %+v", ev)
+	}
+	if ev.Evidence == nil || ev.Evidence.Native == nil || ev.Evidence.Native.ID != native.ID {
+		t.Fatalf("fingerprint event must carry native evidence: %+v", ev.Evidence)
+	}
+
+	// 没有完整 result（直接调用 runner 的场景）时退回纯结论事件，且不 panic。
+	ev = fingerprintResultEvent("a.example:80", fingerprint.Hit{ID: "nginx-detect", Severity: ""}, nil)
+	if ev == nil || ev.Evidence != nil || ev.PocName != "nginx-detect" || ev.Severity != "info" {
+		t.Fatalf("nil full result must still emit a plain event: %+v", ev)
+	}
+}
+
 func TestShouldReportFingerprint(t *testing.T) {
 	cases := []struct {
 		severity string
