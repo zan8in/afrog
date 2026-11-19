@@ -44,6 +44,8 @@ func main() {
 	// 子命令分派：goflags 只认 flag，`afrog serve` 这种子命令必须在解析前分流，
 	// 否则 --listen 之类的参数会被当成未知 flag 报错。
 	if len(os.Args) > 1 && os.Args[1] == "serve" {
+		// gRPC 服务的检索面与扫描子进程要看到同一份 PoC 库，启动前先按 CLI 口径装配。
+		ensurePocLibrary()
 		if err := scanapi.ServeCommand(os.Args[2:]); err != nil {
 			gologger.Error().Msg(err.Error())
 		}
@@ -52,6 +54,10 @@ func main() {
 
 	// `afrog mcp`：在 stdio 上提供 MCP 工具服务，供 Agent 编排调用。
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		// stdio 传输下 stdout 专供 JSON-RPC：装配与后续日志都必须改道 stderr。
+		jsonstream.RedirectLogs()
+		// 检索类工具（poc.search / observe）与实际扫描子进程必须看到同一份 PoC 库。
+		ensurePocLibrary()
 		if err := mcp.Command(os.Args[2:]); err != nil {
 			gologger.Error().Msg(err.Error())
 		}
@@ -682,6 +688,103 @@ func main() {
 
 	// 标记正常退出
 	normalExit = !interrupted.Load()
+}
+
+// ensurePocLibrary 让"先 return 的宿主进程"（`afrog mcp` / `afrog serve`）也按 CLI 口径
+// 装配一遍 PoC 库。
+//
+// 这两个子命令在 config.NewOptions()（公开库更新）与 web.AssembleCurated（会员库装配）
+// 之前就 return 了，于是父进程内的检索能力（poc.search / observe）看不到会员库、也看不到
+// 尚未下载的公开库，而 scan.start 拉起的扫描子进程两者都有——出现"预检说没有、实际扫得出来"
+// 的口径漂移。这里补上同一套装配，使父进程与子进程看到同一份库。
+//
+// 全程 best-effort：任何失败只写日志，绝不阻断启动；公开库更新带硬超时，离线不卡死。
+func ensurePocLibrary() {
+	if envTruthy(os.Getenv("AFROG_MCP_NO_BOOTSTRAP")) {
+		return
+	}
+
+	cfg, err := config.LoadConfigReadOnly("")
+	if err != nil {
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "poclib", "load config failed", strings.TrimSpace(err.Error())))
+		cfg = nil
+	}
+
+	// 公开库更新：与 CLI 的 NewOptions 保持同一门控语义（-disable-update-check / -duc）。
+	if !hasFlag(os.Args[1:], "disable-update-check", "duc") {
+		updatePublicPocs()
+	}
+
+	// 会员库装配：与 CLI / Web 共用同一实现，避免口径漂移。
+	if cfg != nil {
+		if err := web.AssembleCurated(cfg.Curated, "", false); err != nil {
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "curated", "mount failed", strings.TrimSpace(err.Error())))
+		}
+	}
+}
+
+// updatePublicPocs 在超时上限内做一次公开库更新；到点即返回，剩余工作转后台。
+//
+// AfrogUpdate 内部的网络调用没有超时，这里必须套一个有界外壳，否则离线/黑洞网络会挂死启动。
+func updatePublicPocs() {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		au, err := config.NewAfrogUpdate(true)
+		if err != nil {
+			return
+		}
+		info, uerr := au.AfrogUpdatePocs()
+		switch {
+		case uerr != nil:
+			gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "poclib", "update failed", strings.TrimSpace(uerr.Error())))
+		case info == "":
+			// 真正下载成功时 info 为空；返回非空 info 表示"已是最新"，无需打扰。
+			gologger.Print().Msgf("%s", log.Op(log.LevelInfo, "poclib", "pocs updated", "ok"))
+		}
+	}()
+	select {
+	case <-done:
+	case <-time.After(pocBootstrapTimeout()):
+		gologger.Print().Msgf("%s", log.Op(log.LevelWarn, "poclib", "update timeout", "continue in background"))
+	}
+}
+
+// pocBootstrapTimeout 返回装配的硬超时上限，默认 30s，可用 AFROG_MCP_BOOTSTRAP_TIMEOUT 覆盖
+// （Go duration 写法，如 "45s"）。
+func pocBootstrapTimeout() time.Duration {
+	if v := strings.TrimSpace(os.Getenv("AFROG_MCP_BOOTSTRAP_TIMEOUT")); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			return d
+		}
+	}
+	return 30 * time.Second
+}
+
+// envTruthy 沿用项目内既有的布尔环境变量口径（1/true/on/yes）。
+func envTruthy(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+// hasFlag 判断 args 中是否显式出现过给定开关（兼容 -x / --x / -x=v 三种写法）。
+func hasFlag(args []string, names ...string) bool {
+	for _, a := range args {
+		a = strings.TrimLeft(a, "-")
+		if i := strings.IndexByte(a, '='); i >= 0 {
+			a = a[:i]
+		}
+		for _, n := range names {
+			if a == n {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func expandTildePath(v string) string {
