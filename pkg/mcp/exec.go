@@ -67,6 +67,9 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 		return nil, err
 	}
 
+	// 进度通道：客户端带了 progressToken 时才有；没有则整条路径零开销。
+	report := progressFrom(ctx)
+
 	// Results 预置为空切片：没有命中时若为 nil，会被序列化成 null，
 	// 与 scan.start 等工具的 outputSchema 里 "results": array 冲突。
 	run := &scanRun{Results: []map[string]any{}}
@@ -86,6 +89,8 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 			if ev.Error != nil {
 				run.Error = ev.Error.Message
 			}
+		case scanstream.TypeProgress, scanstream.TypePhase:
+			reportScanProgress(report, ev)
 		}
 	}
 
@@ -106,6 +111,35 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 		}
 	}
 	return run, nil
+}
+
+// reportScanProgress 把子进程的进度事件转成一条 MCP progress 通知。
+//
+// afrog 引擎在扫描过程中约每秒发一条 progress、阶段切换时发一条 phase（见
+// pkg/jsonstream），这是「长任务还在跑、还是已经卡住」的唯一在线信号——否则调用方
+// 只能干等整批扫描结束（实测一次关键词扫描约 200 秒）。report 为 nil（客户端未带
+// progressToken、或当前传输不支持中途推送）时直接返回：进度是可选增强，缺了不影响
+// 扫描结果。
+func reportScanProgress(report ProgressFunc, ev *scanstream.Event) {
+	if report == nil || ev == nil {
+		return
+	}
+	switch ev.Type {
+	case scanstream.TypeProgress:
+		if ev.Progress == nil {
+			return
+		}
+		p := ev.Progress
+		report(float64(p.Percent), 100,
+			fmt.Sprintf("扫描进度 %d%%（%d/%d）", p.Percent, p.Finished, p.Total))
+	case scanstream.TypePhase:
+		if ev.Phase == nil {
+			return
+		}
+		ph := ev.Phase
+		report(float64(ph.Percent), 100,
+			fmt.Sprintf("阶段 %s/%s %d%%（%d/%d）", ph.Phase, ph.Status, ph.Percent, ph.Finished, ph.Total))
+	}
 }
 
 // resultFromStream 把一条结果事件归一化，字段与旧 verify.* 的 results 保持同构，

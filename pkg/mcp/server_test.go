@@ -11,6 +11,7 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/policy"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
 
 func newTestServer() *Server {
@@ -280,6 +281,53 @@ func TestToolCallEmitsProgressOnlyWithToken(t *testing.T) {
 	noToken := &request{ID: json.RawMessage(`2`), Params: json.RawMessage(`{"name":"tick"}`)}
 	if _, _ = s.callTool(context.Background(), noToken, notify); len(got) != 0 {
 		t.Fatalf("without token: want no notification, got %v", got)
+	}
+}
+
+// reportScanProgress 把子进程的 progress/phase 事件转成一条进度通知；缺 token、
+// 事件为 nil、载荷为 nil 时都必须安全返回、不产生通知。
+func TestReportScanProgressMapsEvents(t *testing.T) {
+	type call struct {
+		progress, total float64
+		message         string
+	}
+	var calls []call
+	report := func(progress, total float64, message string) {
+		calls = append(calls, call{progress, total, message})
+	}
+
+	// nil 上报函数、nil 事件：不 panic、无副作用。
+	reportScanProgress(nil, &scanstream.Event{Type: scanstream.TypeProgress})
+	reportScanProgress(report, nil)
+
+	// 载荷为 nil：按类型跳过，不产生通知。
+	reportScanProgress(report, &scanstream.Event{Type: scanstream.TypeProgress})
+	reportScanProgress(report, &scanstream.Event{Type: scanstream.TypePhase})
+	if len(calls) != 0 {
+		t.Fatalf("nil payload must not emit progress, got %v", calls)
+	}
+
+	// progress 事件：percent 直接映射，total 归一化到 100，消息含百分比与计数。
+	reportScanProgress(report, &scanstream.Event{
+		Type:     scanstream.TypeProgress,
+		Progress: &scanstream.ProgressEvent{Percent: 42, Finished: 21, Total: 50},
+	})
+	// phase 事件：消息含阶段名与状态，便于调用方区分「正在哪个阶段」。
+	reportScanProgress(report, &scanstream.Event{
+		Type:  scanstream.TypePhase,
+		Phase: &scanstream.PhaseEvent{Phase: "vuln", Status: "running", Percent: 7, Finished: 3, Total: 40},
+	})
+
+	if len(calls) != 2 {
+		t.Fatalf("want 2 progress notifications, got %d: %v", len(calls), calls)
+	}
+	if calls[0].progress != 42 || calls[0].total != 100 ||
+		!strings.Contains(calls[0].message, "42%") || !strings.Contains(calls[0].message, "21/50") {
+		t.Fatalf("unexpected progress mapping: %+v", calls[0])
+	}
+	if calls[1].progress != 7 || calls[1].total != 100 ||
+		!strings.Contains(calls[1].message, "vuln") || !strings.Contains(calls[1].message, "running") {
+		t.Fatalf("unexpected phase mapping: %+v", calls[1])
 	}
 }
 
