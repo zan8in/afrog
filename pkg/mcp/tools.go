@@ -49,6 +49,11 @@ const (
 	// 解析失败或纯脚本 PoC 则退回保守的固定值。
 	defaultVerifyReserve = 10
 	maxVerifyReserve     = 500
+
+	// verify.replay / poc.submit 的整体超时。runPocScan 默认会一并跑指纹与资源
+	// 探测（它直接影响漏洞发现能力），最坏情况下串行抓取多个同源资源会把单轮
+	// 拖到分钟级；默认给到 180s，避免把「探测慢」误判成「未复现」。
+	defaultReplayTimeout = 180 * time.Second
 )
 
 var nowFunc = time.Now
@@ -859,7 +864,7 @@ func (s *Server) pocSubmitTool() *Tool {
 			"properties": map[string]any{
 				"poc_path":    map[string]any{"type": "string", "description": "草稿 YAML 路径（通常来自 poc.draft 的 poc_path）"},
 				"target":      map[string]any{"type": "string", "description": "实跑目标 URL 或 host:port"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 300, "description": "整体超时，默认 60 秒"},
+				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 300, "description": "整体超时，默认 180 秒（含指纹与资源探测，慢站点可调大）"},
 			},
 			"required": []string{"poc_path", "target"},
 		},
@@ -905,7 +910,7 @@ func (s *Server) pocSubmitTool() *Tool {
 
 			timeout := time.Duration(a.TimeoutSec) * time.Second
 			if timeout <= 0 {
-				timeout = 60 * time.Second
+				timeout = defaultReplayTimeout
 			}
 			run, err := s.runPocScan(ctx, "poc.submit", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
 			if err != nil {
@@ -1684,7 +1689,7 @@ func (s *Server) verifyReplayTool() *Tool {
 				"id":          map[string]any{"type": "string", "description": "证据 id 或 result id"},
 				"target":      map[string]any{"type": "string", "description": "重放目标；留空沿用证据里的 target"},
 				"poc_path":    map[string]any{"type": "string", "description": "本地 PoC 路径；留空按证据的 poc_id 从仓库或 drafts 解析"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 300},
+				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 300, "description": "重放整体超时，默认 180 秒（含指纹与资源探测，慢站点可调大）"},
 			},
 			"required": []string{"id"},
 		},
@@ -1735,7 +1740,7 @@ func (s *Server) verifyReplayTool() *Tool {
 
 			timeout := time.Duration(a.TimeoutSec) * time.Second
 			if timeout <= 0 {
-				timeout = 60 * time.Second
+				timeout = defaultReplayTimeout
 			}
 			run, err := s.runPocScan(ctx, "verify.replay", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
 			if err != nil {
