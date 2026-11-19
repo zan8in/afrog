@@ -331,6 +331,90 @@ func TestReportScanProgressMapsEvents(t *testing.T) {
 	}
 }
 
+// logging 原语：initialize 声明能力，logging/setLevel 设级别，工具执行期间发的日志
+// 经 notifications/message 推给客户端，并按已设级别过滤。
+func TestLoggingPrimitive(t *testing.T) {
+	s := newTestServer()
+
+	caps, _ := s.initializeResult(json.RawMessage(`{}`))["capabilities"].(map[string]any)
+	if _, ok := caps["logging"]; !ok {
+		t.Fatal("initialize must declare logging capability")
+	}
+
+	// setLevel 校验：未知级别报 -32602，合法级别生效。
+	bad, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`9`),
+		Method: "logging/setLevel", Params: json.RawMessage(`{"level":"bogus"}`)}, nil)
+	if bad == nil || bad.Error == nil {
+		t.Fatal("unknown log level must be rejected")
+	}
+
+	s.tools["talk"] = &Tool{
+		Name:        "talk",
+		InputSchema: map[string]any{"type": "object"},
+		Handler: func(ctx context.Context, _ json.RawMessage) (any, error) {
+			if fn := loggerFrom(ctx); fn != nil {
+				fn("info", "started")
+				fn("error", "boom")
+			}
+			return "ok", nil
+		},
+	}
+
+	var got []map[string]any
+	notify := func(method string, params any) {
+		if method != "notifications/message" {
+			return
+		}
+		m, _ := params.(map[string]any)
+		got = append(got, m)
+	}
+	call := func() {
+		_, _ = s.callTool(context.Background(),
+			&request{ID: json.RawMessage(`1`), Params: json.RawMessage(`{"name":"talk"}`)}, notify)
+	}
+
+	// 默认级别 info：info 与 error 都推。
+	call()
+	if len(got) != 2 {
+		t.Fatalf("default level: want info+error, got %v", got)
+	}
+
+	// 设到 error 后，info 被过滤，只剩 error。
+	got = nil
+	ok, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`10`),
+		Method: "logging/setLevel", Params: json.RawMessage(`{"level":"error"}`)}, nil)
+	if ok == nil || ok.Error != nil {
+		t.Fatalf("valid log level must be accepted: %+v", ok)
+	}
+	call()
+	if len(got) != 1 || got[0]["level"] != "error" {
+		t.Fatalf("after setLevel(error): want only error, got %v", got)
+	}
+}
+
+// reportScanLog 把子进程诊断日志映射成 MCP 级别；空载荷、缺通道时安全返回。
+func TestReportScanLogMapsLevels(t *testing.T) {
+	type call struct{ level, message string }
+	var calls []call
+	logf := func(level, message string) { calls = append(calls, call{level, message}) }
+
+	reportScanLog(nil, &scanstream.Event{Type: scanstream.TypeLog, Log: &scanstream.LogEvent{Level: "INF", Text: "x"}})
+	reportScanLog(logf, nil)
+	reportScanLog(logf, &scanstream.Event{Type: scanstream.TypeLog})
+	if len(calls) != 0 {
+		t.Fatalf("nil payload/channel must not emit, got %v", calls)
+	}
+
+	for _, tc := range []struct{ in, want string }{
+		{"INF", "info"}, {"WRN", "warning"}, {"ERR", "error"}, {"DBG", "debug"}, {"", "info"},
+	} {
+		reportScanLog(logf, &scanstream.Event{Type: scanstream.TypeLog, Log: &scanstream.LogEvent{Level: tc.in, Text: "m"}})
+		if last := calls[len(calls)-1]; last.level != tc.want {
+			t.Fatalf("level %q: want %q, got %q", tc.in, tc.want, last.level)
+		}
+	}
+}
+
 // notifications/cancelled 必须精确取消被点名的调用，且只取消它。
 func TestCancelledCancelsInFlightCall(t *testing.T) {
 	s := newTestServer()

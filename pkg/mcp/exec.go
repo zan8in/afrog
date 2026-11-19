@@ -69,6 +69,8 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 
 	// 进度通道：客户端带了 progressToken 时才有；没有则整条路径零开销。
 	report := progressFrom(ctx)
+	// 日志通道：传输支持中途推送时才有；把子进程的诊断日志实时转给客户端。
+	logf := loggerFrom(ctx)
 
 	// Results 预置为空切片：没有命中时若为 nil，会被序列化成 null，
 	// 与 scan.start 等工具的 outputSchema 里 "results": array 冲突。
@@ -91,6 +93,8 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 			}
 		case scanstream.TypeProgress, scanstream.TypePhase:
 			reportScanProgress(report, ev)
+		case scanstream.TypeLog:
+			reportScanLog(logf, ev)
 		}
 	}
 
@@ -139,6 +143,39 @@ func reportScanProgress(report ProgressFunc, ev *scanstream.Event) {
 		ph := ev.Phase
 		report(float64(ph.Percent), 100,
 			fmt.Sprintf("阶段 %s/%s %d%%（%d/%d）", ph.Phase, ph.Status, ph.Percent, ph.Finished, ph.Total))
+	}
+}
+
+// reportScanLog 把子进程的诊断日志转成一条 MCP 日志通知。
+//
+// 引擎在扫描过程中会发阶段运维行（[INF]/[WRN] + 阶段名 + 事实），这是「为什么这轮
+// 扫描是这个结果」的现场记录；此前它被子进程 stdout 事件流吞掉，长任务出问题时
+// 调用方只能靠猜。logf 为 nil（传输不支持中途推送）时直接返回。
+func reportScanLog(logf logFunc, ev *scanstream.Event) {
+	if logf == nil || ev == nil || ev.Log == nil {
+		return
+	}
+	logf(engineLogLevel(ev.Log.Level), ev.Log.Text)
+}
+
+// engineLogLevel 把引擎的缩写级别（INF/WRN/ERR）映射到 MCP 规范的级别名；
+// 未识别的级别回落到 info，避免把非规范级别名推给客户端。
+func engineLogLevel(level string) string {
+	switch strings.ToUpper(strings.TrimSpace(level)) {
+	case "DBG", "DEBUG":
+		return "debug"
+	case "INF", "INFO":
+		return "info"
+	case "NOTICE":
+		return "notice"
+	case "WRN", "WARN", "WARNING":
+		return "warning"
+	case "ERR", "ERROR":
+		return "error"
+	case "CRIT", "CRITICAL":
+		return "critical"
+	default:
+		return "info"
 	}
 }
 

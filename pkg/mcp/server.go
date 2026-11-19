@@ -135,6 +135,37 @@ func progressFrom(ctx context.Context) ProgressFunc {
 	return fn
 }
 
+// logFunc 向客户端报告一条日志（对应 MCP 的 notifications/message）。
+type logFunc func(level, message string)
+
+type loggerKey struct{}
+
+func withLogger(ctx context.Context, fn logFunc) context.Context {
+	return context.WithValue(ctx, loggerKey{}, fn)
+}
+
+// loggerFrom 取当前调用的日志上报函数；当前传输没有推送通道时返回 nil。
+func loggerFrom(ctx context.Context) logFunc {
+	fn, _ := ctx.Value(loggerKey{}).(logFunc)
+	return fn
+}
+
+// mcpLogLevels 是 MCP logging 规范的级别序（取自 RFC 5424），数值越大越严重。
+// 服务端只推严重度不低于 setLevel 所设级别的消息，默认 info。
+var mcpLogLevels = map[string]int{
+	"debug": 0, "info": 1, "notice": 2, "warning": 3, "error": 4,
+	"critical": 5, "alert": 6, "emergency": 7,
+}
+
+// logLevelRank 把级别名规范成序值；未知级别按 info 处理，免得一个拼错的级别名
+// 把该发的消息整条吞掉。
+func logLevelRank(level string) int {
+	if n, ok := mcpLogLevels[strings.ToLower(strings.TrimSpace(level))]; ok {
+		return n
+	}
+	return mcpLogLevels["info"]
+}
+
 // Options 配置 MCP 服务。
 type Options struct {
 	Policy  *policy.Policy
@@ -211,6 +242,11 @@ type Server struct {
 	callMu  sync.Mutex
 	cancels map[string]context.CancelFunc
 
+	// logMu/logMinLevel 是 logging 原语的当前最低级别（logging/setLevel 设置），
+	// 低于它的日志不推给客户端。默认 info。
+	logMu       sync.Mutex
+	logMinLevel int
+
 	// webscanOnce/webscanMatcher 缓存内置 Web 指纹规则：规则集是只读的，
 	// 每次调用都重新解析只会白白拖慢探测。
 	webscanOnce    sync.Once
@@ -233,7 +269,7 @@ func New(opts Options) *Server {
 		info.Name = "afrog"
 	}
 
-	s := &Server{gate: policy.NewGate(p, b, opts.Auditor), info: info, oob: opts.OOB, exec: opts.Executor}
+	s := &Server{gate: policy.NewGate(p, b, opts.Auditor), info: info, oob: opts.OOB, exec: opts.Executor, logMinLevel: mcpLogLevels["info"]}
 	s.tools = s.buildTools()
 	return s
 }
@@ -434,6 +470,8 @@ func (s *Server) handle(ctx context.Context, req *request, notify notifyFunc) (*
 		return s.ok(req.ID, map[string]any{"tools": s.toolList()}), false
 	case "tools/call":
 		return s.callTool(ctx, req, notify)
+	case "logging/setLevel":
+		return s.setLogLevel(req)
 	case "notifications/initialized":
 		return nil, true
 	case "notifications/cancelled":
@@ -510,7 +548,8 @@ func (s *Server) initializeResult(params json.RawMessage) map[string]any {
 		// 原样复述一个不会说的版本等于宣称支持它。
 		"protocolVersion": negotiateProtocolVersion(p.ProtocolVersion),
 		"capabilities": map[string]any{
-			"tools": map[string]any{"listChanged": false},
+			"tools":   map[string]any{"listChanged": false},
+			"logging": map[string]any{},
 		},
 		"serverInfo": s.info,
 		// instructions 是 MCP 规范里 initialize 的可选字段：客户端会把它并入
@@ -586,6 +625,21 @@ func (s *Server) callTool(ctx context.Context, req *request, notify notifyFunc) 
 		})
 	}
 
+	// 有推送通道时把日志接进 ctx：工具执行期间的诊断日志经 notifications/message
+	// 实时给到客户端，调用方据此排障，不必等整批结束（也看不到中途发生了什么）。
+	if notify != nil {
+		ctx = withLogger(ctx, func(level, message string) {
+			if !s.logAtLeast(level) {
+				return
+			}
+			notify("notifications/message", map[string]any{
+				"level":  level,
+				"logger": "afrog",
+				"data":   message,
+			})
+		})
+	}
+
 	result, err := tool.Handler(ctx, params.Arguments)
 	if err != nil {
 		return s.ok(req.ID, toolError(err)), false
@@ -595,6 +649,39 @@ func (s *Server) callTool(ctx context.Context, req *request, notify notifyFunc) 
 
 func (s *Server) ok(id json.RawMessage, result any) *response {
 	return &response{JSONRPC: "2.0", ID: id, Result: result}
+}
+
+// setLogLevel 处理 logging/setLevel：设定服务端推送日志的最低级别。
+//
+// 只接受 MCP 规范里的级别名（debug…emergency）；未知级别按协议报 -32602，
+// 而不是静默回落——静默会让客户端以为设置生效了。
+func (s *Server) setLogLevel(req *request) (*response, bool) {
+	var p struct {
+		Level string `json:"level"`
+	}
+	if err := json.Unmarshal(req.Params, &p); err != nil {
+		return &response{JSONRPC: "2.0", ID: req.ID, Error: &rpcError{
+			Code: codeInvalidParams, Message: "invalid params",
+		}}, false
+	}
+	rank, ok := mcpLogLevels[strings.ToLower(strings.TrimSpace(p.Level))]
+	if !ok {
+		return &response{JSONRPC: "2.0", ID: req.ID, Error: &rpcError{
+			Code: codeInvalidParams, Message: "unknown log level: " + p.Level,
+		}}, false
+	}
+	s.logMu.Lock()
+	s.logMinLevel = rank
+	s.logMu.Unlock()
+	return s.ok(req.ID, map[string]any{}), false
+}
+
+// logAtLeast 判断某级别的日志是否达到当前最低级别、可以推送给客户端。
+func (s *Server) logAtLeast(level string) bool {
+	s.logMu.Lock()
+	min := s.logMinLevel
+	s.logMu.Unlock()
+	return logLevelRank(level) >= min
 }
 
 func toolError(err error) map[string]any {
