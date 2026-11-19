@@ -1,6 +1,8 @@
 package planner
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -349,6 +351,27 @@ expression: r0()
 	}
 	if defaultPocNeedsOOB("") || defaultPocNeedsOOB("no-such-poc-id") {
 		t.Fatal("empty / unknown ids must not be reported as requiring OOB")
+	}
+}
+
+// 没有候选时 proposals 必须是空数组而不是 null：nil 切片会序列化成 null，
+// 与 outputSchema 里 "proposals": array 的契约冲突，客户端会整批拒绝。
+func TestBuildEmptyProposalsSerializesAsArray(t *testing.T) {
+	withStore(t, map[string]pocsrepo.Item{})
+
+	plan, err := Build(Options{})
+	if err != nil {
+		t.Fatalf("build plan: %v", err)
+	}
+	if plan.Proposals == nil {
+		t.Fatal("proposals must not be nil")
+	}
+	b, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Contains(b, []byte(`"proposals":[]`)) {
+		t.Fatalf("proposals must serialize as array: %s", b)
 	}
 }
 

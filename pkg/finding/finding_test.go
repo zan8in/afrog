@@ -59,6 +59,27 @@ func TestSubjectForFallback(t *testing.T) {
 	}
 }
 
+func TestTargetForMirrorsSubject(t *testing.T) {
+	cases := []struct {
+		name               string
+		fulltarget, target string
+		want               string
+	}{
+		{"fulltarget 是绝对 URL", "http://a.example/x", "http://a.example", "http://a.example/x"},
+		{"fulltarget 无效回退 target", "not-a-url", "http://b.example", "http://b.example"},
+		{"都不是 URL 退到原值", "10.0.0.5:80", "10.0.0.5", "10.0.0.5:80"},
+	}
+	for _, tc := range cases {
+		if got := TargetFor(tc.fulltarget, tc.target); got != tc.want {
+			t.Fatalf("%s: TargetFor=%q, want %q", tc.name, got, tc.want)
+		}
+		// Subject 与 Target 必须取自同一个输入：一个是它的 id、一个是它的原值。
+		if got := ref.Endpoint(TargetFor(tc.fulltarget, tc.target)); got != "" && got != SubjectFor(tc.fulltarget, tc.target) {
+			t.Fatalf("%s: SubjectFor 应等于 TargetFor 的端点 id，实际 %q vs %q", tc.name, SubjectFor(tc.fulltarget, tc.target), got)
+		}
+	}
+}
+
 func TestStateFromStatus(t *testing.T) {
 	cases := map[string]string{
 		"":               StateNew,

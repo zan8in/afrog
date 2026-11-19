@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -265,6 +266,65 @@ func digestOf(e *Evidence) string {
 	if err != nil {
 		// digestView 只含可序列化字段，走到这里说明代码有 bug；用字符串兜底，
 		// 保证 ID 仍然确定，不 panic 整个扫描。
+		b = []byte(fmt.Sprintf("%s|%s", e.PocID, e.Target))
+	}
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// behaviorStep 是「行为指纹」用的步骤视图：与 digestStep 的唯一差别是 Extracted
+// 只保留键、丢弃取值。
+type behaviorStep struct {
+	Role          Role     `json:"role"`
+	Matched       bool     `json:"matched"`
+	Method        string   `json:"method,omitempty"`
+	URL           string   `json:"url,omitempty"`
+	Status        int      `json:"status,omitempty"`
+	ExtractedKeys []string `json:"extracted_keys,omitempty"`
+}
+
+type behaviorView struct {
+	PocID      string         `json:"poc_id"`
+	Target     string         `json:"target"`
+	Confidence string         `json:"confidence"`
+	Judgement  *Judgement     `json:"judgement,omitempty"`
+	Steps      []behaviorStep `json:"steps"`
+}
+
+// BehaviorDigest 返回证据的「行为指纹」：与 Digest 同源，但丢弃抽取到的具体取值，
+// 只保留「抽到了哪些键」。
+//
+// 抽取到的会话号、CSRF token、时间戳这类值每次请求都会变，把它们计入摘要会让同一次
+// 判定在重放时得到不同指纹；但键集合（抽到了哪些字段）本身是稳定的行为特征。
+// verify.replay 据此把重放结论分成两档：digest 不等而行为指纹相等，说明这次重放观察到
+// 的是同一行为、只是响应里的易变值不同；两档都不等才是目标或 PoC 真的变了。
+func BehaviorDigest(e *Evidence) string {
+	if e == nil {
+		return ""
+	}
+	view := behaviorView{
+		PocID:      e.PocID,
+		Target:     e.Target,
+		Confidence: e.Confidence,
+		Judgement:  e.Judgement,
+	}
+	for _, s := range e.Steps {
+		keys := make([]string, 0, len(s.Extracted))
+		for k := range s.Extracted {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		view.Steps = append(view.Steps, behaviorStep{
+			Role:          s.Role,
+			Matched:       s.Matched,
+			Method:        s.Request.Method,
+			URL:           s.Request.URL,
+			Status:        s.Response.Status,
+			ExtractedKeys: keys,
+		})
+	}
+	b, err := json.Marshal(view)
+	if err != nil {
 		b = []byte(fmt.Sprintf("%s|%s", e.PocID, e.Target))
 	}
 	sum := sha256.Sum256(b)

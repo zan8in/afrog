@@ -67,7 +67,9 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 		return nil, err
 	}
 
-	run := &scanRun{}
+	// Results 预置为空切片：没有命中时若为 nil，会被序列化成 null，
+	// 与 scan.start 等工具的 outputSchema 里 "results": array 冲突。
+	run := &scanRun{Results: []map[string]any{}}
 	for ev := range h.Events() {
 		switch ev.Type {
 		case scanstream.TypeResult:
@@ -108,6 +110,10 @@ func (s *Server) runScanSpec(ctx context.Context, taskID string, spec *executor.
 
 // resultFromStream 把一条结果事件归一化，字段与旧 verify.* 的 results 保持同构，
 // 并顺手把证据里的每次往返写进观测流。
+//
+// evidence / extractors 只在有值时写入：scan.start 的 outputSchema 把它们声明为
+// object，nil 指针或 nil map 会序列化成 null，客户端按 schema 校验时会整批拒绝。
+// 指纹/服务识别类结果本来就没有原生证据与提取器，省略这两个键才符合契约。
 func resultFromStream(r *scanstream.ResultEvent) map[string]any {
 	var native *evidence.Evidence
 	if r.Evidence != nil {
@@ -120,10 +126,14 @@ func resultFromStream(r *scanstream.ResultEvent) map[string]any {
 		"poc_name": r.PocName,
 		"severity": r.Severity,
 		"target":   r.Target,
-		"evidence": native,
+	}
+	if native != nil {
+		item["evidence"] = native
 	}
 	if r.Evidence != nil {
-		item["extractors"] = r.Evidence.Extractors
+		if len(r.Evidence.Extractors) > 0 {
+			item["extractors"] = r.Evidence.Extractors
+		}
 		item["exchanges"] = sanitizeStreamExchanges(r.Evidence.Exchanges)
 	}
 	return item

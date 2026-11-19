@@ -1,7 +1,7 @@
 id: mysql-detect
 
 info:
-  name: MySQL Dectect
+  name: MySQL Detect
   author: zan8in
   severity: info
   verified: true

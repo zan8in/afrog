@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
 )
 
@@ -54,6 +55,54 @@ func TestScanRunResultConclusions(t *testing.T) {
 	}
 	if lib["matched_pocs"] != 0 {
 		t.Fatalf("library matched_pocs = %v, want 0", lib["matched_pocs"])
+	}
+}
+
+func TestResultFromStreamSkipsNilEvidence(t *testing.T) {
+	// 指纹/服务识别类结果：没有 Evidence，不应写出 null 字段。
+	plain := resultFromStream(&scanstream.ResultEvent{
+		PocID: "nginx-detect", PocName: "Nginx 检测", Severity: "info", Target: "http://t",
+	})
+	assertNoNullFields(t, plain)
+
+	// 有 Evidence 但既无原生证据也无提取器：同样只省略，不写 null。
+	partial := resultFromStream(&scanstream.ResultEvent{
+		PocID: "mysql-detect", Target: "http://t",
+		Evidence: &scanstream.Evidence{},
+	})
+	assertNoNullFields(t, partial)
+
+	// 有原生证据与提取器时才写这两个键。
+	full := resultFromStream(&scanstream.ResultEvent{
+		PocID: "CVE-2020-1938", Target: "http://t",
+		Evidence: &scanstream.Evidence{
+			Native:     &evidence.Evidence{ID: "evd_x", Digest: "sha256:x"},
+			Extractors: map[string]string{"version": "9.0"},
+		},
+	})
+	if full["evidence"] == nil || full["extractors"] == nil {
+		t.Fatal("evidence/extractors must carry values when present")
+	}
+}
+
+// assertNoNullFields 递归断言 map 里不存在 nil 值——nil 序列化成 null 会让
+// outputSchema 声明为 object/array 的字段整批校验失败。
+//
+// 直接遍历结构而不是「序列化后搜 null 子串」：后者会被值里恰好含 "null"
+// 的正常字符串（如 poc_name）误伤。
+func assertNoNullFields(t *testing.T, item map[string]any) {
+	t.Helper()
+	for k, v := range item {
+		switch val := v.(type) {
+		case nil:
+			t.Fatalf("field %q is nil", k)
+		case map[string]any:
+			assertNoNullFields(t, val)
+		case []map[string]any:
+			for _, e := range val {
+				assertNoNullFields(t, e)
+			}
+		}
 	}
 }
 

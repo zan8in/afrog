@@ -160,6 +160,7 @@ func groupFindings(rows []findingRow) []*findingGroup {
 			nf, err := finding.New(finding.Finding{
 				ProjectID: r.ProjectID,
 				Subject:   subject,
+				Target:    finding.TargetFor(r.FullTarget, r.Target),
 				VulnClass: class,
 				Severity:  strings.ToUpper(strings.TrimSpace(r.Severity)),
 				Title:     strings.TrimSpace(r.VulName),
@@ -195,6 +196,9 @@ func groupFindings(rows []findingRow) []*findingGroup {
 			g.Finding.Status = strings.ToLower(strings.TrimSpace(r.Status))
 		}
 		g.Finding.HitCount += r.HitCount
+		if id := strings.TrimSpace(r.VulID); id != "" {
+			g.Finding.PocIDs = append(g.Finding.PocIDs, id)
+		}
 		if r.ResultID > 0 {
 			g.ResultIDs = append(g.ResultIDs, r.ResultID)
 		}
@@ -202,7 +206,25 @@ func groupFindings(rows []findingRow) []*findingGroup {
 
 	out := make([]*findingGroup, 0, len(order))
 	for _, id := range order {
-		out = append(out, byID[id])
+		g := byID[id]
+		g.Finding.PocIDs = dedupSorted(g.Finding.PocIDs)
+		out = append(out, g)
+	}
+	return out
+}
+
+// dedupSorted 去重并升序排列，让同一结论的 poc_ids 与行顺序无关、可稳定断言。
+func dedupSorted(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	sorted := append([]string(nil), values...)
+	sort.Strings(sorted)
+	out := sorted[:1]
+	for _, v := range sorted[1:] {
+		if v != out[len(out)-1] {
+			out = append(out, v)
+		}
 	}
 	return out
 }
@@ -319,4 +341,37 @@ func sortFindings(items []finding.Finding) {
 		}
 		return items[i].ID < items[j].ID
 	})
+}
+
+// SelectActiveFindingCountsBySubject 返回 (subject → 命中数) 聚合，只统计主动扫描结论。
+//
+// 资产图此前只反映被动覆盖命中（passive_finding 表），主动扫描出来的结论（result 表）
+// 读不到，导致「明明有 CRITICAL 命中，observe.state 里 findings=0」。这里把台账投影出的
+// 主动结论按主体归集，供资产图把结论数挂到对应节点上。
+//
+// 复用 findingGroupedSelect + groupFindings：与 observe.findings 是同一份投影口径，
+// 避免两处各算一套 subject / 类目而逐渐漂移。被动结论由 passive_finding 表单独统计，
+// 这里显式跳过，避免同一命中被算两次。
+func SelectActiveFindingCountsBySubject(projectID string) (map[string]int64, error) {
+	if dbx == nil {
+		return nil, fmt.Errorf("sqlite not initialized")
+	}
+	where, args := ledgerConditions(LedgerFilter{Project: projectID}, true)
+	query := "SELECT * FROM (" + findingGroupedSelect + ") t"
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+
+	var rows []findingRow
+	if err := dbx.Select(&rows, query, args...); err != nil {
+		return nil, err
+	}
+	out := make(map[string]int64)
+	for _, g := range groupFindings(rows) {
+		if g.Finding.Source != finding.SourceActive {
+			continue
+		}
+		out[g.Finding.Subject] += g.Finding.HitCount
+	}
+	return out, nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -197,7 +198,7 @@ func (s *Server) observeFindingsTool() *Tool {
 	return &Tool{
 		Name:        "observe.findings",
 		Title:       "列出漏洞结论",
-		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。想知道「已经扫出什么」时先调它；返回为空只说明本地还没有这类数据，不代表目标没有漏洞。",
+		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。subject 是不可读的主体 id（ep_ 前缀，供跨工具引用），target 是它对应的可读目标（完整 URL），poc_ids 是产生本条结论的 PoC id 列表（可回到 poc.search）。想知道「已经扫出什么」时先调它；返回为空只说明本地还没有这类数据，不代表目标没有漏洞。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -301,7 +302,7 @@ func (s *Server) observeStateTool() *Tool {
 	return &Tool{
 		Name:        "observe.state",
 		Title:       "读攻击面子图",
-		Description: "以某个资产（id 或地址）为根，返回攻击面子图：上下游资产、端点与参数、技术栈与候选 PoC（tech:/poc: 派生节点）、被动覆盖与命中数。tech: 节点就是技术栈，可把它的关键词交给 poc.search 找同族 PoC；poc: 节点是已给出的候选。",
+		Description: "以某个资产（id 或地址）为根，返回攻击面子图：上下游资产、端点与参数、技术栈与候选 PoC（tech:/poc: 派生节点）、被动覆盖与命中数。节点的 findings 是被动覆盖命中与主动扫描结论（observe.findings 台账）之和，因此扫出过的漏洞会体现在对应资产的 findings 上。tech: 节点就是技术栈，可把它的关键词交给 poc.search 找同族 PoC；poc: 节点是已给出的候选。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
@@ -1224,7 +1225,7 @@ func (s *Server) probeFingerprintTool() *Tool {
 			"properties": map[string]any{
 				"url":         map[string]any{"type": "string", "description": "绝对 URL，缺省协议时按 http 处理"},
 				"favicon":     map[string]any{"type": "boolean", "description": "强制抓取 /favicon.ico（多一次请求与预算）；默认关闭，但首页没识别出任何技术栈时会自动补抓一次"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 1, "maximum": 60, "description": "整体超时，默认 15 秒"},
+				"timeout_sec": map[string]any{"type": "integer", "minimum": 1, "maximum": 120, "description": "单次尝试的整体超时，默认 25 秒；首轮在瞬时错误（超时/连接重置）上会自动重试一次"},
 			},
 			"required": []string{"url"},
 		},
@@ -1254,22 +1255,30 @@ func (s *Server) probeFingerprintTool() *Tool {
 
 			timeout := time.Duration(a.TimeoutSec) * time.Second
 			if timeout <= 0 {
-				timeout = 15 * time.Second
+				timeout = 25 * time.Second
 			}
-			runCtx, cancel := context.WithTimeout(ctx, timeout)
+			// runCtx 给「首轮 + 一次重试」留出整体上限，因此按 2×timeout 设；单次尝试
+			// 仍由 Prober 的 Timeout 单独封顶。这只是对一个显式 URL 的探测，最坏耗时
+			// 2×timeout，不会放大成批量扫描。
+			runCtx, cancel := context.WithTimeout(ctx, 2*timeout)
 			defer cancel()
 
 			// 抓取与指纹素材组装统一在 pkg/webscan.Prober（与 afrog CLI 同一实现）：
 			// 这里只做 MCP 参数到探测参数的映射。
+			//
+			// InsecureSkipVerify 必须与 CLI/引擎侧保持一致（扫描器语义：证书是否可信交给
+			// 使用者判断）。否则自签名/不合规证书的 HTTPS 资产会在探测阶段直接报错，
+			// 整资产识别不出来——这是跨端能力不一致导致的漏资产。
 			prober := webscan.NewProber(webscan.ProbeOptions{
-				Timeout: timeout,
-				Headers: []string{"Accept: " + probeFingerprintAccept},
+				Timeout:            timeout,
+				Headers:            []string{"Accept: " + probeFingerprintAccept},
+				InsecureSkipVerify: true,
 			})
 
 			start := time.Now()
-			probe, err := prober.Probe(runCtx, target)
+			probe, err := s.probeFingerprintFetch(runCtx, prober, target)
 			if err != nil {
-				return nil, err
+				return nil, describeProbeError(target, err)
 			}
 			latency := time.Since(start).Milliseconds()
 			headers := probe.Headers
@@ -1392,6 +1401,64 @@ func (s *Server) probeFingerprintTool() *Tool {
 			return out, nil
 		},
 	}
+}
+
+// probeFingerprintFetch 抓一次首页，对「没拿到响应」的瞬时错误做一次有界重试。
+//
+// 目标是 Web 服务时首包慢很常见，一次瞬时超时就报失败会把整资产误判成「无 Web 服务」。
+// 重试同样要过预算门控：额度不足就不重试，退回首轮错误。
+func (s *Server) probeFingerprintFetch(ctx context.Context, prober *webscan.Prober, target string) (*webscan.ProbeResult, error) {
+	probe, err := prober.Probe(ctx, target)
+	if err == nil || !isTransientProbeError(err) || ctx.Err() != nil {
+		return probe, err
+	}
+	if takeErr := s.gate.Take(policy.Action{Name: "probe.fingerprint", Target: target}, 1); takeErr != nil {
+		return nil, err
+	}
+	if probe, retryErr := prober.Probe(ctx, target); retryErr == nil {
+		return probe, nil
+	}
+	return nil, err
+}
+
+// isTransientProbeError 判断「没拿到响应」的错误是否为值得重试的瞬时错误：超时、
+// 连接重置、EOF。连接被拒（端口没在监听）不算瞬时错误——重试也一样。
+func isTransientProbeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err) {
+		return true
+	}
+	if portscan.IsConnRefused(err) {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "reset by peer") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "eof") ||
+		strings.Contains(msg, "timeout")
+}
+
+// describeProbeError 把「没拿到响应」的错误翻成可操作的一句话。
+//
+// 超时（慢 / 端口被过滤，值得放长超时重试）与连接被拒（多半不是 Web 服务）对 Agent 的
+// 下一步决策完全不同；直接抛原始 error 会让两者都读成含糊的「探测失败」。
+func describeProbeError(target string, err error) error {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err):
+		return fmt.Errorf("no response from %s within the probe timeout (the port may be slow, filtered, or not speaking plain HTTP — it is not necessarily a non-web service; retry with a larger timeout_sec): %w", target, err)
+	case portscan.IsConnRefused(err):
+		return fmt.Errorf("connection refused by %s (nothing is listening on this scheme/port — likely not a web service): %w", target, err)
+	default:
+		return fmt.Errorf("probe %s failed: %w", target, err)
+	}
+}
+
+// isTimeoutError 判断错误是否实现了 net.Error 且被标记为超时。
+func isTimeoutError(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
 
 // webMatcher 懒加载内置指纹规则；规则集只读，整个进程复用一份。
@@ -1677,18 +1744,24 @@ func (s *Server) verifyReplayTool() *Tool {
 
 			actual := firstEvidence(run.Results)
 			consistent := replayMatches(expected, actual)
+			// 行为指纹相等说明这次重放观察到的是同一行为，只是抽取到的取值（会话号、
+			// token 等）不同——它是「归一化后的 digest」，用来把「目标/PoC 真的变了」
+			// 与「只是响应里的易变值不同」区分开，避免后者被误报成结论失效。
+			behaviorConsistent := actual != nil &&
+				evidence.BehaviorDigest(expected) == evidence.BehaviorDigest(actual)
 			res := map[string]any{
-				"poc_id":     expected.PocID,
-				"target":     target,
-				"replayed":   actual != nil,
-				"consistent": consistent,
-				"expected":   evidenceRef(expected),
+				"poc_id":              expected.PocID,
+				"target":              target,
+				"replayed":            actual != nil,
+				"consistent":          consistent,
+				"behavior_consistent": behaviorConsistent,
+				"expected":            evidenceRef(expected),
 			}
 			if actual != nil {
 				res["actual"] = evidenceRef(actual)
 				res["evidence"] = actual
 			}
-			if reason := replayReason(actual != nil, consistent); reason != "" {
+			if reason := replayReason(actual != nil, consistent, behaviorConsistent); reason != "" {
 				res["reason"] = reason
 			}
 			return res, nil
@@ -1732,14 +1805,20 @@ func replayMatches(expected, actual *evidence.Evidence) bool {
 	return expected.ID == actual.ID && expected.Digest == actual.Digest
 }
 
-func replayReason(replayed, consistent bool) string {
+// replayReason 给不一致的重放一句可读的原因；两档一致（字节一致 / 行为一致）都不带原因。
+//
+// 只有 digest 不等但行为指纹相等时，才把结论说成「同一行为、只是易变值不同」——
+// 这仍然算复现成功，不该让调用方误以为结论失效。
+func replayReason(replayed, consistent, behaviorConsistent bool) string {
 	switch {
 	case !replayed:
 		return "replay did not reproduce the finding"
-	case !consistent:
-		return "replay produced different evidence: the target or the PoC changed"
-	default:
+	case consistent:
 		return ""
+	case behaviorConsistent:
+		return "replay reproduced the same behavior, but captured values differ (digest changed); treat the finding as reproduced"
+	default:
+		return "replay produced different evidence: the target or the PoC changed"
 	}
 }
 

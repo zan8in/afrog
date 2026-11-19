@@ -93,6 +93,14 @@ func TestSelectFindingsAggregatesBySubjectAndClass(t *testing.T) {
 	if got.Source != finding.SourceActive {
 		t.Fatalf("source = %s, want active", got.Source)
 	}
+	// 可读目标与来源 PoC：subject 是不透明的 ep_ id，target 是可读 URL；同一类目下
+	// 由两个 PoC 命中聚合而来，poc_ids 必须给全且去重升序。
+	if got.Target != "http://a.example/1" {
+		t.Fatalf("target = %q, want http://a.example/1", got.Target)
+	}
+	if len(got.PocIDs) != 2 || got.PocIDs[0] != "poc-a" || got.PocIDs[1] != "poc-b" {
+		t.Fatalf("poc_ids = %v, want [poc-a poc-b]", got.PocIDs)
+	}
 }
 
 // 同一个 (项目, 主体, 类目) 在任何路径下都必须算出同一个 id；项目参与 canonical，

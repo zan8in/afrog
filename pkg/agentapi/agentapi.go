@@ -6,6 +6,7 @@ package agentapi
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/planner"
+	"github.com/zan8in/afrog/v3/pkg/poc"
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 )
 
@@ -120,6 +122,16 @@ func SearchPocs(keyword string, severity []string, limit int) (*PocSearchResult,
 
 	total := len(items)
 
+	// 相关性排序：poc.search 是用来「先预检本机有没有这个技术栈的 PoC」的，命中
+	// 关键词越多、越靠近 id/名称的结果越该排前面。ListMeta 的 severity→name 排序
+	// 会把一个只命中 tags 的低相关项排到精确命中 id 的项之前，模型据此容易选错 PoC。
+	// 排序只在读取层做：afrog -pl -s 的输出顺序保持原样。
+	if kws := poc.SplitSearchKeywords(keyword); len(kws) > 0 {
+		sort.SliceStable(items, func(i, j int) bool {
+			return searchRelevance(items[i], kws) > searchRelevance(items[j], kws)
+		})
+	}
+
 	if limit <= 0 {
 		limit = 50
 	}
@@ -132,17 +144,58 @@ func SearchPocs(keyword string, severity []string, limit int) (*PocSearchResult,
 		truncated = true
 	}
 
+	// tags/requires 为空时保持空切片而不是 nil：nil 会被序列化成 null，
+	// 与 poc.search 的 outputSchema 里 "tags": array 冲突，客户端按 schema 校验会整批拒绝。
+	nonNil := func(v []string) []string {
+		if v == nil {
+			return []string{}
+		}
+		return v
+	}
+
 	out := make([]map[string]any, 0, len(items))
 	for _, it := range items {
 		out = append(out, map[string]any{
 			"id":       it.ID,
 			"name":     it.Name,
 			"severity": it.Severity,
-			"tags":     it.Tags,
-			"requires": it.Requires,
+			"tags":     nonNil(it.Tags),
+			"requires": nonNil(it.Requires),
 			"path":     it.Path,
 			"source":   string(it.Source),
 		})
 	}
 	return &PocSearchResult{Items: out, Count: len(out), Total: total, Truncated: truncated}, nil
+}
+
+// searchRelevance 给一条 PoC 算相对关键词的相关性：每个关键词只按它命中的最靠前
+// 字段计一次分（id > name > tags > requires），再对所有关键词求和。
+//
+// 只用「命中几个关键词、命中最靠前的哪个字段」两个稳定维度：不去猜语义、也不做
+// 分词模糊匹配，保证与 poc.search / afrog -s 的硬子串口径一致，同一输入结果确定。
+func searchRelevance(it pocsrepo.Item, keywords []string) int {
+	score := 0
+	for _, k := range keywords {
+		switch {
+		case strings.Contains(strings.ToLower(it.ID), k):
+			score += 4
+		case strings.Contains(strings.ToLower(it.Name), k):
+			score += 3
+		case containsAnyFold(it.Tags, k):
+			score += 2
+		case containsAnyFold(it.Requires, k):
+			score += 1
+		}
+	}
+	return score
+}
+
+// containsAnyFold 判断 values 里是否有任一项（小写后）包含关键词 k。
+func containsAnyFold(values []string, k string) bool {
+	for _, v := range values {
+		if strings.Contains(strings.ToLower(v), k) {
+			return true
+		}
+	}
+	return false
 }

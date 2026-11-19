@@ -20,3 +20,11 @@ func isConnRefused(err error) bool {
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "refused")
 }
+
+// IsConnRefused 供其它包（如 MCP 的 probe.* 工具）判断一次拨号失败是否为「连接被拒绝」。
+//
+// 复用与端口扫描同一份平台感知判定，避免各处（尤其 windows 的 WSA 错误码）各写一个
+// 不可靠的字符串比较。
+func IsConnRefused(err error) bool {
+	return isConnRefused(err)
+}

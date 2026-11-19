@@ -5,6 +5,8 @@
 package assetgraph
 
 import (
+	"net"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -31,7 +33,7 @@ type Node struct {
 	Relation string `json:"relation"`
 	// Coverage 只对可作为被动覆盖口径的节点（domain / hostport / ip）有值。
 	Coverage *sqlite.AssetCoverageSummary `json:"coverage,omitempty"`
-	// Findings 是该资产上已锚定的被动命中数。
+	// Findings 是该资产上已锚定的命中数：被动覆盖命中 + 主动扫描结论（台账）之和。
 	Findings    int64 `json:"findings"`
 	ParentCount int   `json:"parent_count"`
 	ChildCount  int   `json:"child_count"`
@@ -199,6 +201,14 @@ func Build(opts Options) (*Response, error) {
 		gologger.Debug().Msgf("资产图命中数读取失败: %v", err)
 		findings = map[string]int64{}
 	}
+	// 主动扫描结论（台账）命中数：与被动命中合并——observe.state 的 findings 表示
+	// 「这个资产上有多少条已知结论」，主动与被动都应计入。
+	activeBySubject, err := sqlite.SelectActiveFindingCountsBySubject(opts.ProjectID)
+	if err != nil {
+		gologger.Debug().Msgf("资产图主动命中数读取失败: %v", err)
+		activeBySubject = map[string]int64{}
+	}
+	activeFindings := foldActiveFindings(order, activeBySubject)
 	// 端点/参数不是资产行，命中数只能按 target/location 归集，再折算到节点 id。
 	endpointFindings, paramFindings := passiveTargetFindings(order, opts.ProjectID)
 
@@ -237,7 +247,7 @@ func Build(opts Options) (*Response, error) {
 			AssetNodeRow: r,
 			Depth:        t.depth,
 			Relation:     t.relation,
-			Findings:     nodeFindings(id, r.Type, findings, endpointFindings, paramFindings),
+			Findings:     nodeFindings(id, r.Type, findings, endpointFindings, paramFindings) + activeFindings[id],
 			ParentCount:  parentCount[id],
 			ChildCount:   childCount[id],
 		}
@@ -331,4 +341,65 @@ func nodeFindings(id, typ string, byAsset, endpoints, params map[string]int64) i
 		return params[id]
 	}
 	return byAsset[id]
+}
+
+// foldActiveFindings 把「按主体（结论的 endpoint 地址）聚合的主动命中数」折算到图节点。
+//
+// 结论主体是端点地址，而图里往往只有它的 authority（hostport）节点；找不到主体节点本身时
+// 就逐级向上找最近的、存在于本图中的上级地址，让「主机:端口」这个根也能看到结论数。
+func foldActiveFindings(order []string, bySubject map[string]int64) map[string]int64 {
+	out := make(map[string]int64)
+	if len(bySubject) == 0 {
+		return out
+	}
+	present := make(map[string]struct{}, len(order))
+	for _, id := range order {
+		present[id] = struct{}{}
+	}
+	for subject, c := range bySubject {
+		if c <= 0 {
+			continue
+		}
+		if _, ok := present[subject]; ok {
+			out[subject] += c
+			continue
+		}
+		if ancestor := nearestPresentAncestor(subject, present); ancestor != "" {
+			out[ancestor] += c
+		}
+	}
+	return out
+}
+
+// nearestPresentAncestor 从地址逐级向上找第一个存在于本图里的上级节点。
+func nearestPresentAncestor(address string, present map[string]struct{}) string {
+	for _, cand := range assetAncestorAddresses(address) {
+		if _, ok := present[cand]; ok {
+			return cand
+		}
+	}
+	return ""
+}
+
+// assetAncestorAddresses 返回地址的逐级上级候选（不含自身）：
+// http://h:p/path → [h:p, h]；h:p → [h]；其余 → nil。
+func assetAncestorAddresses(address string) []string {
+	s := strings.TrimSpace(address)
+	if s == "" {
+		return nil
+	}
+	var out []string
+	host := s
+	if i := strings.Index(s, "://"); i > 0 {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return nil
+		}
+		host = u.Host
+		out = append(out, host)
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil && h != "" {
+		out = append(out, h)
+	}
+	return out
 }

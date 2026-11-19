@@ -128,6 +128,11 @@ func Build(opts Options) (*Plan, error) {
 		proposals = proposals[:limit]
 		out.Truncated = true
 	}
+	// proposals 为空时保持空切片而不是 nil：nil 会被序列化成 null，
+	// 与 outputSchema 里 "proposals": array 的契约冲突，客户端会整批拒绝。
+	if proposals == nil {
+		proposals = []Proposal{}
+	}
 	out.Proposals = proposals
 	return out, nil
 }

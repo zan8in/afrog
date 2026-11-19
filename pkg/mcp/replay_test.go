@@ -30,14 +30,41 @@ func TestReplayMatchesUsesContentAddress(t *testing.T) {
 		t.Fatal("different digest must not match")
 	}
 
-	if got := replayReason(false, false); !strings.Contains(got, "did not reproduce") {
+	if got := replayReason(false, false, false); !strings.Contains(got, "did not reproduce") {
 		t.Fatalf("reason for missed replay = %q", got)
 	}
-	if got := replayReason(true, false); !strings.Contains(got, "changed") {
+	if got := replayReason(true, false, false); !strings.Contains(got, "changed") {
 		t.Fatalf("reason for changed evidence = %q", got)
 	}
-	if got := replayReason(true, true); got != "" {
+	if got := replayReason(true, false, true); !strings.Contains(got, "same behavior") {
+		t.Fatalf("reason for behavior-consistent replay = %q", got)
+	}
+	if got := replayReason(true, true, true); got != "" {
 		t.Fatalf("consistent replay should not carry a reason, got %q", got)
+	}
+}
+
+// digest 包含抽取到的取值，重放时若响应里的易变值（会话号、token）不同，digest 会变，
+// 但行为指纹（只保留抽取到的键）应当相等——这正是「同一行为、只是易变值不同」的判据。
+func TestBehaviorDigestIgnoresExtractedValues(t *testing.T) {
+	step := func(v string) evidence.Step {
+		return evidence.Step{
+			Role:      evidence.RoleConfirm,
+			Matched:   true,
+			Request:   evidence.Request{Method: "GET", URL: "http://h/a"},
+			Response:  evidence.Response{Status: 200},
+			Extracted: map[string]string{"session": v},
+		}
+	}
+	a := &evidence.Evidence{PocID: "p", Target: "http://h", Steps: []evidence.Step{step("aaa")}}
+	b := &evidence.Evidence{PocID: "p", Target: "http://h", Steps: []evidence.Step{step("bbb")}}
+
+	if evidence.BehaviorDigest(a) != evidence.BehaviorDigest(b) {
+		t.Fatalf("behavior digest must ignore extracted values: %s vs %s",
+			evidence.BehaviorDigest(a), evidence.BehaviorDigest(b))
+	}
+	if evidence.BehaviorDigest(nil) != "" {
+		t.Fatal("nil evidence must have an empty behavior digest")
 	}
 }
 

@@ -37,12 +37,21 @@ const (
 
 // Finding 是某个主体上一类漏洞的聚合结论。
 type Finding struct {
-	ID         string   `json:"id"`
-	ProjectID  string   `json:"project_id"`
-	Subject    string   `json:"subject"`
-	VulnClass  string   `json:"vuln_class"`
-	Severity   string   `json:"severity"`
-	Title      string   `json:"title"`
+	ID        string `json:"id"`
+	ProjectID string `json:"project_id"`
+	// Subject 是主体的内容寻址 id（ep_ 前缀）：它能被资产图与证据稳定引用，但读不出
+	// 「这是哪个目标」。可读的原值见 Target。
+	Subject string `json:"subject"`
+	// Target 是主体的可读原值（命中所在的完整 URL，退而取种子目标或原始地址），由
+	// TargetFor 按与 Subject 相同的优先级选出。只用它做展示与判断，引用一律用 Subject。
+	Target    string `json:"target"`
+	VulnClass string `json:"vuln_class"`
+	Severity  string `json:"severity"`
+	Title     string `json:"title"`
+	// PocIDs 是产生本条结论的 PoC id（去重、升序）。类目级聚合会把映射到同一类目的
+	// 多个 PoC 合并成一条结论，只给一个 id 会丢信息，因此给出全集，供调用方据此回到
+	// poc.search / scan.start 或核对来源。
+	PocIDs     []string `json:"poc_ids"`
 	Confidence string   `json:"confidence,omitempty"`
 	Evidence   []string `json:"evidence"`
 	State      string   `json:"state"`
@@ -80,20 +89,35 @@ func VulnClass(cweID, tags, vulID string) string {
 	return strings.ToLower(strings.TrimSpace(vulID))
 }
 
-// SubjectFor 返回 Finding 的主体：优先取完整命中的端点 id，其次回退种子目标，
-// 最后退到原始地址。回退到原值是为了避免非绝对 URL 的目标（如 host:port）算出
-// 空 subject，把不同主体错误塌缩成同一条结论。
+// SubjectFor 返回 Finding 主体的内容寻址 id：优先取完整命中的端点，其次回退种子目标，
+// 都不是绝对 URL 时退到可读原值。退到原值是为了避免非绝对 URL 的目标（如 host:port）
+// 算出空 subject，把不同主体错误塌缩成同一条结论。
 func SubjectFor(fullTarget, target string) string {
-	if id := ref.Endpoint(strings.TrimSpace(fullTarget)); id != "" {
+	raw := TargetFor(fullTarget, target)
+	if id := ref.Endpoint(raw); id != "" {
 		return id
 	}
-	if id := ref.Endpoint(strings.TrimSpace(target)); id != "" {
-		return id
+	return raw
+}
+
+// TargetFor 返回 Finding 主体的可读原值：与 SubjectFor 取同一个输入（优先完整的命中
+// 端点，其次种子目标，最后原始地址），只是返回地址本身而不是内容寻址 id。
+//
+// 两者共用同一套优先级：Subject 是它的 id、Target 是它的原值，调用方才能一一对应地
+// 「用 Subject 引用、用 Target 展示」。
+func TargetFor(fullTarget, target string) string {
+	ft := strings.TrimSpace(fullTarget)
+	tg := strings.TrimSpace(target)
+	switch {
+	case ref.Endpoint(ft) != "":
+		return ft
+	case ref.Endpoint(tg) != "":
+		return tg
+	case ft != "":
+		return ft
+	default:
+		return tg
 	}
-	if s := strings.TrimSpace(fullTarget); s != "" {
-		return s
-	}
-	return strings.TrimSpace(target)
 }
 
 // StateFromStatus 把台账状态映射成 §4.5 的 state 枚举。
@@ -129,6 +153,9 @@ func New(f Finding) (*Finding, error) {
 	f.ID = IDFor(f.ProjectID, f.Subject, f.VulnClass)
 	if f.Evidence == nil {
 		f.Evidence = []string{}
+	}
+	if f.PocIDs == nil {
+		f.PocIDs = []string{}
 	}
 	return &f, nil
 }
