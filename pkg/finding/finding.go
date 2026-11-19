@@ -39,7 +39,7 @@ const (
 type Finding struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
-	// Subject 是主体的内容寻址 id（ep_ 前缀）：它能被资产图与证据稳定引用，但读不出
+	// Subject 是主体的内容寻址 id（endpoint_ 前缀）：它能被资产图与证据稳定引用，但读不出
 	// 「这是哪个目标」。可读的原值见 Target。
 	Subject string `json:"subject"`
 	// Target 是主体的可读原值（命中所在的完整 URL，退而取种子目标或原始地址），由

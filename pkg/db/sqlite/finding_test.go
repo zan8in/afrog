@@ -93,7 +93,7 @@ func TestSelectFindingsAggregatesBySubjectAndClass(t *testing.T) {
 	if got.Source != finding.SourceActive {
 		t.Fatalf("source = %s, want active", got.Source)
 	}
-	// 可读目标与来源 PoC：subject 是不透明的 ep_ id，target 是可读 URL；同一类目下
+	// 可读目标与来源 PoC：subject 是不透明的 endpoint_ id，target 是可读 URL；同一类目下
 	// 由两个 PoC 命中聚合而来，poc_ids 必须给全且去重升序。
 	if got.Target != "http://a.example/1" {
 		t.Fatalf("target = %q, want http://a.example/1", got.Target)
@@ -239,6 +239,33 @@ func TestSelectFindingsPaginates(t *testing.T) {
 	}
 	if len(second.Items) != 1 || second.Items[0].Subject != ref.Endpoint("http://a.example/2") {
 		t.Fatalf("page2 items = %+v, want endpoint /2", second.Items)
+	}
+}
+
+// Web 探测汇总行（vulid=webprobe）是服务 HTML 报告「Web 探测汇总」段落的展示行，
+// 不由 PoC 产生，也不是某主体上的漏洞：投影必须排除它，否则 observe.findings 会多出
+// 一条 subject/target 都是 "webprobe" 的假结论。
+func TestSelectFindingsExcludesWebProbeSummary(t *testing.T) {
+	db := useFindingFixture(t)
+
+	linkFindingProject(t, db, "t-1", "p-alpha", "2026-09-28 10:00:00")
+	insertFindingResult(t, db, 1, "t-1", "poc-a", "http://a.example", "http://a.example/1", "2026-09-28 10:00:00", "CWE-89")
+	// webprobe 汇总行：poc 为空、subject/target 都是占位串。
+	if _, err := db.Exec(
+		`INSERT INTO result(id, taskid, vulid, vulname, target, fulltarget, severity, poc, result, created, fingerprint, extractor)
+		 VALUES(2, 't-1', 'webprobe', 'webprobe', 'webprobe', 'webprobe', 'info', '', '', '2026-09-28 11:00:00', '', '')`); err != nil {
+		t.Fatalf("insert webprobe summary: %v", err)
+	}
+
+	page, err := SelectFindings(LedgerFilter{Project: "p-alpha"})
+	if err != nil {
+		t.Fatalf("SelectFindings: %v", err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 {
+		t.Fatalf("total/items = %d/%d, want 1/1 (webprobe summary must be excluded)", page.Total, len(page.Items))
+	}
+	if page.Items[0].Subject == "webprobe" || page.Items[0].Target == "webprobe" {
+		t.Fatalf("webprobe summary leaked into findings: %+v", page.Items[0])
 	}
 }
 

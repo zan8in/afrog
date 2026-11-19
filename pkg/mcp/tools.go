@@ -198,7 +198,7 @@ func (s *Server) observeFindingsTool() *Tool {
 	return &Tool{
 		Name:        "observe.findings",
 		Title:       "列出漏洞结论",
-		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。subject 是不可读的主体 id（ep_ 前缀，供跨工具引用），target 是它对应的可读目标（完整 URL），poc_ids 是产生本条结论的 PoC id 列表（可回到 poc.search）。想知道「已经扫出什么」时先调它；返回为空只说明本地还没有这类数据，不代表目标没有漏洞。",
+		Description: "按项目、状态、严重级别列出漏洞结论（Finding）：同一主体上的同一类漏洞聚合为一条，带内容寻址 id 与证据引用（evidence[]）。subject 是不可读的主体 id（endpoint_ 前缀，供跨工具引用），target 是它对应的可读目标（完整 URL），poc_ids 是产生本条结论的 PoC id 列表（可回到 poc.search）。想知道「已经扫出什么」时先调它；返回为空只说明本地还没有这类数据，不代表目标没有漏洞。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{

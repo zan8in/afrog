@@ -10,12 +10,22 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/finding"
 )
 
+// findingSummaryVulID 是 Web 探测汇总行的 vulid：扫描结束时引擎会往 result 表写一条
+// vulid=vulname=target=fulltarget="webprobe" 的展示行，只服务于 HTML 报告的「Web 探测
+// 汇总」段落（见 pkg/runner/engine.go 的 InsertWebProbeSummary 调用点）。它不由 PoC
+// 产生、也不是某个主体上的漏洞，若不过滤会以 subject/target 都是 "webprobe" 的假结论
+// 混进 Finding 投影，因此在此显式排除。
+const findingSummaryVulID = "webprobe"
+
 // findingGroupedSelect 在台账聚合（vulid, target, fulltarget）之上多取 poc 与代表
 // result 主键：Finding 的类目与主体由这两者推导，投影在 Go 侧完成（纯函数、可单测）。
 //
 // 与 ledgerGroupedSelect 的差别有两点：多一列 poc，以及聚合键带上 project_id。
 // project_id 参与 canonical，同一漏洞在不同项目下必须是两条独立结论，若沿用台账的
 // MAX(project_id) 会把其中一个项目折叠掉、让另一项目看不到这条命中。
+//
+// WHERE 里排除报告展示行（findingSummaryVulID）：Finding 是「某主体上的某类漏洞」，
+// 展示行不满足这一语义。
 var findingGroupedSelect = `SELECT
 	r.vulid AS vulid,
 	MAX(r.vulname) AS vulname,
@@ -33,6 +43,7 @@ var findingGroupedSelect = `SELECT
   LEFT JOIN vuln_ledger l
 	ON l.vulid = r.vulid AND l.target = r.target AND l.fulltarget = r.fulltarget
   LEFT JOIN task_project tp ON tp.taskid = r.taskid
+  WHERE r.vulid <> '` + findingSummaryVulID + `'
   GROUP BY r.vulid, r.target, r.fulltarget, COALESCE(tp.project_id, '')`
 
 // FindingPage 是 Finding 投影的分页结果。
