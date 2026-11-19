@@ -21,7 +21,18 @@ import (
 // Findings 返回由 result / vuln_ledger / task_project / evidence 四表投影出的漏洞
 // 结论（Finding）分页：聚合口径为类目级（project_id + subject + vuln_class）。
 func Findings(f sqlite.LedgerFilter) (*sqlite.FindingPage, error) {
-	return sqlite.SelectFindings(f)
+	page, err := sqlite.SelectFindings(f)
+	if err != nil {
+		return nil, err
+	}
+	// DB 聚合层把 severity 统一成大写（pkg/db/sqlite/finding.go 的 groupFindings 用它
+	// 做组间取高比较），但 agent 面的输入 enum 与 scan.start 的 severity 都是小写。
+	// 在只读投影的出口归一到小写，让 MCP observe.findings 与 REST /api/v1/findings
+	// （二者同源）与 scan.start 同口径；DB 层的 ToUpper 不动。
+	for i := range page.Items {
+		page.Items[i].Severity = strings.ToLower(strings.TrimSpace(page.Items[i].Severity))
+	}
+	return page, nil
 }
 
 // Evidence 按证据 id（evd_ 前缀）或 result 主键取证据。

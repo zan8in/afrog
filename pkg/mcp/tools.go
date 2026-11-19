@@ -1564,10 +1564,10 @@ func (s *Server) scanStartTool() *Tool {
 				"summary": map[string]any{"type": "object", "description": "子进程汇总：executed / found / by_severity / elapsed_ms"},
 				"library": map[string]any{
 					"type":        "object",
-					"description": "本机 PoC 库对该关键词的覆盖：matched_pocs（库中匹配数）/ executed_pocs（实际执行数）",
+					"description": "本机 PoC 库对该关键词的覆盖：matched_pocs 是库中匹配总数（等价 afrog -pl -s <关键词> 的 Total），executed_pocs 是本次实际执行数。两者都不是命中数——命中看 results / found。",
 					"properties": map[string]any{
-						"matched_pocs":  map[string]any{"type": "integer"},
-						"executed_pocs": map[string]any{"type": "integer"},
+						"matched_pocs":  map[string]any{"type": "integer", "description": "库中与关键词匹配的 PoC 总数（库覆盖度，非命中数）"},
+						"executed_pocs": map[string]any{"type": "integer", "description": "本次实际执行的 PoC 数（可能因 severity 过滤少于 matched_pocs）"},
 					},
 				},
 				"conclusion": map[string]any{"type": "string", "description": "hit / no_finding / no_poc_for_keyword"},
