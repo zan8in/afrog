@@ -9,7 +9,7 @@ info:
     Apache Tomcat Manager Path Normalization login panel was discovered via path normalization. Normalizing a path involves modifying the string that identifies a path or file so that it conforms to a valid path on the target operating system.
   reference:
     - https://i.blackhat.com/us-18/Wed-August-8/us-18-Orange-Tsai-Breaking-Parser-Logic-Take-Your-Path-Normalization-Off-And-Pop-0days-Out-2.pdf
-  tags: panel,tomcat,apache,misconfig,tomcat-manager,fingerprint
+  tags: panel,tomcat,apache,misconfig,fingerprint
   created: 2023/10/14
 
 set:
@@ -32,5 +32,8 @@ rules:
     request:
       method: GET
       path: "{{p}}"
-    expression: response.status == 403 && response.body.bcontains(b'username="tomcat" password="s3cret"') && response.body.bcontains(b'manager-gui')
+    expression: |
+      (response.status == 403 || response.status == 401) && 
+      response.body.bcontains(b'username="tomcat" password="s3cret"') && 
+      response.body.bcontains(b'manager-gui')
 expression: r0()
