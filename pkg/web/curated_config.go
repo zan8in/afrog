@@ -82,9 +82,11 @@ func AssembleCurated(cur config.Curated, configPath string, forceUpdate bool) er
 	SetCuratedService(svc)
 
 	timeout := time.Duration(cur.TimeoutSec) * time.Second
-	// 显式更新不该被配置里很小的 timeout_sec 掐断：那个值默认只有 10s，原本是给启动时
-	// "顺手检查一下"用的，而点保存/带 -curated-force-update 时要真的把 PoC 拉下来。
-	if forceUpdate && timeout < curatedRemoteTimeout {
+	// timeout_sec（默认只有 10s）原本是给启动时"顺手检查一下"用的，不能用来掐断真正需要拉包
+	// 的场景：点保存 / 带 -curated-force-update（forceUpdate），以及本地还没有 PoC 的首次冷启动
+	// （curatedPocCount()==0，必须完整下载一次）。两者都给足远端交互预算，否则首次装配会被 10s
+	// 掐断，表现为"一直 0 条、必须手动 force"。
+	if (forceUpdate || curatedPocCount() == 0) && timeout < curatedRemoteTimeout {
 		timeout = curatedRemoteTimeout
 	}
 	ctx := context.Background()

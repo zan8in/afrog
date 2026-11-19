@@ -633,12 +633,22 @@ func (s *Service) updateFromRemote(ctx context.Context, curatedDir string, opts 
 	if rs != nil {
 		currentManifest = rs.ManifestID
 	}
-	if !opts.Force && currentManifest != "" && currentManifest == man.ManifestID {
+	// curated-state.json 里的 manifest_id 只说明「曾经装过」，不代表现在还在。目录被清空或
+	// 删除后（例如鉴权错误触发 purgeCuratedLocal，它清目录和 auth 但保留 state），仅凭
+	// manifest_id 相同就跳过下载，会让本地一直空着且不报错——只能靠 -curated-force-update 恢复。
+	// 必须同时确认目录里确实还有 PoC 才允许跳过。
+	localReady := dirHasCuratedPocs(curatedDir)
+	if !opts.Force && localReady && currentManifest != "" && currentManifest == man.ManifestID {
 		_ = s.updateRuntimeCheck(curatedDir, man.ManifestID, "")
 		return nil
 	}
 
-	artifact, ok := man.SelectBestArtifact(currentManifest)
+	// 本地没有可用基线时不能选增量补丁（没有基线可打），退化为请求全量包。
+	baseManifest := currentManifest
+	if !localReady {
+		baseManifest = ""
+	}
+	artifact, ok := man.SelectBestArtifact(baseManifest)
 	if !ok {
 		err := errors.New("no artifact available")
 		_ = s.updateRuntimeCheck(curatedDir, man.ManifestID, normalizeRuntimeError(err))
