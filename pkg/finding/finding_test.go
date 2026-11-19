@@ -80,6 +80,30 @@ func TestTargetForMirrorsSubject(t *testing.T) {
 	}
 }
 
+// SubjectAddressFor 与 SubjectFor 取同一输入、同一优先级，只是返回可读归一化地址而非
+// 内容寻址 id：web 目标的 Subject 是 endpoint_<hash>，两者必须不同；非 URL 主体两者相同。
+func TestSubjectAddressFor(t *testing.T) {
+	// 绝对 URL：地址是可读归一化 URL，Subject 是它的不透明 id，两者刻意不同。
+	addr := SubjectAddressFor("HTTP://A.Example:80/login/?x=1", "http://a.example")
+	if addr != "http://a.example/login" {
+		t.Fatalf("地址应为归一化 URL，实际 %q", addr)
+	}
+	if subj := SubjectFor("HTTP://A.Example:80/login/?x=1", "http://a.example"); subj == addr {
+		t.Fatalf("web 目标的 Subject 是不透明 id，不应等于可读地址：%q", subj)
+	}
+	// fulltarget 无效、target 有效：回退 target 的地址。
+	if got := SubjectAddressFor("not-a-url", "https://b.example/x"); got != "https://b.example/x" {
+		t.Fatalf("应回退到 target 的地址，实际 %q", got)
+	}
+	// 都不是绝对 URL：退到原值，与 SubjectFor 相同（host:port 这类主体两者恰好一致）。
+	if got := SubjectAddressFor("10.0.0.5:80", "10.0.0.5"); got != "10.0.0.5:80" {
+		t.Fatalf("非 URL 主体应退到原值，实际 %q", got)
+	}
+	if SubjectAddressFor("10.0.0.5:80", "10.0.0.5") != SubjectFor("10.0.0.5:80", "10.0.0.5") {
+		t.Fatal("host:port 主体上地址与 Subject 应恰好相同")
+	}
+}
+
 func TestStateFromStatus(t *testing.T) {
 	cases := map[string]string{
 		"":               StateNew,

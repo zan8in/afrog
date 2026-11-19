@@ -5,6 +5,7 @@ import (
 
 	"github.com/zan8in/afrog/v3/pkg/db/sqlite"
 	"github.com/zan8in/afrog/v3/pkg/poc"
+	"github.com/zan8in/afrog/v3/pkg/result"
 )
 
 // 子图要能穿透到「端点 → 技术栈 → 候选 PoC」，且两类派生节点不落资产表。
@@ -222,5 +223,77 @@ func TestBuildIncludesEndpointsAndParams(t *testing.T) {
 	}
 	if len(up.Nodes) != 1 || up.Nodes[0].ID != endpointID {
 		t.Fatalf("参数上游 = %+v, want 端点", up.Nodes)
+	}
+}
+
+// 主动结论按「主体可读地址」折算：地址命中节点就挂上去，否则逐级向上找最近的上级。
+// 这是 web 端点结论能落图的根据——若误用不透明 Subject（endpoint_<hash>）作 key，
+// 这里会全落空。
+func TestFoldActiveFindingsByAddress(t *testing.T) {
+	order := []string{"a.example", "a.example:8443", "https://a.example/login"}
+	byAddress := map[string]int64{
+		"https://a.example/login": 2, // 端点在图上：挂到端点自身
+		"https://a.example/other": 1, // 端点不在图上：向上挂到 authority
+		"a.example:8443":          3, // host:port 恰好在图上
+		"10.0.0.9:9999":           5, // 完全不在图上：丢弃，不凭空造节点
+	}
+	got := foldActiveFindings(order, byAddress)
+	if got["https://a.example/login"] != 2 {
+		t.Fatalf("端点自身计数 = %d, want 2（got=%v）", got["https://a.example/login"], got)
+	}
+	if got["a.example:8443"] != 3 {
+		t.Fatalf("host:port 计数 = %d, want 3（got=%v）", got["a.example:8443"], got)
+	}
+	if got["a.example"] != 1 {
+		t.Fatalf("authority 折算计 = %d, want 1（got=%v）", got["a.example"], got)
+	}
+	if len(got) != 3 {
+		t.Fatalf("折算结果 = %v, want 3 个节点", got)
+	}
+}
+
+// 端到端：主动扫描结论（result 表）折到 web 端点节点上。
+// 修复前 key 是 endpoint_<hash>，与图节点 id（可读地址）对不上，端点 Findings 恒为 0。
+func TestBuildFoldsActiveFindingOntoEndpointNode(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if err := sqlite.NewWebSqliteDB(); err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(sqlite.CloseX)
+
+	if _, err := sqlite.CreateAssets("manual", "", nil, []sqlite.AssetInput{
+		{Address: "https://a.example", Type: "url"},
+	}); err != nil {
+		t.Fatalf("create asset: %v", err)
+	}
+	endpointID := "https://a.example/login"
+	if err := sqlite.EnsureEndpointGraph(endpointID, ""); err != nil {
+		t.Fatalf("ensure endpoint graph: %v", err)
+	}
+
+	// 主动命中：Target 是种子、FullTarget 是端点；投影出的 Subject 是不透明 id，
+	// 但折算到图上必须用可读地址 https://a.example/login。
+	if _, err := sqlite.InsertResultWithTaskID(&result.Result{
+		Target:     "https://a.example",
+		FullTarget: endpointID,
+		PocInfo:    &poc.Poc{Id: "poc-a", Info: poc.Info{Classification: poc.Classification{CweId: "CWE-89"}}},
+	}, "t-live"); err != nil {
+		t.Fatalf("insert result: %v", err)
+	}
+
+	graph, err := Build(Options{Root: "a.example", Depth: 2, Direction: "down"})
+	if err != nil {
+		t.Fatalf("build graph: %v", err)
+	}
+	nodes := map[string]Node{}
+	for _, n := range graph.Nodes {
+		nodes[n.ID] = n
+	}
+	ep, ok := nodes[endpointID]
+	if !ok || ep.Type != "endpoint" {
+		t.Fatalf("端点节点缺失或类型错误: %+v", nodes)
+	}
+	if ep.Findings != 1 {
+		t.Fatalf("端点主动命中数 = %d, want 1", ep.Findings)
 	}
 }

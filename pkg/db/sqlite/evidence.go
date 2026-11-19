@@ -80,7 +80,7 @@ func linkFindingEvidence(r *result.Result, taskID string) {
 		tags = r.PocInfo.Info.Tags
 		vulID = r.PocInfo.Id
 	}
-	findingID, _, _ := findingKey(projectID, r.FullTarget, r.Target, cweID, tags, vulID)
+	findingID, _, _, _ := findingKey(projectID, r.FullTarget, r.Target, cweID, tags, vulID)
 	if err := LinkFindingEvidence(findingID, r.Evidence.ID); err != nil {
 		gologger.Debug().Msgf("link finding evidence failed: %v", err)
 	}

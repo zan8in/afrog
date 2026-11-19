@@ -269,6 +269,34 @@ func TestSelectFindingsExcludesWebProbeSummary(t *testing.T) {
 	}
 }
 
+// 主动命中数按「主体可读地址」聚合，而不是 Finding.Subject（endpoint_ 的不透明 id）：
+// 资产图节点 id 用的是可读地址，只有用地址做 key，web 端点的结论才能折算到图节点上。
+func TestSelectActiveFindingCountsByAddress(t *testing.T) {
+	db := useFindingFixture(t)
+
+	linkFindingProject(t, db, "t-1", "p-alpha", "2026-09-28 10:00:00")
+	// 同一端点的两次命中（fulltarget 一个带 query）：归一化后是同一地址，次数累加。
+	insertFindingResult(t, db, 1, "t-1", "poc-a", "http://a.example", "http://a.example/login?x=1", "2026-09-28 10:00:00", "CWE-89")
+	insertFindingResult(t, db, 2, "t-1", "poc-a", "http://a.example", "http://a.example/login", "2026-09-28 11:00:00", "CWE-89")
+	// 非 URL 主体：地址退到原值，与 Subject 相同。
+	insertFindingResult(t, db, 3, "t-1", "poc-b", "10.0.0.5:8080", "10.0.0.5:8080", "2026-09-28 12:00:00", "CWE-79")
+
+	got, err := SelectActiveFindingCountsByAddress("p-alpha")
+	if err != nil {
+		t.Fatalf("SelectActiveFindingCountsByAddress: %v", err)
+	}
+	if got["http://a.example/login"] != 2 {
+		t.Fatalf("端点地址命中数 = %d, want 2（map=%v）", got["http://a.example/login"], got)
+	}
+	if got["10.0.0.5:8080"] != 1 {
+		t.Fatalf("host:port 命中数 = %d, want 1（map=%v）", got["10.0.0.5:8080"], got)
+	}
+	// 关键：绝不能以不透明 Subject 为 key，否则资产图对不上节点 id。
+	if _, leaked := got[ref.Endpoint("http://a.example/login")]; leaked {
+		t.Fatalf("map 不应以不透明 Subject 为 key：%v", got)
+	}
+}
+
 // 归组是纯函数：行顺序不影响结果，代表值都取确定性的极值。
 func TestGroupFindingsIsOrderIndependent(t *testing.T) {
 	rowA := findingRow{

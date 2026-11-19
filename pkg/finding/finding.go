@@ -39,8 +39,9 @@ const (
 type Finding struct {
 	ID        string `json:"id"`
 	ProjectID string `json:"project_id"`
-	// Subject 是主体的内容寻址 id（endpoint_ 前缀）：它能被资产图与证据稳定引用，但读不出
-	// 「这是哪个目标」。可读的原值见 Target。
+	// Subject 是主体的内容寻址 id（endpoint_ 前缀）：它能被证据稳定引用，但读不出
+	// 「这是哪个目标」。可读的原值见 Target；资产图节点 id 与观测流 subject 用的是可读
+	// 地址（SubjectAddressFor），引用 Subject 反而对不上（只有 host:port 这类主体两者恰好相同）。
 	Subject string `json:"subject"`
 	// Target 是主体的可读原值（命中所在的完整 URL，退而取种子目标或原始地址），由
 	// TargetFor 按与 Subject 相同的优先级选出。只用它做展示与判断，引用一律用 Subject。
@@ -96,6 +97,20 @@ func SubjectFor(fullTarget, target string) string {
 	raw := TargetFor(fullTarget, target)
 	if id := ref.Endpoint(raw); id != "" {
 		return id
+	}
+	return raw
+}
+
+// SubjectAddressFor 返回主体地址：与 SubjectFor 取同一输入、同一优先级，只是返回可读的
+// 归一化地址而非内容寻址 id——绝对 URL 归一化成 scheme://host[:port]/path，非 URL 回退原值。
+//
+// 资产图节点 id、观测流 subject 用的都是这个地址空间；Subject 则是不透明的引用键。
+// 要把一条结论挂到图节点或对上观测，只能用这个地址，不能用 Subject：web 目标的 Subject
+// 是 endpoint_<hash>，与图/观测的地址对不上（只有 host:port 这类主体两者恰好相同）。
+func SubjectAddressFor(fullTarget, target string) string {
+	raw := TargetFor(fullTarget, target)
+	if canonical, err := ref.NormalizeEndpoint(raw); err == nil {
+		return canonical
 	}
 	return raw
 }

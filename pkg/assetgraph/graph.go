@@ -202,13 +202,14 @@ func Build(opts Options) (*Response, error) {
 		findings = map[string]int64{}
 	}
 	// 主动扫描结论（台账）命中数：与被动命中合并——observe.state 的 findings 表示
-	// 「这个资产上有多少条已知结论」，主动与被动都应计入。
-	activeBySubject, err := sqlite.SelectActiveFindingCountsBySubject(opts.ProjectID)
+	// 「这个资产上有多少条已知结论」，主动与被动都应计入。聚合 key 是主体的可读地址，
+	// 与图节点 id 同一地址空间，才能折算到节点上。
+	activeByAddress, err := sqlite.SelectActiveFindingCountsByAddress(opts.ProjectID)
 	if err != nil {
 		gologger.Debug().Msgf("资产图主动命中数读取失败: %v", err)
-		activeBySubject = map[string]int64{}
+		activeByAddress = map[string]int64{}
 	}
-	activeFindings := foldActiveFindings(order, activeBySubject)
+	activeFindings := foldActiveFindings(order, activeByAddress)
 	// 端点/参数不是资产行，命中数只能按 target/location 归集，再折算到节点 id。
 	endpointFindings, paramFindings := passiveTargetFindings(order, opts.ProjectID)
 

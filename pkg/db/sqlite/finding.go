@@ -70,10 +70,13 @@ type findingRow struct {
 	ResultID   int64  `db:"result_id"`
 }
 
-// findingGroup 是一条投影出的结论，附带来源 result 主键（供证据回填）。
+// findingGroup 是一条投影出的结论，附带来源 result 主键（供证据回填）与主体的可读地址。
 type findingGroup struct {
 	Finding   finding.Finding
 	ResultIDs []int64
+	// SubjectAddress 是主体的可读归一化地址，与 Finding.Subject（不透明 id）成对出现：
+	// 资产图折算、与观测流对齐都必须用它，用 Subject 会对不上图节点 id。
+	SubjectAddress string
 }
 
 // pocMeta 是 result.poc 里参与 Finding 推导的字段。
@@ -87,11 +90,13 @@ type pocMeta struct {
 // findingKey 用同一套 (主体, 类目) 口径算出一条 Finding 的内容寻址 id。
 //
 // 投影查询与证据落库的写边都走这里，保证「同一个结论」在读取与写入两边得到同一个 id。
-func findingKey(projectID, fullTarget, target, cweID, tags, vulID string) (id, subject, class string) {
+// 同时返回主体的可读地址（subjectAddress）：id 用于引用，地址用于对齐资产图 / 观测流。
+func findingKey(projectID, fullTarget, target, cweID, tags, vulID string) (id, subject, subjectAddress, class string) {
 	subject = finding.SubjectFor(fullTarget, target)
+	subjectAddress = finding.SubjectAddressFor(fullTarget, target)
 	class = finding.VulnClass(cweID, tags, vulID)
 	id = finding.IDFor(projectID, subject, class)
-	return id, subject, class
+	return id, subject, subjectAddress, class
 }
 
 // SelectFindings 把 result / vuln_ledger / task_project / evidence 投影成 Finding 分页。
@@ -164,7 +169,7 @@ func groupFindings(rows []findingRow) []*findingGroup {
 			meta = parsePocMeta(r.Poc)
 			cache[r.VulID] = meta
 		}
-		id, subject, class := findingKey(r.ProjectID, r.FullTarget, r.Target, meta.CweID, meta.Tags, r.VulID)
+		id, subject, subjectAddress, class := findingKey(r.ProjectID, r.FullTarget, r.Target, meta.CweID, meta.Tags, r.VulID)
 
 		g, exists := byID[id]
 		if !exists {
@@ -185,7 +190,7 @@ func groupFindings(rows []findingRow) []*findingGroup {
 				// 没有主体或类目的退化行无法参与聚合，跳过。
 				continue
 			}
-			g = &findingGroup{Finding: *nf}
+			g = &findingGroup{Finding: *nf, SubjectAddress: subjectAddress}
 			byID[id] = g
 			order = append(order, id)
 		} else {
@@ -354,16 +359,20 @@ func sortFindings(items []finding.Finding) {
 	})
 }
 
-// SelectActiveFindingCountsBySubject 返回 (subject → 命中数) 聚合，只统计主动扫描结论。
+// SelectActiveFindingCountsByAddress 返回 (主体地址 → 命中数) 聚合，只统计主动扫描结论。
 //
 // 资产图此前只反映被动覆盖命中（passive_finding 表），主动扫描出来的结论（result 表）
 // 读不到，导致「明明有 CRITICAL 命中，observe.state 里 findings=0」。这里把台账投影出的
-// 主动结论按主体归集，供资产图把结论数挂到对应节点上。
+// 主动结论按主体地址归集，供资产图把结论数挂到对应节点上。
+//
+// key 用可读地址（finding.SubjectAddressFor）而不是 Finding.Subject：后者是 endpoint_<hash>
+// 的不透明 id，与图节点 id（可读地址）对不上，只有 host:port 这类主体两者恰好相同——图折算
+// 必须用地址，否则 web 端点的主动结论永远挂不到节点上。
 //
 // 复用 findingGroupedSelect + groupFindings：与 observe.findings 是同一份投影口径，
 // 避免两处各算一套 subject / 类目而逐渐漂移。被动结论由 passive_finding 表单独统计，
 // 这里显式跳过，避免同一命中被算两次。
-func SelectActiveFindingCountsBySubject(projectID string) (map[string]int64, error) {
+func SelectActiveFindingCountsByAddress(projectID string) (map[string]int64, error) {
 	if dbx == nil {
 		return nil, fmt.Errorf("sqlite not initialized")
 	}
@@ -382,7 +391,7 @@ func SelectActiveFindingCountsBySubject(projectID string) (map[string]int64, err
 		if g.Finding.Source != finding.SourceActive {
 			continue
 		}
-		out[g.Finding.Subject] += g.Finding.HitCount
+		out[g.SubjectAddress] += g.Finding.HitCount
 	}
 	return out, nil
 }
