@@ -222,6 +222,39 @@ func (s *Server) observeFindingsTool() *Tool {
 			},
 			"required": []string{},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"items": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":         map[string]any{"type": "string", "description": "结论内容寻址 id（fnd_ 前缀）"},
+							"project_id": map[string]any{"type": "string"},
+							"subject":    map[string]any{"type": "string", "description": "主体内容寻址 id（endpoint_ 前缀，供跨工具引用）"},
+							"target":     map[string]any{"type": "string", "description": "主体可读目标（完整 URL）"},
+							"vuln_class": map[string]any{"type": "string", "description": "归一化漏洞类目（cwe-id → 首个 tag → vulid）"},
+							"severity":   map[string]any{"type": "string"},
+							"title":      map[string]any{"type": "string"},
+							"poc_ids":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "产生本条结论的 PoC id 列表（去重升序）"},
+							"confidence": map[string]any{"type": "string", "description": "证据置信度 certain/probable；无证据时省略"},
+							"evidence":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "证据 id（evd_ 前缀）列表"},
+							"state":      map[string]any{"type": "string", "description": "归一化生命周期状态 new/present/fixed/regression"},
+							"source":     map[string]any{"type": "string", "description": "产生路径 active/passive/agent"},
+							"first_seen": map[string]any{"type": "string"},
+							"last_seen":  map[string]any{"type": "string"},
+							"hit_count":  map[string]any{"type": "integer"},
+							"status":     map[string]any{"type": "string", "description": "台账原始状态；可能省略"},
+						},
+					},
+				},
+				"total":     map[string]any{"type": "integer", "description": "命中总数"},
+				"page":      map[string]any{"type": "integer"},
+				"page_size": map[string]any{"type": "integer"},
+			},
+			"required": []string{"items", "total", "page", "page_size"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -275,6 +308,34 @@ func (s *Server) observeEvidenceTool() *Tool {
 				"id": map[string]any{"type": "string", "description": "result id 或 evd_ 开头的证据 id"},
 			},
 			"required": []string{"id"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"id":      map[string]any{"type": "string", "description": "证据内容寻址 id（evd_ 前缀）"},
+				"finding": map[string]any{"type": "string", "description": "所属结论 id（fnd_ 前缀）；可能省略"},
+				"poc_id":  map[string]any{"type": "string"},
+				"target":  map[string]any{"type": "string", "description": "种子目标（不含规则 path）"},
+				"steps": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"role":      map[string]any{"type": "string", "description": "该步在判定中的作用：baseline/probe/confirm/diff/time_baseline/time_confirm"},
+							"matched":   map[string]any{"type": "boolean"},
+							"request":   map[string]any{"type": "object", "description": "请求快照：method/url/headers/body"},
+							"response":  map[string]any{"type": "object", "description": "响应快照：status/headers/body/latency_ms"},
+							"extracted": map[string]any{"type": "object", "description": "抽取到的命名值（变量 → 值）"},
+						},
+					},
+				},
+				"judgement":  map[string]any{"type": "object", "description": "检测器采用的构造方式：technique/dialect/evasion/construct"},
+				"replay":     map[string]any{"type": "object", "description": "如何重放：command/deterministic"},
+				"confidence": map[string]any{"type": "string", "description": "证据可信度 certain/probable"},
+				"digest":     map[string]any{"type": "string", "description": "内容摘要，供重放比对"},
+				"created":    map[string]any{"type": "string"},
+			},
+			"required": []string{"id", "steps", "replay", "digest"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -375,6 +436,31 @@ func (s *Server) observeObservationsTool() *Tool {
 				"limit":         map[string]any{"type": "integer", "minimum": 1, "maximum": 500},
 			},
 			"required": []string{},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"items": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"seq":        map[string]any{"type": "integer", "description": "观测流自增序号，供 since_seq 增量游标"},
+							"id":         map[string]any{"type": "string", "description": "观测内容寻址 id（obs_ 前缀）"},
+							"project_id": map[string]any{"type": "string"},
+							"source":     map[string]any{"type": "string", "description": "来源 portscan/webscan/http/passive/oob"},
+							"kind":       map[string]any{"type": "string", "description": "类型 port_open/tech/http_transaction/http_passive/tls/oob_hit/dns"},
+							"subject":    map[string]any{"type": "string", "description": "归一化主体地址"},
+							"ts":         map[string]any{"type": "string"},
+							"payload":    map[string]any{"type": "object", "description": "随 kind 变化的结构化载荷"},
+							"digest":     map[string]any{"type": "string"},
+						},
+					},
+				},
+				"next_seq": map[string]any{"type": "integer", "description": "下次调用的 since_seq"},
+				"has_more": map[string]any{"type": "boolean", "description": "是否还有更多记录"},
+			},
+			"required": []string{"items", "next_seq", "has_more"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -695,6 +781,28 @@ func (s *Server) pocDraftTool() *Tool {
 			},
 			"required": []string{},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"valid":              map[string]any{"type": "boolean", "description": "校验是否通过"},
+				"errors":             map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "阻断性问题；valid=false 时说明原因"},
+				"warnings":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "不阻断的告警"},
+				"source":             map[string]any{"type": "string", "description": "草稿来源：yaml 或本地 poc_path"},
+				"id":                 map[string]any{"type": "string", "description": "PoC id；仅在 yaml 可解析时出现"},
+				"name":               map[string]any{"type": "string"},
+				"severity":           map[string]any{"type": "string"},
+				"tags":               map[string]any{"type": "string", "description": "info.tags（逗号分隔的原始字符串）"},
+				"author":             map[string]any{"type": "string"},
+				"rules":              map[string]any{"type": "integer", "description": "规则条数"},
+				"capability":         map[string]any{"type": "string", "description": "草稿汇总出的能力等级"},
+				"destructive":        map[string]any{"type": "boolean", "description": "是否含破坏性动作（brute 或 exec 级）"},
+				"estimated_requests": map[string]any{"type": "integer", "description": "静态估算的单目标请求数"},
+				"uncountable":        map[string]any{"type": "boolean", "description": "brute 负载无法静态枚举（依赖 CEL 表达式）"},
+				"script":             map[string]any{"type": "boolean", "description": "含 JS/Go 脚本规则"},
+				"poc_path":           map[string]any{"type": "string", "description": "落盘路径；仅 save=true 且校验通过时出现"},
+			},
+			"required": []string{"valid", "errors", "warnings", "source"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -874,6 +982,22 @@ func (s *Server) pocSubmitTool() *Tool {
 			},
 			"required": []string{"poc_path", "target"},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"submitted": map[string]any{"type": "boolean", "description": "是否已放入待人工终审队列"},
+				"pending":   map[string]any{"type": "boolean", "description": "沙箱实跑未在窗口内完成、返回异步句柄；此时 submitted=false"},
+				"target":    map[string]any{"type": "string"},
+				"status":    map[string]any{"type": "string", "description": "实跑状态 completed/timeout/failed/cancelled"},
+				"task_id":   map[string]any{"type": "string", "description": "pending 时的异步任务 id，用 task.status / task.events 跟踪"},
+				"reason":    map[string]any{"type": "string", "description": "未提交或未复现时的说明"},
+				"results":   map[string]any{"type": "array", "items": map[string]any{"type": "object", "description": "实跑归一化命中：poc_id/poc_name/severity/target/evidence/extractors"}, "description": "实跑命中列表"},
+				"draft":     map[string]any{"type": "object", "description": "入队记录：id/status/name/severity/capability/requests/path/target/evidence_id/evidence_digest/note/created/updated"},
+				"evidence":  map[string]any{"type": "object", "description": "实跑证据引用：id/digest/poc_id/target/steps/confidence/created"},
+				"next":      map[string]any{"type": "string", "description": "下一步人工操作提示"},
+			},
+			"required": []string{"submitted"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -993,6 +1117,17 @@ func (s *Server) probeHTTPTool() *Tool {
 			},
 			"required": []string{"url"},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"status":     map[string]any{"type": "integer", "description": "HTTP 状态码"},
+				"headers":    map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}, "description": "响应头；同名多值以逗号合并"},
+				"body":       map[string]any{"type": "string", "description": "响应正文，已按上限截断"},
+				"latency_ms": map[string]any{"type": "integer", "description": "往返耗时（毫秒）"},
+				"url":        map[string]any{"type": "string", "description": "实际请求的 URL（跟随跳转后）"},
+			},
+			"required": []string{"status", "headers", "body", "latency_ms", "url"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -1093,6 +1228,34 @@ func (s *Server) probePortTool() *Tool {
 				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 600, "description": "整体超时，默认 120 秒"},
 			},
 			"required": []string{"host"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"host":    map[string]any{"type": "string"},
+				"ports":   map[string]any{"type": "string", "description": "本次使用的端口表达式"},
+				"scanned": map[string]any{"type": "integer", "description": "实际探测的端口数（即扣的预算）"},
+				"open": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"port":       map[string]any{"type": "integer"},
+							"state":      map[string]any{"type": "string"},
+							"service":    map[string]any{"type": "string"},
+							"product":    map[string]any{"type": "string"},
+							"version":    map[string]any{"type": "string"},
+							"device":     map[string]any{"type": "string"},
+							"os":         map[string]any{"type": "string"},
+							"cpe":        map[string]any{"type": "string"},
+							"tls":        map[string]any{"type": "boolean"},
+							"confidence": map[string]any{"type": "string"},
+							"banner":     map[string]any{"type": "string", "description": "被动 banner 片段（已截断）"},
+						},
+					},
+				},
+			},
+			"required": []string{"host", "ports", "scanned", "open"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -1252,6 +1415,49 @@ func (s *Server) probeFingerprintTool() *Tool {
 				"timeout_sec": map[string]any{"type": "integer", "minimum": 1, "maximum": 120, "description": "单次尝试的整体超时，默认 25 秒；首轮在瞬时错误（超时/连接重置）上会自动重试一次"},
 			},
 			"required": []string{"url"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"url":        map[string]any{"type": "string", "description": "跟随跳转后的最终 URL"},
+				"status":     map[string]any{"type": "integer", "description": "最终响应状态码"},
+				"title":      map[string]any{"type": "string"},
+				"server":     map[string]any{"type": "string", "description": "Server 响应头"},
+				"powered_by": map[string]any{"type": "string", "description": "X-Powered-By 响应头"},
+				"technologies": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"name":       map[string]any{"type": "string"},
+							"version":    map[string]any{"type": "string"},
+							"category":   map[string]any{"type": "string"},
+							"cpe":        map[string]any{"type": "string"},
+							"confidence": map[string]any{"type": "string"},
+							"evidence":   map[string]any{"type": "string", "description": "命中依据（素材位置 + 片段）"},
+						},
+					},
+				},
+				"suggested_search": map[string]any{"type": "string", "description": "可直接透传给 poc.search / scan.start 的关键词串；无技术栈时为空"},
+				"confidence":       map[string]any{"type": "string", "description": "整体识别置信度"},
+				"waf":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"cdn":              map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"redirects":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "初始 URL 之后每一次跳转的落点；无跳转时为空"},
+				"favicon_hash":     map[string]any{"type": "string", "description": "favicon 的 mmh3 哈希；未抓取时为空"},
+				"favicon_fetched":  map[string]any{"type": "boolean", "description": "本次是否真的补抓了 favicon"},
+				"latency_ms":       map[string]any{"type": "integer"},
+				"tls": map[string]any{
+					"type":        "object",
+					"description": "https 目标的证书摘要；非 https 或握手失败时省略",
+					"properties": map[string]any{
+						"subject":   map[string]any{"type": "string"},
+						"issuer":    map[string]any{"type": "string"},
+						"not_after": map[string]any{"type": "string"},
+						"dns_names": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+					},
+				},
+			},
+			"required": []string{"url", "status", "title", "server", "powered_by", "technologies", "suggested_search", "confidence", "waf", "cdn", "favicon_hash", "favicon_fetched", "latency_ms"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -1739,6 +1945,75 @@ func (s *Server) verifyReplayTool() *Tool {
 			},
 			"required": []string{"id"},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"poc_id":              map[string]any{"type": "string", "description": "被重放的 PoC id"},
+				"target":              map[string]any{"type": "string", "description": "本次重放使用的目标"},
+				"replayed":            map[string]any{"type": "boolean", "description": "是否重放出了证据；中断时恒为 false"},
+				"status":              map[string]any{"type": "string", "description": "重放收尾状态；仅中断形态出现"},
+				"pending":             map[string]any{"type": "boolean", "description": "重放在收尾前被中断；仅中断形态出现"},
+				"task_id":             map[string]any{"type": "string", "description": "中断后可交给 task.status / task.events 跟踪的句柄；仅中断形态出现"},
+				"consistent":          map[string]any{"type": "boolean", "description": "新证据的 id 与 digest 是否与原证据完全一致"},
+				"behavior_consistent": map[string]any{"type": "boolean", "description": "行为指纹是否一致：digest 变了但行为相同，说明只是易变值不同"},
+				"expected": map[string]any{
+					"type":        "object",
+					"description": "原证据的引用摘要",
+					"properties": map[string]any{
+						"id":         map[string]any{"type": "string"},
+						"digest":     map[string]any{"type": "string"},
+						"poc_id":     map[string]any{"type": "string"},
+						"target":     map[string]any{"type": "string"},
+						"steps":      map[string]any{"type": "integer", "description": "步骤数量"},
+						"confidence": map[string]any{"type": "string"},
+						"created":    map[string]any{"type": "string"},
+					},
+				},
+				"actual": map[string]any{
+					"type":        "object",
+					"description": "新证据的引用摘要；仅重放命中时出现",
+					"properties": map[string]any{
+						"id":         map[string]any{"type": "string"},
+						"digest":     map[string]any{"type": "string"},
+						"poc_id":     map[string]any{"type": "string"},
+						"target":     map[string]any{"type": "string"},
+						"steps":      map[string]any{"type": "integer", "description": "步骤数量"},
+						"confidence": map[string]any{"type": "string"},
+						"created":    map[string]any{"type": "string"},
+					},
+				},
+				"evidence": map[string]any{
+					"type":        "object",
+					"description": "本次重放新产生的完整证据；仅重放命中时出现",
+					"properties": map[string]any{
+						"id":      map[string]any{"type": "string"},
+						"finding": map[string]any{"type": "string"},
+						"poc_id":  map[string]any{"type": "string"},
+						"target":  map[string]any{"type": "string"},
+						"steps": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"role":      map[string]any{"type": "string"},
+									"matched":   map[string]any{"type": "boolean"},
+									"request":   map[string]any{"type": "object", "description": "请求快照：method/url/headers/body"},
+									"response":  map[string]any{"type": "object", "description": "响应快照：status/headers/body/latency_ms"},
+									"extracted": map[string]any{"type": "object", "description": "抽取到的命名值（变量 → 值）"},
+								},
+							},
+						},
+						"judgement":  map[string]any{"type": "object", "description": "检测器采用的构造方式"},
+						"replay":     map[string]any{"type": "object", "description": "如何重放：command/deterministic"},
+						"confidence": map[string]any{"type": "string"},
+						"digest":     map[string]any{"type": "string"},
+						"created":    map[string]any{"type": "string"},
+					},
+				},
+				"reason": map[string]any{"type": "string", "description": "不一致或中断时的可读说明；两档一致时省略"},
+			},
+			"required": []string{"poc_id", "target", "replayed"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -1930,6 +2205,33 @@ func (s *Server) actBruteTool() *Tool {
 			},
 			"required": []string{"target"},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"found": map[string]any{"type": "boolean", "description": "是否有命中；pending 形态恒为 false，不代表「无弱口令」"},
+				"results": map[string]any{
+					"type": "array",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"poc_id":     map[string]any{"type": "string"},
+							"poc_name":   map[string]any{"type": "string"},
+							"severity":   map[string]any{"type": "string"},
+							"target":     map[string]any{"type": "string"},
+							"extractors": map[string]any{"type": "object"},
+							"evidence":   map[string]any{"type": "object", "description": "原生证据（id/digest/steps/replay）；无原生证据时省略"},
+						},
+					},
+				},
+				"target":       map[string]any{"type": "string"},
+				"status":       map[string]any{"type": "string", "description": "completed / timeout / failed / cancelled"},
+				"task_id":      map[string]any{"type": "string", "description": "异步任务 id，可用 task.status / task.events 继续跟踪"},
+				"max_requests": map[string]any{"type": "integer", "description": "本次实际生效的请求上限"},
+				"pending":      map[string]any{"type": "boolean", "description": "未在短等窗口内跑完、已转异步；仅 pending 形态出现"},
+				"guidance":     map[string]any{"type": "string", "description": "pending 时的跟踪说明；仅 pending 形态出现"},
+			},
+			"required": []string{"found", "results", "target", "status", "task_id", "max_requests"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -2025,6 +2327,85 @@ func (s *Server) judgeBriefTool() *Tool {
 			},
 			"required": []string{"id"},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"evidence": map[string]any{
+					"type":        "object",
+					"description": "被研判命中的完整证据链",
+					"properties": map[string]any{
+						"id":      map[string]any{"type": "string"},
+						"finding": map[string]any{"type": "string"},
+						"poc_id":  map[string]any{"type": "string"},
+						"target":  map[string]any{"type": "string"},
+						"steps": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"role":      map[string]any{"type": "string"},
+									"matched":   map[string]any{"type": "boolean"},
+									"request":   map[string]any{"type": "object", "description": "请求快照：method/url/headers/body"},
+									"response":  map[string]any{"type": "object", "description": "响应快照：status/headers/body/latency_ms"},
+									"extracted": map[string]any{"type": "object", "description": "抽取到的命名值（变量 → 值）"},
+								},
+							},
+						},
+						"judgement":  map[string]any{"type": "object", "description": "检测器采用的构造方式"},
+						"replay":     map[string]any{"type": "object", "description": "如何重放：command/deterministic"},
+						"confidence": map[string]any{"type": "string"},
+						"digest":     map[string]any{"type": "string"},
+						"created":    map[string]any{"type": "string"},
+					},
+				},
+				"observations": map[string]any{
+					"type":        "array",
+					"description": "证据目标周边的观测流（同源的端口/指纹/TLS 等过程事实）",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"seq":        map[string]any{"type": "integer"},
+							"id":         map[string]any{"type": "string"},
+							"project_id": map[string]any{"type": "string"},
+							"source":     map[string]any{"type": "string"},
+							"kind":       map[string]any{"type": "string"},
+							"subject":    map[string]any{"type": "string"},
+							"ts":         map[string]any{"type": "string"},
+							"payload":    map[string]any{"description": "观测载荷（按 kind 结构化）"},
+							"digest":     map[string]any{"type": "string"},
+						},
+					},
+				},
+				"graph": map[string]any{
+					"type":        "object",
+					"description": "证据目标所处的攻击面子图；取不到时省略",
+					"properties": map[string]any{
+						"known": map[string]any{"type": "boolean", "description": "目标是否为库中真实存在的资产"},
+						"graph": map[string]any{"description": "资产子图"},
+					},
+				},
+				"judgements": map[string]any{
+					"type":        "array",
+					"description": "该对象上已有的研判意见（可能来自不同 actor）",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":             map[string]any{"type": "string"},
+							"subject_id":     map[string]any{"type": "string"},
+							"evidence_id":    map[string]any{"type": "string"},
+							"conclusion":     map[string]any{"type": "string", "enum": []string{"likely_true", "likely_false", "uncertain"}},
+							"false_positive": map[string]any{"type": "boolean", "description": "结论的布尔投影，便于筛选统计"},
+							"reasoning":      map[string]any{"type": "string"},
+							"review_steps":   map[string]any{"type": "string", "description": "给人工的复核步骤（JSON 字符串数组）"},
+							"actor":          map[string]any{"type": "string"},
+							"created":        map[string]any{"type": "string"},
+							"updated":        map[string]any{"type": "string"},
+						},
+					},
+				},
+			},
+			"required": []string{"evidence", "observations", "judgements"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -2063,6 +2444,30 @@ func (s *Server) judgeRecordTool() *Tool {
 				"actor":        map[string]any{"type": "string", "description": "给出意见的主体，例如 agent:artex"},
 			},
 			"required": []string{"id", "conclusion"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"recorded": map[string]any{"type": "boolean", "description": "是否已写入 judgement 表；成功时恒为 true"},
+				"judgement": map[string]any{
+					"type":        "object",
+					"description": "写入后的研判意见记录",
+					"properties": map[string]any{
+						"id":             map[string]any{"type": "string"},
+						"subject_id":     map[string]any{"type": "string"},
+						"evidence_id":    map[string]any{"type": "string"},
+						"conclusion":     map[string]any{"type": "string", "enum": []string{"likely_true", "likely_false", "uncertain"}},
+						"false_positive": map[string]any{"type": "boolean", "description": "结论的布尔投影，便于筛选统计"},
+						"reasoning":      map[string]any{"type": "string"},
+						"review_steps":   map[string]any{"type": "string", "description": "给人工的复核步骤（JSON 字符串数组）"},
+						"actor":          map[string]any{"type": "string"},
+						"created":        map[string]any{"type": "string"},
+						"updated":        map[string]any{"type": "string"},
+					},
+				},
+				"note": map[string]any{"type": "string", "description": "提示：这是 advisory，不改变漏洞台账"},
+			},
+			"required": []string{"recorded", "judgement", "note"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -2111,6 +2516,91 @@ func (s *Server) learnBriefTool() *Tool {
 			},
 			"required": []string{},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"stats": map[string]any{
+					"type":        "object",
+					"description": "Drafter 流水线量化指标，含自动入库率",
+					"properties": map[string]any{
+						"total":       map[string]any{"type": "integer"},
+						"pending":     map[string]any{"type": "integer"},
+						"approved":    map[string]any{"type": "integer"},
+						"rejected":    map[string]any{"type": "integer"},
+						"reviewed":    map[string]any{"type": "integer", "description": "已决议数（approved + rejected）"},
+						"ingest_rate": map[string]any{"type": "number", "description": "自动入库率 = approved / (approved + rejected)，不含 pending"},
+						"reviews":     map[string]any{"type": "integer", "description": "终审决议流水总条数"},
+						"by_severity": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":        map[string]any{"type": "string"},
+									"total":       map[string]any{"type": "integer"},
+									"pending":     map[string]any{"type": "integer"},
+									"approved":    map[string]any{"type": "integer"},
+									"rejected":    map[string]any{"type": "integer"},
+									"ingest_rate": map[string]any{"type": "number"},
+								},
+							},
+						},
+						"by_capability": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "object",
+								"properties": map[string]any{
+									"name":        map[string]any{"type": "string"},
+									"total":       map[string]any{"type": "integer"},
+									"pending":     map[string]any{"type": "integer"},
+									"approved":    map[string]any{"type": "integer"},
+									"rejected":    map[string]any{"type": "integer"},
+									"ingest_rate": map[string]any{"type": "number"},
+								},
+							},
+						},
+					},
+				},
+				"decisions": map[string]any{
+					"type":        "array",
+					"description": "最近的终审决议流水（含驳回原因）",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":         map[string]any{"type": "integer"},
+							"draft_id":   map[string]any{"type": "string"},
+							"decision":   map[string]any{"type": "string", "enum": []string{"approved", "rejected"}},
+							"severity":   map[string]any{"type": "string"},
+							"capability": map[string]any{"type": "string"},
+							"requests":   map[string]any{"type": "integer"},
+							"target":     map[string]any{"type": "string"},
+							"reason":     map[string]any{"type": "string", "description": "驳回原因或批准备注"},
+							"actor":      map[string]any{"type": "string"},
+							"created":    map[string]any{"type": "string"},
+						},
+					},
+				},
+				"suggestions": map[string]any{
+					"type":        "array",
+					"description": "既有待审调优建议，避免重复提同一件事",
+					"items": map[string]any{
+						"type": "object",
+						"properties": map[string]any{
+							"id":      map[string]any{"type": "string"},
+							"kind":    map[string]any{"type": "string", "enum": []string{"rule", "threshold", "other"}},
+							"summary": map[string]any{"type": "string"},
+							"diff":    map[string]any{"type": "string", "description": "建议的变更内容（文本/diff）"},
+							"status":  map[string]any{"type": "string", "enum": []string{"pending", "accepted", "rejected"}},
+							"note":    map[string]any{"type": "string"},
+							"actor":   map[string]any{"type": "string"},
+							"source":  map[string]any{"type": "string"},
+							"created": map[string]any{"type": "string"},
+							"updated": map[string]any{"type": "string"},
+						},
+					},
+				},
+			},
+			"required": []string{"stats", "decisions", "suggestions"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -2149,6 +2639,30 @@ func (s *Server) learnRecordTool() *Tool {
 				"actor":   map[string]any{"type": "string", "description": "提出建议的主体"},
 			},
 			"required": []string{"summary", "diff"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"recorded": map[string]any{"type": "boolean", "description": "是否已写入 learn_suggestion 表；成功时恒为 true"},
+				"suggestion": map[string]any{
+					"type":        "object",
+					"description": "写入后的调优建议记录",
+					"properties": map[string]any{
+						"id":      map[string]any{"type": "string"},
+						"kind":    map[string]any{"type": "string", "enum": []string{"rule", "threshold", "other"}},
+						"summary": map[string]any{"type": "string"},
+						"diff":    map[string]any{"type": "string", "description": "建议的变更内容（文本/diff）"},
+						"status":  map[string]any{"type": "string", "enum": []string{"pending", "accepted", "rejected"}},
+						"note":    map[string]any{"type": "string"},
+						"actor":   map[string]any{"type": "string"},
+						"source":  map[string]any{"type": "string"},
+						"created": map[string]any{"type": "string"},
+						"updated": map[string]any{"type": "string"},
+					},
+				},
+				"next": map[string]any{"type": "string", "description": "下一步操作提示：人工审阅，不会自动应用 diff"},
+			},
+			"required": []string{"recorded", "suggestion", "next"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args

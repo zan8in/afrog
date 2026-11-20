@@ -12,6 +12,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 	"github.com/zan8in/afrog/v3/pkg/scanstream"
+	"github.com/zan8in/afrog/v3/pkg/scantask"
 )
 
 func newTestServer() *Server {
@@ -191,6 +192,269 @@ func TestInitializeNegotiatesProtocolVersion(t *testing.T) {
 		got, _ := s.initializeResult(params)["protocolVersion"].(string)
 		if got != want {
 			t.Fatalf("requested %q: got %q, want %q", requested, got, want)
+		}
+	}
+}
+
+// initialize 声明的能力必须与「真正实现的 MCP 原语」严格对应：多声明会让客户端去等一个
+// 永远不会来的推送，少声明则会让它错过可用能力。本服务实现 tools / logging / resources /
+// prompts 四个原语。
+//
+// 之所以只有这四个：进度通知（notifications/progress）与取消（notifications/cancelled）
+// 属于基础协议、无对应能力位；completions 本服务没有实现，因此不能声明。
+func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
+	s := New(Options{Policy: policy.Default()})
+
+	caps, _ := s.initializeResult(json.RawMessage(`{}`))["capabilities"].(map[string]any)
+	if len(caps) != 4 {
+		t.Fatalf("capabilities = %v, want exactly tools + logging + resources + prompts", caps)
+	}
+	tools, _ := caps["tools"].(map[string]any)
+	if tools == nil || tools["listChanged"] != false {
+		t.Fatalf("tools capability = %v, want {listChanged:false}", caps["tools"])
+	}
+	if _, ok := caps["logging"]; !ok {
+		t.Fatal("logging capability must be declared")
+	}
+	res, _ := caps["resources"].(map[string]any)
+	if res == nil || res["subscribe"] != false || res["listChanged"] != false {
+		t.Fatalf("resources capability = %v, want {subscribe:false, listChanged:false}", caps["resources"])
+	}
+	if _, ok := caps["prompts"]; !ok {
+		t.Fatal("prompts capability must be declared")
+	}
+
+	// 已声明的原语必须真的能应答。
+	for _, tc := range []struct {
+		method string
+		params string
+	}{
+		{"tools/list", ""},
+		{"logging/setLevel", `{"level":"info"}`},
+		{"resources/list", ""},
+		{"resources/templates/list", ""},
+		{"prompts/list", ""},
+	} {
+		var params json.RawMessage
+		if tc.params != "" {
+			params = json.RawMessage(tc.params)
+		}
+		resp, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`1`), Method: tc.method, Params: params}, nil)
+		if resp == nil || resp.Error != nil {
+			t.Fatalf("%s = %+v, want an ok response", tc.method, resp)
+		}
+	}
+
+	// 未声明/未实现的原语必须真的没实现：调用应得到 method not found，而不是一个空壳成功。
+	// resources/subscribe 尤其要挡住——它正对应上面声明里的 subscribe:false。
+	for _, method := range []string{"completions/complete", "resources/subscribe", "resources/unsubscribe"} {
+		resp, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: method}, nil)
+		if resp == nil || resp.Error == nil || resp.Error.Code != codeMethodNotFound {
+			t.Fatalf("%s = %+v, want method not found (capability is not declared)", method, resp)
+		}
+	}
+}
+
+// 资源读取必须复用对应工具的 Handler：门控、参数校验、返回结构都只有一份实现。
+func TestResourceReadReusesToolHandlers(t *testing.T) {
+	s := New(Options{Policy: policy.Default()})
+
+	list, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`1`), Method: "resources/list"}, nil)
+	resources, _ := list.Result.(map[string]any)["resources"].([]map[string]any)
+	if len(resources) == 0 {
+		t.Fatalf("resources/list = %+v, want entries", list.Result)
+	}
+	uris := map[string]bool{}
+	for _, r := range resources {
+		u, _ := r["uri"].(string)
+		uris[u] = true
+		if name, _ := r["name"].(string); strings.TrimSpace(name) == "" {
+			t.Fatalf("resource %v must carry a name", r)
+		}
+	}
+	for _, want := range []string{resourceStatusURI, resourceFindingsURI, resourceTasksURI} {
+		if !uris[want] {
+			t.Fatalf("resources/list is missing %s: %v", want, uris)
+		}
+	}
+
+	// afrog://status 与 server.status 必须给出同一份内容。
+	tool, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: "tools/call",
+		Params: json.RawMessage(`{"name":"server.status"}`)}, nil)
+	toolText := tool.Result.(map[string]any)["content"].([]map[string]any)[0]["text"].(string)
+
+	read, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`3`), Method: "resources/read",
+		Params: json.RawMessage(`{"uri":"` + resourceStatusURI + `"}`)}, nil)
+	if read.Error != nil {
+		t.Fatalf("resources/read = %+v", read)
+	}
+	contents, _ := read.Result.(map[string]any)["contents"].([]map[string]any)
+	if len(contents) != 1 {
+		t.Fatalf("contents = %+v, want one entry", read.Result)
+	}
+	got, _ := contents[0]["text"].(string)
+	var a, b map[string]any
+	if err := json.Unmarshal([]byte(got), &a); err != nil {
+		t.Fatalf("resource body is not JSON: %v (%s)", err, got)
+	}
+	if err := json.Unmarshal([]byte(toolText), &b); err != nil {
+		t.Fatalf("tool body is not JSON: %v", err)
+	}
+	modeOf := func(v map[string]any) any {
+		m, _ := v["policy"].(map[string]any)
+		return m["mode"]
+	}
+	if len(a) == 0 || modeOf(a) != modeOf(b) {
+		t.Fatalf("resource body %v does not match server.status %v", a, b)
+	}
+
+	// 未知 URI 报「找不到」，与「门控拒绝」区分开。
+	bad, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`4`), Method: "resources/read",
+		Params: json.RawMessage(`{"uri":"afrog://nope"}`)}, nil)
+	if bad.Error == nil || bad.Error.Code != codeResourceNotFound {
+		t.Fatalf("unknown uri = %+v, want codeResourceNotFound", bad)
+	}
+}
+
+// 任务资源按模板拼 URI：读到的必须是 task.status / task.events 的内容，而不是一句空壳。
+func TestTaskResourceTemplates(t *testing.T) {
+	s, ex := newTaskTestServer(t, "mode: safe\n")
+	taskID, _ := submitFakeTask(t, s, ex)
+	waitTaskStatus(t, taskMgrOf(t, s), taskID, scantask.StatusRunning)
+
+	tmpl, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`1`), Method: "resources/templates/list"}, nil)
+	templates, _ := tmpl.Result.(map[string]any)["resourceTemplates"].([]map[string]any)
+	if len(templates) != 2 {
+		t.Fatalf("resourceTemplates = %+v, want two entries", tmpl.Result)
+	}
+
+	read, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: "resources/read",
+		Params: json.RawMessage(`{"uri":"` + resourceTaskPrefix + taskID + `"}`)}, nil)
+	if read.Error != nil {
+		t.Fatalf("read task resource: %+v", read)
+	}
+	contents, _ := read.Result.(map[string]any)["contents"].([]map[string]any)
+	var view map[string]any
+	if err := json.Unmarshal([]byte(contents[0]["text"].(string)), &view); err != nil {
+		t.Fatalf("decode task resource: %v", err)
+	}
+	if view["task_id"] != taskID || view["status"] != "running" {
+		t.Fatalf("task resource = %v, want id=%s status=running", view, taskID)
+	}
+
+	// task_id 里带 "/" 说明 URI 拼错了，不能拿它去查库。
+	bad, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`3`), Method: "resources/read",
+		Params: json.RawMessage(`{"uri":"` + resourceTaskPrefix + `a/b"}`)}, nil)
+	if bad.Error == nil || bad.Error.Code != codeResourceNotFound {
+		t.Fatalf("malformed task uri = %+v, want codeResourceNotFound", bad)
+	}
+}
+
+// prompts/get 必须校验必填参数，并把模板渲染成一条 user 消息。
+func TestPromptsListAndGet(t *testing.T) {
+	s := New(Options{Policy: policy.Default()})
+
+	list, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`1`), Method: "prompts/list"}, nil)
+	prompts, _ := list.Result.(map[string]any)["prompts"].([]map[string]any)
+	if len(prompts) == 0 {
+		t.Fatalf("prompts/list = %+v, want entries", list.Result)
+	}
+	names := map[string]bool{}
+	for _, p := range prompts {
+		name, _ := p["name"].(string)
+		names[name] = true
+		if name == "" {
+			t.Fatalf("prompt without name: %v", p)
+		}
+	}
+	if !names["scan-target"] {
+		t.Fatalf("prompts/list is missing scan-target: %v", names)
+	}
+
+	got, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: "prompts/get",
+		Params: json.RawMessage(`{"name":"scan-target","arguments":{"target":"http://10.0.0.5:8080","project_id":"p1"}}`)}, nil)
+	if got.Error != nil {
+		t.Fatalf("prompts/get = %+v", got)
+	}
+	result := got.Result.(map[string]any)
+	messages, _ := result["messages"].([]map[string]any)
+	if len(messages) != 1 {
+		t.Fatalf("messages = %+v, want one", result["messages"])
+	}
+	text, _ := messages[0]["content"].(map[string]any)["text"].(string)
+	for _, want := range []string{"http://10.0.0.5:8080", "server.status", "task.status", "p1"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("rendered prompt is missing %q: %s", want, text)
+		}
+	}
+
+	// 必填参数缺失：报 -32602，而不是渲染出一句缺了目标的提示词。
+	missing, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`3`), Method: "prompts/get",
+		Params: json.RawMessage(`{"name":"scan-target","arguments":{}}`)}, nil)
+	if missing.Error == nil || missing.Error.Code != codeInvalidParams {
+		t.Fatalf("missing required argument = %+v, want codeInvalidParams", missing)
+	}
+
+	// 未知 prompt 同样报 -32602。
+	unknown, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`4`), Method: "prompts/get",
+		Params: json.RawMessage(`{"name":"nope"}`)}, nil)
+	if unknown.Error == nil || unknown.Error.Code != codeInvalidParams {
+		t.Fatalf("unknown prompt = %+v, want codeInvalidParams", unknown)
+	}
+}
+
+// 结构化输出要成规模：声明 outputSchema 等于承诺「返回结构是稳定契约」，客户端才能按
+// structuredContent 取数、而不是去解析 content 里的文本。这里锁住覆盖面，以及唯一的例外。
+func TestToolOutputSchemaCoverage(t *testing.T) {
+	s := New(Options{Policy: policy.Default()})
+
+	// 唯一豁免：observe.state 的返回体随目标规模变化（整张攻击面子图），属于 server.go
+	// 里说的「大对象」——声明它只会把同一份 payload 在 content 与 structuredContent 里
+	// 各发一遍。
+	exempt := map[string]bool{"observe.state": true}
+
+	listed := map[string]bool{}
+	for _, e := range s.toolList() {
+		name, _ := e["name"].(string)
+		listed[name] = true
+		if _, ok := e["outputSchema"]; ok != !exempt[name] {
+			t.Fatalf("tools/list entry for %s: outputSchema present = %v, want %v", name, ok, !exempt[name])
+		}
+	}
+
+	for name, tool := range s.tools {
+		if !listed[name] {
+			t.Fatalf("%s is missing from tools/list", name)
+		}
+		if exempt[name] {
+			if tool.OutputSchema != nil {
+				t.Fatalf("%s is exempt from outputSchema but declares one", name)
+			}
+			continue
+		}
+		schema, ok := tool.OutputSchema.(map[string]any)
+		if !ok {
+			t.Fatalf("%s must declare an outputSchema", name)
+		}
+		if schema["type"] != "object" {
+			t.Fatalf("%s outputSchema type = %v, want object", name, schema["type"])
+		}
+		props, ok := schema["properties"].(map[string]any)
+		if !ok || len(props) == 0 {
+			t.Fatalf("%s outputSchema must declare properties", name)
+		}
+		// required 是可选的；一旦写了，里面的字段就必须真的在 properties 里声明过，
+		// 否则契约自相矛盾。
+		if raw, ok := schema["required"]; ok {
+			required, ok := raw.([]string)
+			if !ok {
+				t.Fatalf("%s outputSchema required = %T, want []string", name, raw)
+			}
+			for _, r := range required {
+				if _, ok := props[r]; !ok {
+					t.Fatalf("%s outputSchema requires %q but does not declare it", name, r)
+				}
+			}
 		}
 	}
 }

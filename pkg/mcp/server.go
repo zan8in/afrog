@@ -38,7 +38,7 @@ const Instructions = `afrog 把本机的扫描结论、攻击面与 PoC 能力�
 
 主路径：先用 probe.fingerprint 拿技术栈，它返回的 suggested_search 可直接透传给 poc.search 预检「本机有没有该技术栈的 PoC」；非空就用同一串 scan.start 一次并发跑完。不要自己把 technologies 映射成关键词——曾出现识别出 jQuery、却去搜 wordpress,nginx 之类根本没识别到的产品。带关键词时，匹配关键词的指纹 PoC 不受 severity 限制也会保留（但关键词是硬前提，不命中的指纹 PoC 照样被滤掉），因而指纹阶段照常运行、requires 按真实指纹放行，既避免「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成一次并发扫描。
 
-长任务：scan.start / act.brute 是长任务——它们在「短等窗口」（默认 30 秒）内跑完就返回完整结果，没跑完则返回一个 task_id 句柄（返回体的 conclusion 为 pending）。拿到 task_id 后不要当成失败：用 task.status 查状态与汇总、task.events 按 last_seq 增量拉事件（无推送的 Streamable HTTP 也能用）、task.control 取消/暂停/恢复。verify.replay / poc.submit 是单 PoC 短任务，会一直等到跑完（它们的后处理——digest 比对、入待审队列——依赖跑完的结果，不能拆开）。
+长任务：scan.start / act.brute 是长任务——它们在「短等窗口」（默认 30 秒）内跑完就返回完整结果，没跑完则返回一个 task_id 句柄（返回体的 conclusion 为 pending）。拿到 task_id 后不要当成失败：用 task.status 查状态与汇总、task.events 按 last_seq 增量拉事件（拉取式，任何传输都可用，因此不依赖服务端推送）、task.control 取消/暂停/恢复。verify.replay / poc.submit 是单 PoC 短任务，会一直等到跑完（它们的后处理——digest 比对、入待审队列——依赖跑完的结果，不能拆开）。
 
 硬规则：
 - 没有任何指纹线索时（technologies 为空、plan.next 也给不出关键词）：不要凭空编关键词；先问用户是否要用 afrog 扫描全部漏洞，得到同意后再用空 search 调 scan.start（空关键词 = 不加过滤、跑全库所有 PoC，请求量与耗时都大得多）。
@@ -411,6 +411,9 @@ const (
 	codeInvalidRequest = -32600
 	codeMethodNotFound = -32601
 	codeInvalidParams  = -32602
+	codeInternalError  = -32603
+	// codeResourceNotFound 是 MCP 为 resources/read 约定的「没有这个资源」。
+	codeResourceNotFound = -32002
 )
 
 // Serve 在给定的读写流上跑 MCP 主循环，直到输入结束。
@@ -487,6 +490,16 @@ func (s *Server) handle(ctx context.Context, req *request, notify notifyFunc) (*
 		return s.ok(req.ID, map[string]any{"tools": s.toolList()}), false
 	case "tools/call":
 		return s.callTool(ctx, req, notify)
+	case "resources/list":
+		return s.ok(req.ID, map[string]any{"resources": s.resourceList()}), false
+	case "resources/templates/list":
+		return s.ok(req.ID, map[string]any{"resourceTemplates": s.resourceTemplates()}), false
+	case "resources/read":
+		return s.resourceRead(ctx, req)
+	case "prompts/list":
+		return s.ok(req.ID, map[string]any{"prompts": s.promptList()}), false
+	case "prompts/get":
+		return s.promptGet(req)
 	case "logging/setLevel":
 		return s.setLogLevel(req)
 	case "notifications/initialized":
@@ -567,6 +580,10 @@ func (s *Server) initializeResult(params json.RawMessage) map[string]any {
 		"capabilities": map[string]any{
 			"tools":   map[string]any{"listChanged": false},
 			"logging": map[string]any{},
+			// resources 只读、不订阅：本服务没有会话级订阅状态（见 resources.go）。
+			// 显式写 false 而不是留空，免得客户端以为可以订阅、然后等一个永不来的推送。
+			"resources": map[string]any{"subscribe": false, "listChanged": false},
+			"prompts":   map[string]any{"listChanged": false},
 		},
 		"serverInfo": s.info,
 		// instructions 是 MCP 规范里 initialize 的可选字段：客户端会把它并入

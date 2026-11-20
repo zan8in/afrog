@@ -108,6 +108,14 @@ func (s *Server) taskListTool() *Tool {
 			},
 			"required": []string{},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"tasks": map[string]any{"type": "array", "items": taskViewSchema(), "description": "按最新在前排序；filter 命中不足 limit 时可能更短"},
+				"count": map[string]any{"type": "integer", "description": "本次返回的条数"},
+			},
+			"required": []string{"tasks", "count"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -161,30 +169,7 @@ func (s *Server) taskStatusTool() *Tool {
 			},
 			"required": []string{"task_id"},
 		},
-		OutputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"task_id": map[string]any{"type": "string"},
-				"status":  map[string]any{"type": "string", "description": "queued / running / paused / completed / failed / cancelled / timeout"},
-				"targets": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-				"progress": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"percent":    map[string]any{"type": "integer"},
-						"finished":   map[string]any{"type": "integer"},
-						"total":      map[string]any{"type": "integer"},
-						"rate":       map[string]any{"type": "integer"},
-						"elapsed_ms": map[string]any{"type": "integer"},
-					},
-				},
-				"hits":      map[string]any{"type": "object", "description": "按严重级别的命中数"},
-				"hit_total": map[string]any{"type": "integer"},
-				"summary":   map[string]any{"type": "object", "description": "收尾汇总：executed / found / by_severity / elapsed_ms"},
-				"last_seq":  map[string]any{"type": "integer", "description": "已产生事件的最大 seq，供 task.events 增量拉取"},
-				"error":     map[string]any{"type": "string"},
-			},
-			"required": []string{"task_id", "status"},
-		},
+		OutputSchema: taskViewSchema(),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -233,6 +218,21 @@ func (s *Server) taskEventsTool() *Tool {
 				"limit":    map[string]any{"type": "integer", "minimum": 1, "maximum": 1000, "description": "单次最多返回条数，默认 200"},
 			},
 			"required": []string{"task_id"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"task_id":       map[string]any{"type": "string"},
+				"status":        map[string]any{"type": "string", "description": "拉取时的任务状态"},
+				"events":        map[string]any{"type": "array", "items": eventSchema()},
+				"count":         map[string]any{"type": "integer", "description": "本批条数"},
+				"last_seq":      map[string]any{"type": "integer", "description": "本批最后一条事件的 seq，下次原样作为 from_seq"},
+				"has_more":      map[string]any{"type": "boolean", "description": "为 true 表示还有没返回的事件，需继续拉"},
+				"done":          map[string]any{"type": "boolean", "description": "任务已到终态（completed/failed/cancelled/timeout）；此时再拉不会再有新事件"},
+				"truncated":     map[string]any{"type": "boolean", "description": "更早的事件已被缓冲淘汰；只有从 buffered_from 起才拿得到"},
+				"buffered_from": map[string]any{"type": "integer", "description": "缓冲区里仍保留的最早 seq"},
+			},
+			"required": []string{"task_id", "status", "events", "count", "last_seq", "has_more", "done"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -314,6 +314,7 @@ func (s *Server) taskControlTool() *Tool {
 			},
 			"required": []string{"task_id", "action"},
 		},
+		OutputSchema: taskControlSchema(),
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
 			if err := decodeArgs(raw, &a); err != nil {
@@ -419,6 +420,78 @@ func (s *Server) taskView(snap *scantask.Snapshot) map[string]any {
 		out["error"] = snap.Error
 	}
 	return out
+}
+
+// taskViewSchema 是 taskView 的对外契约，供 task.list / task.status / task.control 共用：
+// 三个工具返回的都是同一份「任务视图」，字段只有一处定义，免得其中一个加了字段、
+// 另两个的契约悄悄落后。只在收尾/上报后才出现的字段一律不进 required。
+func taskViewSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"task_id":   map[string]any{"type": "string"},
+			"status":    map[string]any{"type": "string", "description": "queued / running / paused / completed / failed / cancelled / timeout"},
+			"targets":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"progress": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"percent":    map[string]any{"type": "integer"},
+					"finished":   map[string]any{"type": "integer"},
+					"total":      map[string]any{"type": "integer"},
+					"rate":       map[string]any{"type": "integer"},
+					"elapsed_ms": map[string]any{"type": "integer"},
+				},
+			},
+			"hits":       map[string]any{"type": "object", "description": "按严重级别的命中数"},
+			"hit_total":  map[string]any{"type": "integer"},
+			"pausable":   map[string]any{"type": "boolean", "description": "该任务是否支持暂停/恢复"},
+			"last_seq":   map[string]any{"type": "integer", "description": "已产生事件的最大 seq，供 task.events 增量拉取"},
+			"summary":    map[string]any{"type": "object", "description": "收尾汇总：executed / found / by_severity / elapsed_ms；未收尾时不出现"},
+			"scan_info":  map[string]any{"type": "object", "description": "total_targets / total_pocs / total_scans / oob_enabled / oob_status；引擎上报前不出现"},
+			"name":       map[string]any{"type": "string", "description": "任务名；未命名时不出现"},
+			"created_at": map[string]any{"type": "string", "description": "RFC3339；未受理前不出现"},
+			"started_at": map[string]any{"type": "string", "description": "RFC3339；未开始前不出现"},
+			"ended_at":   map[string]any{"type": "string", "description": "RFC3339；未收尾时不出现"},
+			"error":      map[string]any{"type": "string", "description": "失败/超时的原因；正常收尾不出现"},
+		},
+		"required": []string{"task_id", "status"},
+	}
+}
+
+// taskControlSchema 在任务视图上补一个 action：控制类工具要能看出「这次做了什么」。
+func taskControlSchema() map[string]any {
+	schema := taskViewSchema()
+	schema["properties"].(map[string]any)["action"] = map[string]any{
+		"type": "string", "enum": []string{"cancel", "pause", "resume"}, "description": "本次执行的控制动作",
+	}
+	schema["required"] = []string{"task_id", "status", "action"}
+	return schema
+}
+
+// eventSchema 是事件信封的契约：seq / ts_ms / type 恒在，其余按 type 取对应载荷。
+// 各载荷的内部结构差异很大（命中、端口、进度各有各的字段），这里只声明「有哪些载荷槽」，
+// 不展开到每个槽的内部——展开只会写出一个跟不上 scanstream 演进的假契约。
+func eventSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"seq":       map[string]any{"type": "integer"},
+			"ts_ms":     map[string]any{"type": "integer"},
+			"type":      map[string]any{"type": "string", "enum": []string{"status", "scan_info", "progress", "phase", "result", "port", "webprobe", "host", "log", "done", "error"}},
+			"status":    map[string]any{"type": "object", "description": "type=status 时的载荷"},
+			"scan_info": map[string]any{"type": "object", "description": "type=scan_info 时的载荷"},
+			"progress":  map[string]any{"type": "object", "description": "type=progress 时的载荷"},
+			"phase":     map[string]any{"type": "object", "description": "type=phase 时的载荷"},
+			"result":    map[string]any{"type": "object", "description": "type=result 时的命中（poc_id / severity / target 等）"},
+			"port":      map[string]any{"type": "object", "description": "type=port 时的载荷"},
+			"webprobe":  map[string]any{"type": "object", "description": "type=webprobe 时的载荷"},
+			"host":      map[string]any{"type": "object", "description": "type=host 时的载荷"},
+			"log":       map[string]any{"type": "object", "description": "type=log 时的载荷"},
+			"done":      map[string]any{"type": "object", "description": "type=done 时的收尾（status / summary）"},
+			"error":     map[string]any{"type": "object", "description": "type=error 时的载荷"},
+		},
+		"required": []string{"seq", "ts_ms", "type"},
+	}
 }
 
 // eventView 把一条事件整理成对外的扁平结构：信封字段 + type + 对应载荷。

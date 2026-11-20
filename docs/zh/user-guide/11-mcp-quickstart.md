@@ -116,12 +116,13 @@ $req1, $req2 | & afrog mcp 2>$null
 正常会输出两行 JSON：
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{"listChanged":false}},"instructions":"afrog 把本机的扫描结论、攻击面与 PoC 能力暴露成一组工具…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"instructions":"afrog 把本机的扫描结论、攻击面与 PoC 能力暴露成一组工具…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
 {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"act.brute",...},{"name":"judge.brief",...}, ...]}}
 ```
 
-- 第一行是握手成功，`instructions` 是服务端下发的用法说明（客户端会并入模型上下文，见 [MCP 服务 · 工具怎么选](./10-mcp.md)）；
-- 第二行是工具清单，**一共 21 个工具**（`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*` / `poc.*` / `plan.*` / `judge.*` / `learn.*`）。
+- 第一行是握手成功，`instructions` 是服务端下发的用法说明（客户端会并入模型上下文，见 [MCP 服务 · 工具怎么选](./10-mcp.md)）；`capabilities` 里声明的四项能力（`tools` / `logging` / `resources` / `prompts`）都已实现；
+- 第二行是工具清单，**一共 25 个工具**（`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*`（含 `act.oob_*`）/ `poc.*` / `scan.*` / `task.*` / `plan.*` / `judge.*` / `learn.*`）。
+- 除工具外，服务端还暴露只读的 **resources**（`afrog://status`、`afrog://findings`、`afrog://tasks` 及 `afrog://tasks/{task_id}[/events]`）与三条 **prompts** 模板（`scan-target` / `triage-findings` / `follow-task`）；客户端若支持，可直接在「资源 / 提示」面板里读取或用它们起一段对话。
 
 看到这两行，说明 afrog 这一侧已经完全就绪，剩下的只是「怎么让客户端连上来」。
 
@@ -234,7 +235,7 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
 
 **超时**：Cherry Studio 的 MCP 超时**不在配置文件里**，去 `设置 → MCP → 超时时间` 调大（长扫描建议 10 分钟）。
 
-**验证**：展开 `afrog` 条目应能看到 21 个工具；在对话界面选中「启用 MCP」，然后提问「用 afrog 列出最近的漏洞命中」。
+**验证**：展开 `afrog` 条目应能看到 25 个工具；在对话界面选中「启用 MCP」，然后提问「用 afrog 列出最近的漏洞命中」。
 
 **想走远程 HTTP**：同样在「添加服务器」里，类型改选 **可流式传输的 HTTP**（或 **SSE**），其余按表填：
 
@@ -309,7 +310,7 @@ afrog 的 MCP 默认策略是 **只读（readonly）**：一个刚被拉起来�
 
 **验证**
 
-保存后条目上方会出现 `Start` 的 code lens，点一下等它显示 `Running with 21 tools`；也可以在命令面板执行 `MCP: List Servers` 查看状态，然后在 Copilot Chat 里提问。
+保存后条目上方会出现 `Start` 的 code lens，点一下等它显示 `Running with 25 tools`；也可以在命令面板执行 `MCP: List Servers` 查看状态，然后在 Copilot Chat 里提问。
 
 **想走远程 HTTP**，把条目换成：
 
@@ -443,7 +444,7 @@ claude mcp add --transport http afrog -s user http://127.0.0.1:16870/mcp \
 
 | 层次 | 怎么看 |
 | --- | --- |
-| 1. 连接 | 客户端的 MCP 面板里 `afrog` 是已连接状态，能看到 **21 个**工具 |
+| 1. 连接 | 客户端的 MCP 面板里 `afrog` 是已连接状态，能看到 **25 个**工具 |
 | 2. 调用 | 提问后，客户端明确显示它调用了 afrog 的某个工具 |
 | 3. 数据 | 返回真实数据：有命中就是 `{"items":[...], "total":N, ...}`；数据库里没数据时是 `{"items":[], "total":0, ...}` |
 

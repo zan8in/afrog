@@ -225,6 +225,18 @@ func (s *Server) actOOBPayloadTool() *Tool {
 			"properties": map[string]any{},
 			"required":   []string{},
 		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"filter": map[string]any{"type": "string", "description": "本次反连的过滤器，原样交给 act.oob_wait"},
+				"dns":    map[string]any{"type": "string", "description": "DNS 反连地址"},
+				"http":   map[string]any{"type": "string", "description": "HTTP 反连地址"},
+				"jndi":   map[string]any{"type": "string", "description": "JNDI 反连地址；平台不支持时不出现"},
+				"rmi":    map[string]any{"type": "string", "description": "RMI 反连地址；平台不支持时不出现"},
+				"ldap":   map[string]any{"type": "string", "description": "LDAP 反连地址；平台不支持时不出现"},
+			},
+			"required": []string{"filter", "dns", "http"},
+		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			if err := s.gate.Take(policy.Action{
 				Name:       "act.oob_payload",
@@ -264,6 +276,18 @@ func (s *Server) actOOBWaitTool() *Tool {
 				"project_id":  map[string]any{"type": "string", "description": "观测流归属的项目 ID；留空表示全局"},
 			},
 			"required": []string{"filter"},
+		},
+		OutputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"hit":         map[string]any{"type": "boolean", "description": "等待窗口内是否收到回连"},
+				"filter":      map[string]any{"type": "string"},
+				"filter_type": map[string]any{"type": "string", "enum": []string{oobadapter.OOBDNS, oobadapter.OOBHTTP}},
+				"count":       map[string]any{"type": "integer", "description": "已确认的回连次数；hit=false 时不出现"},
+				"last_at":     map[string]any{"type": "string", "description": "最近一次回连时间；hit=false 时不出现"},
+				"evidence":    map[string]any{"type": "string", "description": "回连证据（请求摘要）；hit=false 时不出现"},
+			},
+			"required": []string{"hit", "filter", "filter_type"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args

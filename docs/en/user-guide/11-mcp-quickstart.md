@@ -116,12 +116,13 @@ $req1, $req2 | & afrog mcp 2>$null
 You should get two lines of JSON:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"tools":{"listChanged":false}},"instructions":"afrog exposes this machine's findings, attack surface and PoC ability as a set of tools…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"instructions":"afrog exposes this machine's findings, attack surface and PoC ability as a set of tools…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
 {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"act.brute",...},{"name":"judge.brief",...}, ...]}}
 ```
 
-- The first line is a successful handshake; `instructions` is the usage guide the server hands to the client (clients fold it into the model context — see [MCP Server · how the tools fit together](./10-mcp.md));
-- The second is the tool list: **21 tools in total** (`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*` / `poc.*` / `plan.*` / `judge.*` / `learn.*`).
+- The first line is a successful handshake; `instructions` is the usage guide the server hands to the client (clients fold it into the model context — see [MCP Server · how the tools fit together](./10-mcp.md)); all four capabilities declared in `capabilities` (`tools` / `logging` / `resources` / `prompts`) are implemented;
+- The second is the tool list: **25 tools in total** (`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*` (including `act.oob_*`) / `poc.*` / `scan.*` / `task.*` / `plan.*` / `judge.*` / `learn.*`).
+- Besides tools, the server also exposes read-only **resources** (`afrog://status`, `afrog://findings`, `afrog://tasks`, and `afrog://tasks/{task_id}[/events]`) and three **prompts** templates (`scan-target` / `triage-findings` / `follow-task`); if your client supports them, you can read them from the resources/prompts panel or use them to kick off a conversation.
 
 If you see both lines, afrog's side is fully ready. What remains is just getting a client to connect.
 
@@ -235,7 +236,7 @@ If you already have the JSON from 3.1, click `Import from JSON` and paste the `m
 
 **Timeout**: Cherry Studio's MCP timeout is **not in the config file** — go to `Settings → MCP → Timeout` and raise it (10 minutes is recommended for long scans).
 
-**Verify**: expanding `afrog` should show 21 tools. In a chat with MCP enabled, ask "Use afrog to list the most recent findings."
+**Verify**: expanding `afrog` should show 25 tools. In a chat with MCP enabled, ask "Use afrog to list the most recent findings."
 
 **For remote HTTP**: in the same `Add Server` dialog, switch the type to **Streamable HTTP** (or **SSE**) and fill in:
 
@@ -310,7 +311,7 @@ Create `.vscode/mcp.json` in your project:
 
 **Verify**
 
-After saving, a `Start` code lens appears above the entry; click it and wait for `Running with 21 tools`. You can also run `MCP: List Servers` from the command palette, then ask in Copilot Chat.
+After saving, a `Start` code lens appears above the entry; click it and wait for `Running with 25 tools`. You can also run `MCP: List Servers` from the command palette, then ask in Copilot Chat.
 
 **For remote HTTP**, replace the entry with:
 
@@ -444,7 +445,7 @@ Check these three layers in order. All three must pass.
 
 | Layer | How to tell |
 | --- | --- |
-| 1. Connected | The client's MCP panel shows `afrog` connected with **20** tools |
+| 1. Connected | The client's MCP panel shows `afrog` connected with **25** tools |
 | 2. Called | After your question, the client clearly shows it called an afrog tool |
 | 3. Data | Real data comes back: with findings, `{"items":[...], "total":N, ...}`; with an empty database, `{"items":[], "total":0, ...}` |
 

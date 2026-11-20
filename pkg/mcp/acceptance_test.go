@@ -184,6 +184,19 @@ func newAcceptanceTarget(t *testing.T, cases []acceptanceCase) *httptest.Server 
 	return srv
 }
 
+// mcpTaskID 为「旧引擎对照基线」生成任务 ID。
+//
+// 这条路径刻意绕过控制面：验收对照要的就是「CLI 单 PoC 直跑」口径。ID 会经
+// AFROG_TASK_ID 注入子进程、并决定它临时工作目录的前缀，因此带上纳秒时间戳，
+// 保证同一天内多次运行不互相覆盖（与 pkg/scantask 的「日期-序号」口径不同源，这里是有意的）。
+func mcpTaskID(tool string) string {
+	name := strings.NewReplacer(".", "-", " ", "-").Replace(strings.TrimSpace(tool))
+	if name == "" {
+		name = "scan"
+	}
+	return fmt.Sprintf("mcp-%s-%d", name, time.Now().UnixNano())
+}
+
 // legacyMatchCount 用「旧引擎口径」跑同一份语料，作为误报率对照基线：只加载这一份 PoC
 // （-P 独占 + -nf 关指纹），与既有 CLI 单 PoC 检测路径一致；agent 路径新增的命中数必须
 // 不高于它。

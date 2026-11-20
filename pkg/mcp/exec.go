@@ -346,16 +346,6 @@ func describeEvidenceRequest(req evidence.Request) string {
 	return sb.String()
 }
 
-// mcpTaskID 为一次工具发起的扫描生成任务 ID，供需要「绕过控制面直接拉起子进程」的
-// 调用方（验收测试的旧引擎基线）使用。工具面的长任务一律由控制面分配 ID。
-func mcpTaskID(tool string) string {
-	name := strings.NewReplacer(".", "-", " ", "-").Replace(strings.TrimSpace(tool))
-	if name == "" {
-		name = "scan"
-	}
-	return fmt.Sprintf("mcp-%s-%d", name, time.Now().UnixNano())
-}
-
 // estimateKeywordReserve 估算「按关键词扫一批」需要预留多少请求额度。
 //
 // 口径：命中关键词的 PoC 数 × 单个 PoC 的保守请求数，落在
