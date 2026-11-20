@@ -116,13 +116,13 @@ $req1, $req2 | & afrog mcp 2>$null
 正常会输出两行 JSON：
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"instructions":"afrog 把本机的扫描结论、攻击面与 PoC 能力暴露成一组工具…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":true},"tools":{"listChanged":false}},"instructions":"afrog 把本机的扫描结论、攻击面与 PoC 能力暴露成一组工具…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
 {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"act.brute",...},{"name":"judge.brief",...}, ...]}}
 ```
 
 - 第一行是握手成功，`instructions` 是服务端下发的用法说明（客户端会并入模型上下文，见 [MCP 服务 · 工具怎么选](./10-mcp.md)）；`capabilities` 里声明的四项能力（`tools` / `logging` / `resources` / `prompts`）都已实现；
 - 第二行是工具清单，**一共 25 个工具**（`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*`（含 `act.oob_*`）/ `poc.*` / `scan.*` / `task.*` / `plan.*` / `judge.*` / `learn.*`）。
-- 除工具外，服务端还暴露只读的 **resources**（`afrog://status`、`afrog://findings`、`afrog://tasks` 及 `afrog://tasks/{task_id}[/events]`）与三条 **prompts** 模板（`scan-target` / `triage-findings` / `follow-task`）；客户端若支持，可直接在「资源 / 提示」面板里读取或用它们起一段对话。
+- 除工具外，服务端还暴露只读的 **resources**（`afrog://status`、`afrog://findings`、`afrog://tasks` 及 `afrog://tasks/{task_id}[/events]`）与三条 **prompts** 模板（`scan-target` / `triage-findings` / `follow-task`）；客户端若支持，可直接在「资源 / 提示」面板里读取或用它们起一段对话。资源支持**订阅**（`resources/subscribe`）：订阅后资源发生变化（如长任务收尾）时服务端会推 `notifications/resources/updated`，客户端据此重读一次即可，不必轮询。
 
 看到这两行，说明 afrog 这一侧已经完全就绪，剩下的只是「怎么让客户端连上来」。
 

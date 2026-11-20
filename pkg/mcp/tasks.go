@@ -38,6 +38,10 @@ func (s *Server) taskManager() (*scantask.Manager, error) {
 		mgr, err := scantask.New(scantask.Options{
 			Executor:   ex,
 			Dispatcher: s.Dispatcher(),
+			// 任务收尾是「资源变了」的一个确定时点：任务列表、该任务详情、以及本次
+			// 扫描可能新增的结论都变了。而此刻没有任何调用在途，只能靠会话登记的
+			// 通道推 notifications/resources/updated（见 notifyResourceUpdated）。
+			OnTaskFinished: s.onTaskFinished,
 		})
 		if err != nil {
 			s.taskErr = err
@@ -46,6 +50,12 @@ func (s *Server) taskManager() (*scantask.Manager, error) {
 		s.taskMgr = mgr
 	})
 	return s.taskMgr, s.taskErr
+}
+
+// onTaskFinished 在任务收尾后推送资源变更通知：三个受影响的资源一次推完，
+// 客户端据此重读即可拿到刚出炉的任务状态与结论。
+func (s *Server) onTaskFinished(snap *scantask.Snapshot) {
+	s.notifyResourceUpdated(resourceTasksURI, resourceTaskPrefix+snap.ID, resourceFindingsURI)
 }
 
 // watchTimeout 为任务挂一个超时看护：到点若任务仍未结束，就取消它并登记

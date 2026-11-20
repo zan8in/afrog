@@ -127,6 +127,8 @@ type streamableHandler struct {
 // stream 为 nil 表示客户端没开 GET 流（推送被丢弃）。
 type streamableSession struct {
 	stream *notifyStream
+	// unregisterPush 注销该会话在 Server 上登记的资源变更推送通道（见 handleDelete）。
+	unregisterPush func()
 }
 
 // notifyStream 是一条 GET 的 SSE 流。
@@ -184,9 +186,10 @@ func (h *streamableHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 		}
 		responses := make([]*response, 0, len(reqs))
 		notify := h.notifyFn(sessionID)
+		ctx := withSession(r.Context(), sessionID)
 		for i := range reqs {
 			h.maybeStartSession(w, &reqs[i], sessionID)
-			resp, isNotify := h.srv.handle(r.Context(), &reqs[i], notify)
+			resp, isNotify := h.srv.handle(ctx, &reqs[i], notify)
 			if !isNotify && resp != nil {
 				responses = append(responses, resp)
 			}
@@ -206,7 +209,7 @@ func (h *streamableHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.maybeStartSession(w, &req, sessionID)
-	resp, isNotify := h.srv.handle(r.Context(), &req, h.notifyFn(sessionID))
+	resp, isNotify := h.srv.handle(withSession(r.Context(), sessionID), &req, h.notifyFn(sessionID))
 	if isNotify {
 		// 通知没有响应体，按规范回 202。
 		w.WriteHeader(http.StatusAccepted)
@@ -329,7 +332,8 @@ func (h *streamableHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 	sessionID := strings.TrimSpace(r.Header.Get("Mcp-Session-Id"))
 	if sessionID != "" {
 		h.mu.Lock()
-		if sess, ok := h.sessions[sessionID]; ok {
+		sess, ok := h.sessions[sessionID]
+		if ok {
 			// 终止会话时先让它的 GET 流收尾：done 是单向信号，发送方据此放弃未发出的通知。
 			if sess.stream != nil {
 				close(sess.stream.done)
@@ -338,11 +342,18 @@ func (h *streamableHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 			delete(h.sessions, sessionID)
 		}
 		h.mu.Unlock()
+		// 会话没了，登记的推送通道与订阅一并注销，免得在 Server 上留下永不复用的条目。
+		if ok && sess.unregisterPush != nil {
+			sess.unregisterPush()
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // maybeStartSession 在 initialize 时分配会话 id，并通过响应头回给客户端。
+//
+// 顺带把该会话的服务端通知通道登记到 Server 上：资源订阅的变更通知要在调用之外送达
+// （如后台长任务收尾），而 POST 的一次「一问一答」没有地方塞通知，只能经会话的 GET 流。
 func (h *streamableHandler) maybeStartSession(w http.ResponseWriter, req *request, current string) {
 	if req.Method != "initialize" || current != "" {
 		return
@@ -352,8 +363,13 @@ func (h *streamableHandler) maybeStartSession(w http.ResponseWriter, req *reques
 		return
 	}
 	h.mu.Lock()
-	h.sessions[id] = &streamableSession{}
+	sess := &streamableSession{}
+	h.sessions[id] = sess
 	h.mu.Unlock()
+
+	// 会话已入表再挂推送通道：notifyFn 会先确认会话存在（见 hasSession），
+	// 且它自己也要拿 h.mu，不能在上面的临界区里调。
+	sess.unregisterPush = h.srv.RegisterResourcePush(id, h.notifyFn(id))
 	w.Header().Set("Mcp-Session-Id", id)
 }
 

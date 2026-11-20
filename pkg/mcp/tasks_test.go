@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -213,6 +214,72 @@ func finishFakeTask(t *testing.T, mgr *scantask.Manager, taskID string, h *fakeS
 		t.Fatalf("finish: %v", err)
 	}
 	waitTerminalTask(t, mgr, taskID)
+}
+
+// 任务收尾会推送资源变更通知：任务列表、该任务详情、结论台账都变了。这条推送发生在
+// 调用之外（task_id 句柄早就返回了），只能靠会话登记的通道送达。
+func TestResourcePushOnTaskFinish(t *testing.T) {
+	s, ex := newTaskTestServer(t, "mode: safe\n")
+
+	var mu sync.Mutex
+	pushed := map[string]bool{}
+	unregister := s.RegisterResourcePush("s1", func(method string, params any) {
+		p, _ := params.(map[string]any)
+		uri, _ := p["uri"].(string)
+		mu.Lock()
+		pushed[method+" "+uri] = true
+		mu.Unlock()
+	})
+	defer unregister()
+	ctx := withSession(context.Background(), "s1")
+
+	subscribe := func(uri string) {
+		t.Helper()
+		resp, _ := s.handle(ctx, &request{ID: json.RawMessage(`1`), Method: "resources/subscribe",
+			Params: json.RawMessage(`{"uri":"` + uri + `"}`)}, nil)
+		if resp == nil || resp.Error != nil {
+			t.Fatalf("subscribe %s = %+v", uri, resp)
+		}
+	}
+	subscribe(resourceTasksURI)
+	subscribe(resourceFindingsURI)
+
+	mgr := taskMgrOf(t, s)
+	id, h := submitFakeTask(t, s, ex)
+	waitTaskStatus(t, mgr, id, scantask.StatusRunning)
+	// 任务 id 这时才知道，订阅本任务详情后再让它收尾（订阅前它还没跑出来）。
+	subscribe(resourceTaskPrefix + id)
+
+	finishFakeTask(t, mgr, id, h)
+
+	for _, uri := range []string{resourceTasksURI, resourceTaskPrefix + id, resourceFindingsURI} {
+		want := "notifications/resources/updated " + uri
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			mu.Lock()
+			ok := pushed[want]
+			mu.Unlock()
+			if ok {
+				break
+			}
+			if time.Now().After(deadline) {
+				mu.Lock()
+				got := pushed
+				mu.Unlock()
+				t.Fatalf("task finish never pushed %s; got %v", want, got)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+
+	// 没订阅的资源不该被推：订阅的意义就是客户端声明了关心哪些资源。
+	mu.Lock()
+	defer mu.Unlock()
+	for key := range pushed {
+		if strings.Contains(key, resourceStatusURI) {
+			t.Fatalf("unsubscribed resource was pushed: %s", key)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

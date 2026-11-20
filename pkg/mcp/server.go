@@ -129,6 +129,21 @@ type ProgressFunc func(progress, total float64, message string)
 // Streamable HTTP 的一次 POST 是「一问一答」，中途没有地方塞通知。
 type notifyFunc func(method string, params any)
 
+// sessionKey 承载「这条请求属于哪个会话」。
+//
+// 会话级状态（资源订阅）必须知道请求来自哪个会话，而 stdio 与 HTTP 的会话模型并不
+// 相同——由各传输自己写进 ctx：stdio 只有一条连接，标识为空串；HTTP 用 Mcp-Session-Id。
+type sessionKey struct{}
+
+func withSession(ctx context.Context, session string) context.Context {
+	return context.WithValue(ctx, sessionKey{}, session)
+}
+
+func sessionFrom(ctx context.Context) string {
+	session, _ := ctx.Value(sessionKey{}).(string)
+	return session
+}
+
 type progressKey struct{}
 
 func withProgress(ctx context.Context, fn ProgressFunc) context.Context {
@@ -263,6 +278,13 @@ type Server struct {
 	// 低于它的日志不推给客户端。默认 info。
 	logMu       sync.Mutex
 	logMinLevel int
+
+	// resMu 保护资源订阅登记表：resSubs 是「会话 -> 订阅的 URI 集合」，
+	// resPush 是「会话 -> 服务端通知通道」。通道由传输层在会话建立时登记
+	// （见 RegisterResourcePush），因为资源变更发生在调用之外（长任务收尾）。
+	resMu   sync.Mutex
+	resSubs map[string]map[string]struct{}
+	resPush map[string]notifyFunc
 
 	// webscanOnce/webscanMatcher 缓存内置 Web 指纹规则：规则集是只读的，
 	// 每次调用都重新解析只会白白拖慢探测。
@@ -433,10 +455,15 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 		return enc.Encode(v)
 	}
 
-	// notify 让工具在长调用过程中推送通知（目前只有 notifications/progress）。
+	// notify 让工具在长调用过程中推送通知（notifications/progress）。
 	notify := func(method string, params any) {
 		_ = write(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})
 	}
+
+	// 登记本连接的服务端推送通道：资源订阅的变更通知要在「没有调用在途」时也能送达
+	// （如后台长任务收尾）。stdio 只有一条连接，会话标识为空串。
+	unregisterPush := s.RegisterResourcePush("", notify)
+	defer unregisterPush()
 
 	var wg sync.WaitGroup
 	var loopErr error
@@ -496,6 +523,10 @@ func (s *Server) handle(ctx context.Context, req *request, notify notifyFunc) (*
 		return s.ok(req.ID, map[string]any{"resourceTemplates": s.resourceTemplates()}), false
 	case "resources/read":
 		return s.resourceRead(ctx, req)
+	case "resources/subscribe":
+		return s.resourceSubscribe(ctx, req)
+	case "resources/unsubscribe":
+		return s.resourceUnsubscribe(ctx, req)
 	case "prompts/list":
 		return s.ok(req.ID, map[string]any{"prompts": s.promptList()}), false
 	case "prompts/get":
@@ -580,9 +611,10 @@ func (s *Server) initializeResult(params json.RawMessage) map[string]any {
 		"capabilities": map[string]any{
 			"tools":   map[string]any{"listChanged": false},
 			"logging": map[string]any{},
-			// resources 只读、不订阅：本服务没有会话级订阅状态（见 resources.go）。
-			// 显式写 false 而不是留空，免得客户端以为可以订阅、然后等一个永不来的推送。
-			"resources": map[string]any{"subscribe": false, "listChanged": false},
+			// resources 只读但可订阅：订阅是会话级的，通道由传输层在会话建立时登记
+			// （见 RegisterResourcePush），资源变更（如长任务收尾）据此主动推送
+			// notifications/resources/updated。资源清单本身不会变，故 listChanged 为 false。
+			"resources": map[string]any{"subscribe": true, "listChanged": false},
 			"prompts":   map[string]any{"listChanged": false},
 		},
 		"serverInfo": s.info,

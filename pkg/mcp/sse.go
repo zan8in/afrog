@@ -71,6 +71,11 @@ func (h *sseHandler) handleSSE(w http.ResponseWriter, r *http.Request) {
 	h.addSession(id, ch)
 	defer h.removeSession(id)
 
+	// 登记该会话的服务端推送通道：SSE 是长连接，资源订阅的变更通知在调用之外
+	// （如后台长任务收尾）也能推到这条事件流上。
+	unregisterPush := h.srv.RegisterResourcePush(id, h.notifyFn(ch))
+	defer unregisterPush()
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -128,16 +133,17 @@ func (h *sseHandler) handleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, notify := h.srv.handle(r.Context(), &req, h.notifyFn(ch))
+	resp, notify := h.srv.handle(withSession(r.Context(), id), &req, h.notifyFn(ch))
 	if !notify && resp != nil {
 		h.deliver(ch, resp)
 	}
 	w.WriteHeader(http.StatusAccepted)
 }
 
-// notifyFn 让一次调用在跑的过程中把服务端通知（目前只有 notifications/progress）
-// 推进该会话的事件流：SSE 是长连接，中途有地方塞通知，这是它相对 Streamable
-// HTTP 的优势。
+// notifyFn 让一次调用在跑的过程中把服务端通知（notifications/progress、
+// notifications/message）推进该会话的事件流：SSE 是长连接，中途有地方塞通知，
+// 这是它相对 Streamable HTTP 的优势。资源变更通知则经 RegisterResourcePush 登记，
+// 可在调用之外送达。
 func (h *sseHandler) notifyFn(ch chan []byte) notifyFunc {
 	return func(method string, params any) {
 		b, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})

@@ -116,13 +116,13 @@ $req1, $req2 | & afrog mcp 2>$null
 You should get two lines of JSON:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"instructions":"afrog exposes this machine's findings, attack surface and PoC ability as a set of tools…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
+{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"logging":{},"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":true},"tools":{"listChanged":false}},"instructions":"afrog exposes this machine's findings, attack surface and PoC ability as a set of tools…","protocolVersion":"2024-11-05","serverInfo":{"name":"afrog","version":"..."}}}
 {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"act.brute",...},{"name":"judge.brief",...}, ...]}}
 ```
 
 - The first line is a successful handshake; `instructions` is the usage guide the server hands to the client (clients fold it into the model context — see [MCP Server · how the tools fit together](./10-mcp.md)); all four capabilities declared in `capabilities` (`tools` / `logging` / `resources` / `prompts`) are implemented;
 - The second is the tool list: **25 tools in total** (`server.*` / `observe.*` / `probe.*` / `verify.*` / `act.*` (including `act.oob_*`) / `poc.*` / `scan.*` / `task.*` / `plan.*` / `judge.*` / `learn.*`).
-- Besides tools, the server also exposes read-only **resources** (`afrog://status`, `afrog://findings`, `afrog://tasks`, and `afrog://tasks/{task_id}[/events]`) and three **prompts** templates (`scan-target` / `triage-findings` / `follow-task`); if your client supports them, you can read them from the resources/prompts panel or use them to kick off a conversation.
+- Besides tools, the server also exposes read-only **resources** (`afrog://status`, `afrog://findings`, `afrog://tasks`, and `afrog://tasks/{task_id}[/events]`) and three **prompts** templates (`scan-target` / `triage-findings` / `follow-task`); if your client supports them, you can read them from the resources/prompts panel or use them to kick off a conversation. Resources support **subscriptions** (`resources/subscribe`): once subscribed, the server pushes `notifications/resources/updated` when the resource changes (a long task finishing, for example), so the client re-reads once instead of polling.
 
 If you see both lines, afrog's side is fully ready. What remains is just getting a client to connect.
 

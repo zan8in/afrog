@@ -217,8 +217,8 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 		t.Fatal("logging capability must be declared")
 	}
 	res, _ := caps["resources"].(map[string]any)
-	if res == nil || res["subscribe"] != false || res["listChanged"] != false {
-		t.Fatalf("resources capability = %v, want {subscribe:false, listChanged:false}", caps["resources"])
+	if res == nil || res["subscribe"] != true || res["listChanged"] != false {
+		t.Fatalf("resources capability = %v, want {subscribe:true, listChanged:false}", caps["resources"])
 	}
 	if _, ok := caps["prompts"]; !ok {
 		t.Fatal("prompts capability must be declared")
@@ -233,6 +233,8 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 		{"logging/setLevel", `{"level":"info"}`},
 		{"resources/list", ""},
 		{"resources/templates/list", ""},
+		{"resources/subscribe", `{"uri":"afrog://status"}`},
+		{"resources/unsubscribe", `{"uri":"afrog://status"}`},
 		{"prompts/list", ""},
 	} {
 		var params json.RawMessage
@@ -245,9 +247,8 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 		}
 	}
 
-	// 未声明/未实现的原语必须真的没实现：调用应得到 method not found，而不是一个空壳成功。
-	// resources/subscribe 尤其要挡住——它正对应上面声明里的 subscribe:false。
-	for _, method := range []string{"completions/complete", "resources/subscribe", "resources/unsubscribe"} {
+	// 未声明的原语必须真的没实现：调用应得到 method not found，而不是一个空壳成功。
+	for _, method := range []string{"completions/complete"} {
 		resp, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: method}, nil)
 		if resp == nil || resp.Error == nil || resp.Error.Code != codeMethodNotFound {
 			t.Fatalf("%s = %+v, want method not found (capability is not declared)", method, resp)
@@ -313,6 +314,82 @@ func TestResourceReadReusesToolHandlers(t *testing.T) {
 		Params: json.RawMessage(`{"uri":"afrog://nope"}`)}, nil)
 	if bad.Error == nil || bad.Error.Code != codeResourceNotFound {
 		t.Fatalf("unknown uri = %+v, want codeResourceNotFound", bad)
+	}
+}
+
+// 资源订阅是会话级状态：订阅后由服务端主动推变更通知，退订即停推；通知只发给订阅了
+// 该 URI 的那个会话，没订阅的资源不推。
+func TestResourceSubscriptionDeliversUpdates(t *testing.T) {
+	s := New(Options{Policy: policy.Default()})
+
+	var pushed []string
+	unregister := s.RegisterResourcePush("s1", func(method string, params any) {
+		if method != "notifications/resources/updated" {
+			t.Errorf("notification method = %s, want notifications/resources/updated", method)
+			return
+		}
+		p, _ := params.(map[string]any)
+		uri, _ := p["uri"].(string)
+		pushed = append(pushed, uri)
+	})
+	defer unregister()
+	ctx := withSession(context.Background(), "s1")
+
+	call := func(method, params string) *response {
+		t.Helper()
+		resp, _ := s.handle(ctx, &request{ID: json.RawMessage(`1`), Method: method, Params: json.RawMessage(params)}, nil)
+		return resp
+	}
+	subscribe := func(uri string) {
+		t.Helper()
+		if resp := call("resources/subscribe", `{"uri":"`+uri+`"}`); resp.Error != nil {
+			t.Fatalf("subscribe %s = %+v", uri, resp)
+		}
+	}
+
+	// 参数坏报 -32602；没有 uri、或 URI 不是本服务的资源报 -32002（与 resources/read 一致）。
+	if resp := call("resources/subscribe", `123`); resp.Error == nil || resp.Error.Code != codeInvalidParams {
+		t.Fatalf("malformed params = %+v, want codeInvalidParams", resp)
+	}
+	if resp := call("resources/subscribe", `{}`); resp.Error == nil || resp.Error.Code != codeResourceNotFound {
+		t.Fatalf("subscribe without uri = %+v, want codeResourceNotFound", resp)
+	}
+	if resp := call("resources/subscribe", `{"uri":"afrog://nope"}`); resp.Error == nil || resp.Error.Code != codeResourceNotFound {
+		t.Fatalf("subscribe unknown uri = %+v, want codeResourceNotFound", resp)
+	}
+
+	subscribe(resourceStatusURI)
+
+	s.notifyResourceUpdated(resourceStatusURI)
+	if len(pushed) != 1 || pushed[0] != resourceStatusURI {
+		t.Fatalf("pushed = %v, want exactly [%s]", pushed, resourceStatusURI)
+	}
+
+	// 重复订阅不产生重复通知：订阅是一份集合，不是计数器。
+	subscribe(resourceStatusURI)
+	s.notifyResourceUpdated(resourceStatusURI)
+	if len(pushed) != 2 {
+		t.Fatalf("pushed = %v, want one more notification only", pushed)
+	}
+
+	// 没订阅的资源不推。
+	s.notifyResourceUpdated(resourceFindingsURI)
+	if len(pushed) != 2 {
+		t.Fatalf("pushed = %v, want no notification for an unsubscribed resource", pushed)
+	}
+
+	// 退订后不再推。
+	if resp := call("resources/unsubscribe", `{"uri":"afrog://status"}`); resp.Error != nil {
+		t.Fatalf("unsubscribe = %+v", resp)
+	}
+	s.notifyResourceUpdated(resourceStatusURI)
+	if len(pushed) != 2 {
+		t.Fatalf("pushed = %v, want no notification after unsubscribe", pushed)
+	}
+
+	// 退订从未订阅的 URI 也算成功：退订是「此后别推」，不是「必须曾经订阅过」。
+	if resp := call("resources/unsubscribe", `{"uri":"afrog://status"}`); resp.Error != nil {
+		t.Fatalf("repeated unsubscribe = %+v", resp)
 	}
 }
 
