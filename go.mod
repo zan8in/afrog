@@ -31,7 +31,6 @@ require (
 	github.com/rs/xid v1.6.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sijms/go-ora/v2 v2.9.0
-	github.com/spaolacci/murmur3 v1.1.0
 	github.com/vimsucks/wxwork-bot-go v1.0.0
 	github.com/xuri/excelize/v2 v2.9.1
 	github.com/zan8in/fileutil v0.0.0-20220917063910-ce47dcc0cfa9

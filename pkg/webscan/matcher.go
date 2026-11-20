@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spaolacci/murmur3"
+	"github.com/zan8in/afrog/v3/pkg/utils"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -660,7 +660,7 @@ func faviconHash(data []byte) string {
 		sb.WriteString(encoded[i:end])
 		sb.WriteByte('\n')
 	}
-	return strconv.FormatInt(int64(int32(murmur3.Sum32([]byte(sb.String())))), 10)
+	return strconv.FormatInt(int64(utils.Mmh3Hash32([]byte(sb.String()))), 10)
 }
 
 // groupRef 提供按名字或序号读取捕获组的能力。
