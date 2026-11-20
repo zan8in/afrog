@@ -175,6 +175,9 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 - **协议版本协商**：客户端报的版本在支持集（`2024-11-05` / `2025-03-26` / `2025-06-18`）内就沿用，否则回 afrog 支持的最新版，而不是原样复述一个并不会说的版本。
 - **`title` 与 `annotations`**（每个工具）：`title` 是给人看的短标签；`annotations` 是提示性标注——`readOnlyHint` 与 afrog 自己的只读判定完全一致（`server.*` / `observe.*` / `plan.*` / `poc.search` / `poc.draft` / `judge.*` / `learn.*`），`openWorldHint` 标出会向外部目标发包的工具，`destructiveHint` 只给 `act.brute`、`poc.submit`。它们**只是提示、不参与门控**：放行与否仍由策略与预算决定。
 - **`outputSchema` 与 `structuredContent`**：返回结构稳定的工具（如 `server.status`、`poc.search`、`plan.next`）声明 `outputSchema`，调用结果里会附 `structuredContent`，客户端可直接按 schema 取值；返回大对象的工具不声明，避免同一份 payload 在 `content` 与 `structuredContent` 里各塞一遍。
+- **只读资源与订阅**（`resources`）：`afrog://status`、`afrog://findings`、`afrog://tasks` 以及 `afrog://tasks/{task_id}[/events]` 可直接读取；支持 `resources/subscribe` 订阅，资源变化（如长任务收尾）时服务端会推 `notifications/resources/updated`，客户端重读一次即可，不必轮询。
+- **prompt 模板**（`prompts`）：`scan-target` / `triage-findings` / `follow-task` 三条模板，供客户端按需起一段对话。
+- **参数补全**（`completions`）：`completion/complete` 为 prompt 参数与资源模板变量给候选值（如 `follow-task` 的 `task_id`、`triage-findings` 的 `severity`）；服务端不掌握取值空间的字段一律返回空列表，不猜不编。
 - **进度通知**（`notifications/progress`）：客户端在 `tools/call` 的 `_meta.progressToken` 里声明要进度时，长调用（如 `act.oob_wait` 等回连）会按秒上报「已等多久 / 上限」；Streamable HTTP 是一次 POST 一问一答、没有中途推送的地方，因此该传输不推进度。
 - **取消**（`notifications/cancelled`）：客户端按 `requestId` 取消某一次调用时，afrog 精确取消那一次，而不是把整条连接一起断掉；stdio 这类可并发读写的持久连接才支持中途取消。
 
