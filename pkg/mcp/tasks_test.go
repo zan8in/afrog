@@ -282,6 +282,30 @@ func TestResourcePushOnTaskFinish(t *testing.T) {
 	}
 }
 
+// 任务 id 的候选来自控制面任务表：任务模板与 follow-task 都能补出真实的 id。
+// 还没装配任务层时补不出来（空列表），但也不能顺手把它装配起来。
+func TestCompletionSuggestsTaskIDs(t *testing.T) {
+	s, ex := newTaskTestServer(t, "mode: safe\n")
+	const resourceRef = `"ref":{"type":"ref/resource","uri":"afrog://tasks/{task_id}"}`
+	const promptRef = `"ref":{"type":"ref/prompt","name":"follow-task"}`
+
+	// 补全不该为了几个候选值把子进程执行器拉起来。
+	if got := completionValues(t, s, `{`+resourceRef+`,"argument":{"name":"task_id","value":""}}`); len(got) != 0 {
+		t.Fatalf("values = %v, want empty before any task exists", got)
+	}
+	if s.readyTaskManager() != nil {
+		t.Fatal("completion must not assemble the task manager")
+	}
+
+	id, _ := submitFakeTask(t, s, ex)
+
+	assertValues(t, completionValues(t, s, `{`+resourceRef+`,"argument":{"name":"task_id","value":""}}`), id)
+	assertValues(t, completionValues(t, s, `{`+promptRef+`,"argument":{"name":"task_id","value":"`+id[:4]+`"}}`), id)
+
+	// 已输入的值不匹配任何任务时给空列表。
+	assertValues(t, completionValues(t, s, `{`+resourceRef+`,"argument":{"name":"task_id","value":"task_zzz"}}`))
+}
+
 // ---------------------------------------------------------------------------
 // 注册与注解
 // ---------------------------------------------------------------------------

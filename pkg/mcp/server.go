@@ -260,8 +260,11 @@ type Server struct {
 
 	// taskMgr 是控制面任务层（懒加载）：长任务提交给它受理，task.* 从它读状态与
 	// 事件。懒加载是为了让「从不发包」的会话不必付出拉子进程执行器的代价。
+	// taskMu 保护 taskMgr/taskErr 的读写：taskOnce 只保证「只装配一次」，保证不了
+	// 「是否已装配」的并发探测（补全 task_id 就属于这种只读探测，见 readyTaskManager）。
 	taskMgr  *scantask.Manager
 	taskOnce sync.Once
+	taskMu   sync.Mutex
 	taskErr  error
 
 	// timeoutMu/timeouts 登记因超时被看护取消的任务，供 scanStatus 把「跑太久了」
@@ -531,6 +534,8 @@ func (s *Server) handle(ctx context.Context, req *request, notify notifyFunc) (*
 		return s.ok(req.ID, map[string]any{"prompts": s.promptList()}), false
 	case "prompts/get":
 		return s.promptGet(req)
+	case "completion/complete":
+		return s.completionComplete(req)
 	case "logging/setLevel":
 		return s.setLogLevel(req)
 	case "notifications/initialized":
@@ -616,6 +621,9 @@ func (s *Server) initializeResult(params json.RawMessage) map[string]any {
 			// notifications/resources/updated。资源清单本身不会变，故 listChanged 为 false。
 			"resources": map[string]any{"subscribe": true, "listChanged": false},
 			"prompts":   map[string]any{"listChanged": false},
+			// completions 只声明「参数补全」这一件事，具体能补哪些参数由
+			// completionComplete 决定（见 completions.go）；补不出建议时返回空列表。
+			"completions": map[string]any{},
 		},
 		"serverInfo": s.info,
 		// instructions 是 MCP 规范里 initialize 的可选字段：客户端会把它并入

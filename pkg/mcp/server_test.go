@@ -198,16 +198,16 @@ func TestInitializeNegotiatesProtocolVersion(t *testing.T) {
 
 // initialize 声明的能力必须与「真正实现的 MCP 原语」严格对应：多声明会让客户端去等一个
 // 永远不会来的推送，少声明则会让它错过可用能力。本服务实现 tools / logging / resources /
-// prompts 四个原语。
+// prompts / completions 五个原语。
 //
-// 之所以只有这四个：进度通知（notifications/progress）与取消（notifications/cancelled）
-// 属于基础协议、无对应能力位；completions 本服务没有实现，因此不能声明。
+// 之所以只有这五个：进度通知（notifications/progress）与取消（notifications/cancelled）
+// 属于基础协议、无对应能力位。
 func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 	s := New(Options{Policy: policy.Default()})
 
 	caps, _ := s.initializeResult(json.RawMessage(`{}`))["capabilities"].(map[string]any)
-	if len(caps) != 4 {
-		t.Fatalf("capabilities = %v, want exactly tools + logging + resources + prompts", caps)
+	if len(caps) != 5 {
+		t.Fatalf("capabilities = %v, want exactly tools + logging + resources + prompts + completions", caps)
 	}
 	tools, _ := caps["tools"].(map[string]any)
 	if tools == nil || tools["listChanged"] != false {
@@ -223,6 +223,9 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 	if _, ok := caps["prompts"]; !ok {
 		t.Fatal("prompts capability must be declared")
 	}
+	if _, ok := caps["completions"]; !ok {
+		t.Fatal("completions capability must be declared")
+	}
 
 	// 已声明的原语必须真的能应答。
 	for _, tc := range []struct {
@@ -236,6 +239,7 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 		{"resources/subscribe", `{"uri":"afrog://status"}`},
 		{"resources/unsubscribe", `{"uri":"afrog://status"}`},
 		{"prompts/list", ""},
+		{"completion/complete", `{"ref":{"type":"ref/prompt","name":"triage-findings"},"argument":{"name":"severity","value":"h"}}`},
 	} {
 		var params json.RawMessage
 		if tc.params != "" {
@@ -247,11 +251,12 @@ func TestInitializeCapabilitiesMatchImplementedPrimitives(t *testing.T) {
 		}
 	}
 
-	// 未声明的原语必须真的没实现：调用应得到 method not found，而不是一个空壳成功。
-	for _, method := range []string{"completions/complete"} {
+	// 不认识的方法必须真的报 method not found，而不是一个空壳成功。
+	// completions/complete（复数）是照着能力位想当然写出来的名字，协议里没有这个方法。
+	for _, method := range []string{"unknown/method", "completions/complete"} {
 		resp, _ := s.handle(context.Background(), &request{ID: json.RawMessage(`2`), Method: method}, nil)
 		if resp == nil || resp.Error == nil || resp.Error.Code != codeMethodNotFound {
-			t.Fatalf("%s = %+v, want method not found (capability is not declared)", method, resp)
+			t.Fatalf("%s = %+v, want method not found", method, resp)
 		}
 	}
 }

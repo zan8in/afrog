@@ -32,7 +32,7 @@ func (s *Server) taskManager() (*scantask.Manager, error) {
 	s.taskOnce.Do(func() {
 		ex, err := s.scanExecutor()
 		if err != nil {
-			s.taskErr = err
+			s.setTaskManager(nil, err)
 			return
 		}
 		mgr, err := scantask.New(scantask.Options{
@@ -44,12 +44,30 @@ func (s *Server) taskManager() (*scantask.Manager, error) {
 			OnTaskFinished: s.onTaskFinished,
 		})
 		if err != nil {
-			s.taskErr = err
+			s.setTaskManager(nil, err)
 			return
 		}
-		s.taskMgr = mgr
+		s.setTaskManager(mgr, nil)
 	})
+
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	return s.taskMgr, s.taskErr
+}
+
+func (s *Server) setTaskManager(mgr *scantask.Manager, err error) {
+	s.taskMu.Lock()
+	s.taskMgr, s.taskErr = mgr, err
+	s.taskMu.Unlock()
+}
+
+// readyTaskManager 返回已经装配好的任务管理器；还没装配时返回 nil。
+//
+// 给只读探测用（补全 task_id）：补全只是在帮用户打字，不该顺手把子进程执行器拉起来。
+func (s *Server) readyTaskManager() *scantask.Manager {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	return s.taskMgr
 }
 
 // onTaskFinished 在任务收尾后推送资源变更通知：三个受影响的资源一次推完，
