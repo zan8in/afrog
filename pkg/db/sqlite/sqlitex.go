@@ -67,6 +67,11 @@ func saveToDatabaseX() {
 }
 
 func NewWebSqliteDB() error {
+	// 重新初始化前先退役上一轮的观测写协程：它是唯一在后台长期持有 dbx 的协程，
+	// 若与本函数随后的 dbx 赋值并发，就是一次真实的数据竞争（-race 可复现）。
+	// 生产路径只会初始化一次，此处是空操作；测试会反复建库，必须靠它退掉旧写协程。
+	stopObservationWriter()
+
 	// 初始化数据库连接（开启 WAL + busy_timeout）
 	//
 	// 备注：logoove/sqlite 驱动使用名为 sqlite3 的驱动注册，但它只认 `_pragma=` 形式的
