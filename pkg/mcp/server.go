@@ -18,6 +18,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/capability"
 	"github.com/zan8in/afrog/v3/pkg/executor"
 	"github.com/zan8in/afrog/v3/pkg/policy"
+	"github.com/zan8in/afrog/v3/pkg/scantask"
 	"github.com/zan8in/afrog/v3/pkg/webscan"
 	"github.com/zan8in/gologger"
 )
@@ -37,16 +38,19 @@ const Instructions = `afrog 把本机的扫描结论、攻击面与 PoC 能力�
 
 主路径：先用 probe.fingerprint 拿技术栈，它返回的 suggested_search 可直接透传给 poc.search 预检「本机有没有该技术栈的 PoC」；非空就用同一串 scan.start 一次并发跑完。不要自己把 technologies 映射成关键词——曾出现识别出 jQuery、却去搜 wordpress,nginx 之类根本没识别到的产品。带关键词时，匹配关键词的指纹 PoC 不受 severity 限制也会保留（但关键词是硬前提，不命中的指纹 PoC 照样被滤掉），因而指纹阶段照常运行、requires 按真实指纹放行，既避免「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也把 N 次串行验证压成一次并发扫描。
 
+长任务：scan.start / act.brute 是长任务——它们在「短等窗口」（默认 30 秒）内跑完就返回完整结果，没跑完则返回一个 task_id 句柄（返回体的 conclusion 为 pending）。拿到 task_id 后不要当成失败：用 task.status 查状态与汇总、task.events 按 last_seq 增量拉事件（无推送的 Streamable HTTP 也能用）、task.control 取消/暂停/恢复。verify.replay / poc.submit 是单 PoC 短任务，会一直等到跑完（它们的后处理——digest 比对、入待审队列——依赖跑完的结果，不能拆开）。
+
 硬规则：
 - 没有任何指纹线索时（technologies 为空、plan.next 也给不出关键词）：不要凭空编关键词；先问用户是否要用 afrog 扫描全部漏洞，得到同意后再用空 search 调 scan.start（空关键词 = 不加过滤、跑全库所有 PoC，请求量与耗时都大得多）。
 - poc_id 只能来自 poc.search 的真实返回或 plan.next 的提议，禁止凭空编造；自己写的 PoC 先用 poc.draft（save=true）落盘，再把返回的 poc_path 交给 poc.submit 实跑取证据。
-- 只读工具（observe.* / plan.* / judge.* / learn.* / server.* / poc.search / poc.draft）不发包也不消耗会话额度；probe.* / scan.* / verify.* / act.* 会发包并按请求数扣额度。拿不准当前档位、还剩多少额度，先看 server.status。
+- 只读工具（observe.* / plan.* / judge.* / learn.* / server.* / task.list / task.status / task.events / poc.search / poc.draft）不发包也不消耗会话额度；probe.* / scan.* / verify.* / act.* 会发包并按请求数扣额度。拿不准当前档位、还剩多少额度，先看 server.status。
 - 默认策略只读：probe.* / scan.* / verify.* 需要 safe 或 full 档位，act.brute / poc.submit 等破坏性动作还需要 destructive=true。被拒绝（403）是策略挡的，不是工具故障。
 
 反模式（不要做）：
 - 把一批候选拆成逐个串行的单 PoC 验证——用关键词让 scan.start 一次并发跑完。
 - 用户没指定等级就无理由默认塞 severity=["high","critical"] 挨个扫——那是既白扣额度、又得不出可信「无漏洞」结论的遍历；留空即扫描所有等级。
 - 把 observe.* / plan.next 返回为空当成「目标没有漏洞」或「无事可做」——前者只表示本地还没有这类数据，后者应改用 probe.* 补观测或直接 poc.search。
+- 把 scan.start / act.brute 返回的 task_id 句柄当成「扫描失败」或「没有命中」——那只是还没在短等窗口内跑完，去 task.status / task.events 继续跟踪结果。
 
 本工具面只做「按需、可解释、可重放的动作」；「整目标、全量库」的大范围扫描由用户在他自己的 afrog 入口（CLI / Web 控制台）完成，再用 observe.* 回读结论——除非用户明确同意在 scan.start 里用空 search 跑全库。`
 
@@ -89,10 +93,11 @@ type ToolAnnotations struct {
 //
 // 判据与 pkg/policy 的 isReadOnly / 各工具的门控声明保持同一口径：
 //   - readOnlyHint 与策略的「只读档」完全一致（observe.* / plan.* / judge.* /
-//     learn.* / server.* / poc.search / poc.draft），这样客户端对它们的自动放行与
-//     afrog 自己的只读判定不会互相矛盾；
+//     learn.* / server.* / task.list / task.status / task.events / poc.search /
+//     poc.draft），这样客户端对它们的自动放行与 afrog 自己的只读判定不会互相矛盾；
 //   - openWorldHint 表示「会向外部目标发包」：probe.* / verify.* / act.* /
-//     scan.* / poc.submit。act.oob_wait 只是等回连，不算对外发包；
+//     scan.* / poc.submit。act.oob_wait 只是等回连、task.* 只是读任务状态，
+//     都不算对外发包；
 //   - destructiveHint 只给真正可能改变目标状态的动作（act.brute、poc.submit）；
 //   - idempotentHint 表示重放同一调用不会产生新的副作用：只读工具以及
 //     probe.* / verify.* / scan.* 都满足（重扫得到的是同一批事实）。
@@ -100,6 +105,7 @@ func annotationsFor(name string) ToolAnnotations {
 	readOnly := strings.HasPrefix(name, "observe.") || strings.HasPrefix(name, "plan.") ||
 		strings.HasPrefix(name, "judge.") || strings.HasPrefix(name, "learn.") ||
 		strings.HasPrefix(name, "server.") ||
+		name == "task.list" || name == "task.status" || name == "task.events" ||
 		name == "poc.search" || name == "poc.draft"
 
 	openWorld := strings.HasPrefix(name, "probe.") || strings.HasPrefix(name, "verify.") ||
@@ -236,6 +242,17 @@ type Server struct {
 	exec     executor.Executor
 	execOnce sync.Once
 	execErr  error
+
+	// taskMgr 是控制面任务层（懒加载）：长任务提交给它受理，task.* 从它读状态与
+	// 事件。懒加载是为了让「从不发包」的会话不必付出拉子进程执行器的代价。
+	taskMgr  *scantask.Manager
+	taskOnce sync.Once
+	taskErr  error
+
+	// timeoutMu/timeouts 登记因超时被看护取消的任务，供 scanStatus 把「跑太久了」
+	// 与「人去取消的」区分开。
+	timeoutMu sync.Mutex
+	timeouts  map[string]struct{}
 
 	// callMu/cancels 登记在途调用的取消函数，供 notifications/cancelled 精确取消
 	// 某一次调用（而不是靠客户端断连把整条连接一起掐掉）。

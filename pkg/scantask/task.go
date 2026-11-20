@@ -316,6 +316,23 @@ func (t *Task) snapshotLocked() *Snapshot {
 	return snap
 }
 
+// EventsSince 返回缓冲中 seq 大于 fromSeq 的事件（副本，事件本身只读）。
+//
+// 它是「拉取式」读取：不建立订阅、不阻塞、拿完即返回，供没有推送通道的传输
+// （如 MCP 的 Streamable HTTP）按 last_seq 做一次性增量拉取。需要持续推送的走
+// subscribe。
+func (t *Task) EventsSince(fromSeq uint64) []*scanstream.Event {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]*scanstream.Event, 0, len(t.buf))
+	for _, ev := range t.buf {
+		if ev.Seq > fromSeq {
+			out = append(out, ev)
+		}
+	}
+	return out
+}
+
 // Snapshot 返回任务当前状态。
 func (t *Task) Snapshot() *Snapshot {
 	t.mu.Lock()

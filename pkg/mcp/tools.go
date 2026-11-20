@@ -36,6 +36,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/pocsrepo"
 	"github.com/zan8in/afrog/v3/pkg/policy"
 	"github.com/zan8in/afrog/v3/pkg/portscan"
+	"github.com/zan8in/afrog/v3/pkg/scantask"
 	"github.com/zan8in/afrog/v3/pkg/webscan"
 	"gopkg.in/yaml.v2"
 )
@@ -82,6 +83,10 @@ func (s *Server) buildTools() map[string]*Tool {
 		s.judgeRecordTool(),
 		s.learnBriefTool(),
 		s.learnRecordTool(),
+		s.taskListTool(),
+		s.taskStatusTool(),
+		s.taskEventsTool(),
+		s.taskControlTool(),
 	}
 	out := make(map[string]*Tool, len(tools))
 	for _, t := range tools {
@@ -913,10 +918,23 @@ func (s *Server) pocSubmitTool() *Tool {
 			if timeout <= 0 {
 				timeout = defaultReplayTimeout
 			}
-			run, err := s.runPocScan(ctx, "poc.submit", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
+			// poc.submit 一直等到跑完（wait=0）：它的后处理「入待审队列」依赖实跑
+			// 取到的证据，拆成异步就没人能做这一步。超时仍由控制面看护。
+			outcome, err := s.runPocScan(ctx, target, pocPath, pocData, 0, est.NeedsOOB, timeout, 0)
 			if err != nil {
 				return nil, err
 			}
+			if !outcome.Done() {
+				return map[string]any{
+					"submitted": false,
+					"pending":   true,
+					"target":    target,
+					"status":    outcome.Status,
+					"task_id":   outcome.TaskID,
+					"reason":    "sandbox run was interrupted before completion, so the candidate was not staged; track it via task.status / task.events",
+				}, nil
+			}
+			run := outcome.Run
 			ev := firstEvidence(run.Results)
 			if ev == nil {
 				return map[string]any{
@@ -1571,8 +1589,9 @@ func (s *Server) scanStartTool() *Tool {
 						"executed_pocs": map[string]any{"type": "integer", "description": "本次实际执行的 PoC 数（可能因 severity 过滤少于 matched_pocs）"},
 					},
 				},
-				"conclusion": map[string]any{"type": "string", "description": "hit / no_finding / no_poc_for_keyword"},
-				"guidance":   map[string]any{"type": "string", "description": "未命中时的说明，用来分清「本机没 PoC」与「有 PoC 没命中」"},
+				"conclusion": map[string]any{"type": "string", "description": "hit / no_finding / no_poc_for_keyword / pending（未在短等窗口内跑完，改看 task_id）"},
+				"guidance":   map[string]any{"type": "string", "description": "未命中或未跑完时的说明，用来分清「本机没 PoC」与「有 PoC 没命中」与「还没跑完」"},
+				"task_id":    map[string]any{"type": "string", "description": "异步任务 id；仅当 conclusion=pending（未在短等窗口内跑完）时出现，用 task.status / task.events 继续跟踪"},
 				"error":      map[string]any{"type": "string"},
 			},
 			"required": []string{"target", "search", "status", "found", "results", "library", "conclusion"},
@@ -1612,12 +1631,38 @@ func (s *Server) scanStartTool() *Tool {
 				spec.OOBAdapter = s.oob.Adapter()
 			}
 
-			run, err := s.runScanSpec(ctx, mcpTaskID("scan.start"), spec, timeout)
+			outcome, err := s.submitScan(ctx, spec, timeout, defaultWait)
 			if err != nil {
 				return nil, err
 			}
-			return scanRunResult(target, search, run, pocsrepo.CountMatched(search)), nil
+			matched := pocsrepo.CountMatched(search)
+			if !outcome.Done() {
+				return pendingScanResult(target, search, outcome.TaskID, outcome.Status, matched), nil
+			}
+			return scanRunResult(target, search, outcome.Run, matched), nil
 		},
+	}
+}
+
+// pendingScanResult 是一次长任务在短等窗口内没跑完时返回的句柄。
+//
+// 它刻意保留 scan.start 的字段骨架（target/search/status/found/results/library），
+// 使返回对 outputSchema 仍然合法，只是把结论标成 pending 并附上 task_id——调用方
+// 据此改用 task.status / task.events 继续跟踪，而不是把「还没跑完」误读成「无命中」。
+func pendingScanResult(target, search, taskID, status string, matched int) map[string]any {
+	if status == "" {
+		status = string(scantask.StatusRunning)
+	}
+	return map[string]any{
+		"target":  target,
+		"search":  search,
+		"status":  status,
+		"found":   false,
+		"results": []map[string]any{},
+		"task_id": taskID,
+		"library": map[string]any{"matched_pocs": matched, "executed_pocs": 0},
+		"conclusion": "pending",
+		"guidance": fmt.Sprintf("扫描未在短等窗口内跑完，已转成异步任务 %s（状态 %s）。用 task.status 查状态与汇总、task.events 拉增量事件；在它收尾前不要把 found=false 当成「无漏洞」，完成后以 task.status 的 summary/hits 为最终结论。", taskID, status),
 	}
 }
 
@@ -1743,10 +1788,24 @@ func (s *Server) verifyReplayTool() *Tool {
 			if timeout <= 0 {
 				timeout = defaultReplayTimeout
 			}
-			run, err := s.runPocScan(ctx, "verify.replay", target, pocPath, pocData, 0, est.NeedsOOB, timeout)
+			// 与 poc.submit 同理：重放的 digest 比对依赖跑完的结果，因此一直等到收尾
+			// （wait=0）；超时由控制面看护。
+			outcome, err := s.runPocScan(ctx, target, pocPath, pocData, 0, est.NeedsOOB, timeout, 0)
 			if err != nil {
 				return nil, err
 			}
+			if !outcome.Done() {
+				return map[string]any{
+					"poc_id":   expected.PocID,
+					"target":   target,
+					"status":   outcome.Status,
+					"replayed": false,
+					"pending":  true,
+					"task_id":  outcome.TaskID,
+					"reason":   "replay was interrupted before completion, so the digest comparison could not be made; track it via task.status / task.events",
+				}, nil
+			}
+			run := outcome.Run
 
 			actual := firstEvidence(run.Results)
 			consistent := replayMatches(expected, actual)
@@ -1913,15 +1972,30 @@ func (s *Server) actBruteTool() *Tool {
 			if timeout <= 0 {
 				timeout = 120 * time.Second
 			}
-			run, err := s.runPocScan(ctx, "act.brute", target, pocPath, pocData, maxReq, analyzePoc(pocData).NeedsOOB, timeout)
+			// act.brute 无后处理：短等窗口内跑完返回完整结果，超窗口转异步句柄。
+			outcome, err := s.runPocScan(ctx, target, pocPath, pocData, maxReq, analyzePoc(pocData).NeedsOOB, timeout, defaultWait)
 			if err != nil {
 				return nil, err
 			}
+			if !outcome.Done() {
+				return map[string]any{
+					"found":        false,
+					"results":      []map[string]any{},
+					"target":       target,
+					"status":       outcome.Status,
+					"task_id":      outcome.TaskID,
+					"max_requests": maxReq,
+					"pending":      true,
+					"guidance":     fmt.Sprintf("爆破未在短等窗口内跑完，已转成异步任务 %s（状态 %s）。用 task.status / task.events 继续跟踪——在它收尾前不要把 found=false 当作「无弱口令」。", outcome.TaskID, outcome.Status),
+				}, nil
+			}
+			run := outcome.Run
 			return map[string]any{
 				"found":        len(run.Results) > 0,
 				"results":      run.Results,
 				"target":       target,
 				"status":       run.Status,
+				"task_id":      outcome.TaskID,
 				"max_requests": maxReq,
 			}, nil
 		},
@@ -2125,7 +2199,10 @@ func (s *Server) learnRecordTool() *Tool {
 //
 // needsOOB 为真时接上反连平台；缺 OOB 直接报错，绝不下空结论。bruteMax > 0 时下发
 // -brute-max-requests，只约束 YAML brute 字典。
-func (s *Server) runPocScan(ctx context.Context, tool, target, pocPath string, pocData []byte, bruteMax int, needsOOB bool, timeout time.Duration) (*scanRun, error) {
+//
+// wait 决定这次提交是「短等窗口转句柄」还是「等它收尾」：verify.replay / poc.submit
+// 传 0（要跑完才能做后处理），act.brute 传 defaultWait（无后处理，超窗口转异步）。
+func (s *Server) runPocScan(ctx context.Context, target, pocPath string, pocData []byte, bruteMax int, needsOOB bool, timeout, wait time.Duration) (*scanOutcome, error) {
 	spec := &executor.Spec{
 		Targets:        []string{strings.TrimSpace(target)},
 		AppendPocs:     []string{pocPath},
@@ -2145,7 +2222,7 @@ func (s *Server) runPocScan(ctx context.Context, tool, target, pocPath string, p
 		spec.EnableOOB = true
 		spec.OOBAdapter = s.oob.Adapter()
 	}
-	return s.runScanSpec(ctx, mcpTaskID(tool), spec, timeout)
+	return s.submitScan(ctx, spec, timeout, wait)
 }
 
 // pocSearchKeyword 取 -s 用的关键词：优先用 PoC 自身的 id，退回文件名。

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zan8in/afrog/v3/pkg/executor"
+	"github.com/zan8in/afrog/v3/pkg/scanstream"
 	"github.com/zan8in/gologger"
 )
 
@@ -77,6 +78,31 @@ func (m *Manager) SubmitBatch(batch Batch) (*Snapshot, error) {
 	return t.Snapshot(), nil
 }
 
+// SubmitSpec 直接受理一份已经装配好的执行器规格。
+//
+// 与 Submit / SubmitBatch 的差别只在「规格从哪来」：那两者把 Request 解析成 Spec，
+// 而工具面（pkg/mcp）自己装配 Spec——AppendPocs(-ap)、BruteMaxRequests、GatingLevel
+// 这些字段无法用 Request 表达，走 Request 会静默丢字段。受理之后的排队、事件窗口、
+// 订阅与收尾与其它路径完全一致。
+func (m *Manager) SubmitSpec(spec *executor.Spec, cleanup func()) (*Snapshot, error) {
+	if spec == nil || len(spec.Targets) == 0 {
+		return nil, ErrNoTargets
+	}
+	if cleanup == nil {
+		cleanup = func() {}
+	}
+
+	t := newTask(m.nextID(), m.node, spec, cleanup, Batch{}, m.opts.eventBuffer(), m.opts.now)
+
+	m.mu.Lock()
+	m.tasks[t.id] = t
+	m.order = append(m.order, t.id)
+	m.mu.Unlock()
+
+	m.schedule(t)
+	return t.Snapshot(), nil
+}
+
 // buildSpec 把批量翻译成任务规格：工具面动作交给 Dispatcher，其余走执行面。
 //
 // 拒绝「没有派发后端」的工具面动作发生在受理阶段而不是启动阶段，因为那时还没有
@@ -116,6 +142,18 @@ func (m *Manager) List() []*Snapshot {
 		out = append(out, t.Snapshot())
 	}
 	return out
+}
+
+// Events 返回任务中 seq 大于 fromSeq 的缓冲事件，并带回当前状态快照。
+//
+// 它是 Subscribe 的「拉取式」对偶：一次性取走已有增量、不保持通道，供没有推送
+// 能力或不想长连的调用方（MCP Streamable HTTP 的 task.events）。
+func (m *Manager) Events(taskID string, fromSeq uint64) ([]*scanstream.Event, *Snapshot, error) {
+	t, ok := m.Get(taskID)
+	if !ok {
+		return nil, nil, ErrTaskNotFound
+	}
+	return t.EventsSince(fromSeq), t.Snapshot(), nil
 }
 
 // Subscribe 订阅任务事件。fromSeq 是调用方已经收到的最大 seq（0 表示从头取），
@@ -161,6 +199,11 @@ func (m *Manager) Control(taskID string, action ControlAction) error {
 	case ControlCancel:
 		if err := h.Cancel(); err != nil && !errors.Is(err, executor.ErrAlreadyDone) {
 			return err
+		}
+		// 任务在取消指令生效前就自己收尾了：把它当空操作。否则 setErr 会把
+		// 「任务已被取消」写到一条已经成功的任务上，调用方读到的失败原因是假的。
+		if t.Status().Terminal() {
+			return nil
 		}
 		t.setErr("任务已被取消")
 		m.finalize(t, StatusCancelled)

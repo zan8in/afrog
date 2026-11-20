@@ -217,11 +217,15 @@ func (p *Policy) modeAllows(name string) (string, bool) {
 
 // isReadOnly 判断一个动作是否「不对外发包」。judge.* 与 learn.* 只读写本机 advisory
 // 数据（研判意见、调优建议），与 poc.draft 的落盘同源，因此也归入只读档；
-// server.* 只读自身运行状态（策略档位、剩余额度、作用域），同样不算发包。
+// server.* 只读自身运行状态（策略档位、剩余额度、作用域），同样不算发包；
+// task.list / task.status / task.events 只读控制面任务表，也不发包。
+//
+// task.control 不在其列：它虽不发包，但会改变任务状态，不应在只读档被自动放行。
 func isReadOnly(name string) bool {
 	return strings.HasPrefix(name, "observe.") || strings.HasPrefix(name, "plan.") ||
 		strings.HasPrefix(name, "judge.") || strings.HasPrefix(name, "learn.") ||
 		strings.HasPrefix(name, "server.") ||
+		name == "task.list" || name == "task.status" || name == "task.events" ||
 		name == "poc.search" || name == "poc.draft"
 }
 
