@@ -27,6 +27,7 @@ import (
 	"github.com/zan8in/afrog/v3/pkg/drafter"
 	"github.com/zan8in/afrog/v3/pkg/evidence"
 	"github.com/zan8in/afrog/v3/pkg/executor"
+	"github.com/zan8in/afrog/v3/pkg/gating"
 	"github.com/zan8in/afrog/v3/pkg/judge"
 	"github.com/zan8in/afrog/v3/pkg/learner"
 	"github.com/zan8in/afrog/v3/pkg/observation"
@@ -2111,6 +2112,13 @@ func (s *Server) learnRecordTool() *Tool {
 //   - -P（独占）会屏蔽内置库、只加载这一个 PoC，指纹阶段没有可跑的内置指纹 PoC，
 //     requires 的准入来源最少，最容易把这次验证整个跳过——那是一个说不清楚的假阴性。
 //
+// 关键：这是「按 id 单跑一个 PoC」，Keyword 是 PoC 自己的 id，**不会**顺带加载为该
+// PoC 的 requires 提供准入的指纹 PoC（如 CVE-2020-1938 依赖 ajp-protocol-detect 注册
+// 的 "ajp" token）。若仍走默认门控，requires 硬依赖在单跑时必然未命中 → 该 PoC 被整条
+// 跳过 → 必然 replayed:false 的假阴性（实测 Ghostcat 即如此）。因此这里显式把门控置为
+// off：调用方要的是「这**一个** PoC 在当前目标上还成不成立」，与批量关键词扫描的
+// 「先识别、再按 requires 裁剪」是两回事，不应受 requires 裁剪。
+//
 // 这与 scan.start 的 -s 口径一致，也是 afrog 自己的推荐用法。SDK 的 HTTP 客户端、
 // 限速器与探测缓存都是进程级全局状态，同进程并发 scanner 会互相污染，所以整批交给
 // 独立子进程执行。
@@ -2123,6 +2131,7 @@ func (s *Server) runPocScan(ctx context.Context, tool, target, pocPath string, p
 		AppendPocs:     []string{pocPath},
 		Search:         pocSearchKeyword(pocPath, pocData),
 		WebFingerprint: executor.BoolPtr(true),
+		GatingLevel:    string(gating.LevelOff),
 	}
 	if bruteMax > 0 {
 		spec.BruteMaxRequests = bruteMax
