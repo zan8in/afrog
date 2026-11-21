@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -758,10 +759,77 @@ func (s *Server) logAtLeast(level string) bool {
 	return logLevelRank(level) >= min
 }
 
+// 工具错误的机器可读分类。kind 与 REST `/api/v1/call`（403 / 429 / 400）以及 gRPC
+// `AgentService.Invoke`（PermissionDenied / ResourceExhausted / InvalidArgument）同口径，
+// 让 Agent 不必去猜中文错误文本就能程序化分流：
+//
+//	policy_denied    ≈ 403 —— 策略没放行，重试无用
+//	budget_exhausted ≈ 429 —— 会话额度用尽，等窗口重置后重试
+//	not_configured   —— 服务端缺配置（如未配 OOB），重试无用
+//	invalid_params   ≈ 400 —— 参数或校验问题，按 message 改入参后重试
+//
+// not_configured 在那两个传输里目前并入 400，这里单列，是因为「服务端没配好」与
+// 「你参数写错了」对 Agent 的下一步动作完全不同：一个要去找人配 OOB，一个改参数即可。
+const (
+	errKindPolicyDenied    = "policy_denied"
+	errKindBudgetExhausted = "budget_exhausted"
+	errKindNotConfigured   = "not_configured"
+	errKindInvalidParams   = "invalid_params"
+)
+
+// toolErrorInfo 是随工具错误一起下发的结构化错误（见 toolError）。
+type toolErrorInfo struct {
+	Kind    string `json:"kind"`
+	Message string `json:"message"`
+	// Retryable 表示「原样重试有没有意义」：额度耗尽等窗口重置算有，参数错改完参数
+	// 也算有；策略拒绝、服务端没配好都算没有——那是人要去处理的事。
+	Retryable bool   `json:"retryable"`
+	Hint      string `json:"hint,omitempty"`
+}
+
+// classifyToolError 把工具错误归到上面几类，并给出给模型看的处置建议。
+func classifyToolError(err error) toolErrorInfo {
+	info := toolErrorInfo{
+		Kind:      errKindInvalidParams,
+		Message:   err.Error(),
+		Retryable: true,
+		Hint:      "多为入参或校验问题：按 message 修正参数后重试。",
+	}
+	switch {
+	case errors.Is(err, policy.ErrDenied):
+		info.Kind = errKindPolicyDenied
+		info.Retryable = false
+		info.Hint = "被策略挡下（同 REST 403）：重试无用，需要更高档位或该动作要求的 destructive；先看 server.status 确认当前档位与额度。"
+	case errors.Is(err, policy.ErrBudgetExceeded):
+		info.Kind = errKindBudgetExhausted
+		info.Hint = "会话额度已用尽（同 REST 429）：等空闲窗口重置或调高 budget.requests 后再试；先看 server.status。"
+	case errors.Is(err, errOOBUnavailable):
+		info.Kind = errKindNotConfigured
+		info.Retryable = false
+		info.Hint = "服务端未配置带外（反连）能力：需在 afrog-config.yaml 里设 agent.oob 与反连凭据，重试无用。"
+	}
+	return info
+}
+
+// toolError 把工具错误包成 MCP 的 CallToolResult。
+//
+// 除人类可读文本外还给一份机器可读分类（_meta["afrog/error"]，见 classifyToolError）：
+// 只有文本时，Agent 得去猜措辞才能判断「该降级、还是改参数重试」；有了 kind 与
+// retryable 就能直接分流。文本里也重复一份 kind/hint，因为不少客户端不会把 _meta
+// 交给模型看。
+//
+// 不用 structuredContent 承载：它是给「声明了 outputSchema 的成败结果」用的，拿它装
+// 报错会与该 schema 对不上，可能触发客户端校验失败。
 func toolError(err error) map[string]any {
+	info := classifyToolError(err)
+	text := fmt.Sprintf("%s\n[kind=%s retryable=%t]", info.Message, info.Kind, info.Retryable)
+	if info.Hint != "" {
+		text += " " + info.Hint
+	}
 	return map[string]any{
-		"content": []map[string]any{{"type": "text", "text": err.Error()}},
+		"content": []map[string]any{{"type": "text", "text": text}},
 		"isError": true,
+		"_meta":   map[string]any{"afrog/error": info},
 	}
 }
 

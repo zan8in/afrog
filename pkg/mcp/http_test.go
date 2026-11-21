@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -444,12 +445,22 @@ type sseStream struct {
 
 func dialStream(t *testing.T, url, session string) *sseStream {
 	t.Helper()
+	return dialStreamWithLastEvent(t, url, session, "")
+}
+
+// dialStreamWithLastEvent 打开 GET 推送流，并按需带上 Last-Event-ID 声明断点：服务端
+// 据此从会话缓冲补发 id 更大的通知（见 handleStream）。
+func dialStreamWithLastEvent(t *testing.T, url, session, lastID string) *sseStream {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Mcp-Session-Id", session)
+	if lastID != "" {
+		req.Header.Set("Last-Event-ID", lastID)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("get stream: %v", err)
@@ -517,6 +528,179 @@ func (s *sseStream) waitClosed(t *testing.T) {
 		case <-deadline:
 			t.Fatal("stream did not close")
 		}
+	}
+}
+
+// nextEvent 读一条完整的 SSE 事件帧，返回它的 id 与 data 里的 JSON-RPC 报文。
+// 断线续传要断言的正是「补发的事件带了哪个 id」，所以这里必须把 id 一并取回。
+func (s *sseStream) nextEvent(t *testing.T) (int, map[string]any) {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	id := -1
+	payload := ""
+	for {
+		select {
+		case ln, ok := <-s.lines:
+			if !ok {
+				t.Fatal("stream closed while waiting for an event")
+			}
+			ln = strings.TrimSpace(ln)
+			switch {
+			case ln == "":
+				if payload == "" {
+					continue
+				}
+				var env map[string]any
+				if err := json.Unmarshal([]byte(payload), &env); err != nil {
+					t.Fatalf("event payload is not JSON: %q", payload)
+				}
+				return id, env
+			case strings.HasPrefix(ln, "id:"):
+				v, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(ln, "id:")))
+				if err != nil {
+					t.Fatalf("event id is not a number: %q", ln)
+				}
+				id = v
+			case strings.HasPrefix(ln, "data:"):
+				payload = strings.TrimSpace(strings.TrimPrefix(ln, "data:"))
+			}
+		case <-deadline:
+			t.Fatal("timeout waiting for an SSE event")
+		}
+	}
+}
+
+// eventBuffer 是 GET 流的断线续传缓冲：id 只增不减，按 Last-Event-ID 补发 id 更大的，
+// 超量裁剪与超大跳过都在这里锁住。
+func TestEventBufferResume(t *testing.T) {
+	b := eventBuffer{max: 3, maxLen: 8}
+
+	// id 递增、不重复。
+	for i := 0; i < 3; i++ {
+		if ev := b.push([]byte("x")); ev.id != i {
+			t.Fatalf("push #%d id = %d, want %d", i, ev.id, i)
+		}
+	}
+	if got := b.since("0"); len(got) != 2 || got[0].id != 1 || got[1].id != 2 {
+		t.Fatalf("since(0) = %+v, want ids 1,2", got)
+	}
+
+	// 空 / 非数字断点不补发：客户端没声明断点就不该凭空重发。
+	if got := b.since(""); got != nil {
+		t.Fatalf("since(\"\") = %+v, want nil", got)
+	}
+	if got := b.since("nope"); got != nil {
+		t.Fatalf("since(nope) = %+v, want nil", got)
+	}
+	// 断点已是最新则不补发任何东西。
+	if got := b.since("2"); len(got) != 0 {
+		t.Fatalf("since(2) = %+v, want nothing", got)
+	}
+
+	// 超出条数上限后裁剪最旧的，id 仍一路递增。
+	b.push([]byte("y"))
+	if len(b.events) != 3 || b.events[0].id != 1 {
+		t.Fatalf("buffer = %+v, want the 3 newest events (ids 1..3)", b.events)
+	}
+	if got := b.since("0"); len(got) != 3 || got[len(got)-1].id != 3 {
+		t.Fatalf("since(0) = %+v, want ids 1,2,3", got)
+	}
+
+	// 超过单条字节上限的事件照常下发（带 id），但不进缓冲——否则几条 MB 级响应就能把
+	// 内存占满。
+	big := b.push([]byte("0123456789"))
+	if big.id != 4 || len(big.data) != 10 {
+		t.Fatalf("oversized event = %+v, want a full event with id 4", big)
+	}
+	if got := b.since("3"); len(got) != 0 {
+		t.Fatalf("since(3) = %+v, want the oversized event left out of the buffer", got)
+	}
+}
+
+// 客户端第一次没开 GET 流就调用长任务：通知进缓冲；带 Last-Event-ID 补开流时能把漏掉
+// 的那条按原 id 取回，不至于「断了一段就永远看不到进度」。
+func TestStreamableHTTPResumesMissedEvents(t *testing.T) {
+	s := newTestServer()
+	s.tools["tick"] = &Tool{
+		Name:        "tick",
+		InputSchema: map[string]any{"type": "object"},
+		Handler: func(ctx context.Context, _ json.RawMessage) (any, error) {
+			if p := progressFrom(ctx); p != nil {
+				p(1, 2, "first")
+				p(2, 2, "second")
+			}
+			return "ok", nil
+		},
+	}
+	ts := httptest.NewServer(newHTTPMux(s, ""))
+	t.Cleanup(ts.Close)
+
+	resp, body := postStreamable(t, ts.URL+"/mcp", "",
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	session := resp.Header.Get("Mcp-Session-Id")
+	if session == "" {
+		t.Fatalf("missing session id: %s", body)
+	}
+
+	// 还没开 GET 流就先调一次：两条通知只进续传缓冲（id 0、1）。
+	callResp, callBody := postStreamable(t, ts.URL+"/mcp", session,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"tick","_meta":{"progressToken":"t"}}}`)
+	if callResp.StatusCode != http.StatusOK {
+		t.Fatalf("call status = %d: %s", callResp.StatusCode, callBody)
+	}
+
+	// 补开流，声明「只收到了 id=0 那条」：服务端应从缓冲补发 id 更大的那条。
+	stream := dialStreamWithLastEvent(t, ts.URL+"/mcp", session, "0")
+	id, env := stream.nextEvent(t)
+	if id != 1 {
+		t.Fatalf("replayed event id = %d, want 1", id)
+	}
+	if env["method"] != "notifications/progress" {
+		t.Fatalf("replayed event = %#v, want a progress notification", env)
+	}
+	params, _ := env["params"].(map[string]any)
+	if params["message"] != "second" {
+		t.Fatalf("replayed params = %#v, want the missed notification (second)", params)
+	}
+}
+
+// 不带 Last-Event-ID 补开流时不补发：客户端没声明断点，凭空重发一批它可能已处理过
+// 的事件只会造成重复。
+func TestStreamableHTTPStreamWithoutLastEventIDDoesNotReplay(t *testing.T) {
+	s := newTestServer()
+	s.tools["tick"] = &Tool{
+		Name:        "tick",
+		InputSchema: map[string]any{"type": "object"},
+		Handler: func(ctx context.Context, _ json.RawMessage) (any, error) {
+			if p := progressFrom(ctx); p != nil {
+				p(1, 2, "before")
+			}
+			return "ok", nil
+		},
+	}
+	ts := httptest.NewServer(newHTTPMux(s, ""))
+	t.Cleanup(ts.Close)
+
+	resp, body := postStreamable(t, ts.URL+"/mcp", "",
+		`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`)
+	session := resp.Header.Get("Mcp-Session-Id")
+	if session == "" {
+		t.Fatalf("missing session id: %s", body)
+	}
+
+	// 先在无流状态下产生一条通知（id 0），再不带断点补开流。
+	if _, callBody := postStreamable(t, ts.URL+"/mcp", session,
+		`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"tick","_meta":{"progressToken":"t"}}}`); len(callBody) == 0 {
+		t.Fatal("expected a call response")
+	}
+	stream := dialStream(t, ts.URL+"/mcp", session)
+
+	// 再调一次：实时下发的那条必须是它自己的 id（1），而不是把 id 0 也重发过来。
+	postStreamable(t, ts.URL+"/mcp", session,
+		`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tick","_meta":{"progressToken":"t"}}}`)
+	id, _ := stream.nextEvent(t)
+	if id != 1 {
+		t.Fatalf("first event id = %d, want 1 (no replay of the buffered id 0)", id)
 	}
 }
 

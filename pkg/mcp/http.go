@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -111,24 +112,45 @@ func tokenAllowed(r *http.Request, token string) bool {
 //	GET     /mcp   开服务端推送流（每会话至多一条），进度/日志从这里下发
 //	DELETE  /mcp   终止会话，顺带关掉它的推送流
 //
-// 客户端没开 GET 流时推送就丢弃：进度与日志都是可选增强，缺了不影响结果正确性——
-// 长任务仍可用 task.status / task.events 主动拉取（见 Instructions）。
+// 客户端没开 GET 流时通知只进会话的事件缓冲，等它重连带 Last-Event-ID 再补发：进度与
+// 日志都是可选增强，缺了不影响结果正确性——长任务仍可用 task.status / task.events
+// 主动拉取（见 Instructions）。这条缓冲也是「GET 流中途断了」的兜底（见 handleStream）。
 type streamableHandler struct {
 	srv   *Server
 	token string
 
 	mu       sync.Mutex
 	sessions map[string]*streamableSession
+
+	drops dropCounter
 }
 
 // streamableSession 是一个 Streamable HTTP 会话。请求/响应各走各的 POST，但服务端
 // 主动推送只能经会话的 GET 流送达，所以会话要挂着这条流。
 //
-// stream 为 nil 表示客户端没开 GET 流（推送被丢弃）。
+// stream 为 nil 表示客户端暂时没开 GET 流（通知只进 events 缓冲）。
 type streamableSession struct {
-	stream *notifyStream
 	// unregisterPush 注销该会话在 Server 上登记的资源变更推送通道（见 handleDelete）。
 	unregisterPush func()
+
+	// mu 保护 stream 与 events：stream 会被 GET 的挂载/摘除、DELETE 的收尾与推送方
+	// 同时读写；events 则供 GET 重连时按 Last-Event-ID 补发。
+	//
+	// 加锁顺序固定为「先 handler.mu，再 session.mu」，两个方向都不能反过来。
+	mu     sync.Mutex
+	stream *notifyStream
+	events eventBuffer
+}
+
+// closeStream 收尾会话的 GET 流：done 是单向信号，发送方据此放弃未发出的通知。
+func (s *streamableSession) closeStream() {
+	s.mu.Lock()
+	stream := s.stream
+	s.stream = nil
+	s.mu.Unlock()
+	if stream != nil {
+		close(stream.done)
+	}
 }
 
 // notifyStream 是一条 GET 的 SSE 流。
@@ -137,8 +159,77 @@ type streamableSession struct {
 // 调用协程」与「终止会话的 DELETE」竞争同一句 send，可能撞上 send on closed channel
 // 而 panic。改用 done 单向下发终止信号，发送方 select 到 done 就放弃这条通知。
 type notifyStream struct {
-	msgs chan []byte
+	msgs chan sseEvent
 	done chan struct{}
+}
+
+// sseEvent 是一条待下发的 SSE 事件：id 进 `id:` 字段（客户端断线重连时以它作
+// Last-Event-ID），data 是 JSON-RPC 报文。
+type sseEvent struct {
+	id   int
+	data []byte
+}
+
+// writeSSEMessage 按 SSE 帧格式下发一条消息事件。
+func writeSSEMessage(w io.Writer, ev sseEvent) {
+	fmt.Fprintf(w, "id: %d\nevent: message\ndata: %s\n\n", ev.id, ev.data)
+}
+
+const (
+	// sseResumeEvents 是每个会话保留的最近事件条数，供 Last-Event-ID 续传。
+	sseResumeEvents = 128
+	// sseResumeMaxBytes 是单条事件的续传上限：更大的报文照常下发，但不进缓冲——
+	// 缓冲最多几十条，塞进 MB 级响应只会白占内存。
+	sseResumeMaxBytes = 256 << 10
+)
+
+// eventBuffer 是会话级的「最近事件」环形缓冲，供 GET 流断线重连时按 Last-Event-ID 补发。
+//
+// 规范把断线续传定义在 Streamable HTTP 上（经典 HTTP+SSE 传输的会话与连接同生共死，
+// 结构上没有地方带 Last-Event-ID），所以只有这里用它。
+type eventBuffer struct {
+	// max 是保留条数上限，maxLen 是单条事件的字节上限。
+	max    int
+	maxLen int
+	events []sseEvent
+	// nextID 是下一个待分配的 id：只增不减，客户端据此判断「有没有漏事件」。
+	nextID int
+}
+
+func newEventBuffer() eventBuffer {
+	return eventBuffer{max: sseResumeEvents, maxLen: sseResumeMaxBytes}
+}
+
+// push 给事件分配递增 id 并记进缓冲，返回可直接下发的 sseEvent。
+func (b *eventBuffer) push(data []byte) sseEvent {
+	ev := sseEvent{id: b.nextID, data: data}
+	b.nextID++
+	if b.maxLen > 0 && len(data) > b.maxLen {
+		return ev
+	}
+	b.events = append(b.events, ev)
+	if len(b.events) > b.max {
+		b.events = b.events[len(b.events)-b.max:]
+	}
+	return ev
+}
+
+// since 返回 id 严格大于 lastID 的缓冲事件。
+//
+// lastID 为空或不是数字时返回 nil：客户端没声明断点（首次连接、或压根不认 id），
+// 就不该凭空补发一批它可能已经处理过的事件。
+func (b *eventBuffer) since(lastID string) []sseEvent {
+	last, err := strconv.Atoi(strings.TrimSpace(lastID))
+	if err != nil {
+		return nil
+	}
+	out := make([]sseEvent, 0, len(b.events))
+	for _, ev := range b.events {
+		if ev.id > last {
+			out = append(out, ev)
+		}
+	}
+	return out
 }
 
 func (h *streamableHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +314,10 @@ func (h *streamableHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 //
 // 规范要求 GET 必须带 Mcp-Session-Id，且一个会话同时只允许一条流（重复开回 409）。
 // 没有可用会话就直接 404，避免客户端挂在一个永远不会来的流上。
+//
+// 带 Last-Event-ID 重连时，先把缓冲里 id 更大的事件按原 id 补发，再转入实时下发：
+// 一次工具调用期间断流，客户端补上即可拿到漏掉的进度/日志，不必等下一次调用才发现
+// 自己错过了通知。
 func (h *streamableHandler) handleStream(w http.ResponseWriter, r *http.Request) {
 	sessionID := strings.TrimSpace(r.Header.Get("Mcp-Session-Id"))
 	if sessionID == "" || !h.hasSession(sessionID) {
@@ -235,7 +330,7 @@ func (h *streamableHandler) handleStream(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	stream := &notifyStream{msgs: make(chan []byte, 32), done: make(chan struct{})}
+	stream := &notifyStream{msgs: make(chan sseEvent, 32), done: make(chan struct{})}
 	if !h.attachStream(sessionID, stream) {
 		http.Error(w, "session already has an active stream", http.StatusConflict)
 		return
@@ -248,6 +343,11 @@ func (h *streamableHandler) handleStream(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
+
+	for _, ev := range h.eventsSince(sessionID, r.Header.Get("Last-Event-ID")) {
+		writeSSEMessage(w, ev)
+		flusher.Flush()
+	}
 
 	// 周期性注释帧兼作保活：中间代理与客户端的读超时都靠它续命。
 	ticker := time.NewTicker(15 * time.Second)
@@ -262,18 +362,35 @@ func (h *streamableHandler) handleStream(w http.ResponseWriter, r *http.Request)
 		case <-ticker.C:
 			fmt.Fprint(w, ": ping\n\n")
 			flusher.Flush()
-		case msg := <-stream.msgs:
-			fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg)
+		case ev := <-stream.msgs:
+			writeSSEMessage(w, ev)
 			flusher.Flush()
 		}
 	}
+}
+
+// eventsSince 取会话缓冲里 id 大于 lastID 的事件，供 GET 重连补发。
+func (h *streamableHandler) eventsSince(sessionID, lastID string) []sseEvent {
+	if strings.TrimSpace(lastID) == "" {
+		return nil
+	}
+	h.mu.Lock()
+	sess, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	return sess.events.since(lastID)
 }
 
 // notifyFn 返回把服务端通知投递到该会话 GET 流的回调。
 //
 // 没有会话（客户端没走 initialize，或没带 Mcp-Session-Id）时返回 nil：此时传输确实
 // 没有可推送的通道，工具侧会跳过进度/日志接线（见 callTool）。开了会话但没开 GET 流
-// 的情况不返回 nil——通知会被静默丢弃，但工具不必为「客户端没听」改变行为。
+// 的情况不返回 nil——通知进会话的续传缓冲，客户端补开流后能按 Last-Event-ID 取回；
+// 工具也不必为「客户端暂时没听」改变行为。
 func (h *streamableHandler) notifyFn(sessionID string) notifyFunc {
 	if sessionID == "" || !h.hasSession(sessionID) {
 		return nil
@@ -287,32 +404,46 @@ func (h *streamableHandler) notifyFn(sessionID string) notifyFunc {
 	}
 }
 
-// deliverTo 把一条通知写进会话的 GET 流。没有流就丢弃。
+// deliverTo 把一条通知写进会话的 GET 流，并记进续传缓冲。
+//
+// 没有流时就只缓冲：客户端重连带 Last-Event-ID 能补回来。有流但客户端读得太慢（5 秒
+// 还没读走一条）则丢弃这一条并计数，不阻塞发起调用的 HTTP 处理协程——丢掉的这条仍在
+// 缓冲里，客户端重连一样能补回。
 func (h *streamableHandler) deliverTo(sessionID string, b []byte) {
 	h.mu.Lock()
 	sess, ok := h.sessions[sessionID]
-	var stream *notifyStream
-	if ok {
-		stream = sess.stream
-	}
 	h.mu.Unlock()
+	if !ok {
+		return
+	}
+
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	ev := sess.events.push(b)
+	stream := sess.stream
 	if stream == nil {
 		return
 	}
 	select {
-	case stream.msgs <- b:
+	case stream.msgs <- ev:
 	case <-stream.done:
-	case <-time.After(5 * time.Second):
-		// 客户端读得太慢：丢弃这一条，不阻塞发起调用的 HTTP 处理协程。
+	case <-time.After(deliverTimeout):
+		// 客户端读得太慢：丢弃这一条，不阻塞调用协程。
+		h.drops.note("streamable-http", sessionID)
 	}
 }
 
 // attachStream 把 GET 流挂到会话上；会话已经有流则返回 false。
 func (h *streamableHandler) attachStream(sessionID string, stream *notifyStream) bool {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	sess, ok := h.sessions[sessionID]
-	if !ok || sess.stream != nil {
+	h.mu.Unlock()
+	if !ok {
+		return false
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	if sess.stream != nil {
 		return false
 	}
 	sess.stream = stream
@@ -322,8 +453,14 @@ func (h *streamableHandler) attachStream(sessionID string, stream *notifyStream)
 // detachStream 在 GET 流结束时摘掉它（客户端断开、会话终止、服务端关停都会走到）。
 func (h *streamableHandler) detachStream(sessionID string, stream *notifyStream) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	if sess, ok := h.sessions[sessionID]; ok && sess.stream == stream {
+	sess, ok := h.sessions[sessionID]
+	h.mu.Unlock()
+	if !ok {
+		return
+	}
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	if sess.stream == stream {
 		sess.stream = nil
 	}
 }
@@ -334,17 +471,16 @@ func (h *streamableHandler) handleDelete(w http.ResponseWriter, r *http.Request)
 		h.mu.Lock()
 		sess, ok := h.sessions[sessionID]
 		if ok {
-			// 终止会话时先让它的 GET 流收尾：done 是单向信号，发送方据此放弃未发出的通知。
-			if sess.stream != nil {
-				close(sess.stream.done)
-				sess.stream = nil
-			}
 			delete(h.sessions, sessionID)
 		}
 		h.mu.Unlock()
-		// 会话没了，登记的推送通道与订阅一并注销，免得在 Server 上留下永不复用的条目。
-		if ok && sess.unregisterPush != nil {
-			sess.unregisterPush()
+		if ok {
+			// 终止会话时先让它的 GET 流收尾（done 是单向信号，发送方据此放弃未发出的
+			// 通知），再注销登记的推送通道与订阅，免得在 Server 上留下永不复用的条目。
+			sess.closeStream()
+			if sess.unregisterPush != nil {
+				sess.unregisterPush()
+			}
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -363,7 +499,7 @@ func (h *streamableHandler) maybeStartSession(w http.ResponseWriter, req *reques
 		return
 	}
 	h.mu.Lock()
-	sess := &streamableSession{}
+	sess := &streamableSession{events: newEventBuffer()}
 	h.sessions[id] = sess
 	h.mu.Unlock()
 

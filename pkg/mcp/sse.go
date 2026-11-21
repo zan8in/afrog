@@ -7,10 +7,33 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/zan8in/gologger"
 )
+
+// deliverTimeout 是等客户端把一条通知读走的上限：超了就丢弃这一条，不阻塞发起调用的
+// HTTP 处理协程（客户端读得慢不该把整条链路拖死）。
+const deliverTimeout = 5 * time.Second
+
+// dropCounter 统计因客户端读得太慢而丢弃的通知条数。
+//
+// 丢弃本身极少发生（客户端 5 秒都没读走一条通知），但一旦发生就是「订阅静默失联」——
+// 客户端以为还能收到 resources/updated，实际再也收不到。计数加日志是让这件事可见的
+// 最低成本做法；两个 SSE 传输各持一份，便于分辨是哪个入口出的问题。
+type dropCounter struct{ n atomic.Int64 }
+
+// note 记一次丢弃并打日志，累计条数一并给出（丢弃往往成串出现，单条看不出严重程度）。
+func (d *dropCounter) note(transport, session string) {
+	n := d.n.Add(1)
+	gologger.Warning().Str("transport", transport).Str("session", session).
+		Str("dropped", strconv.FormatInt(n, 10)).
+		Msg("mcp: notification dropped, client too slow to read")
+}
 
 // sseHandler 实现 MCP 的 HTTP+SSE 传输：
 //
@@ -24,6 +47,8 @@ type sseHandler struct {
 
 	mu       sync.Mutex
 	sessions map[string]chan []byte
+
+	drops dropCounter
 }
 
 // NewSSEHandler 创建一个 SSE 传输处理器。
@@ -73,7 +98,7 @@ func (h *sseHandler) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	// 登记该会话的服务端推送通道：SSE 是长连接，资源订阅的变更通知在调用之外
 	// （如后台长任务收尾）也能推到这条事件流上。
-	unregisterPush := h.srv.RegisterResourcePush(id, h.notifyFn(ch))
+	unregisterPush := h.srv.RegisterResourcePush(id, h.notifyFn(id, ch))
 	defer unregisterPush()
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -128,14 +153,14 @@ func (h *sseHandler) handleMessage(w http.ResponseWriter, r *http.Request) {
 
 	var req request
 	if err := json.Unmarshal(body, &req); err != nil {
-		h.deliver(ch, &response{JSONRPC: "2.0", Error: &rpcError{Code: codeParseError, Message: "parse error"}})
+		h.deliver(id, ch, &response{JSONRPC: "2.0", Error: &rpcError{Code: codeParseError, Message: "parse error"}})
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 
-	resp, notify := h.srv.handle(withSession(r.Context(), id), &req, h.notifyFn(ch))
+	resp, notify := h.srv.handle(withSession(r.Context(), id), &req, h.notifyFn(id, ch))
 	if !notify && resp != nil {
-		h.deliver(ch, resp)
+		h.deliver(id, ch, resp)
 	}
 	w.WriteHeader(http.StatusAccepted)
 }
@@ -144,30 +169,35 @@ func (h *sseHandler) handleMessage(w http.ResponseWriter, r *http.Request) {
 // notifications/message）推进该会话的事件流：SSE 是长连接，中途有地方塞通知，
 // 这是它相对 Streamable HTTP 的优势。资源变更通知则经 RegisterResourcePush 登记，
 // 可在调用之外送达。
-func (h *sseHandler) notifyFn(ch chan []byte) notifyFunc {
+func (h *sseHandler) notifyFn(session string, ch chan []byte) notifyFunc {
 	return func(method string, params any) {
 		b, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "method": method, "params": params})
 		if err != nil {
 			return
 		}
-		h.deliverRaw(ch, b)
+		h.deliverRaw(session, ch, b)
 	}
 }
 
-func (h *sseHandler) deliver(ch chan []byte, resp *response) {
+func (h *sseHandler) deliver(session string, ch chan []byte, resp *response) {
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return
 	}
-	h.deliverRaw(ch, b)
+	h.deliverRaw(session, ch, b)
 }
 
-func (h *sseHandler) deliverRaw(ch chan []byte, b []byte) {
+func (h *sseHandler) deliverRaw(session string, ch chan []byte, b []byte) {
 	select {
 	case ch <- b:
-	case <-time.After(5 * time.Second):
-		// 客户端读得太慢时丢弃单条消息，避免阻塞 HTTP 处理协程；
-		// MCP 客户端会因超时重试请求。
+	case <-time.After(deliverTimeout):
+		// 客户端读得太慢时丢弃单条消息，避免阻塞 HTTP 处理协程。
+		//
+		// 经典 HTTP+SSE 传输的会话与这条连接同生共死（客户端重连只会拿到新会话，
+		// 没有地方带 Last-Event-ID 续传），所以丢掉的这条补不回来——至少别让它静默，
+		// 记一条日志以便排查「订阅突然不再更新」。要断线可补，请用 Streamable HTTP
+		// 的 GET 流（见 http.go）。
+		h.drops.note("sse", session)
 	}
 }
 

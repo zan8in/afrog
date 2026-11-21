@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -913,6 +914,95 @@ func TestGateEnforcesBudget(t *testing.T) {
 	}
 	if err := s.gate.Take(policy.Action{Name: "observe.findings"}, 1); err == nil {
 		t.Fatal("budget must reject the second request")
+	}
+}
+
+// 工具错误的机器可读分类必须与 REST/gRPC 同口径：Agent 靠 kind 分流，而不是去猜中文文本。
+func TestClassifyToolError(t *testing.T) {
+	cases := []struct {
+		name      string
+		err       error
+		kind      string
+		retryable bool
+	}{
+		{"策略拒绝", fmt.Errorf("%w action %q: %s", policy.ErrDenied, "act.brute", "readonly"), errKindPolicyDenied, false},
+		{"额度耗尽", fmt.Errorf("%w: window busy", policy.ErrBudgetExceeded), errKindBudgetExhausted, true},
+		{"OOB 未配置", errOOBUnavailable, errKindNotConfigured, false},
+		{"普通错误", errors.New("target is required"), errKindInvalidParams, true},
+	}
+	for _, tc := range cases {
+		got := classifyToolError(tc.err)
+		if got.Kind != tc.kind || got.Retryable != tc.retryable {
+			t.Errorf("%s: got kind=%s retryable=%t, want kind=%s retryable=%t",
+				tc.name, got.Kind, got.Retryable, tc.kind, tc.retryable)
+		}
+		if got.Message != tc.err.Error() {
+			t.Errorf("%s: message = %q, want the original error text", tc.name, got.Message)
+		}
+		if strings.TrimSpace(got.Hint) == "" {
+			t.Errorf("%s: hint must never be empty", tc.name)
+		}
+	}
+}
+
+// toolError 同时给人类可读文本与机器可读 _meta：不少客户端不把 _meta 交给模型，
+// 所以 kind/retryable 要在文本里再出现一次。
+func TestToolErrorCarriesStructuredMeta(t *testing.T) {
+	out := toolError(fmt.Errorf("%w action %q: %s", policy.ErrDenied, "probe.http", "readonly"))
+
+	if out["isError"] != true {
+		t.Fatalf("isError = %v, want true", out["isError"])
+	}
+	content, _ := out["content"].([]map[string]any)
+	if len(content) != 1 {
+		t.Fatalf("content = %+v, want one entry", out["content"])
+	}
+	text, _ := content[0]["text"].(string)
+	if !strings.Contains(text, "[kind=policy_denied retryable=false]") {
+		t.Fatalf("error text must repeat kind/retryable for clients that drop _meta: %q", text)
+	}
+	if !strings.Contains(text, "policy denied") {
+		t.Fatalf("error text must keep the original message: %q", text)
+	}
+
+	meta, _ := out["_meta"].(map[string]any)
+	info, _ := meta["afrog/error"].(toolErrorInfo)
+	if info.Kind != errKindPolicyDenied || info.Retryable {
+		t.Fatalf("_meta[afrog/error] = %+v, want policy_denied & not retryable", meta["afrog/error"])
+	}
+	if _, ok := out["structuredContent"]; ok {
+		t.Fatal("errors must not be smuggled into structuredContent (it clashes with outputSchema)")
+	}
+}
+
+// 走 stdio 传输时 _meta 要真的落到线上，而不只是内存里的结构体。
+func TestServeProtocolToolErrorMeta(t *testing.T) {
+	srv := newTestServer()
+	var out bytes.Buffer
+	if err := srv.Serve(context.Background(), strings.NewReader(
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"boom"}}`), &out); err != nil {
+		t.Fatalf("serve: %v", err)
+	}
+
+	var env struct {
+		Result struct {
+			IsError bool `json:"isError"`
+			Meta    map[string]struct {
+				Kind      string `json:"kind"`
+				Retryable bool   `json:"retryable"`
+				Hint      string `json:"hint"`
+			} `json:"_meta"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(nonEmptyLines(out.String())[0]), &env); err != nil {
+		t.Fatalf("decode: %v (%s)", err, out.String())
+	}
+	if !env.Result.IsError {
+		t.Fatal("boom must surface as a tool error")
+	}
+	info := env.Result.Meta["afrog/error"]
+	if info.Kind != errKindInvalidParams || !info.Retryable || strings.TrimSpace(info.Hint) == "" {
+		t.Fatalf("afrog/error = %+v, want invalid_params & retryable & a hint", info)
 	}
 }
 
