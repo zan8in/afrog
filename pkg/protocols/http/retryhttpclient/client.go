@@ -1240,41 +1240,27 @@ func checkProtocolDirect(host string) (string, error) {
 		return HTTPS_PREFIX + host, nil
 
 	default:
-		preferHTTPS := false
-		if parsePort == "" {
-			preferHTTPS = true
+		// 端口没有先验（无端口或非 80/443）时先试 https：非标准端口上「https 才是业务、
+		// http 只是把请求回显成 404/400」的情况很常见（如业务挂在 :30003），先试 http
+		// 会把这类端点误判成 http，关键资产就此漏掉。
+		//
+		// 代价可控：明文服务端收到 TLS ClientHello 会立刻回明文错误或直接断连，失败在
+		// 毫秒级；真正不回包的端口两种顺序都要等满超时，总耗时不变。
+		if _, err := checkTarget(HTTPS_PREFIX+host, probeTimeout); err != nil {
+			lastErr = err
 		} else {
-			switch parsePort {
-			case "443", "8443", "9443", "10443":
-				preferHTTPS = true
-			}
+			return HTTPS_PREFIX + host, nil
 		}
 
-		tryFirst := HTTP_PREFIX
-		trySecond := HTTPS_PREFIX
-		if preferHTTPS {
-			tryFirst = HTTPS_PREFIX
-			trySecond = HTTP_PREFIX
-		}
-
-		body, err := checkTarget(tryFirst+host, probeTimeout)
+		body, err := checkTarget(HTTP_PREFIX+host, probeTimeout)
 		if err == nil {
-			if tryFirst == HTTP_PREFIX && utils.LooksLikeHTTPSMismatch(body) {
+			// https 不可用才轮到 http；仍按响应内容纠正「明文打到 TLS 端口」的服务端。
+			if utils.LooksLikeHTTPSMismatch(body) {
 				return HTTPS_PREFIX + host, nil
 			}
-			return tryFirst + host, nil
+			return HTTP_PREFIX + host, nil
 		}
 		lastErr = err
-
-		body, err = checkTarget(trySecond+host, probeTimeout)
-		if err == nil {
-			if trySecond == HTTP_PREFIX && utils.LooksLikeHTTPSMismatch(body) {
-				return HTTPS_PREFIX + host, nil
-			}
-			return trySecond + host, nil
-		}
-		lastErr = err
-
 	}
 
 	if lastErr != nil {

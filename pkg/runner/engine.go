@@ -581,7 +581,7 @@ func headerCoveredByTech(techSummary, header string) bool {
 // webProbeScheme 依据端口指纹结论决定候选是否值得做 Web 探测，以及应采用的协议。
 //
 // 返回 ok 为 false 表示指纹已明确判定该端口不是 Web 服务，应跳过 HTTP 探测；
-// scheme 为空表示没有可用指纹，调用方需要退回协议试探。
+// scheme 为空表示协议还没有定论，调用方需要退回协议试探（试探默认 https 优先）。
 func webProbeScheme(fact *portscan.ScanResult) (scheme string, ok bool) {
 	if fact == nil {
 		return "", true
@@ -591,6 +591,12 @@ func webProbeScheme(fact *portscan.ScanResult) (scheme string, ok bool) {
 	}
 	if fact.Service != "" && !portscan.IsWebService(fact.Service) {
 		return "", false
+	}
+	if fact.Service == "" {
+		// 端口开放但没识别出服务：没有任何证据说明它说 http 还是 https，不预设 http
+		// ——非标准端口上 https-only 的业务端点会因先试 http 拿到的 404/400 被误判
+		// （如 :30003）。返回空 scheme 退回首包试探，由试探按 https 优先定协议。
+		return "", true
 	}
 	return "http", true
 }

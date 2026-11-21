@@ -117,9 +117,9 @@ func TestWebProbeScheme(t *testing.T) {
 			wantScheme: "https", wantOK: true,
 		},
 		{
-			name:       "unknown service falls back to http",
+			name:       "unknown service defers to protocol probe",
 			fact:       &portscan.ScanResult{ServiceInfo: portscan.ServiceInfo{}},
-			wantScheme: "http", wantOK: true,
+			wantScheme: "", wantOK: true,
 		},
 	}
 	for _, tt := range tests {
@@ -1036,6 +1036,34 @@ func (s *dualProtoServer) Close() { _ = s.ln.Close() }
 func (s *dualProtoServer) HTTPHits() int { return int(atomic.LoadInt32(&s.httpHits)) }
 
 func (s *dualProtoServer) TLSHits() int { return int(atomic.LoadInt32(&s.tlsHits)) }
+
+// TestCheckProtocolPrefersHTTPSOnUnknownPort 钉住「端口没有先验时先试 https」这条回归。
+//
+// 复刻真实案例：非标准端口上 https 才是业务（200），明文端只把请求回显成 404（正文没有
+// 任何「请改用 https」的特征串，内容纠正帮不上忙）。先试 http 会把这个端点误判成 http，
+// 关键资产就此漏掉。
+func TestCheckProtocolPrefersHTTPSOnUnknownPort(t *testing.T) {
+	if err := retryhttpclient.Init(&retryhttpclient.Options{Timeout: 5, Retries: 0, MaxRespBodySize: 2}); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	retryhttpclient.ResetCheckProtocolCache()
+	t.Cleanup(retryhttpclient.ResetCheckProtocolCache)
+
+	srv := startDualProtoServer(t,
+		http.StatusNotFound, "<html><head><title>Not Found</title></head></html>",
+		http.StatusOK, "<html><head><title>business</title></head></html>")
+	defer srv.Close()
+
+	hostPort := srv.ln.Addr().String() // 127.0.0.1:随机非标准端口
+	want := "https://" + hostPort
+	if got, err := retryhttpclient.CheckProtocol(hostPort); err != nil || got != want {
+		t.Fatalf("CheckProtocol(%q) = (%q, %v), want %q", hostPort, got, err, want)
+	}
+	// https 必须是第一个被试探的协议：先试 http 会拿到 404 并就此定型。
+	if srv.HTTPHits() != 0 {
+		t.Fatalf("expected https to be tried first, but the plain http endpoint was hit %d time(s)", srv.HTTPHits())
+	}
+}
 
 // peekConn 让已被 bufio.Peek 缓冲的字节也能被后续读取方（如 tls.Server）看到。
 type peekConn struct {
