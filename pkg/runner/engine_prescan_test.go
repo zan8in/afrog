@@ -832,63 +832,13 @@ func TestLooksLikeHTTPSMismatch(t *testing.T) {
 // 模拟服务端在同一 host:port 上同时承载明文与 TLS：明文回 400 特征页、TLS 回 200。
 // 站点最终必须被记成 https，且明文只探一次（纠正的代价是一次重探，只发生在踩坑的目标上）。
 func TestWebProbeCorrectsHTTPSOnlySite(t *testing.T) {
-	// 借 httptest 的 TLS 服务端取一份可用证书，供下面「同端口双协议」复用；
-	// 客户端 InsecureSkipVerify，证书内容不影响断言。
-	tmp := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	cert := tmp.TLS.Certificates[0]
-	tmp.Close()
+	// 模拟服务端在同一 host:port 上同时承载明文与 TLS：明文回 400 特征页、TLS 回 200。
+	srv := startDualProtoServer(t,
+		http.StatusBadRequest, "<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head></html>",
+		http.StatusOK, "ok")
+	defer srv.Close()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	defer ln.Close()
-
-	// TLS 服务端要读的 ClientHello 首字节已被 bufio.Peek 缓冲，这里把缓冲读透传
-	// 回去（peekConn 先吐缓冲），否则握手会丢掉第一个字节。
-	replay := func(c net.Conn, r *bufio.Reader) net.Conn {
-		return &peekConn{Conn: c, r: r}
-	}
-
-	var httpHits, tlsHits int32
-	wantBody := "ok"
-	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			go func(c net.Conn) {
-				defer c.Close()
-				br := bufio.NewReader(c)
-				first, err := br.Peek(1)
-				if err != nil {
-					return
-				}
-				if first[0] == 0x16 { // TLS ClientHello
-					atomic.AddInt32(&tlsHits, 1)
-					tc := tls.Server(replay(c, br), &tls.Config{Certificates: []tls.Certificate{cert}})
-					if err := tc.Handshake(); err != nil {
-						return
-					}
-					if _, err := http.ReadRequest(bufio.NewReader(tc)); err != nil {
-						return
-					}
-					fmt.Fprintf(tc, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s", len(wantBody), wantBody)
-					return
-				}
-				atomic.AddInt32(&httpHits, 1)
-				// 先把请求读完再回，避免带着未读数据关连接触发 RST 丢响应。
-				if _, err := http.ReadRequest(br); err != nil {
-					return
-				}
-				body := "<html><head><title>400 The plain HTTP request was sent to HTTPS port</title></head></html>"
-				fmt.Fprintf(c, "HTTP/1.1 400 Bad Request\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s", len(body), body)
-			}(conn)
-		}
-	}()
-
-	host, portStr, err := net.SplitHostPort(ln.Addr().String())
+	host, portStr, err := net.SplitHostPort(srv.ln.Addr().String())
 	if err != nil {
 		t.Fatalf("split host port: %v", err)
 	}
@@ -924,10 +874,10 @@ func TestWebProbeCorrectsHTTPSOnlySite(t *testing.T) {
 	if len(out) != 1 || !strings.HasPrefix(out[0], "https://") {
 		t.Fatalf("expected site corrected to https, got %#v", out)
 	}
-	if got := atomic.LoadInt32(&httpHits); got != 1 {
+	if got := srv.HTTPHits(); got != 1 {
 		t.Fatalf("expected exactly 1 plain http probe, got %d", got)
 	}
-	if atomic.LoadInt32(&tlsHits) == 0 {
+	if srv.TLSHits() == 0 {
 		t.Fatal("expected a https retry after the plain-HTTP rejection")
 	}
 
@@ -944,6 +894,148 @@ func TestWebProbeCorrectsHTTPSOnlySite(t *testing.T) {
 		t.Fatal("the https probe should carry tls info")
 	}
 }
+
+// TestWebProbeHTTPSOverridesHTTPOnSamePort 钉住「同一 host:port 上的 https 记录不被
+// 先到的 http 挤掉」这条回归。
+//
+// 复刻真实案例：站点明文端回 404（正文没有任何「请改用 https」的特征串），TLS 端回 200。
+// Web 记录用不含 scheme 的 host:port 作 key，http 与 https 会撞在一起；早先谁先探完谁
+// 占 key，http 一瞬即回的 404 就把真正的 https 业务端点挤掉了。修复后 http 必须被 https 顶掉。
+func TestWebProbeHTTPSOverridesHTTPOnSamePort(t *testing.T) {
+	srv := startDualProtoServer(t,
+		http.StatusNotFound, "<html><head><title>Not Found</title></head></html>",
+		http.StatusOK, "<html><head><title>business</title></head></html>")
+	defer srv.Close()
+
+	host, portStr, err := net.SplitHostPort(srv.ln.Addr().String())
+	if err != nil {
+		t.Fatalf("split host port: %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("parse port: %v", err)
+	}
+	hostPort := net.JoinHostPort(host, portStr)
+
+	// 端口指纹正面判定该端口是 https：由此派生的 https 候选与用户显式写的 http URL 落在
+	// 同一个 host:port 上。候选按「显式 URL 在前、端口派生在后」排列，并发=1 时 http 先
+	// 探完入库，https 后到时必须把 http 顶掉——这条顺序把竞态路径稳定复现出来。
+	facts := newOpenPortsCollector()
+	facts.AddResult(&portscan.ScanResult{
+		Host: host, Port: port,
+		ServiceInfo: portscan.ServiceInfo{Service: "https", TLS: true},
+	})
+
+	r := &Runner{
+		options: &config.Options{
+			Timeout:         5,
+			Retries:         0,
+			MaxRespBodySize: 2,
+			RateLimit:       10,
+			Concurrency:     1,
+			SDKMode:         true,
+			Silent:          true,
+			WebProbeTimeout: 5,
+		},
+		ctx:          context.Background(),
+		webURLByKey:  make(map[string]string),
+		webMetaByKey: make(map[string]WebMeta),
+	}
+
+	out := r.webProbe(context.Background(), targets.BuildTargetIndex([]string{"http://" + hostPort, hostPort}), facts)
+	if len(out) != 1 || !strings.HasPrefix(out[0], "https://") {
+		t.Fatalf("expected https to supersede http, got %#v", out)
+	}
+	if srv.HTTPHits() == 0 {
+		t.Fatal("expected the plain http endpoint to be probed before being superseded")
+	}
+
+	// 同一 host:port 只留一条记录，且结论来自 https 探针本身。
+	r.webMu.Lock()
+	meta, ok := r.webMetaByKey[fingerprint.KeyFromTarget(out[0])]
+	r.webMu.Unlock()
+	if !ok {
+		t.Fatalf("no web meta recorded for %q", out[0])
+	}
+	if meta.Status != http.StatusOK {
+		t.Fatalf("meta.Status = %d, want 200 from the https probe", meta.Status)
+	}
+	if meta.TLS == nil {
+		t.Fatal("the https probe should carry tls info")
+	}
+}
+
+// dualProtoServer 在同一 host:port 上同时承载明文与 TLS 两种协议：按连接首字节分流
+// （0x16 是 TLS ClientHello），复刻「非标准端口同时开着 http 与 https」的真实站点。
+// 两个分支各自累计命中次数，供「只探一次 / 是否发生纠正」这类断言使用。
+type dualProtoServer struct {
+	ln       net.Listener
+	httpHits int32
+	tlsHits  int32
+}
+
+// startDualProtoServer 启动双协议服务端：明文分支回 plainStatus/plainBody，TLS 分支回
+// tlsStatus/tlsBody。证书借 httptest 的 TLS 服务端取一份（客户端 InsecureSkipVerify，
+// 证书内容不影响断言）。
+func startDualProtoServer(t *testing.T, plainStatus int, plainBody string, tlsStatus int, tlsBody string) *dualProtoServer {
+	t.Helper()
+
+	tmp := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	cert := tmp.TLS.Certificates[0]
+	tmp.Close()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+
+	s := &dualProtoServer{ln: ln}
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				br := bufio.NewReader(c)
+				first, err := br.Peek(1)
+				if err != nil {
+					return
+				}
+				if first[0] == 0x16 { // TLS ClientHello
+					atomic.AddInt32(&s.tlsHits, 1)
+					// ClientHello 首字节已被 bufio.Peek 缓冲，用 peekConn 透传回去再握手，
+					// 否则握手会丢掉第一个字节。
+					tc := tls.Server(&peekConn{Conn: c, r: br}, &tls.Config{Certificates: []tls.Certificate{cert}})
+					if err := tc.Handshake(); err != nil {
+						return
+					}
+					if _, err := http.ReadRequest(bufio.NewReader(tc)); err != nil {
+						return
+					}
+					fmt.Fprintf(tc, "HTTP/1.1 %d %s\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s",
+						tlsStatus, http.StatusText(tlsStatus), len(tlsBody), tlsBody)
+					return
+				}
+				atomic.AddInt32(&s.httpHits, 1)
+				// 先把请求读完再回，避免带着未读数据关连接触发 RST 丢响应。
+				if _, err := http.ReadRequest(br); err != nil {
+					return
+				}
+				fmt.Fprintf(c, "HTTP/1.1 %d %s\r\nContent-Length: %d\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n%s",
+					plainStatus, http.StatusText(plainStatus), len(plainBody), plainBody)
+			}(conn)
+		}
+	}()
+	return s
+}
+
+func (s *dualProtoServer) Close() { _ = s.ln.Close() }
+
+func (s *dualProtoServer) HTTPHits() int { return int(atomic.LoadInt32(&s.httpHits)) }
+
+func (s *dualProtoServer) TLSHits() int { return int(atomic.LoadInt32(&s.tlsHits)) }
 
 // peekConn 让已被 bufio.Peek 缓冲的字节也能被后续读取方（如 tls.Server）看到。
 type peekConn struct {

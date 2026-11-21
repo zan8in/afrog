@@ -625,6 +625,20 @@ func webProbeResumeKey(raw, scheme string) string {
 	return keyFromTargetWithPath(raw)
 }
 
+// webProbeSupersedesHTTP 报告一条新记录是否应当顶掉同一 host:port 上已有的 http 记录。
+//
+// Web 记录用不含 scheme 的 host:port 作 key，同一端口的 http 与 https 会撞在一起、
+// 并发下先到先得。站点只认 https 时，它的 http 端点常以 400/404 快速返回，于是抢在
+// 真正的 https 业务端点之前占住 key，把关键资产挤掉（非标准端口上尤其常见）。
+//
+// 这里只额外放行「http 被 https 覆盖」这一种替换：其余组合（http/http、https/http、
+// https/https）一律保持先到先得。不放行「https 被 http 覆盖」是刻意的——否则探测
+// 顺序不同就可能把已确认的 https 端点换成 http，结果反而漂移。
+func webProbeSupersedesHTTP(prev, next string) bool {
+	return strings.HasPrefix(strings.ToLower(prev), "http://") &&
+		strings.HasPrefix(strings.ToLower(next), "https://")
+}
+
 // webProbeHTTPSVariant 把候选 URL 换成 https 版（同 host:port），供「http 探测发现
 // 站点只认 https」时重探。已经是 https 或解析不出主机名时返回空串，表示无需重探。
 func webProbeHTTPSVariant(raw string) string {
@@ -979,6 +993,9 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 	webURLs := make([]string, 0)
 	webURLByKey := make(map[string]string)
 	webMetaByKey := make(map[string]WebMeta)
+	// webURLIndex 记住每个 key 在 webURLs 里的下标，供「https 顶掉 http」时就地替换，
+	// 省下一次线性扫描（webURLs 是对外返回的资产列表，必须与 webURLByKey 保持一致）。
+	webURLIndex := make(map[string]int)
 
 	// 续传结论先灌进结果集：它们没有经过本轮 record()，但报告、资产汇总与 requires
 	// 门控都必须看到它们。不重复打印存活行——上一轮已经打过，恢复时再刷一遍只是噪音。
@@ -995,6 +1012,7 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			}
 			webURLByKey[k] = meta.URL
 			webMetaByKey[k] = meta
+			webURLIndex[k] = len(webURLs)
 			webURLs = append(webURLs, meta.URL)
 			runner.options.Targets.SetNum(meta.URL, ActiveTarget)
 		}
@@ -1014,14 +1032,27 @@ func (runner *Runner) webProbe(ctx context.Context, idx *targets.TargetIndex, fa
 			runner.options.Targets.SetNum(urlStr, ActiveTarget)
 		}
 		mu.Lock()
-		if _, ok := webURLByKey[key]; ok {
+		if prev, ok := webURLByKey[key]; ok {
+			// 同一 host:port 的 http / https 撞同一个 key。先到的 http 通常只是 400/404
+			// 的「协议用错」回显，真正的业务在 https 上；这时把记录整体换成 https，
+			// 否则关键资产会被先到先得挤掉（见 webProbeSupersedesHTTP）。
+			if !webProbeSupersedesHTTP(prev, urlStr) {
+				mu.Unlock()
+				return
+			}
+			webURLByKey[key] = urlStr
+			webMetaByKey[key] = meta
+			if i, ok := webURLIndex[key]; ok {
+				webURLs[i] = urlStr
+			}
 			mu.Unlock()
-			return
+		} else {
+			webURLByKey[key] = urlStr
+			webMetaByKey[key] = meta
+			webURLIndex[key] = len(webURLs)
+			webURLs = append(webURLs, urlStr)
+			mu.Unlock()
 		}
-		webURLByKey[key] = urlStr
-		webMetaByKey[key] = meta
-		webURLs = append(webURLs, urlStr)
-		mu.Unlock()
 		// 本轮探测结论写回断点进度，供中断后 -resume 直接复用（含指纹与 WAF）。
 		if runner.ScanProgress != nil {
 			runner.ScanProgress.RecordWebProbe(key, meta)
