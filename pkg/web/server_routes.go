@@ -214,6 +214,10 @@ func registerAPIRoutes(api *mux.Router) {
 	api.HandleFunc("/agent/policy", jwtAuthMiddleware(agentPolicyGetHandler)).Methods(http.MethodGet)
 	api.HandleFunc("/agent/policy", jwtAuthMiddleware(agentPolicyPutHandler)).Methods(http.MethodPut)
 	api.HandleFunc("/agent/audit", jwtAuthMiddleware(agentAuditHandler)).Methods(http.MethodGet)
+	// MCP 服务可见性与接入配置：探活 + 生成接入片段（GET），保存 listen/token（PUT）。
+	// 只读写配置，不托管也不启停服务。
+	api.HandleFunc("/agent/mcp", jwtAuthMiddleware(agentMCPProbeHandler)).Methods(http.MethodGet)
+	api.HandleFunc("/agent/mcp", jwtAuthMiddleware(agentMCPPutHandler)).Methods(http.MethodPut)
 
 	// 认证与业务 API（复用现有处理器）
 	api.HandleFunc("/login", loginRateLimitMiddleware(loginHandler)).Methods(http.MethodPost)

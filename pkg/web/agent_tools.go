@@ -28,6 +28,9 @@ var (
 	agentReverse    config.Reverse
 	// agentConfigPath 是 afrog-config.yaml 的路径：控制台保存策略/审计路径时要写回它。
 	agentConfigPath string
+	// agentMCP 是当前的 MCP 接入配置（agent.mcp 段）。保存策略与保存 MCP 配置都会把
+	// 整个 agent 段写回，因此两处都必须带上它，否则整块替换会抹掉对方。
+	agentMCP config.AgentMCP
 )
 
 // SetAgentConfig 注入 Agent 工具面的策略、审计与带外来源，由 cmd 层在启动 Web 服务前调用。
@@ -40,6 +43,10 @@ func SetAgentConfig(cfg config.Agent, reverse config.Reverse, configPath string)
 	agentPolicyPath = strings.TrimSpace(cfg.Policy)
 	agentAuditPath = strings.TrimSpace(cfg.Audit)
 	agentOOBAdapter = strings.TrimSpace(cfg.OOB)
+	agentMCP = config.AgentMCP{
+		Listen: strings.TrimSpace(cfg.MCP.Listen),
+		Token:  strings.TrimSpace(cfg.MCP.Token),
+	}
 	agentReverse = reverse
 	agentConfigPath = strings.TrimSpace(configPath)
 }

@@ -256,12 +256,16 @@ Notes:
 | `policy` | string | Path to the policy YAML; same format as `afrog mcp -policy` | empty (read-only default) |
 | `audit` | string | Path to the decision audit JSONL | empty (no logging) |
 | `oob` | string | Tool-surface OOB adapter (`ceyeio`/`dnslogcn`/`alphalog`/`xray`/`revsuit`/`interactsh`, same values as CLI `-oob`); credentials come from the `reverse` section | empty (`act.oob_*` unavailable) |
+| `mcp` | object | Access settings for the MCP service, with `listen` (bind address) and `token` (access secret); `afrog mcp` reads these when the matching flag is not passed | empty (`listen` empty means stdio) |
 
 ```yaml
 agent:
   policy: /path/to/agent-policy.yaml
   audit: /path/to/audit.jsonl
   oob: ceyeio
+  mcp:
+    listen: 127.0.0.1:16870
+    token: your-token
 ```
 
 Notes:
@@ -271,6 +275,7 @@ Notes:
 - The web server is long-lived, so `budget.requests` is a single session allowance shared by the whole process and debited across requests (same as `afrog mcp -listen`); `budget.duration` is the idle window, after which a fresh session starts with the allowance refilled — no restart required
 - Read-only calls (`observe.*`, `plan.next`, `poc.search`, `judge.*`, `learn.*`) consume no allowance and are not subject to any budget limit
 - Setting `agent.oob` is what gives the tool surface its OOB capability (`act.oob_payload` mints addresses, `act.oob_wait` waits for a callback), with credentials reused from the `reverse` section; when empty both report "not configured" instead of silently waiting
+- `agent.mcp` gives `afrog mcp` and the web console a single source for listen/token: an explicit `-listen`/`-token` on the command line wins, otherwise these values are used, and an empty `listen` still means stdio; startup logs print the values actually in effect (the token is shown masked). Binding to a non-loopback address without a token is refused at startup whether the token would have come from a flag or from the config
 - Errors are distinguished by semantics: policy denial `403`, budget exhaustion `429`, unknown tool `404`, bad request `400`
 
 ## What `reverse` means

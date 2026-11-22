@@ -256,12 +256,16 @@ observe:
 | `policy` | string | 策略 YAML 路径；格式与 `afrog mcp -policy` 一致 | 空（只读默认策略） |
 | `audit` | string | 判定审计 JSONL 路径 | 空（不记录） |
 | `oob` | string | 工具面的反连适配器名（`ceyeio`/`dnslogcn`/`alphalog`/`xray`/`revsuit`/`interactsh`，取值同 CLI `-oob`）；凭据取自 `reverse` 段 | 空（`act.oob_*` 不可用） |
+| `mcp` | object | MCP 服务的接入配置，含 `listen`（监听地址）与 `token`（访问口令）；`afrog mcp` 未显式传对应 flag 时读取这里 | 空（`listen` 为空则走 stdio） |
 
 ```yaml
 agent:
   policy: /path/to/agent-policy.yaml
   audit: /path/to/audit.jsonl
   oob: ceyeio
+  mcp:
+    listen: 127.0.0.1:16870
+    token: your-token
 ```
 
 要点：
@@ -271,6 +275,7 @@ agent:
 - Web 服务是长驻进程，`budget.requests` 是整个进程共享的一份会话额度、跨请求累计扣减（与 `afrog mcp -listen` 一致）；`budget.duration` 是空闲窗口，连续空闲这么久后自动开新会话、把额度补满，不必重启进程
 - 只读调用（`observe.*`、`plan.next`、`poc.search`、`judge.*`、`learn.*`）不扣额度，也不受任何预算限制
 - `agent.oob` 配置后工具面才有反连能力（`act.oob_payload` 铸地址、`act.oob_wait` 等回连），凭据复用 `reverse` 段；未配置时两者明确报「未配置」，而不是静默等待
+- `agent.mcp` 让 `afrog mcp` 与 Web 控制台共用同一份 listen/token：命令行显式传入的 `-listen`/`-token` 优先，未传时回落这里，仍为空则 `listen` 走 stdio；启动日志会打印实际生效的 listen 与 token（token 以掩码回显）。监听非本机地址却没有 token 时，无论来自 flag 还是配置都会被拒绝启动
 - 错误码按语义区分：策略拒绝 `403`、预算耗尽 `429`、未知工具 `404`、参数错误 `400`
 
 ## reverse 是什么

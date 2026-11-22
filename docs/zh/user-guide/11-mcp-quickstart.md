@@ -38,13 +38,13 @@ afrog mcp -h
 ```text
 Usage of afrog mcp:
   -audit string
-    	策略审计日志路径（JSONL）；留空不记录
+    	策略审计日志路径（JSONL）；留空时用 afrog-config.yaml 的 agent.audit，仍为空则不记录
   -listen string
-    	以 HTTP+SSE 方式监听（如 127.0.0.1:16870）；留空走 stdio
+    	以 HTTP+SSE 方式监听（如 127.0.0.1:16870）；留空时用 afrog-config.yaml 的 agent.mcp.listen，仍为空则走 stdio
   -policy string
-    	策略 YAML 路径；留空使用只读默认策略
+    	策略 YAML 路径；留空时用 afrog-config.yaml 的 agent.policy，仍为空则只读默认
   -token string
-    	SSE 模式的访问 token；监听非本机地址时必须提供
+    	SSE 模式的访问 token；留空时用 afrog-config.yaml 的 agent.mcp.token；监听非本机地址时必须提供
 ```
 
 **如果是下面这几种情况，说明你用的是旧版**：

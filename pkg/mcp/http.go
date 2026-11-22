@@ -78,7 +78,7 @@ func originAllowed(r *http.Request) bool {
 	if host == "" {
 		return false
 	}
-	if isLoopbackAddr(host) {
+	if IsLoopbackAddr(host) {
 		return true
 	}
 	reqHost, _, err := net.SplitHostPort(strings.TrimSpace(r.Host))

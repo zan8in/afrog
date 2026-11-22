@@ -45,6 +45,7 @@ web_smoke.log
 
 /afrog-pocs/
 afrogweb
+scripts
 fscan
 naabu
 nuclei

@@ -39,8 +39,8 @@ func Command(args []string) error {
 	fs := flag.NewFlagSet("afrog mcp", flag.ContinueOnError)
 	policyPath := fs.String("policy", "", "策略 YAML 路径；留空时用 afrog-config.yaml 的 agent.policy，仍为空则只读默认")
 	auditPath := fs.String("audit", "", "策略审计日志路径（JSONL）；留空时用 afrog-config.yaml 的 agent.audit，仍为空则不记录")
-	listen := fs.String("listen", "", "以 HTTP+SSE 方式监听（如 127.0.0.1:16870）；留空走 stdio")
-	token := fs.String("token", "", "SSE 模式的访问 token；监听非本机地址时必须提供")
+	listen := fs.String("listen", "", "以 HTTP+SSE 方式监听（如 127.0.0.1:16870）；留空时用 afrog-config.yaml 的 agent.mcp.listen，仍为空则走 stdio")
+	token := fs.String("token", "", "SSE 模式的访问 token；留空时用 afrog-config.yaml 的 agent.mcp.token；监听非本机地址时必须提供")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -115,13 +115,31 @@ func Command(args []string) error {
 	})
 
 	addr := strings.TrimSpace(*listen)
+	addrFromConfig := false
+	if addr == "" && cfg != nil {
+		if v := strings.TrimSpace(cfg.Agent.MCP.Listen); v != "" {
+			addr, addrFromConfig = v, true
+		}
+	}
 	if addr == "" {
 		return srv.Serve(context.Background(), os.Stdin, os.Stdout)
 	}
-	if !isLoopbackAddr(addr) && strings.TrimSpace(*token) == "" {
+	if addrFromConfig {
+		// 配置生效必须可见：否则使用者会以为服务监听在别处。
+		gologger.Info().Msgf("使用 afrog-config.yaml 的 agent.mcp.listen=%s", addr)
+	}
+
+	tok := strings.TrimSpace(*token)
+	if tok == "" && cfg != nil {
+		if v := strings.TrimSpace(cfg.Agent.MCP.Token); v != "" {
+			tok = v
+			gologger.Info().Msgf("使用 afrog-config.yaml 的 agent.mcp.token=%s", maskMCPToken(v))
+		}
+	}
+	if !IsLoopbackAddr(addr) && tok == "" {
 		return fmt.Errorf("refusing to expose MCP on %s without -token", addr)
 	}
-	return serveSSE(srv, addr, *token)
+	return serveSSE(srv, addr, tok)
 }
 
 // serveSSE 以 HTTP+SSE 方式提供 MCP 服务，收到 Ctrl+C / SIGTERM 时优雅退出。
@@ -149,8 +167,10 @@ func serveSSE(srv *Server, addr, token string) error {
 	return nil
 }
 
-// isLoopbackAddr 判断监听地址是否只对本机可见。空 host、0.0.0.0、:: 都算对外暴露。
-func isLoopbackAddr(addr string) bool {
+// IsLoopbackAddr 判断监听地址是否只对本机可见。空 host、0.0.0.0、:: 都算对外暴露。
+//
+// 导出供 Web 控制台的「MCP 服务」面板复用，避免各处重复实现同一判定。
+func IsLoopbackAddr(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		host = addr
@@ -166,4 +186,17 @@ func isLoopbackAddr(addr string) bool {
 		return ip.IsLoopback()
 	}
 	return false
+}
+
+// maskMCPToken 用于日志回显 token：只留首尾各两位，中间以 `*` 占位。
+//
+// 目的是让使用者确认「读到了哪个 token」，又不把明文写进日志或终端回滚缓冲。
+func maskMCPToken(token string) string {
+	if token == "" {
+		return ""
+	}
+	if len(token) <= 6 {
+		return strings.Repeat("*", len(token))
+	}
+	return token[:2] + strings.Repeat("*", len(token)-4) + token[len(token)-2:]
 }

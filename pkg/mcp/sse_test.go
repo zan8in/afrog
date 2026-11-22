@@ -94,7 +94,7 @@ func TestIsLoopbackAddr(t *testing.T) {
 		{"192.168.1.10:16870", false},
 	}
 	for _, c := range cases {
-		if got := isLoopbackAddr(c.addr); got != c.want {
+		if got := IsLoopbackAddr(c.addr); got != c.want {
 			t.Fatalf("isLoopbackAddr(%q) = %v, want %v", c.addr, got, c.want)
 		}
 	}

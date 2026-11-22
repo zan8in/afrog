@@ -38,13 +38,13 @@ You are good if you see this (written to stderr):
 ```text
 Usage of afrog mcp:
   -audit string
-    	Path to the policy audit log (JSONL); empty means no audit
+    	Path to the policy audit log (JSONL); empty falls back to agent.audit in afrog-config.yaml, then no audit
   -listen string
-    	Serve over HTTP+SSE instead (e.g. 127.0.0.1:16870); empty means stdio
+    	Serve over HTTP+SSE instead (e.g. 127.0.0.1:16870); empty falls back to agent.mcp.listen in afrog-config.yaml, then stdio
   -policy string
-    	Path to the policy YAML; empty uses the read-only default
+    	Path to the policy YAML; empty falls back to agent.policy in afrog-config.yaml, then the read-only default
   -token string
-    	Access token for SSE mode; required when listening on a non-local address
+    	Access token for SSE mode; empty falls back to agent.mcp.token in afrog-config.yaml; required when listening on a non-local address
 ```
 
 **Any of these means you are on an old build**:

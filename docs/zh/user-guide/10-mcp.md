@@ -50,6 +50,8 @@ afrog mcp -listen 127.0.0.1:16870 -token your-token
 - 鉴权支持 `Authorization: Bearer <token>` 或 `?token=`；
 - 按 MCP 规范校验 `Origin`：浏览器带来的跨站来源一律 403（防 DNS rebinding）；不带 `Origin` 的原生客户端与 curl 不受影响。
 
+`-listen` / `-token` 留空时会回落到 `afrog-config.yaml` 的 `agent.mcp.listen` / `agent.mcp.token`（与 `-policy`/`-audit` 同构）；仍为空则 `listen` 走 stdio。启动日志会打印实际生效的 listen 与 token（token 以掩码回显），便于核对到底用了哪一份配置。
+
 ## 客户端配置
 
 以 stdio 为例（不同客户端字段名略有差异）：

@@ -5,9 +5,76 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 )
+
+// TestAgentSectionKeepsMCPSubsection 回归「保存策略抹掉 agent.mcp 子段」。
+//
+// agent 段是整块替换（见 replaceTopLevelSection），内容由 agentSectionLines 生成。
+// 若它只输出 policy/audit/oob 而漏掉 mcp，则用户随后在控制台保存「策略与审计」时会把
+// agent.mcp 整段抹掉且无任何提示。这里验证：带 mcp 往返、只改 policy 时 mcp 仍在、
+// 清空后子段被移除。
+func TestAgentSectionKeepsMCPSubsection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), afrogConfigFilename)
+	if err := os.WriteFile(path, []byte("curated:\n  enabled: \"off\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	full := Agent{
+		Policy: "/tmp/p.yaml",
+		Audit:  "/tmp/a.jsonl",
+		OOB:    "ceyeio",
+		MCP:    AgentMCP{Listen: "127.0.0.1:16870", Token: "deadbeef"},
+	}
+	if err := UpdateAgentSection(path, full); err != nil {
+		t.Fatalf("write agent section: %v", err)
+	}
+
+	cfg, err := ReadConfiguration(path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	if cfg.Agent.MCP.Listen != "127.0.0.1:16870" || cfg.Agent.MCP.Token != "deadbeef" {
+		t.Fatalf("mcp round-trip failed: %+v", cfg.Agent.MCP)
+	}
+	if cfg.Agent.Policy != "/tmp/p.yaml" {
+		t.Fatalf("policy = %q, want /tmp/p.yaml", cfg.Agent.Policy)
+	}
+
+	// 模拟「保存策略」：带上当前 mcp 原样回写，mcp 必须还在。
+	if err := UpdateAgentSection(path, Agent{
+		Policy: "/tmp/p2.yaml",
+		Audit:  "/tmp/a.jsonl",
+		OOB:    "ceyeio",
+		MCP:    cfg.Agent.MCP,
+	}); err != nil {
+		t.Fatalf("rewrite agent section: %v", err)
+	}
+	cfg2, err := ReadConfiguration(path)
+	if err != nil {
+		t.Fatalf("read back 2: %v", err)
+	}
+	if cfg2.Agent.MCP.Listen != "127.0.0.1:16870" {
+		t.Fatalf("mcp lost after policy save: %+v", cfg2.Agent.MCP)
+	}
+	if cfg2.Agent.Policy != "/tmp/p2.yaml" {
+		t.Fatalf("policy not updated: %q", cfg2.Agent.Policy)
+	}
+
+	// 清空 mcp：listen/token 都空时应移除整个子段，避免留下空壳。
+	if err := UpdateAgentSection(path, Agent{Policy: "/tmp/p2.yaml"}); err != nil {
+		t.Fatalf("clear mcp: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "mcp:") {
+		t.Fatalf("empty mcp should be omitted, got:\n%s", raw)
+	}
+}
 
 // TestReadConfigurationNotBrokenByConcurrentWrite 回归「配置写回把读方坑成 io.EOF」。
 //

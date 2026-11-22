@@ -208,10 +208,12 @@ func agentPolicyPutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 回写 afrog-config.yaml 的 agent 段，让重启后仍指向同一份策略与审计文件。
+	// 段是整块替换，必须把当前 mcp 子段一并带上，否则保存策略会静默抹掉 MCP 接入配置。
 	if err := config.UpdateAgentSection(resolveClusterConfigPath(agentConfigPath), config.Agent{
 		Policy: policyPath,
 		Audit:  auditPath,
 		OOB:    agentOOBAdapter,
+		MCP:    agentMCP,
 	}); err != nil {
 		agentReviewFail(w, http.StatusInternalServerError, "写入配置文件失败："+err.Error())
 		return

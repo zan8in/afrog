@@ -51,6 +51,19 @@ type Agent struct {
 	// 的 -oob 一致（ceyeio / dnslogcn / alphalog / xray / revsuit / interactsh）；
 	// 凭据仍取 reverse 段。留空表示工具面不提供 OOB 能力，两个工具会明确报未配置。
 	OOB string `yaml:"oob"`
+	// MCP 是 MCP 服务的接入配置，供 Web 控制台与 `afrog mcp` 共用同一份口径。
+	MCP AgentMCP `yaml:"mcp"`
+}
+
+// AgentMCP 是 MCP 服务（HTTP+SSE / Streamable HTTP）的接入配置。
+//
+// 与 `afrog mcp -listen/-token` 一一对应：`afrog mcp` 未显式传对应 flag 时读取这里，
+// 与既有 agent.policy / agent.audit 的「flag 空则读配置」同构。留空时 listen 走 stdio。
+type AgentMCP struct {
+	// Listen 是监听地址（如 127.0.0.1:16870）；留空表示以 stdio 方式运行。
+	Listen string `yaml:"listen"`
+	// Token 是监听非本机地址时的访问 token；监听非本机地址却留空会被拒绝启动。
+	Token string `yaml:"token"`
 }
 
 // Observe 是观测流（observe.observations）的保留策略配置。
@@ -984,22 +997,34 @@ func UpdateReverseSection(configPath string, reverse Reverse) error {
 
 // UpdateAgentSection 把 agent 段整体写回配置文件，其余段落原样保留。
 //
-// 用于 Web 控制台保存「Agent 写动作面」的策略/审计路径：段内只有三个路径字段，
-// 整体替换比逐键增量更不容易留下半截配置。
+// 用于 Web 控制台保存「Agent 写动作面」的策略/审计路径：段内字段整体替换比逐键增量
+// 更不容易留下半截配置。调用方须带齐全部字段（含 MCP）——整块替换会把未带上的子段
+// 一并抹掉，因此保存策略时也要把当前的 mcp 配置原样带回。
 func UpdateAgentSection(configPath string, agent Agent) error {
 	return replaceTopLevelSection(configPath, "agent", agentSectionLines(0, agent))
 }
 
 // agentSectionLines 生成 agent 段。
+//
+// mcp 子段仅在 listen / token 至少一项非空时输出：两者都空表示不启用 HTTP 监听，
+// 此时省略子段，既保持配置干净，也让「清除接入配置」能真正生效。
 func agentSectionLines(baseIndent int, agent Agent) []string {
 	prefix := strings.Repeat(" ", baseIndent)
 	q := strconv.Quote
-	return []string{
+	lines := []string{
 		prefix + "agent:",
 		prefix + "  policy: " + q(strings.TrimSpace(agent.Policy)),
 		prefix + "  audit: " + q(strings.TrimSpace(agent.Audit)),
 		prefix + "  oob: " + q(strings.TrimSpace(agent.OOB)),
 	}
+	if listen, token := strings.TrimSpace(agent.MCP.Listen), strings.TrimSpace(agent.MCP.Token); listen != "" || token != "" {
+		lines = append(lines,
+			prefix+"  mcp:",
+			prefix+"    listen: "+q(listen),
+			prefix+"    token: "+q(token),
+		)
+	}
+	return lines
 }
 
 // replaceTopLevelSection 用 block 整体替换顶层 key 段；文件里没有该段时追加到末尾。

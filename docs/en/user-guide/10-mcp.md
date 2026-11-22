@@ -50,6 +50,8 @@ Security rules:
 - Auth accepts `Authorization: Bearer <token>` or `?token=`;
 - Per the MCP spec the `Origin` header is validated: cross-origin requests coming from a browser get 403 (DNS-rebinding protection), while native clients and curl that send no `Origin` are unaffected.
 
+When `-listen` / `-token` are empty they fall back to `agent.mcp.listen` / `agent.mcp.token` in `afrog-config.yaml` (the same pattern as `-policy`/`-audit`); an empty `listen` still means stdio. Startup logs print the values actually in effect (the token is shown masked), so you can confirm which config was used.
+
 ## Client configuration
 
 stdio example (field names vary slightly per client):
