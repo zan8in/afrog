@@ -3119,17 +3119,6 @@
     - source: favicon
       pattern: '^-1298131932$'
 
-
-# ==================== TscanPlus Web 指纹差集 ====================
-#
-# 来源：TscanPlus technologies.json。只收录 afrog 精选集与 Wappalyzer 社区库都没有的技术。
-# 不写入 wappalyzer.json，避免污染上游同步文件。
-#
-# 判据只保留引擎能匹配的页面级证据：标题、响应头、meta、Cookie、脚本地址、
-# favicon mmh3、足够长的 HTML 字面量。JS 全局变量、DOM、XHR、DNS、证书签发者已丢弃。
-# 短 HTML / 通用词已丢弃。全部 softmatch：众包弱特征不得记为 certain，
-# 因此只参与 requires 正向放行，不进入否定跳过。
-
 - id: a-base
   name: 'A-Base'
   softmatch: true
