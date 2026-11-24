@@ -100,22 +100,48 @@ func TestProbePortToolFindsListener(t *testing.T) {
 	}
 }
 
-// maxProbePorts 即整个端口空间（65535），而任何单个端口表达式去重后最多也就是
-// 65535 个端口，所以「超出上限」这一分支不会被任何合法表达式触发。这里验证边界：
-// 全端口表达式能通过上限校验，随后由预算兜住——预算不足时在扣减前就失败、且不扣
-// 额度，也就不会真的去扫 65535 个端口。
-func TestProbePortToolFullRangeWithinPortLimit(t *testing.T) {
-	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 100\n  duration: 2m\n")
-
-	_, err := s.tools["probe.port"].Handler(context.Background(), mustJSON(t, map[string]any{
-		"host":  "127.0.0.1",
-		"ports": "full",
-	}))
-	if err == nil || !strings.Contains(err.Error(), "budget") {
-		t.Fatalf("err = %v, want the budget gate (full range is within the port limit)", err)
+// probePortReserve 是端口扫描的单次额度预留：按端口数计，但单次封顶
+// maxPortScanReserve。这样一次全端口调用（65535）不会按 65535 计费，也就不会
+// 吃光会话额度、把后续 scan.start / probe.* / verify.* 一起挤到 429。
+func TestProbePortReserve(t *testing.T) {
+	cases := map[int]int{
+		0:     1,
+		1:     1,
+		80:    80,
+		500:   500,
+		501:   maxPortScanReserve,
+		65535: maxPortScanReserve,
 	}
-	if got := s.gate.Budget().Remaining(); got != 100 {
-		t.Fatalf("budget touched by rejected call: %d", got)
+	for count, want := range cases {
+		if got := probePortReserve(count); got != want {
+			t.Fatalf("probePortReserve(%d) = %d, want %d", count, got, want)
+		}
+	}
+}
+
+// full 在端口上限（maxProbePorts）之内，且单次只按封顶值预留额度。这里给一个远小于
+// 65535、又高于封顶值的会话额度（600）：改动前全端口会按 65535 计费被预算拒绝，
+// 改动后应能放行。整体超时压到 2 秒，避免在单测里真扫 65535 个端口。
+func TestProbePortToolFullRangeUsesCappedReserve(t *testing.T) {
+	s := newIntegrationServer(t, "mode: safe\nbudget:\n  requests: 600\n  duration: 2m\n")
+
+	out, err := s.tools["probe.port"].Handler(context.Background(), mustJSON(t, map[string]any{
+		"host":        "127.0.0.1",
+		"ports":       "full",
+		"timeout_sec": 2,
+	}))
+	if err != nil {
+		t.Fatalf("full range should pass the port limit and the budget gate: %v", err)
+	}
+	res := out.(map[string]any)
+	if res["scanned"] != 65535 {
+		t.Fatalf("scanned = %v, want 65535", res["scanned"])
+	}
+	if status, _ := res["status"].(string); status != "completed" && status != "partial" {
+		t.Fatalf("status = %v, want completed or partial", res["status"])
+	}
+	if got := s.gate.Budget().Remaining(); got != 600-maxPortScanReserve {
+		t.Fatalf("budget remaining = %d, want %d (capped reserve)", got, 600-maxPortScanReserve)
 	}
 }
 

@@ -130,7 +130,7 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 
 - `budget.requests` 是一次会话的请求额度，**只统计真正发包的动作**；读库、查证据这类只读调用既不扣额度，也不受任何预算限制。
 - `budget.duration` 是**空闲窗口**（默认 10 分钟）：只要有消耗额度的调用成功，窗口就顺延；连续空闲这么久即判定会话结束，下一次调用自动开一个新会话、把额度补满。因此长驻服务（Web 服务、`afrog mcp -listen`）不会跑够一段时间就整体失效，也不必为了恢复额度去重启。
-- 发包类动作（如 `scan.start`、`poc.submit`）会按候选 PoC 可能的请求数预留预算，而不是固定扣 1。
+- 发包类动作（如 `scan.start`、`poc.submit`）会按候选 PoC 可能的请求数预留预算，而不是固定扣 1。端口扫描（`probe.port`）同样按端口数预留，但**单次封顶**（约 500）：因此一次 `full` 全端口调用不会按 65535 计费、也不会吃光会话额度把后续 `scan.start` / `probe.*` / `verify.*` 一起挤到 429。
 - `audit: true` 配合 `-audit audit.jsonl` 逐条记录「哪个动作、打哪、放行与否、剩余预算」。
 - 拿不准还剩多少额度、当前是什么档位，调只读的 `server.status` 看 `requests_remaining` / `policy.mode`——它本身不计额度，比撞上 403/429 再回头猜更省事。
 
@@ -148,7 +148,7 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 | `poc.draft` | 校验一份 PoC 草稿：结构、能力等级、请求量估算；可选落盘供 `poc.submit` 实跑使用 | 只读 |
 | `poc.submit` | 在真实目标上受限实跑一份草稿并取证据，通过后放入待人工终审队列（`afrog poc approve/reject`） | `verify.*`（按草稿能力分级，`exec` 级还需 `destructive: true`） |
 | `probe.http` | 发一次 HTTP 请求，返回状态、头、正文与耗时 | `probe.*` |
-| `probe.port` | 单主机端口探测（默认 top，单次上限 65535 个），返回开放端口与服务指纹 | `probe.*` |
+| `probe.port` | 单主机端口探测（connect 扫描，默认 top，**支持 full 全端口，单次上限 65535 个**），返回开放端口与服务指纹（被动 banner）。额度按端口数扣但**单次封顶**（大端口集约 500），一次全端口调用不会吃光会话额度；端口集 ≥500 时自动切到按链路自适应速率（内网约 2 分钟、公网约 5 分钟量级跑完全端口）并开启代答设备识别（避免被 WAF/端口转发「全端口代答」误报成一片假开放）——跑全端口请把客户端单次工具超时调到 10 分钟。超时/取消时返回 `status: partial`，`open` 里是已扫到的部分结论而不是整批丢弃 | `probe.*` |
 | `probe.fingerprint` | 单 URL 指纹识别：技术栈、WAF/CDN、跳转链与 TLS 摘要。返回的 `suggested_search` 是可直接透传的关键词串，由各技术栈的**标识词**（PoC 的规则 id、技术名及其连字符写法，**不含 category**——category 太宽，一搜一大片）拼成，与 afrog 自身的 `requires` 门控口径一致，模型不必再猜关键词；先用它 `poc.search` 预检，有结果再把同一串交给 `scan.start` 并发扫描。`favicon` 默认 `false`；当首页一个技术栈都没识别出来时会**自动补抓一次 favicon**（单独计 1 次预算）再匹配，返回里的 `favicon_fetched` 标明是否补抓过 | `probe.*` |
 | `scan.start` | **取代逐个验证的主入口**：用一次子进程并发跑完某个技术栈（`search` 关键词）下的全部 PoC，返回可重放证据。`afrog` 按 `-s` 选 PoC（命中 id/名称/标签）；`search` 留空表示不加关键词、跑全库（没有指纹线索时的兜底，需先征得用户同意）。带关键词时，命中该关键词的指纹 PoC 不受 `severity` 限制也会被保留（但关键词是硬前提，不命中的指纹 PoC 照样被滤掉），于是指纹阶段照常运行、`requires` 按真实指纹放行——既不会有「单跑一个漏洞 PoC 被指纹门控跳过」的假阴性，也不会为 N 个候选发 N 次串行请求。反向 PoC 需要 `agent.oob`，未配置时明确报错（fail-closed）。返回里的 `library` 给出本机 PoC 库对该关键词的覆盖（`matched_pocs` 库中匹配总数，等价 `afrog -pl -s <关键词>` 的 Total；`executed_pocs` 本次实际执行数；两者都不是命中数），`conclusion` 显式区分三种结论：`hit`（有命中）、`no_finding`（本机有 PoC 但均未命中，或全被 `severity` 滤掉一条未执行）、`no_poc_for_keyword`（本机没有该关键词的 PoC）；后两种附 `guidance` 说明「**不等于目标无漏洞**」，并给出改关键词 / 去掉 `severity` / 征得同意跑全库的建议 | `scan.start` |
 | `verify.replay` | 按证据 id 重放一次，比对 id/digest 判断旧结论是否仍成立 | `verify.*` |

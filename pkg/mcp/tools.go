@@ -1210,6 +1210,75 @@ func (s *Server) probeHTTPTool() *Tool {
 // 使 `-p full` / `-p 1-65535` 这类全量表达式也能从一次 MCP 调用发起。
 const maxProbePorts = 65535
 
+// largePortScanMinPorts 是「大端口集」的判定门槛，与 portscan 引擎自身的启发式
+// 门槛（heuristicsMinPorts=500）对齐。≥ 该值时端口扫描切到引擎的自适应档位：
+// 固定速率会把全端口拖到几十分钟（见 probePortOptions 注释），且最容易被
+// WAF/端口转发的「全端口代答」骗出一片假开放。小规模精扫（80,443）保持原有
+// 的保守固定速率，行为不变。
+const largePortScanMinPorts = 500
+
+// maxPortScanReserve 是单次端口扫描的会话额度预留上限。端口扫描按端口数扣额度，
+// 但单次封顶：否则一次全端口调用会按 65535 计费，在默认会话额度（5000）下要么
+// 直接被预算拒绝、要么一次吃光，让后续 scan.start / probe.* / verify.* 全部撞 429。
+// 端口扫描是单主机、且受 per-host CPS 与拥塞控制约束的受控动作，爆炸半径有界，
+// 无需 1:1 计费；这与 scan.start 单次预留封顶（maxVerifyReserve）是同一口径。
+const maxPortScanReserve = 500
+
+// probePortReserve 计算一次端口探测要预留的会话额度（端口数，单次封顶）。
+func probePortReserve(count int) int {
+	if count > maxPortScanReserve {
+		return maxPortScanReserve
+	}
+	if count < 1 {
+		return 1
+	}
+	return count
+}
+
+// probePortOptions 组装一次端口探测的扫描参数。
+//
+// 小规模精扫（如 80,443）沿用保守的固定速率，行为与改动前一致。大端口集（含全
+// 端口）改走引擎的自适应档位：固定 20/s 会把全端口拖到 ~55 分钟、必然撞超时；
+// 自适应档位按「目标是否私网 / 网关空载 RTT」选时间预算、用端口数反推 CPS，全端口
+// 内网约 2 分钟、公网约 5 分钟量级。大端口集同时打开：
+//   - LinkProbe：扫描前量一次网关基线 RTT，驱动拥塞控制在链路变差时乘性降速；
+//   - 代答识别（SkipSpoofCheck=false）：全端口最容易被 WAF / 高防 / 端口转发设备
+//     「全端口代答」骗出成百上千个假开放，这一步专门把这类设备挑出并剔除。
+func probePortOptions(host, spec string, large bool, onResult func(*portscan.ScanResult)) *portscan.Options {
+	opts := &portscan.Options{
+		Targets:                 []string{host},
+		Ports:                   spec,
+		RateLimit:               50,
+		ConnectRateLimit:        50,
+		ConnectRateLimitPerHost: 20,
+		MaxHostConcurrency:      4,
+		Timeout:                 time.Second,
+		Retries:                 0,
+		ScanMode:                portscan.ScanModeConnect,
+		SkipDiscovery:           true,
+		// 小规模精扫关掉哨兵预探测：它在端口数扣费之外额外发包，而这个量级本来也
+		// 不会遇到代答设备。大端口集在下面重新打开。
+		SkipSpoofCheck: true,
+		Quiet:          true,
+		OnResult:       onResult,
+	}
+	if large {
+		// 池容量（RateLimit）是自适应速率的物理上限：可持续吞吐 = 池 / 单次超时，
+		// 池太小会把反推出来的速率再压回去（50/1s 只能跑 50/s）。这里放到 500，与
+		// CLI 默认档位一致，且仍会被本机 fd 上限收敛。
+		opts.RateLimit = 500
+		opts.AutoRate = true
+		opts.AutoHostConcurrency = true
+		opts.LinkProbe = true
+		opts.SkipSpoofCheck = false
+		// Retries=1 与引擎默认一致：全端口扫描下漏报一个开放端口的代价太高，
+		// 首次 SYN 常因瞬时丢包 / 目标端口扫描防护被静默丢弃，没有第二次机会就
+		// 等于把真实开放端口永久记成 closed/filtered。
+		opts.Retries = 1
+	}
+	return opts
+}
+
 func (s *Server) probePortTool() *Tool {
 	type args struct {
 		Host       string `json:"host"`
@@ -1219,13 +1288,13 @@ func (s *Server) probePortTool() *Tool {
 	return &Tool{
 		Name:        "probe.port",
 		Title:       "端口探测",
-		Description: "对单个主机做受限 TCP 端口探测（connect 扫描），返回开放端口与服务指纹；服务信息取自被动 banner 抓取，不发主动服务探针。ports 语义对齐 afrog 的 `-p`：支持单端口（如 3306）、区间（如 8000-8100）、逗号组合（如 80,443,8080-8090），以及关键字 top（常用端口集）与 full（全端口 65535）；单次最多 65535 个端口，超出直接报错，按表达式端口数扣预算。用法：用户只说「扫端口」而没给范围时，ports 留空即可——等价于 afrog 的 `-ps`（默认按 top 常用端口集扫）；用户指明了要扫哪些端口时，按上面的 `-p` 语法填 ports。注意：top100 / top1000 这类写法不是有效关键字（会扫不到任何端口），请用 top / full 或显式列出。目标没有 Web 面、或想先摸清暴露了哪些服务时用它。",
+		Description: "对单个主机做受限 TCP 端口探测（connect 扫描），返回开放端口与服务指纹；服务信息取自被动 banner 抓取，不发主动服务探针。ports 语义对齐 afrog 的 `-p`：支持单端口（如 3306）、区间（如 8000-8100）、逗号组合（如 80,443,8080-8090），以及关键字 top（常用端口集）与 full（全端口 65535）；单次最多 65535 个端口，超出直接报错。**全端口（full）完全支持**：额度按端口数扣但单次封顶（大端口集约 500），一次全端口调用不会把整个会话额度吃光；端口集 ≥500 时自动切到按链路自适应速率（内网约 2 分钟、公网约 5 分钟量级跑完全端口），并开启代答设备识别，避免被 WAF/端口转发的「全端口代答」误报成一片假开放——跑全端口请把客户端单次工具超时调到 10 分钟。用法：用户只说「扫端口」而没给范围时，ports 留空即可——等价于 afrog 的 `-ps`（默认按 top 常用端口集扫）；用户指明了要扫哪些端口时，按上面的 `-p` 语法填 ports。注意：top100 / top1000 这类写法不是有效关键字（会扫不到任何端口），请用 top / full 或显式列出。目标没有 Web 面、或想先摸清暴露了哪些服务时用它。",
 		InputSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"host":        map[string]any{"type": "string", "description": "主机、host:port 或 URL"},
 				"ports":       map[string]any{"type": "string", "description": "端口表达式，语法同 afrog 的 -p：单端口（3306）、区间（8000-8100）、逗号组合（80,443）或关键字 top/full；留空等价于 -ps 的默认（top 常用端口集）"},
-				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 600, "description": "整体超时，默认 120 秒"},
+				"timeout_sec": map[string]any{"type": "integer", "minimum": 5, "maximum": 900, "description": "整体超时，默认 120 秒；端口集 ≥500（含 full）时默认放宽到 600 秒"},
 			},
 			"required": []string{"host"},
 		},
@@ -1234,7 +1303,9 @@ func (s *Server) probePortTool() *Tool {
 			"properties": map[string]any{
 				"host":    map[string]any{"type": "string"},
 				"ports":   map[string]any{"type": "string", "description": "本次使用的端口表达式"},
-				"scanned": map[string]any{"type": "integer", "description": "实际探测的端口数（即扣的预算）"},
+				"scanned": map[string]any{"type": "integer", "description": "本次要探测的端口数（预算按它扣，但单次封顶）"},
+				"status":  map[string]any{"type": "string", "description": "completed（正常跑完）/ partial（撞上超时或取消，open 里是已扫到的部分结论）"},
+				"error":   map[string]any{"type": "string", "description": "status=partial 时的中断原因"},
 				"open": map[string]any{
 					"type": "array",
 					"items": map[string]any{
@@ -1255,7 +1326,7 @@ func (s *Server) probePortTool() *Tool {
 					},
 				},
 			},
-			"required": []string{"host", "ports", "scanned", "open"},
+			"required": []string{"host", "ports", "scanned", "status", "open"},
 		},
 		Handler: func(ctx context.Context, raw json.RawMessage) (any, error) {
 			var a args
@@ -1279,47 +1350,39 @@ func (s *Server) probePortTool() *Tool {
 			if count > maxProbePorts {
 				return nil, fmt.Errorf("ports %q needs %d probes, above the %d limit for one call", spec, count, maxProbePorts)
 			}
-			if err := s.gate.Take(policy.Action{Name: "probe.port", Target: host}, count); err != nil {
+			// 端口扫描按端口数扣额度，但单次封顶（见 maxPortScanReserve）：
+			// 一次全端口调用不该按 65535 计费、也不该吃光会话额度把后续
+			// scan.start / probe.* / verify.* 一起挤到 429。
+			if err := s.gate.Take(policy.Action{Name: "probe.port", Target: host}, probePortReserve(count)); err != nil {
 				return nil, err
 			}
 
+			large := count >= largePortScanMinPorts
 			timeout := time.Duration(a.TimeoutSec) * time.Second
 			if timeout <= 0 {
-				timeout = 120 * time.Second
+				// 大端口集默认放宽到 10 分钟：自适应档位下全端口内网约 2 分钟、
+				// 公网约 5 分钟量级，旧的 120 秒默认会把公网全端口拦腰截断成 partial。
+				if large {
+					timeout = 600 * time.Second
+				} else {
+					timeout = 120 * time.Second
+				}
 			}
 			runCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
 
-			// 收敛速率：一次工具调用没有理由打满链路，也不做主动服务探针
-			// （被动 banner 足够支撑「这个端口是什么」的判断，且请求数可数）。
 			var (
 				mu    sync.Mutex
 				found []portscan.ScanResult
 			)
-			scanner, err := portscan.NewScanner(&portscan.Options{
-				Targets:                 []string{host},
-				Ports:                   spec,
-				RateLimit:               50,
-				ConnectRateLimit:        50,
-				ConnectRateLimitPerHost: 20,
-				MaxHostConcurrency:      4,
-				Timeout:                 time.Second,
-				Retries:                 0,
-				ScanMode:                portscan.ScanModeConnect,
-				SkipDiscovery:           true,
-				// 关掉「疑似代答设备」的哨兵预探测：它会在预算之外额外发包，
-				// 而一次工具调用只需要「这些端口开没开」这一个结论。
-				SkipSpoofCheck: true,
-				Quiet:          true,
-				OnResult: func(r *portscan.ScanResult) {
-					if r == nil || r.State != portscan.PortStateOpen {
-						return
-					}
-					mu.Lock()
-					found = append(found, *r)
-					mu.Unlock()
-				},
-			})
+			scanner, err := portscan.NewScanner(probePortOptions(host, spec, large, func(r *portscan.ScanResult) {
+				if r == nil || r.State != portscan.PortStateOpen {
+					return
+				}
+				mu.Lock()
+				found = append(found, *r)
+				mu.Unlock()
+			}))
 			if err != nil {
 				return nil, err
 			}
@@ -1344,12 +1407,20 @@ func (s *Server) probePortTool() *Tool {
 					"banner":     clampText(r.Banner, toolHeaderLimit),
 				})
 			}
-			return map[string]any{
+			out := map[string]any{
 				"host":    host,
 				"ports":   spec,
 				"scanned": count,
+				"status":  "completed",
 				"open":    open,
-			}, nil
+			}
+			// 引擎在超时/取消时不返回错误，只停下并吐回已扫到的部分结论。这里如实
+			// 标注 partial，把已确认开放的端口交给 Agent，而不是把整批结果丢弃。
+			if err := runCtx.Err(); err != nil {
+				out["status"] = "partial"
+				out["error"] = err.Error()
+			}
+			return out, nil
 		},
 	}
 }
