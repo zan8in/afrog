@@ -82,6 +82,18 @@ Start the built-in web console (open `http://127.0.0.1:16868` in a browser and s
 afrog -web
 ```
 
+## MCP: use afrog from your AI client
+
+`afrog mcp` turns afrog into a **Model Context Protocol (MCP) server**, so AI clients (Claude, Cursor, Cline, VS Code…) can read your findings, read the attack surface, probe ports and verify PoCs — all under afrog's policy, budget and audit controls. Run one long-lived HTTP server that every client connects to:
+
+```bash
+afrog mcp -listen 127.0.0.1:16870 -token your-token
+```
+
+**[Read the MCP tutorial →](docs/en/user-guide/12-mcp-tutorial.md)** — start the server, connect a client, verify it, and pick the right policy mode.
+
+Reference: [MCP server](docs/en/user-guide/10-mcp.md) ｜ Per-client setup: [MCP quickstart](docs/en/user-guide/11-mcp-quickstart.md)
+
 ## Documentation
 
 The documentation is organized into five handbooks:

@@ -620,4 +620,4 @@ agent:
 - 在图形界面里用人审队列、工具台、策略面板 → [Agent 工具面（MCP）](../web/12-agent.md)
 - 脚本直连（不装 MCP 客户端）→ [MCP 服务 · REST 入口](./10-mcp.md)
 
-> **← 上一篇：** [MCP 服务](./10-mcp.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **文档首页 →：** [afrog 文档](../index.md)
+> **← 上一篇：** [MCP 服务](./10-mcp.md) ｜ **本手册首页：** [afrog 简介](./01-overview.md) ｜ **下一篇 →：** [MCP 使用教程](./12-mcp-tutorial.md)

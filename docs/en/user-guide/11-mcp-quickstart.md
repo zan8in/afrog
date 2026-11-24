@@ -606,4 +606,4 @@ agent:
 - Review queue, tool console and policy panel in the GUI → [Agent Tool Surface (MCP)](../web/12-agent.md)
 - Call it from scripts instead (no MCP client) → [MCP Server · REST entry point](./10-mcp.md)
 
-> **← Previous:** [MCP Server](./10-mcp.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Docs home →:** [afrog Docs](../index.md)
+> **← Previous:** [MCP Server](./10-mcp.md) ｜ **Handbook home:** [What afrog does](./01-overview.md) ｜ **Next →:** [MCP Tutorial](./12-mcp-tutorial.md)

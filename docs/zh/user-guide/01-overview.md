@@ -38,6 +38,7 @@ last_reviewed: 2026-09-23
 8. [定时与计划扫描](./09-scheduled-scans.md)
 9. [MCP 服务](./10-mcp.md)
 10. [小白教程：把你的 AI 客户端接入 afrog](./11-mcp-quickstart.md)
+11. [MCP 使用教程](./12-mcp-tutorial.md)
 
 ## 最短起步
 

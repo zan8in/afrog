@@ -118,13 +118,20 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # also set the audit file
 
 ### Modes
 
-| Mode | Allowed | Typical use |
+**A real full vulnerability scan requires `mode: full`.** Stop at any lower mode and something will be missing:
+
+| Mode | Allowed | What is missing |
 | --- | --- | --- |
-| `readonly` (default) | `observe.*`, `plan.*`, `poc.search`, `poc.draft`, `judge.*`, `learn.*`, `server.*` | Let the agent read results, reason, and write local advisories |
-| `safe` | Adds `probe.*`, `scan.start`, `verify.replay`, `poc.submit` | Retest and verify without changing target state |
-| `full` | Everything not explicitly denied | Full assessment in a controlled environment |
+| `readonly` (default) | `observe.*`, `plan.*`, `poc.search`, `poc.draft`, `judge.*`, `learn.*`, `server.*` | **all traffic ability**: no port probe, no fingerprint, no scan, no verify |
+| `safe` | everything in readonly, plus `probe.*` (HTTP / ports / fingerprints), `scan.start` (run PoCs, JS PoCs included), `verify.replay`, `poc.submit` | **active attack**: `act.brute` (weak-password brute force), `act.oob_payload` / `act.oob_wait` (active OOB) |
+| `full` | everything in safe, plus `act.*` | nothing — the complete capability set |
 
 Evaluation order is fixed: `deny → allowlist → mode → destructive → scope`. **Deny always wins.**
+
+- **Stop at `readonly`**: a freshly started server sends nothing, so probing and scanning are rejected — you will not find a single vulnerability.
+- **Stop at `safe`**: you can probe, scan and verify, but you **miss the active-attack `act.*` tools** (weak-password brute force, active OOB).
+- **Only `full` has no capability gap** — which is why a real full vulnerability scan uses `full`.
+- Note: **`full` is still not the finish line.** `destructive` is an independent switch, orthogonal to the mode, and defaults to `false`: `act.brute`, active OOB, and `poc.submit` of a JS/Go (exec-level) PoC additionally require `destructive: true` on top of the mode. So "weak-password brute force" = `full` **and** `destructive: true`; `scan.start` is declarative and is not affected by this switch.
 
 ### Budget and audit
 

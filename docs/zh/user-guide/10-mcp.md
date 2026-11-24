@@ -118,13 +118,20 @@ afrog mcp -policy ./p.yaml -audit ./a.jsonl   # 同时指定审计文件
 
 ### 档位
 
-| 档位 | 允许 | 典型场景 |
+**想要真正的「全漏洞扫描」，必须把 `mode` 设为 `full`。** 停在更低档位都会缺东西：
+
+| 档位 | 允许 | 缺什么 |
 | --- | --- | --- |
-| `readonly`（默认） | `observe.*`、`plan.*`、`poc.search`、`poc.draft`、`judge.*`、`learn.*`、`server.*` | 只让 Agent 读结果、做判断、写本地 advisory |
-| `safe` | 在只读基础上加 `probe.*`、`scan.start`、`verify.replay`、`poc.submit` | 允许复测与验证，不改变目标状态 |
-| `full` | 除显式 `deny` 外全部允许 | 受控环境下的完整评估 |
+| `readonly`（默认） | `observe.*`、`plan.*`、`poc.search`、`poc.draft`、`judge.*`、`learn.*`、`server.*` | **一切发包能力**：不能探端口、不能识别指纹、不能扫描、不能验证 |
+| `safe` | 只读全部，加 `probe.*`（HTTP/端口/指纹）、`scan.start`（跑 PoC，含 JS 脚本 PoC）、`verify.replay`、`poc.submit` | **主动攻击能力**：`act.brute`（弱口令爆破）、`act.oob_payload` / `act.oob_wait`（主动带外） |
+| `full` | safe 全部，加 `act.*` | 无——能力完整，afrog 能干的全都能干 |
 
 判定顺序固定为：`deny → allowlist → mode → destructive → scope`。**deny 永远优先**。
+
+- **停在 `readonly`**：刚拉起的服务不发任何包，探测与扫描一律被拒——一条漏洞也扫不到。
+- **停在 `safe`**：能探测、能扫描、能验证，但**缺 `act.*` 主动攻击能力**（弱口令爆破、主动 OOB），覆盖不到这一类。
+- **只有 `full` 能力上无缺口**，这也是「真正的全漏洞扫描」必须用 `full` 的原因。
+- 注意：**`full` 还不是终点**。`destructive` 是与档位正交的独立开关（默认 `false`）：`act.brute`、主动 OOB，以及提交 JS/Go（exec 级）PoC 的 `poc.submit`，除档位外还必须 `destructive: true` 才会放行。因此「弱口令爆破」= `full` **且** `destructive: true`；`scan.start` 属 declarative，不受该开关影响。
 
 ### 预算与审计
 

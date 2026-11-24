@@ -82,6 +82,18 @@ afrog -T targets.txt -S high,critical
 afrog -web
 ```
 
+## MCP：让 AI 客户端直接使用 afrog
+
+`afrog mcp` 会把 afrog 变成一台 **MCP（Model Context Protocol）服务器**，让 Claude、Cursor、Cline、VS Code 这类 AI 客户端直接读你的 afrog 结论、看攻击面、探测端口、验证 PoC——全程受 afrog 的策略、预算与审计约束。推荐只跑一个常驻 HTTP 服务，多个客户端都连它：
+
+```bash
+afrog mcp -listen 127.0.0.1:16870 -token your-token
+```
+
+**[阅读 MCP 使用教程 →](./zh/user-guide/12-mcp-tutorial.md)**——从启动服务、接入客户端、验证连通，到选择正确的策略档位。
+
+详细参考：[MCP 服务](./zh/user-guide/10-mcp.md) ｜ 逐客户端小白教程：[MCP 小白教程](./zh/user-guide/11-mcp-quickstart.md)
+
 ## 文档入口
 
 文档按五本手册组织：

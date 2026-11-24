@@ -38,6 +38,7 @@ The User Guide covers everything you need to put `afrog` to work: install, first
 8. [Scheduled Scans](./09-scheduled-scans.md)
 9. [MCP Server](./10-mcp.md)
 10. [Beginner's Guide: Connect Your AI Client to afrog](./11-mcp-quickstart.md)
+11. [MCP Tutorial](./12-mcp-tutorial.md)
 
 ## Shortest path
 
