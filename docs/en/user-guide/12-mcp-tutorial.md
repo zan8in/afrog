@@ -79,7 +79,35 @@ MCP is **read-only by default**: a freshly started server sends no traffic at al
 - **Only `full` has no capability gap** — which is why a real full vulnerability scan uses `full`.
 - Note: **`full` is still not the finish line** — `destructive` is an independent switch, orthogonal to the mode, and defaults to `false`: `act.brute`, active OOB, and `poc.submit` of a JS/Go (exec-level) PoC additionally require `destructive: true`; `scan.start` is declarative and is not affected by this switch.
 
-The config file (the CLI and the web console read the same one):
+### Recommended: configure it visually in the web console (`afrog -web`)
+
+Prefer clicking over hand-writing YAML? The built-in web console edits **the same policy**, and saving applies it to the MCP server immediately.
+
+1. **Start the console** (in another terminal):
+
+   ```bash
+   afrog -web
+   ```
+
+   It listens on `:16868` by default and prints this run's password: `[INF] Web访问密码: xxxxxxxxxxxxxxxx` (Web access password).
+
+2. **Sign in in a browser**: open `http://127.0.0.1:16868` and log in with the password from step 1.
+
+3. **Open the page**: left-hand nav **Agent → 策略与审计** (Policy & Audit).
+
+4. **Set what you need** (matching the mode table above):
+   - Set the **capacity mode** to **`full`** for a real full vulnerability scan (`safe` if you only probe / scan and do not need brute force);
+   - Turn on the **destructive actions** switch only if you need weak-password brute force and the like;
+   - Use the **scope** allow-hosts list to keep targets inside your authorization;
+   - Adjust the **session budget** if you wish (leave blank for the defaults: 5000 requests / 10 minutes).
+
+5. **Save**: click **Save** and you will see *"已保存，立即生效（会话预算随之重置）"* (saved, effective immediately; the session budget is reset). The page writes the policy to `agent-policy.yaml` and points the `agent` section of `afrog-config.yaml` at it.
+
+> **The web console and `afrog mcp` read the same policy**: once saved on the page, the MCP server picks it up on its **next tool call** — no need to restart `afrog mcp` or the console.
+
+> The OOB adapter (`agent.oob`) is not edited here; it stays in `afrog-config.yaml`. The full page reference is in [Web console: Agent surface](../web/12-agent.md).
+
+**You can also hand-write the policy file** (the same one the web console saves):
 
 ```yaml
 # agent-policy.yaml — use full for a full vulnerability scan; add destructive: true if you also need brute force
